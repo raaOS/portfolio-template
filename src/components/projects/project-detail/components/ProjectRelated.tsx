@@ -107,14 +107,24 @@ const RelatedCardItem = memo(function RelatedCardItem({
   if (isPriority) {
     return (
       <div>
-        <ProjectCardPinterest project={project} priority={true} eager={true} />
+        <ProjectCardPinterest
+          project={project}
+          priority={true}
+          eager={true}
+          transitionOrigin="slug-related"
+        />
       </div>
     );
   }
 
   return (
     <motion.div {...ANIMATION_CONFIG}>
-      <ProjectCardPinterest project={project} priority={false} eager={isEager} />
+      <ProjectCardPinterest
+        project={project}
+        priority={false}
+        eager={isEager}
+        transitionOrigin="slug-related"
+      />
     </motion.div>
   );
 });

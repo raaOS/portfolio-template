@@ -132,6 +132,7 @@ export default function IndexClientInner({
                 eager={isEager}
                 videoEnabled={true}
                 highlightedTag={tag}
+                transitionOrigin="grid"
               />
             </m.div>
           );

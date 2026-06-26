@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef, type MouseEvent } from 'react';
 import { Link } from 'next-view-transitions';
 import { Project } from '@/types/projects';
 import Media from '@/components/shared/Media';
@@ -8,6 +9,10 @@ import { Heart, Share2 } from 'lucide-react';
 import { useImageProtection } from '@/hooks/useImageProtection';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { localizeText } from '@/lib/i18n/contentLocalization';
+import {
+  prepareProjectCoverTransition,
+  type ProjectCoverTransitionOrigin,
+} from '@/lib/projectCoverTransition';
 
 interface ProjectCardPinterestProps {
   project: Project;
@@ -16,6 +21,7 @@ interface ProjectCardPinterestProps {
   videoEnabled?: boolean;
   interactive?: boolean;
   highlightedTag?: string;
+  transitionOrigin?: ProjectCoverTransitionOrigin;
 }
 
 export default function ProjectCardPinterest({
@@ -25,6 +31,7 @@ export default function ProjectCardPinterest({
   videoEnabled = true,
   interactive = true,
   highlightedTag,
+  transitionOrigin,
   onClick,
 }: ProjectCardPinterestProps & { onClick?: () => void }) {
   const { slug, title, tags, likes, shares } = project;
@@ -34,6 +41,7 @@ export default function ProjectCardPinterest({
   const shouldAutoplay = videoEnabled && (project.autoplay ?? true);
   const { toast, handleContextMenu } = useImageProtection();
   const shouldEagerLoad = cover.kind === 'image' ? priority || eager : priority;
+  const transitionElementRef = useRef<HTMLDivElement>(null);
 
   // Calculate aspect ratio for the image/video container
   const width = project.coverWidth || 800;
@@ -61,10 +69,28 @@ export default function ProjectCardPinterest({
     }
   };
 
+  const handleClickCapture = (event: MouseEvent<HTMLElement>) => {
+    if (onClick || !interactive || event.defaultPrevented) return;
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return;
+    }
+
+    if (transitionElementRef.current) {
+      const sourceCard = transitionElementRef.current.closest(
+        '[data-project-card]'
+      ) as HTMLElement | null;
+      prepareProjectCoverTransition(transitionElementRef.current, {
+        origin: transitionOrigin,
+        sourceCard,
+      });
+    }
+  };
+
   return (
     <Component
       {...hrefProps}
       onClick={handleClick}
+      onClickCapture={handleClickCapture}
       data-project-card
       className={`project-card relative z-0 mb-0 block md:mb-6 ${isInteractive ? 'group cursor-pointer hover:z-10' : ''}`}
     >
@@ -75,7 +101,10 @@ export default function ProjectCardPinterest({
         style={{ aspectRatio: ratio }}
         onContextMenu={handleContextMenu}
       >
-        <div className="absolute inset-0 overflow-hidden rounded-none bg-neutral-200 dark:bg-neutral-900">
+        <div
+          ref={transitionElementRef}
+          className="absolute inset-0 overflow-hidden rounded-none bg-neutral-200 dark:bg-neutral-900"
+        >
           <Media
             kind={cover.kind}
             src={cover.src}

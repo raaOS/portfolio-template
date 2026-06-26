@@ -10,6 +10,7 @@ import {
   subscribeProjectsViewMode,
 } from '@/lib/projectsViewMode';
 import { markBack } from '@/lib/navigationDirection';
+import { cancelProjectCoverTransition } from '@/lib/projectCoverTransition';
 
 interface ProjectBackButtonProps {
   label?: string;
@@ -29,6 +30,13 @@ export function ProjectBackButton({
     getProjectsViewModeServerSnapshot
   );
 
+  const handleClickCapture = () => {
+    if (mode === 'grid') {
+      cancelProjectCoverTransition();
+    }
+    markBack();
+  };
+
   return (
     <Link
       href={buildProjectsHref(mode)}
@@ -36,7 +44,7 @@ export function ProjectBackButton({
       // Tandai navigasi ini sebagai "back" agar slide dari arah kiri.
       // Pakai onClickCapture agar set attribute SEBELUM next-view-transitions
       // trigger document.startViewTransition (React capture phase jalan duluan).
-      onClickCapture={markBack}
+      onClickCapture={handleClickCapture}
       className={
         className ||
         'mb-4 inline-flex touch-manipulation items-center gap-2 text-gray-600 transition-colors duration-200 hover:text-black dark:text-gray-400 dark:hover:text-white sm:mb-6'
