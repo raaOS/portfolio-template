@@ -1,0 +1,84 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createOrder } from '@/lib/services/orderService';
+import { isSlugAvailable, validateSlugFormat } from '@/lib/services/slugService';
+import { enforceRequestRateLimit } from '@/lib/security/request';
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const slug = searchParams.get('slug');
+
+    if (!slug) {
+      return NextResponse.json({ error: 'Parameter slug wajib diisi' }, { status: 400 });
+    }
+
+    const formatResult = validateSlugFormat(slug);
+    if (!formatResult.valid) {
+      return NextResponse.json({ available: false, reason: formatResult.reason });
+    }
+
+    const available = await isSlugAvailable(slug);
+
+    return NextResponse.json({
+      available,
+      slug: formatResult.normalizedSlug,
+      reason: available ? 'Slug tersedia' : 'Slug tidak tersedia atau sudah digunakan'
+    });
+  } catch (error: unknown) {
+    console.error('Checkout check-slug API error:', error);
+    return NextResponse.json({ error: 'Gagal memeriksa ketersediaan slug' }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const rateLimit = await enforceRequestRateLimit(request, 'billing_checkout', 10, 60_000, 300_000);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Terlalu banyak permintaan. Silakan coba lagi beberapa saat.', retryAfter: rateLimit.retryAfter },
+        { status: 429 }
+      );
+    }
+
+    const body = await request.json();
+    const { buyerName, buyerEmail, buyerWhatsapp, plan, desiredSlug, templateId } = body;
+
+    if (!buyerName || !buyerEmail || !buyerWhatsapp || !desiredSlug) {
+      return NextResponse.json({ error: 'Data form checkout tidak lengkap' }, { status: 400 });
+    }
+
+    const selectedPlan = plan === 'lite' ? 'lite' : 'pro';
+
+    const result = await createOrder(
+      {
+        buyerName,
+        buyerEmail,
+        buyerWhatsapp,
+        plan: selectedPlan,
+        desiredSlug,
+        templateId: typeof templateId === 'string' && templateId.trim() ? templateId.trim() : undefined,
+      },
+      {
+        TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
+        TELEGRAM_ADMIN_CHAT_ID: process.env.TELEGRAM_ADMIN_CHAT_ID,
+        APP_BASE_URL: process.env.NEXT_PUBLIC_APP_URL,
+      }
+    );
+
+    if (!result.success || !result.order) {
+      return NextResponse.json({ error: result.error || 'Gagal membuat order' }, { status: 400 });
+    }
+
+    const tokenParam = result.accessToken ? `?token=${result.accessToken}` : '';
+
+    return NextResponse.json({
+      success: true,
+      order: result.order,
+      accessToken: result.accessToken,
+      redirectUrl: `/orders/${result.order.id}${tokenParam}`
+    });
+  } catch (error: unknown) {
+    console.error('Checkout API error:', error);
+    return NextResponse.json({ error: 'Terjadi kesalahan sistem saat submit order' }, { status: 500 });
+  }
+}

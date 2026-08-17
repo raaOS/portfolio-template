@@ -140,7 +140,7 @@ export const APP_VERSION = '0.1.0';
  * Canonical site URL — used as fallback when NEXT_PUBLIC_SITE_URL is not set.
  * Centralized here to avoid contradictory fallback values across modules.
  */
-export const DEFAULT_SITE_URL = 'https://ramos-portofolio.vercel.app';
+export const DEFAULT_SITE_URL = 'https://portfolio-os.example';
 
 /**
  * Helper to get asset path with automatic cache busting for visitors

@@ -64,7 +64,7 @@ describe('useProjectDetail optimistic like', () => {
     expect(result.current.metrics.likes).toBe(1);
     expect(result.current.isLikePending).toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(localStorage.getItem('like-demo-project')).toBeNull();
+    expect(localStorage.getItem('like-default-site-demo-project')).toBeNull();
 
     mutation.resolve(
       new Response(JSON.stringify({ success: true, metrics: { likes: 12, shares: 3 } }), {
@@ -80,7 +80,7 @@ describe('useProjectDetail optimistic like', () => {
     expect(result.current.isProjectLiked).toBe(true);
     expect(result.current.metrics).toEqual({ likes: 12, shares: 3 });
     expect(result.current.isLikePending).toBe(false);
-    expect(localStorage.getItem('like-demo-project')).toBe('true');
+    expect(localStorage.getItem('like-default-site-demo-project')).toBe('true');
     unmount();
   });
 
@@ -116,7 +116,7 @@ describe('useProjectDetail optimistic like', () => {
     expect(result.current.isProjectLiked).toBe(false);
     expect(result.current.metrics.likes).toBe(0);
     expect(result.current.isLikePending).toBe(false);
-    expect(localStorage.getItem('like-demo-project')).toBeNull();
+    expect(localStorage.getItem('like-default-site-demo-project')).toBeNull();
     expect(errorSpy).toHaveBeenCalledOnce();
     unmount();
   });

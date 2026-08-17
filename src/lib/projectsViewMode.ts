@@ -42,8 +42,11 @@ export function readProjectsViewMode(): ProjectsViewMode {
 }
 
 /** Bangun URL /projects?view=... dari mode yang diberikan */
-export function buildProjectsHref(view: ProjectsViewMode): string {
-  return view === '3d' ? '/projects?view=3d' : '/projects';
+export function buildProjectsHref(view: ProjectsViewMode, basePath = ''): string {
+  const normalizedBasePath = basePath && basePath !== '/' ? basePath : '';
+  return view === '3d'
+    ? `${normalizedBasePath}/projects?view=3d`
+    : `${normalizedBasePath}/projects`;
 }
 
 /** Subscribe untuk useSyncExternalStore — listen perubahan mode dari tab yang sama */

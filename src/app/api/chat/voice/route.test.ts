@@ -22,12 +22,15 @@ function mockGroqResponse(ok: boolean, body: Record<string, unknown>) {
 describe('POST /api/chat/voice', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.stubEnv('GROQ_API_KEY', 'test-groq-key');
+    vi.stubEnv('FEATURE_AI', 'true');
+    vi.stubEnv('AI_PROVIDER', 'groq');
+    vi.stubEnv('AI_API_KEY', 'test-groq-key');
     mocks.enforceRequestRateLimit.mockResolvedValue({ allowed: true, retryAfter: 0 });
   });
 
-  it('returns 500 when GROQ_API_KEY is missing', async () => {
-    vi.stubEnv('GROQ_API_KEY', '');
+  it('returns 500 when AI voice provider is missing', async () => {
+    vi.stubEnv('AI_PROVIDER', 'groq');
+    vi.stubEnv('AI_API_KEY', '');
 
     const request = new NextRequest('http://localhost/api/chat/voice', {
       method: 'POST',
@@ -37,7 +40,7 @@ describe('POST /api/chat/voice', () => {
     const body = await response.json();
 
     expect(response.status).toBe(500);
-    expect(body.error).toBe('Groq API Key not configured');
+    expect(body.error).toBe('AI voice provider is not configured');
   });
 
   it('returns 429 when rate limited', async () => {

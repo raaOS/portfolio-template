@@ -35,6 +35,7 @@ import { useConfirm } from '@/components/admin/ConfirmDialog';
 
 // Lazy load heavy modals
 const ProjectForm = dynamic(() => import('@/components/admin/project-form/ProjectForm'), {
+  ssr: false,
   loading: () => (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
       <Loader2 className="animate-spin text-white" />
@@ -42,6 +43,7 @@ const ProjectForm = dynamic(() => import('@/components/admin/project-form/Projec
   ),
 });
 const DataConnectionModal = dynamic(() => import('@/app/admin/components/DataConnectionModal'), {
+  ssr: false,
   loading: () => (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
       <Loader2 className="animate-spin text-white" />
@@ -49,7 +51,9 @@ const DataConnectionModal = dynamic(() => import('@/app/admin/components/DataCon
   ),
 });
 
-const SecuritySettingsModal = dynamic(() => import('../components/SecuritySettingsModal'));
+const SecuritySettingsModal = dynamic(() => import('../components/SecuritySettingsModal'), {
+  ssr: false,
+});
 
 const subscribeHydration = () => () => undefined;
 const getHydratedSnapshot = () => true;
@@ -117,9 +121,12 @@ export default function AdminProjectsClient() {
 
   // Derived Paginated Data
   const totalPages = Math.ceil(orderedProjects.length / ITEMS_PER_PAGE);
+  // FIX: Hindari setState di dalam useEffect (cascading render). Gunakan
+  // derived displayPage; pagination controls selalu bekerja dari posisi valid.
+  const displayPage = totalPages > 0 ? Math.min(currentPage, totalPages) : 1;
   const paginatedProjects = orderedProjects.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
+    (displayPage - 1) * ITEMS_PER_PAGE,
+    displayPage * ITEMS_PER_PAGE
   );
 
   const handleToggleProjectStatus = (project: Project) => {
@@ -129,9 +136,13 @@ export default function AdminProjectsClient() {
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    if (active.id !== over?.id) {
+    // Drop di luar area target (`over` null atau item tak dikenal) = batalkan,
+    // bukan memindah item ke paling bawah list tanpa sadar.
+    if (!over?.id) return;
+    if (active.id !== over.id) {
       const oldIndex = orderedProjects.findIndex((i) => i.id === active.id);
-      const newIndex = orderedProjects.findIndex((i) => i.id === over?.id);
+      const newIndex = orderedProjects.findIndex((i) => i.id === over.id);
+      if (oldIndex < 0 || newIndex < 0) return;
       const newItems = [...orderedProjects];
       const [movedItem] = newItems.splice(oldIndex, 1);
       newItems.splice(newIndex, 0, movedItem);
@@ -227,7 +238,7 @@ export default function AdminProjectsClient() {
             )}
 
             <Pagination
-              currentPage={currentPage}
+              currentPage={displayPage}
               totalPages={totalPages}
               onPageChange={setCurrentPage}
             />

@@ -32,7 +32,7 @@ function run(command: string) {
 async function checkEnvironment(): Promise<CheckResult> {
   const missing = [
     !process.env.JWT_SECRET && 'JWT_SECRET',
-    !process.env.NEXT_PUBLIC_SITE_URL && 'NEXT_PUBLIC_SITE_URL',
+    !process.env.NEXT_PUBLIC_APP_URL && 'NEXT_PUBLIC_APP_URL',
     ...getMissingD1EnvKeys(),
     ...getMissingR2EnvKeys(),
     process.env.DATA_BACKEND !== 'cloudflare-d1' && 'DATA_BACKEND=cloudflare-d1',

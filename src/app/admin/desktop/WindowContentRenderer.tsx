@@ -11,75 +11,105 @@ import type { AdminDesktopActions } from './types';
 // They are lazy-loaded so opening a folder doesn't pull in all CRUD bundles.
 
 const ProjectsPanel = dynamic(() => import('@/app/admin/projects/AdminProjectsClient'), {
+  ssr: false,
   loading: () => <AdminLoading size="page" />,
 });
 
+const ClientDashboardPanel = dynamic(
+  () => import('@/app/admin/client-dashboard/ClientDashboardPanel'),
+  {
+    ssr: false,
+    loading: () => <AdminLoading size="page" />,
+  }
+);
+
 const ProfilePanel = dynamic(() => import('./panels/ProfilePanel'), {
+  ssr: false,
   loading: () => <AdminLoading size="page" />,
 });
 
 const ExperiencePanel = dynamic(
   () => import('@/app/admin/content/experience/AdminExperienceClient'),
-  { loading: () => <AdminLoading size="page" /> }
+  { ssr: false, loading: () => <AdminLoading size="page" /> }
 );
 
 const SkillsPanel = dynamic(() => import('./panels/SkillsPanel'), {
+  ssr: false,
   loading: () => <AdminLoading size="page" />,
 });
 
 const ArchivePanel = dynamic(() => import('./panels/ArchivePanel'), {
+  ssr: false,
   loading: () => <AdminLoading size="page" />,
 });
 
 const LabelsPanel = dynamic(() => import('./panels/LabelsPanel'), {
+  ssr: false,
   loading: () => <AdminLoading size="page" />,
 });
 
 const ExplorerPanel = dynamic(() => import('@/app/admin/projects/explorer/AdminExplorerClient'), {
+  ssr: false,
   loading: () => <AdminLoading size="page" />,
 });
 
 const EventPagesPanel = dynamic(
   () => import('@/app/admin/projects/event-pages/AdminEventPagesClient'),
-  { loading: () => <AdminLoading size="page" /> }
+  { ssr: false, loading: () => <AdminLoading size="page" /> }
 );
 
 const AppearancePanel = dynamic(() => import('./panels/AppearancePanel'), {
+  ssr: false,
   loading: () => <AdminLoading size="page" />,
 });
 
 const DockPanel = dynamic(() => import('./panels/DockPanel'), {
+  ssr: false,
   loading: () => <AdminLoading size="page" />,
 });
 
 const WidgetsPanel = dynamic(() => import('./panels/WidgetsPanel'), {
+  ssr: false,
   loading: () => <AdminLoading size="page" />,
 });
 
 const SoundsPanel = dynamic(() => import('./panels/SoundsPanel'), {
+  ssr: false,
   loading: () => <AdminLoading size="page" />,
 });
 
 const NotificationsPanel = dynamic(() => import('./panels/NotificationsPanel'), {
+  ssr: false,
   loading: () => <AdminLoading size="page" />,
 });
 
 const MessagesPanel = dynamic(
   () => import('@/app/admin/communications/messages/AdminLeadsClient'),
-  { loading: () => <AdminLoading size="page" /> }
+  { ssr: false, loading: () => <AdminLoading size="page" /> }
 );
 
 const FeedbackPanel = dynamic(
   () => import('@/app/admin/communications/feedback/AdminFeedbackClient'),
-  { loading: () => <AdminLoading size="page" /> }
+  { ssr: false, loading: () => <AdminLoading size="page" /> }
 );
 
 const ContactsPanel = dynamic(
   () => import('@/app/admin/communications/contacts/AdminContactClient'),
-  { loading: () => <AdminLoading size="page" /> }
+  { ssr: false, loading: () => <AdminLoading size="page" /> }
+);
+
+const PaymentConfigPanel = dynamic(
+  () => import('./panels/PaymentConfigPanel'),
+  { ssr: false, loading: () => <AdminLoading size="page" /> }
+);
+
+const OrdersPanel = dynamic(
+  () => import('./panels/OrdersPanel'),
+  { ssr: false, loading: () => <AdminLoading size="page" /> }
 );
 
 const PANEL_MAP: Record<string, React.ComponentType> = {
+  clientDashboard: ClientDashboardPanel,
   projects: ProjectsPanel,
   profile: ProfilePanel,
   experience: ExperiencePanel,
@@ -96,6 +126,8 @@ const PANEL_MAP: Record<string, React.ComponentType> = {
   messages: MessagesPanel,
   feedback: FeedbackPanel,
   contacts: ContactsPanel,
+  paymentConfig: PaymentConfigPanel,
+  orders: OrdersPanel,
 };
 
 interface WindowContentRendererProps {

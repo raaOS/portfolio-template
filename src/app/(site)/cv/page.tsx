@@ -6,7 +6,7 @@ import { loadExperienceData } from '@/lib/experience';
 import { loadHardSkillsData } from '@/lib/hardSkills';
 
 export const metadata: Metadata = generateSEOMetadata({
-  title: 'Resume | Ramos',
+  title: 'Resume | Portfolio Owner',
   description:
     'Resume versi ATS-friendly untuk screening cepat: ringkasan, skills, dan pengalaman.',
   path: '/cv',

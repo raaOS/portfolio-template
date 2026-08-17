@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   validateAdminRequestMock,
   getTestimonialsMock,
+  getSiteTestimonialsMock,
   createTestimonialMock,
   updateTestimonialMock,
   deleteTestimonialMock,
@@ -10,6 +11,7 @@ const {
 } = vi.hoisted(() => ({
   validateAdminRequestMock: vi.fn(),
   getTestimonialsMock: vi.fn(),
+  getSiteTestimonialsMock: vi.fn(),
   createTestimonialMock: vi.fn(),
   updateTestimonialMock: vi.fn(),
   deleteTestimonialMock: vi.fn(),
@@ -23,6 +25,7 @@ vi.mock('@/lib/auth', () => ({
 vi.mock('@/lib/services/testimonialService', () => ({
   testimonialService: {
     getTestimonials: getTestimonialsMock,
+    getSiteTestimonials: getSiteTestimonialsMock,
     createTestimonial: createTestimonialMock,
     updateTestimonial: updateTestimonialMock,
     deleteTestimonial: deleteTestimonialMock,
@@ -92,7 +95,7 @@ function buildDelete(body: unknown): Request {
 describe('GET /api/testimonial', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    getTestimonialsMock.mockResolvedValue({ testimonials: [mockTestimonial] });
+    getSiteTestimonialsMock.mockResolvedValue({ testimonials: [mockTestimonial] });
   });
 
   it('returns testimonials list', async () => {
@@ -105,7 +108,7 @@ describe('GET /api/testimonial', () => {
   });
 
   it('returns 500 on error', async () => {
-    getTestimonialsMock.mockRejectedValue(new Error('DB fail'));
+    getSiteTestimonialsMock.mockRejectedValue(new Error('DB fail'));
     const response = await GET();
     const body = await response.json();
 
@@ -146,7 +149,7 @@ describe('POST /api/testimonial', () => {
     expect(response.status).toBe(200);
     expect(body.success).toBe(true);
     expect(body.testimonial.name).toBe('Jane Doe');
-    expect(createTestimonialMock).toHaveBeenCalledWith(validCreatePayload);
+    expect(createTestimonialMock).toHaveBeenCalledWith(validCreatePayload, 'default-site');
     expect(revalidatePathMock).toHaveBeenCalledWith('/', 'layout');
     expect(revalidatePathMock).toHaveBeenCalledWith('/about');
   });
@@ -192,7 +195,11 @@ describe('PUT /api/testimonial', () => {
     expect(response.status).toBe(200);
     expect(body.success).toBe(true);
     expect(body.testimonial.name).toBe('Updated Name');
-    expect(updateTestimonialMock).toHaveBeenCalledWith('test-1', { name: 'Updated Name' });
+    expect(updateTestimonialMock).toHaveBeenCalledWith(
+      'test-1',
+      { name: 'Updated Name' },
+      'default-site'
+    );
   });
 
   it('returns 404 when testimonial not found', async () => {
@@ -244,7 +251,7 @@ describe('DELETE /api/testimonial', () => {
 
     expect(response.status).toBe(200);
     expect(body.success).toBe(true);
-    expect(deleteTestimonialMock).toHaveBeenCalledWith('test-1');
+    expect(deleteTestimonialMock).toHaveBeenCalledWith('test-1', 'default-site');
     expect(revalidatePathMock).toHaveBeenCalled();
   });
 

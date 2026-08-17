@@ -6,17 +6,16 @@ const MAX_AI_REQUESTS = 10;
 const RATE_LIMIT_WINDOW = 60 * 1000;
 const BLOCK_DURATION = 5 * 60 * 1000;
 
-export function getGeminiApiKey() {
+export function getGoogleAiApiKey() {
+  const provider = (process.env.AI_PROVIDER || '').toLowerCase();
   return (
-    process.env.GEMINI_API_KEY ||
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
-    process.env.GOOGLE_API_KEY ||
-    ''
+    provider === 'gemini' || provider === 'google' ? process.env.AI_API_KEY || '' : ''
   ).trim();
 }
 
 export function getOpenRouterApiKey() {
-  return process.env.OPENROUTER_API_KEY || '';
+  const provider = (process.env.AI_PROVIDER || '').toLowerCase();
+  return provider === 'openrouter' ? process.env.AI_API_KEY || '' : '';
 }
 
 export async function guardAdminAiRequest(req: NextRequest, scope: string) {

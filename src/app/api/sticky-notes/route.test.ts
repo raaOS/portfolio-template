@@ -99,7 +99,7 @@ describe('PUT /api/sticky-notes', () => {
     const response = await PUT(buildPut([validNote]) as never);
     expect(response.status).toBe(200);
 
-    expect(saveNotesMock).toHaveBeenCalledWith([validNote]);
+    expect(saveNotesMock).toHaveBeenCalledWith([validNote], 'default-site');
     expect(revalidatePathMock).toHaveBeenCalled();
   });
 });

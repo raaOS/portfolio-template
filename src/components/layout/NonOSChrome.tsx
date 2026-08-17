@@ -8,6 +8,7 @@ import Header from '@/components/shared/Header';
 import { useOSOverlays } from '@/components/os/context/OSSystemContext';
 import WindowRenderer from './WindowRenderer';
 import { ErrorBoundary } from '@/components/error/ErrorBoundary';
+import { isProjectsRoute } from '@/lib/routing/tenantRoutes';
 
 const ControlCenter = dynamic(() => import('@/components/os/ui/ControlCenter'), {
   ssr: false,
@@ -40,7 +41,7 @@ export default function NonOSChrome({
     useOSOverlays();
 
   const isContact = pathname === '/contact' || pathname?.startsWith('/contact');
-  const isProjects3D = pathname?.startsWith('/projects') && searchParams?.get('view') === '3d';
+  const isProjects3D = isProjectsRoute(pathname) && searchParams?.get('view') === '3d';
   const mainClassName = isContact || isProjects3D ? '' : 'pb-24';
 
   return (

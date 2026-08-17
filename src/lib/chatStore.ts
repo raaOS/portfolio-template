@@ -16,12 +16,12 @@ export interface ChatMessage {
   sender: 'visitor' | 'admin';
   timestamp: number;
   delivered?: boolean;
+  /** true jika POST /api/chat/send gagal — pesan lokal menunggu kirim ulang */
+  failed?: boolean;
 }
 
 export interface ChatSession {
   visitorId: string;
-  telegramMessageId?: number; // The message ID in telegram to reply to
-  telegramThreadId?: number; // The forum topic ID (message_thread_id)
   lastActive: number;
   aiMode: boolean;
   lastAdminReplyTime: number;
@@ -56,11 +56,7 @@ export const chatStore = {
     return session;
   },
 
-  async addVisitorMessage(
-    visitorId: string,
-    text: string,
-    telegramMsgId?: number
-  ): Promise<ChatMessage> {
+  async addVisitorMessage(visitorId: string, text: string): Promise<ChatMessage> {
     await this.createOrUpdateSession(visitorId);
 
     const msgId = crypto.randomUUID();
@@ -74,40 +70,7 @@ export const chatStore = {
     // Push message
     await db.ref(`messages/${visitorId}/${msgId}`).set(msg);
 
-    // Update session tracking
-    if (telegramMsgId) {
-      await db.ref(`sessions/${visitorId}`).update({ telegramMessageId: telegramMsgId });
-      await db.ref(`messageMap/${telegramMsgId}`).set(visitorId);
-    }
-
     return msg;
-  },
-
-  async mapTelegramMessage(visitorId: string, telegramMsgId: number) {
-    await db.ref(`sessions/${visitorId}`).update({ telegramMessageId: telegramMsgId });
-    // Use string key for consistency
-    await db.ref(`messageMap/${String(telegramMsgId)}`).set(visitorId);
-  },
-
-  async updateSessionThreadId(visitorId: string, threadId: number) {
-    // Ensure threadId is stored as number in session
-    await db.ref(`sessions/${visitorId}`).update({ telegramThreadId: threadId });
-    // Map threadId to visitorId using string key for CLOUDFLARE_D1 (threadId could be very large)
-    await db.ref(`threadMap/${String(threadId)}`).set(visitorId);
-  },
-
-  async getVisitorByThreadId(threadId: number): Promise<string | null> {
-    // Use string key for lookup (consistent with storage)
-    const snap = await db.ref(`threadMap/${String(threadId)}`).once('value');
-    if (!snap.exists()) return null;
-    return snap.val();
-  },
-
-  async getVisitorByMessageId(msgId: number): Promise<string | null> {
-    // Use string key for consistency
-    const snap = await db.ref(`messageMap/${String(msgId)}`).once('value');
-    if (!snap.exists()) return null;
-    return snap.val();
   },
 
   async addAdminReply(visitorId: string, text: string): Promise<boolean> {

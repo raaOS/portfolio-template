@@ -53,7 +53,7 @@ export function useAdminDesktop() {
       const h = Math.min(appDef.defaultHeight, vh - 80);
 
       const newWindow: AdminWindowState = {
-        id: `${appId}-${Date.now()}`,
+        id: `${appId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         appId,
         title: appDef.label,
         icon: appDef.icon,
@@ -126,7 +126,7 @@ export function useAdminDesktop() {
       const h = Math.min(defaultHeight, vh - 80);
 
       const newWindow: AdminWindowState = {
-        id: `${folderAppId}-${Date.now()}`,
+        id: `${folderAppId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         appId: folderAppId,
         title: zone.label,
         icon: zone.icon,

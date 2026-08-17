@@ -53,8 +53,14 @@ function normalizeHardSkill(
   };
 }
 
-async function getHardSkills(noCache = false, throwOnError = false): Promise<HardSkillsData> {
-  const data = await service.getData(noCache, throwOnError);
+async function getHardSkills(
+  noCache: boolean | string = false,
+  throwOnError = false,
+  siteId = 'default-site'
+): Promise<HardSkillsData> {
+  const actualNoCache = typeof noCache === 'boolean' ? noCache : false;
+  const actualSiteId = typeof noCache === 'string' ? noCache : siteId;
+  const data = await service.getData(actualNoCache, throwOnError, actualSiteId);
 
   // Ensure structure
   if (!data || !data.skills) {
@@ -68,18 +74,19 @@ async function getHardSkills(noCache = false, throwOnError = false): Promise<Har
   };
 }
 
-async function saveHardSkills(skills: HardSkill[], message: string): Promise<boolean> {
+async function saveHardSkills(skills: HardSkill[], message: string, siteId = 'default-site'): Promise<boolean> {
   const data: HardSkillsData = {
     skills: skills.map((skill, index) => normalizeHardSkill(skill, index)),
     lastUpdated: new Date().toISOString(),
   };
-  return await service.saveData(data, message);
+  return await service.saveData(data, message, siteId);
 }
 
 async function createHardSkill(
-  skillData: Omit<HardSkill, 'id' | 'createdAt' | 'updatedAt'>
+  skillData: Omit<HardSkill, 'id' | 'createdAt' | 'updatedAt'>,
+  siteId = 'default-site'
 ): Promise<HardSkill> {
-  const currentData = await getHardSkills(true, true);
+  const currentData = await getHardSkills(true, true, siteId);
   const currentSkills = currentData.skills || [];
   const now = new Date().toISOString();
   const newSkill: HardSkill = {
@@ -90,13 +97,13 @@ async function createHardSkill(
   };
 
   const updatedSkills = [...currentSkills, newSkill];
-  await saveHardSkills(updatedSkills, `Add hard skill: ${newSkill.name}`);
+  await saveHardSkills(updatedSkills, `Add hard skill: ${newSkill.name}`, siteId);
 
   return newSkill;
 }
 
-async function updateHardSkill(id: string, updates: Partial<HardSkill>): Promise<HardSkill | null> {
-  const currentData = await getHardSkills(true, true);
+async function updateHardSkill(id: string, updates: Partial<HardSkill>, siteId = 'default-site'): Promise<HardSkill | null> {
+  const currentData = await getHardSkills(true, true, siteId);
   const currentSkills = currentData.skills || [];
 
   const index = currentSkills.findIndex((s) => s.id === id);
@@ -109,13 +116,13 @@ async function updateHardSkill(id: string, updates: Partial<HardSkill>): Promise
   };
 
   currentSkills[index] = updatedSkill;
-  await saveHardSkills(currentSkills, `Update hard skill: ${updatedSkill.name}`);
+  await saveHardSkills(currentSkills, `Update hard skill: ${updatedSkill.name}`, siteId);
 
   return updatedSkill;
 }
 
-async function deleteHardSkill(id: string): Promise<boolean> {
-  const currentData = await getHardSkills(true, true);
+async function deleteHardSkill(id: string, siteId = 'default-site'): Promise<boolean> {
+  const currentData = await getHardSkills(true, true, siteId);
   const currentSkills = currentData.skills || [];
 
   const skillToDelete = currentSkills.find((s) => s.id === id);
@@ -126,7 +133,7 @@ async function deleteHardSkill(id: string): Promise<boolean> {
   }
 
   const filtered = currentSkills.filter((s) => s.id !== id);
-  await saveHardSkills(filtered, `Delete hard skill ID: ${id}`);
+  await saveHardSkills(filtered, `Delete hard skill ID: ${id}`, siteId);
   return true;
 }
 

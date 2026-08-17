@@ -89,7 +89,8 @@ describe('POST /api/hard-skills (bulk)', () => {
 
     expect(saveHardSkillsMock).toHaveBeenCalledWith(
       [validSkill],
-      expect.stringContaining('Bulk update')
+      expect.stringContaining('Bulk update'),
+      'default-site'
     );
     expect(revalidatePathMock).toHaveBeenCalled();
   });

@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
-import { validateAdminRequest } from '@/lib/auth';
 import { aboutService } from '@/lib/services/aboutService';
 import { invalidateAboutCache } from '@/lib/about';
 import { validationError } from '@/lib/api-response';
 import type { Wallpaper, WallpaperConfig } from '@/types/about';
+import { validateSiteMutationRequest } from '@/lib/admin/siteMutationAuth';
+import {
+  assertKnownSite,
+  revalidateSiteContentPaths,
+  resolveRequestSiteId,
+  SiteContextError,
+  stripSiteContext,
+} from '@/lib/admin/siteRequestContext';
 
 /**
  * Atomic collection operations for `wallpaperConfig`.
@@ -29,7 +35,7 @@ import type { Wallpaper, WallpaperConfig } from '@/types/about';
  *   serial.
  *
  * What this does NOT solve:
- *   - Two Vercel function instances handling concurrent requests
+ *   - Two runtime instances handling concurrent requests
  *     can still interleave between read and write. The window is
  *     milliseconds, not seconds, but it is non-zero. A proper fix
  *     needs a SQL-level lock or lease on the D1 row, which we don't
@@ -73,23 +79,24 @@ const requestSchema = z.discriminatedUnion('action', [
 
 export async function POST(request: NextRequest) {
   try {
-    if (!(await validateAdminRequest(request))) {
-      return NextResponse.json({ error: 'Unauthorized or invalid CSRF token' }, { status: 401 });
-    }
-
     const rawBody = await request.json().catch(() => null);
     if (!rawBody) {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
+    const siteId = await resolveRequestSiteId(request, rawBody);
+    if (!(await validateSiteMutationRequest(request, siteId))) {
+      return NextResponse.json({ error: 'Unauthorized or invalid CSRF token' }, { status: 401 });
+    }
+    await assertKnownSite(siteId);
 
-    const parsed = requestSchema.safeParse(rawBody);
+    const parsed = requestSchema.safeParse(stripSiteContext(rawBody));
     if (!parsed.success) {
       return validationError(parsed.error);
     }
 
     // Read freshest snapshot. `getAboutData(true)` skips the
     // CacheManager TTL so we don't merge against a stale collection.
-    const current = await aboutService.getAboutData(true);
+    const current = await aboutService.getAboutData(true, true, siteId);
     const config: WallpaperConfig = current.wallpaperConfig || {
       activeWallpaperId: '',
       collection: [],
@@ -164,17 +171,19 @@ export async function POST(request: NextRequest) {
         activeWallpaperId: nextActiveId,
         collection: nextCollection,
       },
-    });
+    }, siteId);
 
     invalidateAboutCache();
-    revalidatePath('/', 'layout');
-    revalidatePath('/about');
+    await revalidateSiteContentPaths(siteId, ['/', '/about']);
 
     return NextResponse.json({
       success: true,
       data: updated,
     });
   } catch (error) {
+    if (error instanceof SiteContextError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error('[API/About/WallpaperCollection] Error:', error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(

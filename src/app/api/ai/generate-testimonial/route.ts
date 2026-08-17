@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGeminiApiKey, guardAdminAiRequest } from '../_shared';
+import { getGoogleAiApiKey, guardAdminAiRequest } from '../_shared';
 
 /**
- * Gemini AI Integration for Testimonials
+ * AI Integration for Testimonials
  * Generates realistic WhatsApp style testimonials.
  */
 interface GenerateTestimonialRequest {
@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   const guardResponse = await guardAdminAiRequest(req, 'ai_testimonial');
   if (guardResponse) return guardResponse;
 
-  const API_KEY = getGeminiApiKey();
+  const API_KEY = getGoogleAiApiKey();
   if (!API_KEY) {
     return NextResponse.json({ error: 'API Key not configured' }, { status: 500 });
   }
@@ -23,11 +23,11 @@ export async function POST(req: NextRequest) {
     const { topic = 'Desain Ads', messageCount = 3 } =
       (await req.json()) as GenerateTestimonialRequest;
 
-    // Call Gemini API
+    // Call Google AI API
     const model = 'gemini-flash-latest';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
-    const prompt = `BERTINDAK SEBAGAI: Seorang klien yang sangat puas dengan hasil kerja seorang Creative Designer (Ramos).
+    const prompt = `BERTINDAK SEBAGAI: Seorang klien yang sangat puas dengan hasil kerja seorang Creative Designer.
         
         TOPIK PROJECT: ${topic}
         JUMLAH PESAN: ${messageCount} (Satu rangkaian percakapan)
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
         2. notificationText: Satu kalimat singkat yang merangkum inti kepuasan (akan muncul di pop-up notifikasi).
         3. messages: Array objek chat dengan urutan waktu yang logis (selisih 1-5 menit).
            - text: Isi pesan chat.
-           - isMe: boolean (true jika dari Designer/Ramos, false jika dari Klien).
+           - isMe: boolean (true jika dari Designer/Owner, false jika dari Klien).
            - time: String format "HH:mm".
            
         CONTOH STRUKTUR PERCAKAPAN:
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const txt = await response.text();
-      throw new Error(`Gemini API Error: ${txt}`);
+      throw new Error(`Google AI API Error: ${txt}`);
     }
 
     const data = await response.json();

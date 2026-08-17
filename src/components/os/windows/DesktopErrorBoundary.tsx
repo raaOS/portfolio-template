@@ -54,12 +54,12 @@ export default class DesktopErrorBoundary extends Component<Props, State> {
 
   private handleSafeModeConfirm = () => {
     try {
-      localStorage.removeItem('ramos-positions-v2');
+      localStorage.removeItem('portfolio-os-positions-v1');
       localStorage.removeItem('dock-config');
-      sessionStorage.removeItem('ramos-os-visitor-session-v1');
-      sessionStorage.removeItem('ramos-session-positions');
-      sessionStorage.removeItem('ramos_os_welcome_seen');
-      sessionStorage.removeItem('ramos_os_booted');
+      sessionStorage.removeItem('portfolio-os-visitor-session-v1');
+      sessionStorage.removeItem('portfolio-os-session-positions');
+      sessionStorage.removeItem('portfolio_os_welcome_seen');
+      sessionStorage.removeItem('portfolio_os_booted');
     } catch {
       console.error('Failed to clear local or session storage');
     }

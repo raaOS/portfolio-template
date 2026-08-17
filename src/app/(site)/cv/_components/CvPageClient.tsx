@@ -31,8 +31,8 @@ export default function CvPageClient({ aboutData, experienceData, hardSkillsData
   const shouldAutoPrint = searchParams?.get('print') === 'true';
   const cvRef = useRef<HTMLDivElement>(null);
 
-  const displayName = 'Ramos';
-  const headline = 'Graphic Designer';
+  const displayName = 'Portfolio Owner';
+  const headline = 'Creative Professional';
   const summary = localizeText(
     aboutData?.professional?.bio?.content ??
       'Desainer Grafis senior dengan fokus pada solusi visual yang strategis dan berdampak nyata.',

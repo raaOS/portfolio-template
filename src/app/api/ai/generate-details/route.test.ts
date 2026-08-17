@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { getGeminiApiKeyMock, getOpenRouterApiKeyMock, guardAdminAiRequestMock } = vi.hoisted(
+const { getGoogleAiApiKeyMock, getOpenRouterApiKeyMock, guardAdminAiRequestMock } = vi.hoisted(
   () => ({
-    getGeminiApiKeyMock: vi.fn(),
+    getGoogleAiApiKeyMock: vi.fn(),
     getOpenRouterApiKeyMock: vi.fn(),
     guardAdminAiRequestMock: vi.fn(),
   })
 );
 
 vi.mock('../_shared', () => ({
-  getGeminiApiKey: getGeminiApiKeyMock,
+  getGoogleAiApiKey: getGoogleAiApiKeyMock,
   getOpenRouterApiKey: getOpenRouterApiKeyMock,
   guardAdminAiRequest: guardAdminAiRequestMock,
 }));
@@ -31,7 +31,7 @@ function request(body: Record<string, unknown>) {
   }) as never;
 }
 
-function geminiResponse(payload: Record<string, unknown>) {
+function googleAiResponse(payload: Record<string, unknown>) {
   return new Response(
     JSON.stringify({
       candidates: [
@@ -64,12 +64,12 @@ function openRouterResponse(payload: Record<string, unknown>) {
 describe('POST /api/ai/generate-details', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    getGeminiApiKeyMock.mockReturnValue('test-key');
+    getGoogleAiApiKeyMock.mockReturnValue('test-key');
     getOpenRouterApiKeyMock.mockReturnValue('');
     guardAdminAiRequestMock.mockResolvedValue(null);
   });
 
-  it('tries the next Gemini model when the first model is quota-limited', async () => {
+  it('tries the next Google AI model when the first model is quota-limited', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
@@ -79,7 +79,7 @@ describe('POST /api/ai/generate-details', () => {
         })
       )
       .mockResolvedValueOnce(
-        geminiResponse({
+        googleAiResponse({
           title: 'Poster Eksplorasi',
           description: 'Eksplorasi visual yang rapi.',
           client: 'Personal Exploration',
@@ -109,7 +109,7 @@ describe('POST /api/ai/generate-details', () => {
     expect(String(fetchMock.mock.calls[1][0])).toContain('gemini-2.0-flash');
   });
 
-  it('falls back to OpenRouter vision models when all Gemini models are quota-limited', async () => {
+  it('falls back to OpenRouter vision models when all Google AI models are quota-limited', async () => {
     getOpenRouterApiKeyMock.mockReturnValue('openrouter-key');
 
     const fetchMock = vi
@@ -150,14 +150,14 @@ describe('POST /api/ai/generate-details', () => {
     expect(JSON.parse(fetchMock.mock.calls[3][1]?.body as string).model).toBe('openai/gpt-4o-mini');
   });
 
-  it('can use OpenRouter when Gemini API key is not configured', async () => {
-    getGeminiApiKeyMock.mockReturnValue('');
+  it('can use OpenRouter when Google AI API key is not configured', async () => {
+    getGoogleAiApiKeyMock.mockReturnValue('');
     getOpenRouterApiKeyMock.mockReturnValue('openrouter-key');
 
     const fetchMock = vi.fn().mockResolvedValueOnce(
       openRouterResponse({
         title: 'Only OpenRouter',
-        description: 'Detail dibuat tanpa Gemini.',
+        description: 'Detail dibuat tanpa Google AI.',
         client: 'Personal Exploration',
         tags: 'openrouter, vision',
         software: ['photoshop'],
@@ -186,7 +186,7 @@ describe('POST /api/ai/generate-details', () => {
   });
 
   it('keeps trying OpenRouter free vision fallback after paid models return insufficient credits', async () => {
-    getGeminiApiKeyMock.mockReturnValue('');
+    getGoogleAiApiKeyMock.mockReturnValue('');
     getOpenRouterApiKeyMock.mockReturnValue('openrouter-key');
 
     const fetchMock = vi
@@ -226,7 +226,7 @@ describe('POST /api/ai/generate-details', () => {
 
   it('caches identical media and prompt options', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
-      geminiResponse({
+      googleAiResponse({
         title: 'Cached Project',
         description: 'Hasil dari cache.',
         client: 'Personal Exploration',

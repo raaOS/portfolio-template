@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGeminiApiKey, getOpenRouterApiKey, guardAdminAiRequest } from '../_shared';
+import { getGoogleAiApiKey, getOpenRouterApiKey, guardAdminAiRequest } from '../_shared';
 import { createHash } from 'node:crypto';
 import { CacheManager } from '@/lib/cache/CacheManager';
 import { deleteD1Value, getD1Value, isD1Configured, setD1Value } from '@/lib/cloudflareD1';
 
 /**
- * Gemini AI Integration
- * Generates project details using Google's Gemini API.
+ * AI Integration
+ * Generates project details using Google's AI API.
  */
 // API Timeout: 30 seconds
 import {
@@ -17,7 +17,7 @@ import {
 } from '../media-helper';
 import { buildProjectDetailsPrompt } from './prompt';
 import {
-  generateWithGemini,
+  generateWithGoogleAI,
   generateWithOpenRouter,
   toFriendlyProviderError,
   type ProviderFailure,
@@ -115,11 +115,11 @@ export async function POST(req: NextRequest) {
   const guardResponse = await guardAdminAiRequest(req, 'ai_details');
   if (guardResponse) return guardResponse;
 
-  const geminiApiKey = getGeminiApiKey();
+  const googleAiApiKey = getGoogleAiApiKey();
   const openRouterApiKey = getOpenRouterApiKey();
-  if (!geminiApiKey && !openRouterApiKey) {
+  if (!googleAiApiKey && !openRouterApiKey) {
     return NextResponse.json(
-      { error: 'AI provider not configured. Set GEMINI_API_KEY or OPENROUTER_API_KEY.' },
+      { error: 'AI provider not configured. Set AI_PROVIDER and AI_API_KEY.' },
       { status: 500 }
     );
   }
@@ -187,9 +187,9 @@ export async function POST(req: NextRequest) {
     let text = '';
     let lastFailure: ProviderFailure | null = null;
 
-    if (geminiApiKey) {
-      const result = await generateWithGemini({
-        apiKey: geminiApiKey,
+    if (googleAiApiKey) {
+      const result = await generateWithGoogleAI({
+        apiKey: googleAiApiKey,
         prompt,
         mimeType,
         base64Data,

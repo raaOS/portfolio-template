@@ -6,7 +6,7 @@
  *
  * @module middleware/utils
  */
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 
 export function isAPIRoute(pathname: string): boolean {
   return pathname.startsWith('/api/');
@@ -22,6 +22,22 @@ export function isStaticAsset(pathname: string): boolean {
   );
 }
 
+export function shouldRedirectToHttps(request: NextRequest): boolean {
+  if (process.env.NODE_ENV !== 'production') {
+    return false;
+  }
+
+  const forwardedProto = request.headers.get('x-forwarded-proto');
+  const protocol = (forwardedProto || request.nextUrl.protocol.replace(':', '')).toLowerCase();
+
+  if (protocol !== 'http') {
+    return false;
+  }
+
+  const hostname = request.nextUrl.hostname.toLowerCase();
+  return !['localhost', '127.0.0.1', '::1'].includes(hostname);
+}
+
 export function addSecurityHeaders(response: NextResponse): NextResponse {
   const isProd = process.env.NODE_ENV === 'production';
 
@@ -33,17 +49,17 @@ export function addSecurityHeaders(response: NextResponse): NextResponse {
     [
       "default-src 'self'",
       isProd
-        ? "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com https://vercel.live https://www.youtube.com https://s.ytimg.com"
-        : "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://vercel.live https://va.vercel-scripts.com blob: https://www.youtube.com https://s.ytimg.com",
+        ? "script-src 'self' 'unsafe-inline' https://www.youtube.com https://s.ytimg.com"
+        : "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https://www.youtube.com https://s.ytimg.com",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https: blob:",
       "font-src 'self' data:",
-      "connect-src 'self' https: wss: http://localhost:* ws://localhost:* https://va.vercel-scripts.com blob:",
+      "connect-src 'self' https: wss: http://localhost:* ws://localhost:* blob:",
       "media-src 'self' https: data: blob:",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
-      "frame-src 'self' https://vercel.live https://www.youtube.com",
+      "frame-src 'self' https://www.youtube.com",
       "frame-ancestors 'self'",
     ].join('; ') + ';';
 

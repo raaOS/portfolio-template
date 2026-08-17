@@ -63,6 +63,47 @@ describe('/api/r2/[...key]', () => {
       expect(response.status).toBe(404);
     });
 
+    it.each([
+      ['ffmpeg-core.wasm', 'application/wasm'],
+      ['ffmpeg-core.js', 'application/javascript; charset=utf-8'],
+    ])('serves browser-only ffmpeg asset %s from the controlled prefix', async (fileName, contentType) => {
+      isConfiguredMock.mockReturnValue(true);
+      const mockBody = {
+        transformToWebStream: () =>
+          new ReadableStream({
+            start(c) {
+              c.close();
+            },
+          }),
+      };
+      getObjectMock.mockResolvedValue({
+        ContentType: contentType,
+        ContentLength: 32232419,
+        CacheControl: 'public, max-age=31536000, immutable',
+        Body: mockBody,
+      });
+
+      const request = new NextRequest(`http://localhost/api/r2/ffmpeg/${fileName}`);
+      const ctx = { params: Promise.resolve({ key: ['ffmpeg', fileName] }) };
+
+      const response = await GET(request, ctx);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toBe(contentType);
+      expect(response.headers.get('access-control-allow-origin')).toBe('*');
+    });
+
+    it('does not expose arbitrary objects under the ffmpeg prefix', async () => {
+      isConfiguredMock.mockReturnValue(true);
+      const request = new NextRequest('http://localhost/api/r2/ffmpeg/secret.txt');
+      const ctx = { params: Promise.resolve({ key: ['ffmpeg', 'secret.txt'] }) };
+
+      const response = await GET(request, ctx);
+
+      expect(response.status).toBe(404);
+      expect(getObjectMock).not.toHaveBeenCalled();
+    });
+
     it('serves R2 objects with correct headers', async () => {
       isConfiguredMock.mockReturnValue(true);
       const mockBody = {
@@ -89,6 +130,33 @@ describe('/api/r2/[...key]', () => {
       expect(response.headers.get('content-type')).toBe('image/png');
       expect(response.headers.get('accept-ranges')).toBe('bytes');
       expect(response.headers.get('access-control-allow-origin')).toBe('*');
+    });
+
+    it('allows sites/ and platform/ prefixes', async () => {
+      isConfiguredMock.mockReturnValue(true);
+      const mockBody = {
+        transformToWebStream: () =>
+          new ReadableStream({
+            start(c) {
+              c.close();
+            },
+          }),
+      };
+      getObjectMock.mockResolvedValue({
+        ContentType: 'image/webp',
+        ContentLength: 500,
+        Body: mockBody,
+      });
+
+      const siteReq = new NextRequest('http://localhost/api/r2/sites/default-site/assets/media/qris.webp');
+      const siteCtx = { params: Promise.resolve({ key: ['sites', 'default-site', 'assets', 'media', 'qris.webp'] }) };
+      const siteRes = await GET(siteReq, siteCtx);
+      expect(siteRes.status).toBe(200);
+
+      const platformReq = new NextRequest('http://localhost/api/r2/platform/payment/qris.webp');
+      const platformCtx = { params: Promise.resolve({ key: ['platform', 'payment', 'qris.webp'] }) };
+      const platformRes = await GET(platformReq, platformCtx);
+      expect(platformRes.status).toBe(200);
     });
 
     it('returns 206 for range requests', async () => {

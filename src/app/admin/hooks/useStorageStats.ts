@@ -69,6 +69,9 @@ export function useStorageStats({ enabled }: Options) {
       const url = fresh ? '/api/admin/storage-stats?fresh=true' : '/api/admin/storage-stats';
       const res = await fetch(url, { cache: 'no-store', credentials: 'include' });
       if (!res.ok) {
+        if (res.status === 401) {
+          throw new Error('AUTH_REQUIRED');
+        }
         const errBody = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(errBody.error || `Request failed (${res.status})`);
       }

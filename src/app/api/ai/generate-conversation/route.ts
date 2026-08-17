@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGeminiApiKey, guardAdminAiRequest } from '../_shared';
+import { getGoogleAiApiKey, guardAdminAiRequest } from '../_shared';
 
 // API Timeout: 30 seconds
 const API_TIMEOUT = 30000;
@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   const guardResponse = await guardAdminAiRequest(req, 'ai_conversation');
   if (guardResponse) return guardResponse;
 
-  const API_KEY = getGeminiApiKey();
+  const API_KEY = getGoogleAiApiKey();
   if (!API_KEY) {
     return NextResponse.json({ error: 'API Key not configured' }, { status: 500 });
   }
@@ -26,16 +26,16 @@ export async function POST(req: NextRequest) {
     const model = 'gemini-flash-latest';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
-    const prompt = `BERTINDAK SEBAGAI: Senior Creative Designer dengan nama "Ramos".
+    const prompt = `BERTINDAK SEBAGAI: Senior Creative Designer sebagai pemilik portfolio.
         
-        TUGAS: Buatlah simulasi percakapan WhatsApp yang natural dan koheren antara Ramos (SAYA) dan "${senderName}" (DIA).
+        TUGAS: Buatlah simulasi percakapan WhatsApp yang natural dan koheren antara pemilik portfolio (SAYA) dan "${senderName}" (DIA).
         
         KONTEKS AWAL:
-        - "${senderName}" baru saja mengirimkan notifikasi WhatsApp kepada Ramos dengan pesan: "${notifMessage}".
+        - "${senderName}" baru saja mengirimkan notifikasi WhatsApp kepada pemilik portfolio dengan pesan: "${notifMessage}".
         
         GAYA BAHASA:
         - Bahasa Indonesia Gaul/Natural WhatsApp (pakai singkatan wajar seperti 'yg', 'sdh', 'ok', 'sy', 'bisa', 'siap').
-        - Ramos (SAYA) harus merespons secara profesional tapi santai, menunjukkan dia ahli di bidangnya (Desain Visual/Graphic Design).
+        - Pemilik portfolio (SAYA) harus merespons secara profesional tapi santai, menunjukkan keahlian di bidangnya (Desain Visual/Graphic Design).
         - Percakapan harus nyambung dengan isi pesan awal.
         - Jika pesan awal tentang tawaran kerja/proyek, bahas ke arah teknis atau rasa terima kasih.
         - Maksimal 4-6 balon chat tambahan (total alur yang pas).
@@ -44,12 +44,12 @@ export async function POST(req: NextRequest) {
         Setiap objek harus memiliki:
         - id: number (dimulai dari current + 1, buat saja urutan unik sederhana)
         - text: string (isi pesan)
-        - isMe: boolean (true jika dari Ramos/SAYA, false jika dari ${senderName}/DIA)
+        - isMe: boolean (true jika dari pemilik portfolio/SAYA, false jika dari ${senderName}/DIA)
         - time: string (HH:mm format, lanjutkan dari waktu sekarang/wajar)
         - status: "read"
         
         BUAT ALUR YANG MASUK AKAL:
-        1. Respon dari Ramos (isMe: true)
+        1. Respon dari pemilik portfolio (isMe: true)
         2. Balasan dari ${senderName} (isMe: false)
         3. Dst...
         
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const txt = await response.text();
-      throw new Error(`Gemini API Error: ${txt}`);
+      throw new Error(`Google AI API Error: ${txt}`);
     }
 
     const data = await response.json();

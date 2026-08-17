@@ -23,7 +23,7 @@
 // `validateAdminRequest`/`checkAdminAuth` sendiri. Adding ke proxy
 // adalah extra layer (defense-in-depth) — kalau proxy reject, handler
 // tidak kepanggil; kalau proxy approve, handler tetap re-validate.
-export const protectedRoutes = ['/admin', '/api/admin'];
+export const protectedRoutes = ['/admin', '/api/admin', '/portal'];
 
 // Public routes — explicitly excluded dari auth check meski match
 // `protectedRoutes`. Login endpoints harus di sini supaya user yang
@@ -32,12 +32,14 @@ export const protectedRoutes = ['/admin', '/api/admin'];
 // karena endpoint itu memang menjawab status auth untuk visitor/admin.
 export const publicRoutes = [
   '/admin/login',
+  '/portal/login',
   '/api/admin/check-auth',
   '/api/admin/login',
   '/api/admin/logout',
+  '/api/admin/upload/direct',
   '/api/admin/pin/verify',
 ];
 
 // Note: RATE_LIMIT_* previously defined here was removed. Rate limiting is
 // enforced inside mutating handlers via `enforceRequestRateLimit` /
-// `checkDataRateLimit`, not in the proxy — see `src/proxy.ts` comments.
+// `checkDataRateLimit`, not in Edge middleware — see `src/middleware.ts` comments.

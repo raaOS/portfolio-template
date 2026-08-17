@@ -5,9 +5,30 @@
 
 ---
 
+## 0. AI Workflow & Tracker System (MANDATORY)
+
+Sistem dokumentasi pelacakan pekerjaan (Tracker) telah diaktifkan untuk menghemat penggunaan token (*context window*) AI di repositori ini.
+
+1. **MANDATORY READ (Saat Sesi Baru):**
+   Setiap AI **wajib** mengawali sesi dengan membaca file [INDEX_TRACKER.md](file:///C:/Users/USER/Documents/portfolio-template/docs/tracker/INDEX_TRACKER.md). Jangan membaca dokumen panjang sebelum membaca index. AI harus langsung membaca file log spesifik yang dirujuk oleh index.
+   Untuk pekerjaan yang menyentuh env, integrasi eksternal, AI provider, contact, atau data pribadi, baca juga `docs/agent-context/09_PRODUCT_BOUNDARY_CONTEXT.md` dan `docs/product-boundary/env-inventory.md`.
+   
+2. **MANDATORY WRITE (Saat Pekerjaan Selesai / Handoff):**
+   Setiap AI yang menyelesaikan task, memperbaiki bug, atau meninggalkan pekerjaan yang belum selesai (handoff) **wajib** memperbarui file log yang relevan di `docs/tracker/logs/`. Tambahkan daftar file yang dimodifikasi dan bug yang diperbaiki.
+
+---
+
 ## 1. Ringkasan Proyek & Arsitektur
 
-**portfolio-shared** adalah portofolio pribadi berbasis **Next.js App Router** dengan pengalaman pengguna utama berupa desktop simulator bergaya macOS. Halaman utama tidak menggunakan navigasi landing page konvensional; pengunjung langsung masuk ke desktop interaktif dengan window system, dock aplikasi, wallpaper dinamis, efek audio, notifikasi Dynamic Island, dan antarmuka obrolan/testimoni bergaya aplikasi pesan.
+**portfolio-shared** sedang ditransisikan dari portofolio pribadi tunggal menjadi **Portfolio OS Template** multi-site/multi-tenant yang akan dijual dalam paket Lite dan Pro. Pengalaman utama tetap berupa desktop simulator bergaya macOS: pengunjung langsung masuk ke desktop interaktif dengan window system, dock aplikasi, wallpaper dinamis, efek audio, notifikasi Dynamic Island, dan antarmuka obrolan/testimoni bergaya aplikasi pesan.
+
+### Keputusan Produk Terkunci (Wajib Diikuti)
+
+- Target arsitektur adalah **full Cloudflare**, bukan Vercel: Cloudflare Pages/Workers untuk aplikasi/API, Cloudflare D1 untuk data relasional, dan Cloudflare R2 untuk media.
+- Jangan merancang fitur baru dengan asumsi Vercel project, Vercel Functions, atau quota Vercel. Referensi Vercel yang masih ada di repo adalah legacy/migration debt sampai dibersihkan.
+- Model produk adalah **multi-site / multi-tenant single platform**, bukan 1 pembeli = 1 deployment project.
+- Lite dan Pro sama-sama **self-service** untuk client. Lite dibatasi quota/fitur; Pro membuka quota dan fitur lanjutan.
+- CRUD Master tetap diperlukan sebagai panel pusat untuk membuat site, mengatur plan/quota/feature flags, reset akses, audit, suspend/activate, dan override data bila client butuh bantuan. CRUD Master bukan tempat admin mengisi semua project client secara manual.
 
 ### Karakteristik Utama
 
@@ -15,8 +36,8 @@
 - **Framework:** Next.js 16.2.x + React 19 dengan React Compiler diaktifkan.
 - **Rendering:** Server Components secara default; Client Components digunakan untuk area dengan interaksi berat.
 - **Styling:** Tailwind CSS + CSS variables + utility helper `clsx` / `tailwind-merge`.
-- **Deployment Target:** Vercel (Hobby Free Tier).
-- **Middleware Entry:** Diatur melalui `src/proxy.ts` (bukan `middleware.ts` biasa).
+- **Deployment Target:** Cloudflare Pages/Workers (target migrasi full Cloudflare).
+- **Middleware Entry:** Diatur melalui `src/middleware.ts` Edge-style untuk kompatibilitas OpenNext Cloudflare. Jangan mengembalikan ke `src/proxy.ts` karena OpenNext Cloudflare menolak Node.js middleware/proxy.
 - **Database & Media:** Cloudflare D1 sebagai database relasional utama dan Cloudflare R2 sebagai media bucket storage.
 
 ---
@@ -38,7 +59,7 @@ src/
 |   |-- globals.css         # Entry CSS global
 |   |-- layout.tsx
 |   |-- loading.tsx
-|   `-- proxy.ts            # Request interception pipeline (entry point)
+|   `-- middleware.ts       # Edge request interception pipeline (Cloudflare/OpenNext entry point)
 |-- components/
 |   |-- admin/              # Komponen khusus halaman admin
 |   |-- canvas/             # Tampilan 3D / infinite canvas / project view
@@ -83,15 +104,13 @@ src/
 | 1   | `src/components/os/core/Dock.tsx`                         | Menu Dock bawah; hover scaling fisika ikon, bounce animation, context menus, SoundManager, drag-and-drop `@dnd-kit/core`. | Merusak tracking kursor real-time, mengganggu timing bounce, memicu _infinite re-renders_.             |
 | 2   | `src/components/os/windows/Window.tsx`                    | Bingkai jendela aplikasi macOS; dragging, resizing, minimize/maximize animations, z-index focus stacking.                 | Merusak referensi DOM (`useRef`), z-index terputus, animasi transisi minimize menjadi patah.           |
 | 3   | `src/components/os/context/OSSystemContext.tsx`           | State global OS virtual (Spotlight, Control Center, Mission Control, volume, kecerahan, sticky notes).                    | Desinkronisasi state rendering antara Dock, MenuBar, dan Window; overhead boilerplate berlebih.        |
-| 4   | `src/app/api/webhook/telegram/route.ts`                   | Webhook Telegram callback (CS bot & Job hunter bot); pemisahan thread ID, inline buttons, local dev server heartbeat.     | Kegagalan parsing payload Telegram API, request timeout, terganggunya koordinasi lease dev server.     |
-| 5   | `src/app/api/admin/login/route.ts`                        | Endpoint login admin dan logging keamanan; audit, IP geolocation, geocoding maps, notifikasi Telegram.                    | Kegagalan dependency-import antara Edge vs Node runtime Vercel, memperlambat cold-start.               |
+| 4   | `src/app/api/admin/login/route.ts`                        | Endpoint login admin dan logging keamanan; audit, IP geolocation, geocoding maps.                                         | Kegagalan dependency-import antara runtime Cloudflare Worker vs Node compatibility, memperlambat cold-start. |
 | 6   | `src/components/os/core/DesktopEnvironment.tsx`           | Entry point desktop; koordinasi posisi window, drag boundaries, grid shortcut ikon, wallpaper transitions.                | Merusak drag boundaries, bug penumpukan window, atau glitch animasi transisi wallpaper.                |
 | 7   | `src/app/admin/projects/explorer/AdminExplorerClient.tsx` | File explorer virtual admin; grid direktori, drag-and-drop `@dnd-kit/core`, antrean upload R2, action sheets.             | Mengacaukan sinkronisasi drop-zones, merusak progres upload real-time, mematahkan navigasi breadcrumb. |
 | 8   | `src/app/admin/system/components/WallpaperManager.tsx`    | Dashboard admin wallpaper; upload direct-to-R2, kompresi WASM FFmpeg di client, aspek rasio asinkron, backfill poster.    | Kebocoran memori (memory leak) WASM FFmpeg, antrean upload rusak, kegagalan pembuatan poster JPG.      |
 | 9   | `src/app/api/admin/upload/route.ts`                       | API upload media; multipart parsing di edge runtime, validation size, kompresi ffmpeg, sharp image resizing.              | Upload file besar timeout, kegagalan optimasi gambar (.webp/.avif) secara acak.                        |
 | 10  | `src/components/admin/about/DesignPhilosophyForm.tsx`     | Form filosofi desain; nested arrays dengan React Hook Form, skema validasi Zod bersarang, sinkronisasi D1.                | Kerusakan jalur validasi Zod (validation path), input kehilangan fokus saat mengetik.                  |
 | 11  | `src/contexts/BackgroundUploadContext.tsx`                | State upload wallpaper background; serialisasi antrean kompresi `compressChainRef`, progress tracking di menubar.         | Concurrency conflict (race condition) pada thread WASM FFmpeg, video korup sewaktu kompresi.           |
-| 12  | `src/lib/jobBot/handler.ts`                               | Logika bot Telegram Job Hunter; scraper situs loker (Glints/Jobstreet), parser HTML/API, inline buttons router.           | Putusnya rantai callback Telegram API, kegagalan rate-limiting, kerusakan format teks pesan Telegram.  |
 | 13  | `src/components/os/windows/ExplorerWindow/index.tsx`      | Finder/Explorer simulator client; render pohon direktori virtual, double-click gestures, Quick Look modal (PDF/Markdown). | Traversal folder melambat, double-click gesture macet, rendering ikon berkas rusak.                    |
 | 14  | `src/lib/services/explorerService.ts`                     | Layanan tree virtual file system (D1 & R2); SQL parent-child, copy/delete atomik R2, TOCTOU guard.                        | Kehilangan referensi file virtual (dangling files) atau terhapusnya media asli R2 secara permanen.     |
 | 15  | `src/components/canvas/InfiniteCanvasView.tsx`            | Galeri 3D proyek interaktif; Three.js / React Three Fiber setup, custom shaders, orbital camera limits, render loop.      | WebGL context lost, lag parah karena alokasi ulang objek 3D di setiap render, camera jittering.        |
@@ -103,17 +122,16 @@ src/
 | 21  | `src/contexts/MusicPlayerContext.tsx`                     | State global pemutar musik dan antrean track.                                                                             | Terputusnya state musik atau pemutaran tidak terkendali (double audio layer).                          |
 | 22  | `src/components/os/ui/ExitIntentFeedback.tsx`             | Logika deteksi kursor dan exit intent feedback.                                                                           | Gestur kursor terganggu dan memicu modal secara salah.                                                 |
 | 23  | `src/components/os/hooks/useStickyNotes.ts`               | Manajemen state catatan tempel OS dan sinkronisasi local storage.                                                         | Kehilangan data notes sementara atau state tidak sinkron antar komponen.                               |
-| 24  | `src/lib/telegram.ts`                                     | Library wrapper interaksi HTTP API Telegram.                                                                              | Kegagalan koneksi Telegram atau error pada pengiriman pesan notifikasi.                                |
-| 25  | `src/lib/database.ts`                                     | Wrapper core untuk eksekusi ke Cloudflare D1.                                                                             | Kerusakan koneksi DB atau kebocoran koneksi query secara diam-diam.                                    |
-| 26  | `src/hooks/useProjectForm.ts`                             | State controller raksasa untuk form proyek admin.                                                                         | Form kehilangan sinkronisasi reaktivitas saat modifikasi data berukuran besar.                         |
-| 27  | `src/components/os/hooks/window-manager/useWindowActions.ts`| Logika manajemen aktif (minimize/maximize/close) untuk window.                                                            | Window gagal diminimize atau nyangkut dalam state animasi nanggung.                                    |
+| 24  | `src/lib/database.ts`                                     | Wrapper core untuk eksekusi ke Cloudflare D1.                                                                             | Kerusakan koneksi DB atau kebocoran koneksi query secara diam-diam.                                    |
+| 25  | `src/hooks/useProjectForm.ts`                             | State controller raksasa untuk form proyek admin.                                                                         | Form kehilangan sinkronisasi reaktivitas saat modifikasi data berukuran besar.                         |
+| 26  | `src/components/os/hooks/window-manager/useWindowActions.ts`| Logika manajemen aktif (minimize/maximize/close) untuk window.                                                            | Window gagal diminimize atau nyangkut dalam state animasi nanggung.                                    |
 ---
 
 ## 4. Technology Stack & Dependencies
 
 ### Core Stack
 
-- **Next.js:** `^16.2.1` (App Router, Custom `proxy.ts`, React Compiler enabled).
+- **Next.js:** `^16.2.6` (App Router, Edge `middleware.ts`, React Compiler enabled).
 - **React:** `^19.2.1` (React 19).
 - **TypeScript:** `^5.4.5` (`strict: true`, target `ES2017`).
 - **Tailwind CSS:** `^3.4.7` (Utility-first styling).
@@ -165,7 +183,7 @@ Setiap pengunggahan video akan menghasilkan tiga file terpisah di bucket R2:
 
 ### Alur Pengunggahan Wallpaper
 
-1. **Direct-to-R2 (Default):** Melalui `BackgroundUploadContext`. Berkas video berukuran besar dikompresi langsung di sisi client menggunakan WASM FFmpeg sebelum diunggah langsung ke Cloudflare R2 menggunakan _presigned URL_ untuk memintas batas payload Vercel (4.5 MB).
+1. **Direct-to-R2 (Default):** Melalui `BackgroundUploadContext`. Berkas video berukuran besar dikompresi langsung di sisi client menggunakan WASM FFmpeg sebelum diunggah langsung ke Cloudflare R2 menggunakan _presigned URL_ / Worker upload endpoint agar tidak melewati batas payload runtime aplikasi.
 2. **FormData Fallback (`/api/upload`):** Digunakan untuk file kecil (gambar < 30 MB, audio < 25 MB, dan video kecil < 60 MB) seperti gambar poster JPG pendamping.
 
 ### Profil Kompresi WASM FFmpeg (Client & Server)
@@ -174,12 +192,12 @@ Setiap pengunggahan video akan menghasilkan tiga file terpisah di bucket R2:
 - **GOP (Group of Pictures):** Ditetapkan ke `60` secara eksplisit guna menghindari efek macroblocking saat video wallpaper diputar berulang (_looping_).
 - **CRF (Constant Rate Factor):** Di-tune khusus untuk motion graphics (`CRF=18` untuk kualitas High, `CRF=20` untuk Ultra, dan `CRF=24` untuk Standard).
 
-### Alur Pengiriman & Bandwidth Vercel
+### Alur Pengiriman & Bandwidth Cloudflare
 
-Setiap request ke `/r2/<key>` akan diarahkan melalui fungsi serverless Vercel (`src/app/api/r2/[...key]/route.ts`) ke bucket Cloudflare R2.
+Target akhir full Cloudflare: media public disajikan melalui Cloudflare Worker/R2 binding atau domain R2 yang dikontrol, dengan path selalu scoped ke `sites/{siteId}/...`.
 
-- Header `cdn-cache-control: public, max-age=31536000, immutable` diatur secara ketat agar Edge Cache Vercel menyimpan berkas video secara permanen dan menghindari pemanggilan fungsi serverless secara berulang yang dapat menghabiskan kuota transfer data.
-- Limit durasi fungsi diatur ke `maxDuration: 60` di `vercel.json` untuk mencegah pemutusan koneksi saat melakukan streaming file berukuran besar pada koneksi internet lambat.
+- Header cache jangka panjang tetap wajib untuk aset immutable agar tidak memboroskan request Worker/R2.
+- Route Next/Vercel-style seperti `/api/r2/[...key]` yang masih ada dianggap kompatibilitas sementara sampai migrasi Cloudflare selesai.
 
 ---
 
@@ -208,7 +226,7 @@ Setiap request ke `/r2/<key>` akan diarahkan melalui fungsi serverless Vercel (`
 ### Otentikasi Admin
 
 - Otentikasi admin diamankan menggunakan token JWT (`admin_token`) yang disimpan dalam cookie terenkripsi HTTP-only.
-- Filter otentikasi diatur di `src/proxy.ts` dan dievaluasi kembali di file middleware (`src/middleware/auth.ts`).
+- Filter otentikasi diatur di `src/middleware.ts` dan dievaluasi kembali di file middleware (`src/middleware/auth.ts`).
 
 ### Proteksi CSRF
 
@@ -228,8 +246,7 @@ Setiap request ke `/r2/<key>` akan diarahkan melalui fungsi serverless Vercel (`
 
 ```bash
 # Inisialisasi Environment Pengembangan
-npm run dev               # Menjalankan Next.js dev server & Telegram Job Bot poller
-npm run dev -- --no-job-bot # Menjalankan Next.js dev server tanpa Telegram bot lokal
+npm run dev               # Menjalankan dev server template
 npm run fresh-start       # Menghapus cache build .next lalu menjalankan dev server
 npm run ultra-fresh       # Pembersihan cache mendalam lalu menjalankan dev server
 
@@ -263,32 +280,13 @@ npm run ultra-clean       # Menghapus node_modules dan cache secara keseluruhan
 npm run audit             # Audit integritas basis data, relasi data, dan file
 ```
 
-### Integrasi Telegram Bot (Local Development)
+### Integrasi Eksternal Produk
 
-Repositori ini mengelola dua bot Telegram secara terpisah:
-
-1. **Main CS Bot (`@WebPortofolioBot`):** Menangani kiriman testimoni, notifikasi login admin, query OTP, dan perintah admin `/ai`.
-2. **Job Hunter Bot (`@ramos_job_hunter_bot`):** Menangani pemindaian berkas loker otomatis dengan perintah `/scan` dan `/cek` di dalam topic Job Hunter (`JOB_BOT_THREAD_ID`).
-
-> [!IMPORTANT]
-> Saat menjalankan `npm run dev` secara lokal, script orchestrator `scripts/core/dev.js` akan mendeteksi token `JOB_BOT_TELEGRAM_TOKEN` dan otomatis mengaktifkan polling bot Telegram lokal. Polling lokal ini menulis heartbeat lease ke database D1 (`telegramJobBotLocalLease`) agar webhook produksi tidak bentrok dengan server lokal Anda selama proses pengodean. Webhook produksi akan dipulihkan secara otomatis ketika proses dev server dihentikan dengan normal (Ctrl+C).
-
-Manajemen webhook bot dikendalikan melalui CLI demi keamanan:
-
-```bash
-# Memeriksa status webhook dan antrean update tertunda pada kedua bot
-npm run telegram:webhook-info
-
-# Mengatur webhook kedua bot ke URL Next.js domain produksi
-npm run telegram:set-webhook -- --base=https://domain-anda.com
-
-# Membersihkan antrean pesan tertunda (pending updates) secara aman
-npm run telegram:clear-pending
-```
+Repo ini berasal dari portfolio tunggal pribadi, tetapi integrasi personal lama sudah dihapus dari template. Untuk produk, notifikasi harus dibangun ulang sebagai provider generic berbasis `FEATURE_NOTIFICATIONS`, quota, dan `site_id`.
 
 ---
 
-## 10. Konfigurasi Environment & Batasan Quota Vercel
+## 10. Konfigurasi Environment & Batasan Quota Cloudflare
 
 ### Konfigurasi Environment Variables (`.env.local`)
 
@@ -297,20 +295,17 @@ Lihat berkas `.env.example` sebagai referensi utama. Beberapa variabel penting m
 - `CLOUDFLARE_D1_DATABASE_ID` & `CLOUDFLARE_D1_API_TOKEN`: Kredensial database Cloudflare D1.
 - `CLOUDFLARE_R2_BUCKET` & `CLOUDFLARE_R2_PUBLIC_BASE_URL`: Kredensial media bucket Cloudflare R2.
 - `JWT_SECRET` & `PASSWORD_SALT`: Digunakan untuk enkripsi token otentikasi.
-- `CRON_SECRET`: Token otentikasi panggilan webhook watchdog oleh cron scheduler.
-- `JOB_BOT_TELEGRAM_TOKEN` & `JOB_BOT_ADMIN_CHAT_ID`: Token dan chat ID untuk bot Telegram Job Hunter.
-- `JOB_BOT_THREAD_ID` & `JOB_BOT_WEBHOOK_BASE_URL`: ID topik dan base URL untuk webhook Job Hunter.
-- `JOB_BOT_USE_AI_APPLY` & `JOB_BOT_USE_AI_ANALYSIS`: Flag pemicu kecerdasan buatan untuk analisis dan lamaran kerja.
-- `OPENROUTER_API_KEY`: Kunci API opsional untuk multi-provider AI fallback.
+- `FEATURE_CLIENT_DASHBOARD`, `FEATURE_MASTER_DASHBOARD`, `FEATURE_AI`, `FEATURE_NOTIFICATIONS`: Feature gate produk.
+- `AI_PROVIDER` & `AI_API_KEY`: Provider AI generic untuk fitur Pro jika `FEATURE_AI=true`.
+- `NOTIFICATION_PROVIDER` & `NOTIFICATION_API_KEY`: Provider notifikasi generic jika `FEATURE_NOTIFICATIONS=true`.
 - `NEXT_PUBLIC_DEV_VITALS`: PenampilCore Web Vitals melayang di pojok halaman (khusus development).
 
-### Penyesuaian Penghematan Quota Vercel Hobby (Free Tier)
+### Penyesuaian Penghematan Quota Cloudflare
 
-Guna menjaga agar aplikasi tidak melewati batas kuota bulanan gratis pada Vercel Hobby plan, interval panggilan asinkron di-tune sebagai berikut:
+Guna menjaga agar aplikasi tidak boros request Worker/D1/R2, interval panggilan asinkron di-tune sebagai berikut:
 
-- **`useChatSync` (Polling Obrolan):** Ditetapkan ke **8 detik saat aktif / 60 detik saat background** (menghemat invocations serverless hingga ~60%).
+- **`useChatSync` (Polling Obrolan):** Ditetapkan ke **8 detik saat aktif / 60 detik saat background**.
 - **`useRealtimeSync` (Polling Versi Data):** Ditetapkan ke **30 detik** (mengurangi konsumsi request D1).
-- **Watchdog Cron:** Dijalankan setiap **5 menit** menggunakan cron external di [cron-job.org](https://cron-job.org/) dengan menyertakan header `Authorization: Bearer <CRON_SECRET>`.
 - **Transformasi Gambar:** Tag `<Image>` Next.js dikonfigurasi menggunakan transform WebP/AVIF dengan cache jangka panjang. Gunakan atribut `unoptimized` jika gambar berasal dari API eksternal yang sudah teroptimasi.
 
 ---
@@ -390,5 +385,5 @@ Guna mengunci dependency yang rentan, pastikan kolom `overrides` di file `packag
 
 ---
 
-_Terakhir Diperbarui: 2026-06-11_
+_Terakhir Diperbarui: 2026-06-27_
 _Tingkat Kepercayaan Informasi: Terverifikasi Penuh oleh Pengujian Unit & Sistem_

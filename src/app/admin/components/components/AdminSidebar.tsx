@@ -191,7 +191,7 @@ export const AdminSidebar = ({
             <span
               className={`ml-2 truncate text-xl font-bold text-gray-900 transition-all duration-300 ${sidebarCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}
             >
-              Ramos Admin
+              Portfolio Admin
             </span>
           </div>
         </div>

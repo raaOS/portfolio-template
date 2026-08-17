@@ -1,5 +1,5 @@
 const API_TIMEOUT = 30000;
-const GEMINI_MODEL_CANDIDATES = [
+const GOOGLE_AI_MODEL_CANDIDATES = [
   'gemini-flash-latest',
   'gemini-2.0-flash',
   'gemini-2.5-flash-lite',
@@ -22,7 +22,7 @@ const OPENROUTER_VIDEO_MODEL_CANDIDATES = [
 ] as const;
 
 export interface ProviderFailure {
-  provider: 'gemini' | 'openrouter';
+  provider: 'google' | 'openrouter';
   status: number;
   body: string;
   model: string;
@@ -40,7 +40,7 @@ interface ProviderGenerationResult {
   lastFailure: ProviderFailure | null;
 }
 
-function isRetryableGeminiFailure(status: number, body: string) {
+function isRetryableGoogleAiFailure(status: number, body: string) {
   return (
     status === 429 ||
     status === 503 ||
@@ -49,16 +49,16 @@ function isRetryableGeminiFailure(status: number, body: string) {
   );
 }
 
-function toFriendlyGeminiError(status: number, body: string) {
+function toFriendlyGoogleAiError(status: number, body: string) {
   if (/quota|rate.?limit|too many requests/i.test(body) || status === 429) {
-    return 'Gemini quota sedang habis untuk semua model yang dicoba. Isi manual dulu atau coba lagi nanti.';
+    return 'Google AI quota sedang habis untuk semua model yang dicoba. Isi manual dulu atau coba lagi nanti.';
   }
 
   if (/not found/i.test(body) || status === 404) {
-    return 'Model Gemini yang tersedia di API key ini tidak bisa dipakai untuk generate detail.';
+    return 'Model Google AI yang tersedia di API key ini tidak bisa dipakai untuk generate detail.';
   }
 
-  return `Gemini API Error: ${body}`;
+  return `Google AI API Error: ${body}`;
 }
 
 function isRetryableOpenRouterFailure(status: number, body: string) {
@@ -81,7 +81,7 @@ function isRetryableOpenRouterFailure(status: number, body: string) {
 
 function toFriendlyOpenRouterError(status: number, body: string) {
   if (status === 401 || /invalid.*key|unauthorized/i.test(body)) {
-    return 'OpenRouter API key tidak valid. Cek OPENROUTER_API_KEY di .env.local.';
+    return 'OpenRouter API key tidak valid. Cek AI_PROVIDER=openrouter dan AI_API_KEY di .env.local.';
   }
 
   if (status === 402 || /credit|balance|payment|insufficient/i.test(body)) {
@@ -106,7 +106,7 @@ export function toFriendlyProviderError(failure: ProviderFailure | null) {
     return toFriendlyOpenRouterError(failure.status, failure.body);
   }
 
-  return toFriendlyGeminiError(failure.status, failure.body);
+  return toFriendlyGoogleAiError(failure.status, failure.body);
 }
 
 function getOpenRouterModelCandidates(mimeType: string) {
@@ -166,7 +166,7 @@ function extractOpenRouterText(data: Record<string, unknown>) {
   return '';
 }
 
-export async function generateWithGemini({
+export async function generateWithGoogleAI({
   apiKey,
   prompt,
   mimeType,
@@ -193,7 +193,7 @@ export async function generateWithGemini({
     },
   };
 
-  for (const model of GEMINI_MODEL_CANDIDATES) {
+  for (const model of GOOGLE_AI_MODEL_CANDIDATES) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
     const controller = new AbortController();
@@ -213,10 +213,10 @@ export async function generateWithGemini({
 
     if (!response.ok) {
       const body = await response.text();
-      lastFailure = { provider: 'gemini', status: response.status, body, model };
+      lastFailure = { provider: 'google', status: response.status, body, model };
 
-      if (isRetryableGeminiFailure(response.status, body)) {
-        console.warn(`[AI Generate] Gemini model ${model} unavailable, trying fallback.`);
+      if (isRetryableGoogleAiFailure(response.status, body)) {
+        console.warn(`[AI Generate] Google AI model ${model} unavailable, trying fallback.`);
         continue;
       }
 
@@ -230,7 +230,7 @@ export async function generateWithGemini({
       return { text, lastFailure };
     }
 
-    lastFailure = { provider: 'gemini', status: 500, body: 'No response from AI', model };
+    lastFailure = { provider: 'google', status: 500, body: 'No response from AI', model };
   }
 
   return { text: '', lastFailure };

@@ -43,7 +43,7 @@ class PerformanceOptimizer {
         description: 'Run performance tests',
       },
       {
-        name: '7. Deploy to Vercel',
+        name: '7. Deploy to Cloudflare',
         command: 'npm run deploy',
         description: 'Deploy to production',
       },
@@ -126,7 +126,7 @@ class PerformanceOptimizer {
     if (successCount === totalCount) {
       this.log('🎉 All optimizations completed! Ready for deployment.', 'success');
       this.log('Next steps:', 'info');
-      this.log('   1. Deploy to Vercel: npm run deploy', 'info');
+      this.log('   1. Deploy to Cloudflare: npm run deploy', 'info');
       this.log('   2. Test performance: npm run test:performance', 'info');
       this.log('   3. Run Lighthouse: npm run lighthouse', 'info');
     } else {
@@ -144,7 +144,7 @@ class PerformanceOptimizer {
         failed: results.filter((r) => !r.success).length,
       },
       recommendations: [
-        'Deploy to Vercel and test with Lighthouse',
+        'Deploy to Cloudflare and test with Lighthouse',
         'Monitor Core Web Vitals in production',
         'Set up performance monitoring',
         'Configure performance budgets',

@@ -5,7 +5,7 @@ import { verifyAdminToken } from '@/lib/auth';
 import AdminExplorerClient from '@/app/admin/projects/explorer/AdminExplorerClient';
 
 export const metadata = {
-  title: 'Explorer Manager | Ramos Admin',
+  title: 'Explorer Manager | Portfolio Admin',
   description: 'Manage Project Explorer folders and files.',
 };
 

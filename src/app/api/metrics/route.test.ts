@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { refMock, enforceRequestRateLimitMock, getProjectsMock } = vi.hoisted(() => ({
+const { refMock, enforceRequestRateLimitMock, getProjectBySlugSqlMock } = vi.hoisted(() => ({
   refMock: vi.fn(),
   enforceRequestRateLimitMock: vi.fn(),
-  getProjectsMock: vi.fn(),
+  getProjectBySlugSqlMock: vi.fn(),
 }));
 
 vi.mock('@/lib/database', () => ({
@@ -16,9 +16,9 @@ vi.mock('@/lib/security/request', () => ({
   enforceRequestRateLimit: enforceRequestRateLimitMock,
 }));
 
-vi.mock('@/lib/services/projectService', () => ({
-  projectService: {
-    getProjects: getProjectsMock,
+vi.mock('@/lib/services/project/projectSqlService', () => ({
+  projectSqlService: {
+    getProjectBySlugSql: getProjectBySlugSqlMock,
   },
 }));
 
@@ -48,13 +48,10 @@ describe('POST /api/metrics', () => {
 
   it('applies atomic like mutations on top of fallback metrics', async () => {
     enforceRequestRateLimitMock.mockResolvedValue({ allowed: true, retryAfter: 0 });
-    getProjectsMock.mockResolvedValue({
-      projects: [{ slug: 'demo', likes: 7, shares: 2 }],
-      lastUpdated: new Date().toISOString(),
-    });
+    getProjectBySlugSqlMock.mockResolvedValue({ slug: 'demo', likes: 7, shares: 2 });
 
     refMock.mockImplementation((path: string) => {
-      if (path === 'metrics/metrics/demo') {
+      if (path === 'metrics/metrics/default-site/demo') {
         return {
           transaction: vi.fn(
             async (
@@ -89,5 +86,24 @@ describe('POST /api/metrics', () => {
         shares: 2,
       },
     });
+  });
+
+  it('writes metrics into the requesting tenant namespace', async () => {
+    enforceRequestRateLimitMock.mockResolvedValue({ allowed: true, retryAfter: 0 });
+    getProjectBySlugSqlMock.mockResolvedValue({ slug: 'demo', likes: 0, shares: 0 });
+    const transaction = vi.fn(async (updater) => updater(null));
+    refMock.mockReturnValue({ transaction });
+
+    const response = await POST(
+      new Request('http://localhost/api/metrics', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ siteId: 'tenant-a', slug: 'demo', action: 'like' }),
+      }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(getProjectBySlugSqlMock).toHaveBeenCalledWith('tenant-a', 'demo');
+    expect(refMock).toHaveBeenCalledWith('metrics/metrics/tenant-a/demo');
   });
 });

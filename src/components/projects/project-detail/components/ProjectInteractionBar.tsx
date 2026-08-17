@@ -5,6 +5,8 @@ import { Loader2, Languages, RotateCcw, ExternalLink } from 'lucide-react';
 import type { Comment } from '@/lib/magic';
 import ShareSheet from '@/components/ui/ShareSheet';
 import SystemNotification from '@/components/ui/SystemNotification';
+import { usePathname } from 'next/navigation';
+import { buildTenantProjectDetailHref } from '@/lib/routing/tenantRoutes';
 
 interface ProjectInteractionBarProps {
   isProjectLiked: boolean;
@@ -37,6 +39,7 @@ export function ProjectInteractionBar({
   orientation = 'horizontal',
   projectSlug,
 }: ProjectInteractionBarProps) {
+  const pathname = usePathname();
   const [isShareOpen, setIsShareOpen] = React.useState(false);
   const [notification, setNotification] = React.useState<{
     isOpen: boolean;
@@ -154,7 +157,7 @@ export function ProjectInteractionBar({
               ? 'text-purple-600 hover:text-gray-400'
               : 'text-gray-400 hover:text-purple-600'
           }`}
-          title={translations ? 'Restore original' : 'Translate with Gemini AI'}
+          title={translations ? 'Restore original' : 'Translate with AI'}
         >
           {translateLoading ? (
             <Loader2 className="h-5 w-5 animate-spin sm:h-6 sm:w-6" />
@@ -168,7 +171,7 @@ export function ProjectInteractionBar({
         {/* Open Full Page Button (vertical/window mode only) */}
         {isVertical && projectSlug && (
           <a
-            href={`/projects/${projectSlug}`}
+            href={buildTenantProjectDetailHref(pathname, projectSlug)}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center rounded-full p-1.5 text-gray-400 transition-all duration-200 hover:text-amber-500"

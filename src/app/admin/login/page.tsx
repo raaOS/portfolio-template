@@ -5,7 +5,7 @@ import AdminLoginClient from './_components/AdminLoginClient';
 import { verifyAdminToken } from '@/lib/auth';
 
 export const metadata: Metadata = {
-  title: 'Admin Login | Ramos OS',
+  title: 'Admin Login | Portfolio OS',
   description: 'Access the admin dashboard.',
   robots: { index: false, follow: false },
 };

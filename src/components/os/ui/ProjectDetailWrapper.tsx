@@ -17,7 +17,15 @@ const ProjectDetailTwoColumn = dynamic(
 
 const isVideo = (url?: string) => url && /\.(mp4|webm|mov)(\?.*)?$/i.test(url);
 
-const ProjectDetailWrapper = ({ project, projects }: { project: Project; projects: Project[] }) => {
+const ProjectDetailWrapper = ({
+  project,
+  projects,
+  siteId = 'default-site',
+}: {
+  project: Project;
+  projects: Project[];
+  siteId?: string;
+}) => {
   const coverSrc = project.cover || '/placeholder.jpg';
   const isVid = isVideo(coverSrc);
 
@@ -51,6 +59,7 @@ const ProjectDetailWrapper = ({ project, projects }: { project: Project; project
       gallery={gallery}
       ratio={ratio}
       otherProjects={otherProjects}
+      siteId={siteId}
       isWindowMode={true}
     />
   );

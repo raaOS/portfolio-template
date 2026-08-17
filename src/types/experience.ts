@@ -12,6 +12,8 @@ export interface WorkExperience {
   isActive?: boolean;
 }
 
+import type { EventPage } from './event-page';
+
 export interface ExperienceData {
   statistics: {
     years: string;
@@ -20,6 +22,7 @@ export interface ExperienceData {
     clientSatisfaction: string;
   };
   workExperience: WorkExperience[];
+  events?: EventPage[];
   lastUpdated: string;
 }
 

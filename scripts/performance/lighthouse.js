@@ -40,7 +40,7 @@ function extractScores(reportPath) {
 }
 
 function main() {
-  const reports = ['lighthouse-home-vercel.json', 'lighthouse-about-vercel.json'];
+  const reports = ['lighthouse-home-cloudflare.json', 'lighthouse-about-cloudflare.json'];
 
   console.log('📊 Current Lighthouse Scores\n');
 

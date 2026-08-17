@@ -5,14 +5,6 @@ import type { Project, GalleryItem } from '@/types/projects';
 import { resolveStorageUrl } from '@/lib/urlResolver';
 import { getVideoPosterSource, getVideoPreviewSource, isVideoSource } from '@/lib/mediaPreview';
 
-export function toImageProxy(u: string) {
-  return resolveStorageUrl(u);
-}
-
-export function toMediaProxy(u: string) {
-  return resolveStorageUrl(u);
-}
-
 export function isVideoLink(u: string): boolean {
   return isVideoSource((u || '').trim());
 }
@@ -24,7 +16,7 @@ const BLANK_SVG =
   );
 
 export function coverUrl(p: Project) {
-  return p.cover ? toMediaProxy(p.cover) : BLANK_SVG;
+  return p.cover ? resolveStorageUrl(p.cover) : BLANK_SVG;
 }
 
 function resolveCoverWithSource(p: Project, src: string): GalleryItem {
@@ -35,8 +27,8 @@ function resolveCoverWithSource(p: Project, src: string): GalleryItem {
     const posterUrl = inferredVideo ? getVideoPosterSource(p.cover) : undefined;
     return {
       kind,
-      src: toMediaProxy(src),
-      poster: posterUrl ? toImageProxy(posterUrl) : undefined,
+      src: resolveStorageUrl(src),
+      poster: posterUrl ? resolveStorageUrl(posterUrl) : undefined,
       width: p.coverWidth,
       height: p.coverHeight,
     };
@@ -58,11 +50,10 @@ export function resolveGallery(p: Project): GalleryItem[] {
     return p.galleryItems
       .filter((it) => it.isActive !== false)
       .map((it) => {
-        // Return RAW URL
         return {
           kind: it.kind,
-          src: toMediaProxy(it.src),
-          poster: it.poster ? toImageProxy(it.poster) : undefined,
+          src: resolveStorageUrl(it.src),
+          poster: it.poster ? resolveStorageUrl(it.poster) : undefined,
           width: it.width,
           height: it.height,
         };
@@ -70,7 +61,7 @@ export function resolveGallery(p: Project): GalleryItem[] {
   }
 
   const basic = (p.gallery || []).map((src) => {
-    return { kind: 'image', src: toImageProxy(src) } as GalleryItem;
+    return { kind: 'image', src: resolveStorageUrl(src) } as GalleryItem;
   });
 
   if (basic.length) return basic;

@@ -11,6 +11,7 @@ import { useDictionary } from '@/contexts/LanguageContext';
 
 type Props = {
   initialProjects?: Project[];
+  siteId?: string;
   windowWidth?: number;
 };
 
@@ -21,6 +22,7 @@ interface ProjectsResponse {
 
 export default function IndexClientWithAutoUpdate({
   initialProjects: serverProjects = [],
+  siteId,
   windowWidth,
 }: Props) {
   const t = useDictionary();
@@ -47,10 +49,15 @@ export default function IndexClientWithAutoUpdate({
   // BUG FIX #8: Di client component, pakai relative path supaya browser
   // otomatis pakai origin saat ini. Sebelumnya pakai NEXT_PUBLIC_SITE_URL
   // yang kalau di-set ke URL produksi, fetch dari localhost akan gagal
-  // karena cross-origin (CORS) atau Vercel deployment down → menampilkan
+  // karena cross-origin (CORS) atau production deployment down → menampilkan
   // "TypeError: Failed to fetch" di dev.
   const fetchProjects = useCallback(async (): Promise<ProjectsResponse> => {
-    const response = await fetch('/api/projects?status=published');
+    const params = new URLSearchParams({ status: 'published' });
+    if (siteId) {
+      params.set('siteId', siteId);
+    }
+
+    const response = await fetch(`/api/projects?${params.toString()}`);
     if (!response.ok) {
       throw new Error('Failed to fetch projects');
     }
@@ -58,7 +65,7 @@ export default function IndexClientWithAutoUpdate({
     // API wraps response in { success, data: { projects, lastUpdated } }
     // Extract the inner data object
     return json.data ?? json;
-  }, []);
+  }, [siteId]);
 
   // BUG FIX #5: Valid timestamp untuk initialData
   const initialData =
@@ -70,7 +77,7 @@ export default function IndexClientWithAutoUpdate({
       : undefined;
 
   const { data, isError, error, isLoading } = useQuery({
-    queryKey: ['projects', 'published'],
+    queryKey: ['projects', 'published', siteId ?? 'default-site'],
     queryFn: fetchProjects,
     refetchInterval: POLLING.UPDATE_INTERVAL,
     structuralSharing: true,

@@ -166,10 +166,10 @@ export default function ProjectEditorPanel({
               </div>
               <div className="flex-1 space-y-1">
                 <h4 className="text-xs font-bold text-slate-800 group-hover:text-indigo-600 dark:text-slate-200 dark:group-hover:text-indigo-400">
-                  Buat Otomatis (Gemini AI)
+                  Buat Otomatis (AI)
                 </h4>
                 <p className="text-[10px] leading-relaxed text-slate-400">
-                  Gunakan kecerdasan buatan Gemini untuk menghasilkan draf detail proyek &
+                  Gunakan kecerdasan buatan untuk menghasilkan draf detail proyek &
                   statistik viral berdasarkan cover media.
                 </p>
               </div>
@@ -204,7 +204,7 @@ export default function ProjectEditorPanel({
                   Panduan Asisten AI
                 </h4>
                 <p className="mt-1 text-[10px] leading-relaxed text-slate-400 dark:text-slate-500">
-                  Unggah file cover proyek terlebih dahulu di kolom sebelah kiri. Asisten Gemini
+                  Unggah file cover proyek terlebih dahulu di kolom sebelah kiri. Asisten AI
                   akan membaca media tersebut dan memformulasikan draf detail proyek secara otomatis.
                 </p>
               </div>
@@ -258,7 +258,7 @@ export default function ProjectEditorPanel({
                     <span className="flex items-center gap-2">
                       <Sparkles className="h-4 w-4 animate-pulse text-indigo-500" />
                       <span className="font-mono text-[10px] uppercase tracking-wider">
-                        Gemini AI Assistant
+                        AI Assistant
                       </span>
                     </span>
                     <div className="flex items-center gap-1.5">

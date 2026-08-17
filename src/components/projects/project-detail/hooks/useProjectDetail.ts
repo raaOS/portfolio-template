@@ -16,6 +16,7 @@ import { collectProjectTranslationFields } from '../utils/translations';
 
 interface UseProjectDetailProps {
   project: Project;
+  siteId?: string;
 }
 
 interface ProjectMetrics {
@@ -63,7 +64,7 @@ function isInterruptedFetch(error: unknown) {
   return error.name === 'AbortError' || /failed to fetch/i.test(error.message);
 }
 
-export function useProjectDetail({ project }: UseProjectDetailProps): UseProjectDetailReturn {
+export function useProjectDetail({ project, siteId = 'default-site' }: UseProjectDetailProps): UseProjectDetailReturn {
   const [comments, setComments] = useState<Comment[]>([]);
   const [isProjectLiked, setIsProjectLiked] = useState(false);
   const [metrics, setMetrics] = useState({ likes: 0, shares: 0 });
@@ -88,7 +89,7 @@ export function useProjectDetail({ project }: UseProjectDetailProps): UseProject
   const [, setIsLoaded] = useState(false);
   const [translations, setTranslations] = useState<Record<string, string> | null>(null);
   const [translateLoading, setTranslateLoading] = useState(false);
-  const CACHE_KEY = `gemini_proj_v2_${project.slug}`;
+  const CACHE_KEY = `ai_proj_v2_${siteId}_${project.slug}`;
 
   const [activeGalleryGroup, setActiveGalleryGroup] = useState<GalleryGroup | null>(null);
   const [activeNarrativeTab, setActiveNarrativeTab] = useState<'challenge' | 'solution' | 'impact'>(
@@ -163,7 +164,7 @@ export function useProjectDetail({ project }: UseProjectDetailProps): UseProject
     // BUG FIX #6: try-catch untuk localStorage
     if (typeof window !== 'undefined') {
       try {
-        const savedLike = localStorage.getItem(`like-${project.slug}`);
+        const savedLike = localStorage.getItem(`like-${siteId}-${project.slug}`);
         if (savedLike === 'true') {
           requestAnimationFrame(() => setIsProjectLiked(true));
         }
@@ -172,7 +173,7 @@ export function useProjectDetail({ project }: UseProjectDetailProps): UseProject
       }
     }
     requestAnimationFrame(() => setIsLoaded(true));
-  }, [project.slug]);
+  }, [project.slug, siteId]);
 
   // Defer non-critical API calls to improve initial load time
   useEffect(() => {
@@ -182,8 +183,8 @@ export function useProjectDetail({ project }: UseProjectDetailProps): UseProject
     const timer = setTimeout(async () => {
       try {
         const [metricsRes, commentsRes] = await Promise.all([
-          fetch(`/api/metrics?slug=${project.slug}`, { signal: controller.signal }),
-          fetch(`/api/comments?slug=${project.slug}`, { signal: controller.signal }),
+          fetch(`/api/metrics?slug=${encodeURIComponent(project.slug)}&siteId=${encodeURIComponent(siteId)}`, { signal: controller.signal }),
+          fetch(`/api/comments?slug=${encodeURIComponent(project.slug)}&siteId=${encodeURIComponent(siteId)}`, { signal: controller.signal }),
         ]);
 
         if (!isActive) return;
@@ -211,7 +212,7 @@ export function useProjectDetail({ project }: UseProjectDetailProps): UseProject
       clearTimeout(timer);
       controller.abort();
     };
-  }, [project.slug]);
+  }, [project.slug, siteId]);
 
   const handleProjectLike = useCallback(async () => {
     if (likeRequestInFlightRef.current) return;
@@ -229,6 +230,7 @@ export function useProjectDetail({ project }: UseProjectDetailProps): UseProject
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               slug: project.slug,
+              siteId,
               action: nextIsLiked ? 'like' : 'unlike',
             }),
           });
@@ -251,7 +253,7 @@ export function useProjectDetail({ project }: UseProjectDetailProps): UseProject
           });
 
           try {
-            localStorage.setItem(`like-${project.slug}`, String(nextIsLiked));
+            localStorage.setItem(`like-${siteId}-${project.slug}`, String(nextIsLiked));
           } catch (error) {
             console.warn('[useProjectDetail] Failed to save like status:', error);
           }
@@ -263,7 +265,7 @@ export function useProjectDetail({ project }: UseProjectDetailProps): UseProject
         }
       });
     });
-  }, [optimisticLikeState.isLiked, project.slug, startLikeTransition, updateOptimisticLike]);
+  }, [optimisticLikeState.isLiked, project.slug, siteId, startLikeTransition, updateOptimisticLike]);
 
   const handleProjectShare = async () => {
     setMetrics((prev) => ({ ...prev, shares: prev.shares + 1 }));
@@ -273,7 +275,7 @@ export function useProjectDetail({ project }: UseProjectDetailProps): UseProject
     fetch('/api/metrics', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug: project.slug, action: 'share' }),
+      body: JSON.stringify({ slug: project.slug, siteId, action: 'share' }),
       keepalive: true,
     }).catch((error) => {
       console.error('[useProjectDetail] Failed to record share metric:', error);

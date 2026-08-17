@@ -16,38 +16,41 @@ export const generateDesktopIcons = (
 
   // 2. Define Desktop Grid
   const isMobile = windowSize.width < 768;
-  const gridX = isMobile ? 90 : 110; // Tighter grid on mobile
-  const gridY = isMobile ? 120 : 140; // Tighter grid on mobile
-  const margin = isMobile ? 20 : 40; // Smaller margin on mobile
-  const topOffset = 60; // MenuBar
-  const bottomOffset = 120; // Dock
+  let gridX = 120; // Diperlebar agar tidak overlap
+  let gridY = 150; // Diperlebar untuk label teks panjang
+  let margin = 32;
+  let topOffset = 60; // MenuBar
+  let bottomOffset = 120; // Dock
+
+  if (isMobile) {
+    gridX = 82;
+    gridY = 98;
+    margin = 12;
+    topOffset = 50;
+    bottomOffset = 95;
+  }
 
   const cols = Math.max(0, Math.floor((windowSize.width - margin * 2) / gridX));
   const rows = Math.max(0, Math.floor((windowSize.height - topOffset - bottomOffset) / gridY));
 
   const availableSlots: { x: number; y: number }[] = [];
 
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
+  // Urutan pengisian: Atas ke Bawah, lalu Kiri ke Kanan (Column-first)
+  for (let c = 0; c < cols; c++) {
+    for (let r = 0; r < rows; r++) {
       const x = margin + c * gridX;
       const y = topOffset + margin / 2 + r * gridY;
-
       availableSlots.push({ x, y });
     }
   }
 
-  // 3. Stable Slot Assignment (No Random Shuffle)
-  // We sort available slots by position (top-to-bottom, left-to-right)
-  // but we use item IDs to consistently pick a slot.
-  availableSlots.sort((a, b) => a.y - b.y || a.x - b.x);
+  // 3. Stable Slot Assignment
+  // Slot sudah diurutkan dari Atas->Bawah dan Kiri->Kanan secara natural dari loop.
 
   const safeProjects = Array.isArray(commercialProjects) ? commercialProjects : [];
   let visibleProjects = safeProjects.filter((p) => p.status !== 'draft');
 
-  if (isMobile) {
-    // Sembunyikan ikon proyek individual di mobile agar wallpaper bersih & bebas tumpang tindih
-    visibleProjects = [];
-  } else if (desktopPreferences?.maxIcons) {
+  if (desktopPreferences?.maxIcons) {
     visibleProjects = visibleProjects.slice(0, desktopPreferences.maxIcons);
   }
 
@@ -111,30 +114,19 @@ export const generateDesktopIcons = (
       finalX = clamped.x;
       finalY = clamped.y;
     } else {
-      // FALLBACK TO GRID
+      // FALLBACK TO GRID (Simetris & Rapi)
       slotIndex = index % Math.max(1, availableSlots.length);
       slot =
         availableSlots.length > 0
           ? availableSlots[slotIndex] // STABLE PICK
           : {
-              x: windowSize.width - margin - gridX + index * 10,
-              y: windowSize.height - bottomOffset - gridY + index * 10,
+              x: margin + index * gridX,
+              y: topOffset + margin / 2 + index * gridY,
             };
 
-      // Static jitter based on ID (to avoid moving icons but keep organic look)
-      const getSeededRandom = (id: string) => {
-        let hash = 0;
-        for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
-        return (hash % 100) / 100;
-      };
-
-      const seed = getSeededRandom(itemId);
-      const jitterRange = isMobile ? 5 : 20;
-      const jitterX = seed * jitterRange - jitterRange / 2;
-      const jitterY = (1 - seed) * jitterRange - jitterRange / 2;
-
-      finalX = Math.max(10, Math.min(windowSize.width - 80, slot.x + jitterX));
-      finalY = Math.max(topOffset, Math.min(windowSize.height - bottomOffset, slot.y + jitterY));
+      // Tidak ada efek jitter (acak), letakkan ikon sejajar sempurna
+      finalX = Math.max(10, Math.min(windowSize.width - 80, slot.x));
+      finalY = Math.max(topOffset, Math.min(windowSize.height - bottomOffset, slot.y));
     }
 
     if (item.type === 'folder') {

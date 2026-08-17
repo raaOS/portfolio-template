@@ -1,21 +1,16 @@
 import type { Project } from '@/types/projects';
-import { projectService } from '@/lib/services/projectService';
+import { projectSqlService } from '@/lib/services/project/projectSqlService';
 
-export async function allProjectsAsync(): Promise<Project[]> {
-  // Use cached data for homepage to ensure instant load (Performance Fix)
-  // Revalidation handles updates via standard Next.js ISR/On-Demand Revalidation
-  const { projects } = await projectService.getProjects(undefined, false);
-  return (projects || [])
-    .filter((p) => p.status !== 'draft')
-    .slice()
-    .sort((a, b) => (a.order || 0) - (b.order || 0) || (b.year || 0) - (a.year || 0));
+export async function allProjectsAsync(siteId = 'default-site'): Promise<Project[]> {
+  const { projects } = await projectSqlService.getProjectsSql(siteId, 'published');
+  return projects;
 }
 
-export async function getProjectBySlugAsync(slug: string): Promise<Project | null> {
+export async function getProjectBySlugAsync(slug: string, siteId = 'default-site'): Promise<Project | null> {
   try {
-    const project = await projectService.getProjectBySlug(slug);
+    const project = await projectSqlService.getProjectBySlugSql(siteId, slug);
     if (project && project.status === 'draft') return null;
-    return project || null;
+    return project;
   } catch {
     return null;
   }

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getR2Object, headR2Object, isR2StorageConfigured } from '@/lib/r2Storage';
 
-export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 type RouteContext = {
@@ -102,11 +101,9 @@ function buildObjectHeaders(input: {
   const cacheValue = input.cacheControl || 'public, max-age=31536000, immutable';
   headers.set('cache-control', cacheValue);
 
-  // CDN-Cache-Control: Vercel-specific header yang JAMIN edge cache
-  // aktif terlepas dari `dynamic = 'force-dynamic'` di route. Tanpa
-  // ini, Vercel bisa skip edge cache karena `force-dynamic` dan
-  // setiap request invoke function = origin transfer cost.
-  // Reference: https://vercel.com/docs/edge-network/headers/cache-control-headers
+  // CDN-Cache-Control: shared CDN hint for immutable media responses.
+  // Keep long-lived cache headers here so repeated media views avoid
+  // unnecessary origin/R2 transfer cost.
   headers.set('cdn-cache-control', cacheValue);
 
   headers.set('content-type', input.contentType || contentTypeForKey(input.key));
@@ -132,7 +129,18 @@ function buildCorsHeaders() {
 
 function isAllowedKey(key: string) {
   if (!key || key.includes('..') || key.includes('\\')) return false;
-  return key.startsWith('assets/') || key.startsWith('temp/');
+  if (
+    key === 'ffmpeg/ffmpeg-core.js' ||
+    key === 'ffmpeg/ffmpeg-core.wasm'
+  ) {
+    return true;
+  }
+  return (
+    key.startsWith('assets/') ||
+    key.startsWith('temp/') ||
+    key.startsWith('sites/') ||
+    key.startsWith('platform/')
+  );
 }
 
 function toWebStream(body: unknown): ReadableStream | null {
@@ -166,6 +174,8 @@ function contentTypeForKey(key: string) {
     mov: 'video/quicktime',
     pdf: 'application/pdf',
     txt: 'text/plain; charset=utf-8',
+    js: 'application/javascript; charset=utf-8',
+    wasm: 'application/wasm',
   };
 
   return types[ext || ''] || 'application/octet-stream';

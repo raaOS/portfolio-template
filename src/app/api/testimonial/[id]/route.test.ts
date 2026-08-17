@@ -97,10 +97,14 @@ describe('PUT /api/testimonial/[id]', () => {
     expect(body.success).toBe(true);
     expect(body.testimonial.name).toBe('Updated Name');
     expect(body.testimonial.company).toBe('New Corp');
-    expect(updateTestimonialMock).toHaveBeenCalledWith('test-1', {
-      name: 'Updated Name',
-      company: 'New Corp',
-    });
+    expect(updateTestimonialMock).toHaveBeenCalledWith(
+      'test-1',
+      {
+        name: 'Updated Name',
+        company: 'New Corp',
+      },
+      'default-site'
+    );
     expect(revalidatePathMock).toHaveBeenCalled();
   });
 
@@ -109,9 +113,13 @@ describe('PUT /api/testimonial/[id]', () => {
 
     const response = await PUT(buildPut({ name: 'From Params' }) as never, params('test-1'));
     expect(response.status).toBe(200);
-    expect(updateTestimonialMock).toHaveBeenCalledWith('test-1', {
-      name: 'From Params',
-    });
+    expect(updateTestimonialMock).toHaveBeenCalledWith(
+      'test-1',
+      {
+        name: 'From Params',
+      },
+      'default-site'
+    );
   });
 
   it('returns 404 when testimonial not found', async () => {
@@ -155,7 +163,7 @@ describe('DELETE /api/testimonial/[id]', () => {
 
     expect(response.status).toBe(200);
     expect(body.success).toBe(true);
-    expect(deleteTestimonialMock).toHaveBeenCalledWith('test-1');
+    expect(deleteTestimonialMock).toHaveBeenCalledWith('test-1', 'default-site');
     expect(revalidatePathMock).toHaveBeenCalled();
   });
 

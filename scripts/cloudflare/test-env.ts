@@ -1,66 +1,39 @@
 /**
- * Test Environment — Verifikasi konektivitas Cloudflare D1 dan R2.
+ * Product Cloudflare Environment Doctor.
  *
- * Memeriksa apakah semua environment variables untuk D1 database dan
- * R2 storage sudah tersedia dan koneksi berfungsi dengan benar.
- *
- * @module scripts/cloudflare/test-env
+ * Default mode is offline/safe: it checks key presence only and never prints
+ * secret values. Use --live-check only after confirming this env points to the
+ * dedicated product Cloudflare account.
  */
-import * as dotenv from 'dotenv';
-import path from 'path';
-import { getMissingD1EnvKeys, isD1Configured, queryD1 } from '../../src/lib/cloudflareD1';
-import { getMissingR2EnvKeys, isR2StorageConfigured } from '../../src/lib/r2Storage';
+import { queryD1 } from '../../src/lib/cloudflareD1';
+import {
+  loadProductEnv,
+  printProductEnvReport,
+  requireProductCloudflareEnvConfirmed,
+} from './product-env';
 
-dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
-
-async function withTimeout<T>(promise: Promise<T>, ms: number, label: string) {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${label} timeout`)), ms)),
-  ]);
-}
+loadProductEnv();
 
 async function main() {
-  const requiredKeys = [
-    'CLOUDFLARE_D1_DATABASE_ID',
-    'CLOUDFLARE_D1_API_TOKEN',
-    'DATA_BACKEND',
-    'NEXT_PUBLIC_DATA_BACKEND',
-    'CLOUDFLARE_R2_ACCOUNT_ID',
-    'CLOUDFLARE_R2_ACCESS_KEY_ID',
-    'CLOUDFLARE_R2_SECRET_ACCESS_KEY',
-    'CLOUDFLARE_R2_BUCKET',
-    'CLOUDFLARE_R2_PUBLIC_BASE_URL',
-  ];
+  const report = printProductEnvReport();
+  const isLiveCheck = process.argv.includes('--live-check');
 
-  console.log('Env keys:');
-  for (const key of requiredKeys) {
-    console.log(`- ${key}: ${process.env[key] ? 'present' : 'missing'}`);
+  if (!isLiveCheck) {
+    console.log('');
+    console.log('Offline env doctor complete. No Cloudflare request was sent.');
+    return;
   }
 
-  if (!isD1Configured()) {
-    throw new Error(
-      `Cloudflare D1 env is incomplete. Missing: ${getMissingD1EnvKeys().join(', ')}`
-    );
+  if (report.missingRequired.length > 0 || report.backendIssues.length > 0) {
+    throw new Error('Product env is incomplete. Fix missing keys before live check.');
   }
 
-  if (!isR2StorageConfigured()) {
-    throw new Error(
-      `Cloudflare R2 env is incomplete. Missing: ${getMissingR2EnvKeys().join(', ')}`
-    );
-  }
-
-  const d1Rows = await withTimeout(
-    queryD1<{ count: number }>('SELECT COUNT(*) as count FROM app_kv'),
-    15000,
-    'D1 query'
-  );
-
-  console.log(`D1: connected, app_kv rows=${d1Rows[0]?.count ?? 0}`);
-  console.log('R2: configured');
+  requireProductCloudflareEnvConfirmed('run live Cloudflare connectivity check');
+  const rows = await queryD1<{ ok: number }>('SELECT 1 as ok');
+  console.log(`D1 live check: ${rows[0]?.ok === 1 ? 'ok' : 'unexpected response'}`);
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error(error instanceof Error ? error.message : error);
   process.exit(1);
 });

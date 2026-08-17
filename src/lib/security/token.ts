@@ -28,14 +28,11 @@ export function generateCSRFToken(): string {
 export function validateCSRFToken(token: string, sessionToken: string): boolean {
   if (!token || !sessionToken) return false;
   if (token.length !== 64 || sessionToken.length !== 64) return false;
+  if (!/^[a-f0-9]+$/i.test(token) || !/^[a-f0-9]+$/i.test(sessionToken)) return false;
 
-  // Timing-safe comparison to prevent side-channel attacks
-  const bufA = Buffer.from(token, 'hex');
-  const bufB = Buffer.from(sessionToken, 'hex');
-  if (bufA.length !== bufB.length) return false;
-
-  // crypto is available globally in Node.js
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const crypto = require('crypto');
-  return crypto.timingSafeEqual(bufA, bufB);
+  let diff = 0;
+  for (let i = 0; i < token.length; i += 1) {
+    diff |= token.charCodeAt(i) ^ sessionToken.charCodeAt(i);
+  }
+  return diff === 0;
 }

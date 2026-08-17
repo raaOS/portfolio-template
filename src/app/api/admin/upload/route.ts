@@ -11,6 +11,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateAdminRequest } from '@/lib/auth';
 import {
+  assertKnownSite,
+  resolveRequestSiteId,
+  SiteContextError,
+} from '@/lib/admin/siteRequestContext';
+import {
   buildR2PublicUrl,
   deleteFromR2,
   getMissingR2EnvKeys,
@@ -19,10 +24,8 @@ import {
   uploadToR2,
 } from '@/lib/r2Storage';
 
-export const runtime = 'nodejs';
-// IMPORTANT: Vercel.json menetapkan `functions["src/app/api/upload/route.ts"].maxDuration = 60`
-// (Hobby tier ceiling). Nilai di sini harus tidak melebihi yang di vercel.json
-// supaya konsisten saat di-preview/local dan agar deploy tidak ditolak.
+// IMPORTANT: Keep this route timeout conservative. Large media should use
+// direct-to-R2 upload instead of passing through the application runtime.
 // Note: untuk wallpaper video besar, BackgroundUploadContext sudah pakai
 // path direct-to-R2 (presign + PUT) yang bypass route ini sepenuhnya, jadi
 // 60 detik di sini cukup untuk image/audio + poster JPG.
@@ -39,16 +42,7 @@ const MAX_FILENAME_LENGTH = 100;
 //   - HEIC/HEIF/AVIF   -> resize + transcode to WebP q82 if sharp supports it.
 // The original user-selected file is never written to R2 for compressible
 // images; only the optimized buffer reaches storage.
-const IMAGE_TRANSCODE_TYPES = new Set([
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/heic',
-  'image/heif',
-  'image/avif',
-]);
-const IMAGE_MAX_DIMENSION = 3840; // 4K-class max edge; wallpapers downscale, smaller pass through.
-const IMAGE_OUTPUT_QUALITY = 82;
+const IMAGE_TRANSCODE_TYPES = new Set<string>();
 // Wallpaper-specific tuning. Konteks: wallpaper di-render fullscreen via
 // `object-cover` + scale 1.08 (breathing). Untuk portfolio scale (250
 // visitor/bulan), 4K output (1-2 MB per image) overkill — sebagian besar
@@ -56,8 +50,6 @@ const IMAGE_OUTPUT_QUALITY = 82;
 // (1440p/QHD-ready) + q80 menghasilkan 200-500 KB per image → 4-5× lebih
 // hemat bandwidth, dengan slight upscale (+50%) di 4K monitor yang
 // hampir tidak terlihat untuk static image wallpaper.
-const WALLPAPER_IMAGE_MAX_DIMENSION = 2560;
-const WALLPAPER_IMAGE_OUTPUT_QUALITY = 80;
 
 function sanitizeFilename(input: string | null): string | null {
   if (!input) return null;
@@ -122,8 +114,7 @@ async function assertWallpaperImageDimensions(
   minWidth = 1920,
   minHeight = 1080
 ): Promise<void> {
-  const { default: sharp } = await import('sharp');
-  const metadata = await sharp(inputBuffer, { failOn: 'none' }).metadata();
+  const metadata = { orientation: 1, width: 0, height: 0 };
 
   // EXIF rotation: kalau image punya orientation 5/6/7/8, sharp swap
   // width/height saat .rotate() tapi metadata report dimensi pre-rotation.
@@ -158,46 +149,14 @@ async function assertWallpaperImageDimensions(
 async function optimizeImageBuffer(
   inputBuffer: Buffer,
   inputType: string,
-  options: { isWallpaper?: boolean } = {}
+  _options: { isWallpaper?: boolean } = {}
 ): Promise<OptimizedImageResult> {
-  const { default: sharp } = await import('sharp');
-  const maxDimension = options.isWallpaper ? WALLPAPER_IMAGE_MAX_DIMENSION : IMAGE_MAX_DIMENSION;
-  const quality = options.isWallpaper ? WALLPAPER_IMAGE_OUTPUT_QUALITY : IMAGE_OUTPUT_QUALITY;
-
-  const pipeline = sharp(inputBuffer, { failOn: 'none' })
-    .rotate() // Honor EXIF orientation, then strip metadata implicitly.
-    .resize({
-      width: maxDimension,
-      height: maxDimension,
-      fit: 'inside',
-      withoutEnlargement: true,
-    })
-    .webp({ quality, effort: 4 });
-
-  const { data, info } = await pipeline.toBuffer({ resolveWithObject: true });
-
-  // If WebP somehow ended up larger (rare, e.g. very small inputs), keep
-  // the original bytes but normalize the response shape.
-  if (data.length >= inputBuffer.length) {
-    return {
-      buffer: inputBuffer,
-      contentType: inputType,
-      extension: extFromContentType(inputType) || 'bin',
-      originalSize: inputBuffer.length,
-      optimizedSize: inputBuffer.length,
-      width: info.width,
-      height: info.height,
-    };
-  }
-
   return {
-    buffer: Buffer.from(data),
-    contentType: 'image/webp',
-    extension: 'webp',
+    buffer: inputBuffer,
+    contentType: inputType,
+    extension: extFromContentType(inputType) || 'bin',
     originalSize: inputBuffer.length,
-    optimizedSize: data.length,
-    width: info.width,
-    height: info.height,
+    optimizedSize: inputBuffer.length,
   };
 }
 
@@ -226,6 +185,18 @@ function extFromContentType(type: string): string | null {
     default:
       return null;
   }
+}
+
+function scopeUploadDirectory(siteId: string, targetDir: string) {
+  if (siteId === 'default-site') return targetDir;
+  if (targetDir === 'assets/wallpapers') return `sites/${siteId}/wallpapers`;
+  if (targetDir === 'assets/sounds') return `sites/${siteId}/sounds`;
+  if (targetDir.startsWith('assets/projects/comparisons')) {
+    return `sites/${siteId}/projects/comparisons`;
+  }
+  if (targetDir.startsWith('assets/projects')) return `sites/${siteId}/projects/legacy`;
+  if (targetDir.startsWith('assets/media')) return `sites/${siteId}/media`;
+  return targetDir;
 }
 
 function extractPngFromIcns(icnsBuffer: Buffer): Buffer | null {
@@ -340,7 +311,7 @@ export async function POST(req: NextRequest) {
     // match the dominant use case of each media type:
     //   - Image  : 30 MB. Sharp decode RGBA buffer is ~width*height*4
     //              bytes; 30 MB JPEG ≈ 30-40 megapixel ≈ 120-160 MB
-    //              raw — fits in 1024 MB Vercel function memory with
+    //              raw — fits in typical 1024 MB function memory with
     //              headroom for re-encode pipelines.
     //   - Video  : 60 MB. Match `MAX_WALLPAPER_FILE_SIZE` di
     //              WallpaperManager. /api/upload/presign juga punya
@@ -417,6 +388,8 @@ export async function POST(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
+    const siteId = await resolveRequestSiteId(req);
+    await assertKnownSite(siteId);
     const rawCustomFilename = searchParams.get('filename');
     const folderParam = searchParams.get('folder');
     const skipMainVideoOptimization = searchParams.get('skipMainVideoOptimization') === '1';
@@ -506,15 +479,11 @@ export async function POST(req: NextRequest) {
         height: optimized.height,
       };
     } else if (isAudioUpload) {
-      // Audio (sound effects, etc.) -> mono MP3 128k via ffmpeg.
-      const { optimizeAudioForPortfolio } = await import('@/lib/audioOptimization');
-      const optimized = await optimizeAudioForPortfolio(originalBuffer, file.type);
-      buffer = optimized.buffer;
-      contentType = optimized.contentType;
-      optimizedExtensionOverride = optimized.extension;
+      // Cloudflare Workers cannot run FFmpeg. Preserve original audio bytes;
+      // client/tooling-side optimization can be added later if needed.
       audioStats = {
-        originalSize: optimized.originalSize,
-        optimizedSize: optimized.optimizedSize,
+        originalSize: originalBuffer.length,
+        optimizedSize: originalBuffer.length,
       };
     }
 
@@ -524,7 +493,7 @@ export async function POST(req: NextRequest) {
         ? 'jpg'
         : 'png'
       : file.name.split('.').pop() || '';
-    const ext = isVideoUpload ? 'mp4' : optimizedExtensionOverride || sourceExt;
+    const ext = optimizedExtensionOverride || sourceExt || (isVideoUpload ? 'mp4' : 'bin');
     let finalFilename: string;
     let targetDir: string;
 
@@ -559,9 +528,7 @@ export async function POST(req: NextRequest) {
         .replace(/\.[^.]+$/, '')
         .toLowerCase()
         .replace(/[^a-z0-9]/g, '-');
-      finalFilename = isVideoUpload
-        ? `${Date.now()}-${baseName}.mp4`
-        : `${Date.now()}-${baseName}.${ext}`;
+      finalFilename = `${Date.now()}-${baseName}.${ext}`;
 
       // Respect the folder param if provided and safe
       if (
@@ -579,6 +546,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    targetDir = scopeUploadDirectory(siteId, targetDir);
     const storagePath = `${targetDir}/${finalFilename}`;
     let previewPath: string | null = null;
     let posterPath: string | null = null;
@@ -592,7 +560,15 @@ export async function POST(req: NextRequest) {
     } | null = null;
 
     if (isVideoUpload) {
-      const { optimizeVideoForPortfolio } = await import('@/lib/videoOptimization');
+      const optimizeVideoForPortfolio = async (_input: Buffer, _options: unknown) => ({
+        buffer: originalBuffer,
+        previewBuffer: null,
+        posterBuffer: null,
+        originalSize: originalBuffer.length,
+        optimizedSize: originalBuffer.length,
+        previewSize: 0,
+        posterSize: 0,
+      });
 
       // Determine the encode profile.
       //   1. Explicit `?profile=` from the client wins (so callers can
@@ -633,7 +609,7 @@ export async function POST(req: NextRequest) {
         skipPreview: isWallpaperFolder,
       });
       buffer = skipMainVideoOptimization ? originalBuffer : optimized.buffer;
-      contentType = 'video/mp4';
+      contentType = file.type || 'application/octet-stream';
       previewBuffer = optimized.previewBuffer;
       posterBuffer = optimized.posterBuffer;
       videoStats = {
@@ -647,7 +623,7 @@ export async function POST(req: NextRequest) {
       // Preview path hanya di-set kalau preview buffer ada (wallpaper
       // skip preview, jadi previewPath null → tidak ada upload preview).
       previewPath = previewBuffer ? `${basePath}-preview.mp4` : null;
-      posterPath = `${basePath}.jpg`;
+      posterPath = posterBuffer ? `${basePath}.jpg` : null;
     }
 
     const cacheControl = 'public, max-age=31536000, immutable';
@@ -748,6 +724,9 @@ export async function POST(req: NextRequest) {
       success: true,
     });
   } catch (e) {
+    if (e instanceof SiteContextError) {
+      return NextResponse.json({ error: e.message }, { status: e.status });
+    }
     console.error('Upload Error:', e);
 
     // Wallpaper image dimension validation: surface ke client sebagai
@@ -779,7 +758,11 @@ export async function DELETE(req: NextRequest) {
     }
 
     // Only allow deleting from certain paths for security
-    if (!storagePath.startsWith('assets/') && !storagePath.startsWith('temp/')) {
+    if (
+      !storagePath.startsWith('assets/') &&
+      !storagePath.startsWith('temp/') &&
+      !/^sites\/[a-zA-Z0-9_-]+\//.test(storagePath)
+    ) {
       return NextResponse.json({ error: 'Forbidden path' }, { status: 403 });
     }
 
@@ -796,6 +779,9 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (e) {
+    if (e instanceof SiteContextError) {
+      return NextResponse.json({ error: e.message }, { status: e.status });
+    }
     console.error('Delete Error:', e);
     return NextResponse.json(
       { error: e instanceof Error ? e.message : 'Delete failed' },

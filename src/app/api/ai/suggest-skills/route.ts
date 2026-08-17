@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGeminiApiKey, guardAdminAiRequest } from '../_shared';
+import { getGoogleAiApiKey, guardAdminAiRequest } from '../_shared';
 
 interface SuggestSkillsRequest {
   skillName: string;
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   const guardResponse = await guardAdminAiRequest(req, 'ai_skills');
   if (guardResponse) return guardResponse;
 
-  const API_KEY = getGeminiApiKey();
+  const API_KEY = getGoogleAiApiKey();
   if (!API_KEY) {
     return NextResponse.json({ error: 'API Key not configured' }, { status: 500 });
   }
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const txt = await response.text();
-      throw new Error(`Gemini API Error: ${txt}`);
+      throw new Error(`Google AI API Error: ${txt}`);
     }
 
     const data = await response.json();

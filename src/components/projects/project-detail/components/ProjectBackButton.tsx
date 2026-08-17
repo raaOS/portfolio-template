@@ -11,6 +11,8 @@ import {
 } from '@/lib/projectsViewMode';
 import { markBack } from '@/lib/navigationDirection';
 import { cancelProjectCoverTransition } from '@/lib/projectCoverTransition';
+import { usePathname } from 'next/navigation';
+import { getTenantBasePath } from '@/lib/routing/tenantRoutes';
 
 interface ProjectBackButtonProps {
   label?: string;
@@ -21,6 +23,7 @@ export function ProjectBackButton({
   label = 'Back to Projects',
   className,
 }: ProjectBackButtonProps) {
+  const pathname = usePathname();
   // SSR-safe read dari sessionStorage via useSyncExternalStore.
   // Server snapshot selalu 'grid' (default) agar tidak hydration mismatch.
   // Client snapshot baca sessionStorage, re-read otomatis bila mode berubah.
@@ -39,7 +42,7 @@ export function ProjectBackButton({
 
   return (
     <Link
-      href={buildProjectsHref(mode)}
+      href={buildProjectsHref(mode, getTenantBasePath(pathname))}
       scroll={false}
       // Tandai navigasi ini sebagai "back" agar slide dari arah kiri.
       // Pakai onClickCapture agar set attribute SEBELUM next-view-transitions

@@ -161,7 +161,7 @@ export function NetworkPopout({
       </div>
 
       <div className="border-t border-black/5 px-4 py-2 text-[10px] uppercase tracking-[0.18em] text-zinc-400">
-        Ramos Admin · Network
+        Portfolio Admin · Network
       </div>
     </PopoutShell>
   );

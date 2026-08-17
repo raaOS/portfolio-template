@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { enforceRequestRateLimit } from '@/lib/security/request';
 
+function isCloudflareRuntime(request: NextRequest): boolean {
+  return Boolean(
+    request.headers.get('cf-ray') ||
+      request.headers.get('cf-connecting-ip') ||
+      process.env.CLOUDFLARE_ACCOUNT_ID ||
+      process.env.CF_PAGES
+  );
+}
+
 export async function GET(request: NextRequest) {
   try {
     const rateLimit = await enforceRequestRateLimit(request, 'health', 10, 60_000, 300_000);
@@ -18,16 +27,20 @@ export async function GET(request: NextRequest) {
       version: '1.0.0',
     };
 
-    // Check file system access
-    try {
-      const fs = await import('fs').then((m) => m.promises);
-      const path = await import('path');
-      const testPath = path.join(process.cwd(), 'public');
-      await fs.access(testPath);
-      checks.filesystem = 'accessible';
-    } catch {
-      checks.filesystem = 'inaccessible';
-      checks.status = 'degraded';
+    if (isCloudflareRuntime(request)) {
+      checks.filesystem = 'not_applicable';
+    } else {
+      // Check file system access for local Node.js runtime.
+      try {
+        const fs = await import('fs').then((m) => m.promises);
+        const path = await import('path');
+        const testPath = path.join(process.cwd(), 'public');
+        await fs.access(testPath);
+        checks.filesystem = 'accessible';
+      } catch {
+        checks.filesystem = 'inaccessible';
+        checks.status = 'degraded';
+      }
     }
 
     // Check configured data backend connection.

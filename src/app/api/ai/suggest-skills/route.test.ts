@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { getGeminiApiKeyMock, guardAdminAiRequestMock } = vi.hoisted(() => ({
-  getGeminiApiKeyMock: vi.fn(),
+const { getGoogleAiApiKeyMock, guardAdminAiRequestMock } = vi.hoisted(() => ({
+  getGoogleAiApiKeyMock: vi.fn(),
   guardAdminAiRequestMock: vi.fn(),
 }));
 
 vi.mock('../_shared', () => ({
-  getGeminiApiKey: getGeminiApiKeyMock,
+  getGoogleAiApiKey: getGoogleAiApiKeyMock,
   guardAdminAiRequest: guardAdminAiRequestMock,
 }));
 
@@ -20,7 +20,7 @@ function request(body: Record<string, unknown>) {
   }) as never;
 }
 
-function geminiSkillsResponse(details: string[]) {
+function googleAiSkillsResponse(details: string[]) {
   return new Response(
     JSON.stringify({
       candidates: [
@@ -38,18 +38,18 @@ function geminiSkillsResponse(details: string[]) {
 describe('POST /api/ai/suggest-skills', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    getGeminiApiKeyMock.mockReturnValue('test-key');
+    getGoogleAiApiKeyMock.mockReturnValue('test-key');
     guardAdminAiRequestMock.mockResolvedValue(null);
   });
 
-  it('returns 4 skill details from Gemini', async () => {
+  it('returns 4 skill details from Google AI', async () => {
     const details = [
       'Masking & Compositing',
       'Color Grading',
       'Photo Retouching',
       'Batch Processing',
     ];
-    const fetchMock = vi.fn().mockResolvedValue(geminiSkillsResponse(details));
+    const fetchMock = vi.fn().mockResolvedValue(googleAiSkillsResponse(details));
     vi.stubGlobal('fetch', fetchMock);
 
     const response = await POST(request({ skillName: 'Photoshop' }));
@@ -71,7 +71,7 @@ describe('POST /api/ai/suggest-skills', () => {
   });
 
   it('returns 500 when API key is not configured', async () => {
-    getGeminiApiKeyMock.mockReturnValue('');
+    getGoogleAiApiKeyMock.mockReturnValue('');
 
     const response = await POST(request({ skillName: 'Figma' }));
     const body = await response.json();
@@ -92,7 +92,7 @@ describe('POST /api/ai/suggest-skills', () => {
     expect(body.error).toBe('Unauthorized');
   });
 
-  it('returns 500 when Gemini API responds with HTTP error', async () => {
+  it('returns 500 when Google AI API responds with HTTP error', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(new Response('Service unavailable', { status: 503 }));
@@ -102,7 +102,7 @@ describe('POST /api/ai/suggest-skills', () => {
     const body = await response.json();
 
     expect(response.status).toBe(500);
-    expect(body.error).toContain('Gemini API Error');
+    expect(body.error).toContain('Google AI API Error');
   });
 
   it('returns 500 when AI returns no candidates text', async () => {

@@ -2,28 +2,30 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   validateAdminRequestMock,
-  getProjectsMock,
-  updateProjectMock,
-  deleteProjectMock,
+  getProjectByIdSqlMock,
+  updateProjectSqlMock,
+  deleteProjectSqlMock,
+  enforceProjectUpdateQuotaMock,
+  resolveProjectSiteIdMock,
   refMock,
   onceMock,
   valMock,
   setMock,
   removeMock,
-  sendTelegramAlertMock,
   revalidatePathMock,
   generateGenZCommentsMock,
 } = vi.hoisted(() => ({
   validateAdminRequestMock: vi.fn(),
-  getProjectsMock: vi.fn(),
-  updateProjectMock: vi.fn(),
-  deleteProjectMock: vi.fn(),
+  getProjectByIdSqlMock: vi.fn(),
+  updateProjectSqlMock: vi.fn(),
+  deleteProjectSqlMock: vi.fn(),
+  enforceProjectUpdateQuotaMock: vi.fn(),
+  resolveProjectSiteIdMock: vi.fn(),
   refMock: vi.fn(),
   onceMock: vi.fn(),
   valMock: vi.fn(),
   setMock: vi.fn(),
   removeMock: vi.fn(),
-  sendTelegramAlertMock: vi.fn(),
   revalidatePathMock: vi.fn(),
   generateGenZCommentsMock: vi.fn(),
 }));
@@ -32,22 +34,36 @@ vi.mock('@/lib/auth', () => ({
   validateAdminRequest: validateAdminRequestMock,
 }));
 
-vi.mock('@/lib/services/projectService', () => ({
-  projectService: {
-    getProjects: getProjectsMock,
-    updateProject: updateProjectMock,
-    deleteProject: deleteProjectMock,
+vi.mock('@/lib/services/project/projectSqlService', () => ({
+  projectSqlService: {
+    getProjectByIdSql: getProjectByIdSqlMock,
+    updateProjectSql: updateProjectSqlMock,
+    deleteProjectSql: deleteProjectSqlMock,
   },
 }));
+
+vi.mock('@/lib/admin/projectSiteContext', () => {
+  class ProjectQuotaError extends Error {
+    constructor(
+      message: string,
+      public readonly errorCode: string,
+      public readonly details?: Record<string, unknown>
+    ) {
+      super(message);
+    }
+  }
+
+  return {
+    enforceProjectUpdateQuota: enforceProjectUpdateQuotaMock,
+    resolveProjectSiteId: resolveProjectSiteIdMock,
+    ProjectQuotaError,
+  };
+});
 
 vi.mock('@/lib/database', () => ({
   db: {
     ref: refMock,
   },
-}));
-
-vi.mock('@/lib/telegram', () => ({
-  sendTelegramAlert: sendTelegramAlertMock,
 }));
 
 vi.mock('@/lib/magic', () => ({
@@ -100,12 +116,11 @@ function buildDelete(): NextRequest {
 describe('GET /api/projects/[id]', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    valMock.mockReturnValue(mockProject);
-    onceMock.mockResolvedValue({ val: valMock });
-    refMock.mockReturnValue({ once: onceMock });
+    resolveProjectSiteIdMock.mockReturnValue('default-site');
+    getProjectByIdSqlMock.mockResolvedValue(mockProject);
   });
 
-  it('returns a single project from D1', async () => {
+  it('returns a single project from SQL', async () => {
     const response = await GET(
       new NextRequest('http://localhost/api/projects/proj-1'),
       params('proj-1')
@@ -114,32 +129,11 @@ describe('GET /api/projects/[id]', () => {
 
     expect(response.status).toBe(200);
     expect(body.project.id).toBe('proj-1');
-    expect(refMock).toHaveBeenCalledWith('projects/proj-1');
+    expect(getProjectByIdSqlMock).toHaveBeenCalledWith('default-site', 'proj-1');
   });
 
-  it('falls back to service when D1 returns null', async () => {
-    valMock.mockReturnValue(null);
-    getProjectsMock.mockResolvedValue({
-      projects: [mockProject],
-      lastUpdated: new Date().toISOString(),
-    });
-
-    const response = await GET(
-      new NextRequest('http://localhost/api/projects/proj-1'),
-      params('proj-1')
-    );
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body.project.id).toBe('proj-1');
-  });
-
-  it('returns 404 when project not found anywhere', async () => {
-    valMock.mockReturnValue(null);
-    getProjectsMock.mockResolvedValue({
-      projects: [{ ...mockProject, id: 'other' }],
-      lastUpdated: new Date().toISOString(),
-    });
+  it('returns 404 when project not found', async () => {
+    getProjectByIdSqlMock.mockResolvedValue(null);
 
     const response = await GET(
       new NextRequest('http://localhost/api/projects/proj-1'),
@@ -152,9 +146,7 @@ describe('GET /api/projects/[id]', () => {
   });
 
   it('returns 500 on unexpected error', async () => {
-    refMock.mockReturnValue({
-      once: vi.fn().mockRejectedValue(new Error('DB error')),
-    });
+    getProjectByIdSqlMock.mockRejectedValue(new Error('DB error'));
 
     const response = await GET(
       new NextRequest('http://localhost/api/projects/proj-1'),
@@ -171,8 +163,10 @@ describe('PUT /api/projects/[id]', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     validateAdminRequestMock.mockResolvedValue(true);
-    updateProjectMock.mockResolvedValue(mockProject);
-    sendTelegramAlertMock.mockResolvedValue(undefined);
+    resolveProjectSiteIdMock.mockReturnValue('default-site');
+    enforceProjectUpdateQuotaMock.mockResolvedValue(undefined);
+    getProjectByIdSqlMock.mockResolvedValue(mockProject);
+    updateProjectSqlMock.mockResolvedValue(mockProject);
     valMock.mockReturnValue([]);
     onceMock.mockResolvedValue({ val: valMock });
     refMock.mockReturnValue({ once: onceMock, set: setMock, remove: removeMock });
@@ -202,7 +196,7 @@ describe('PUT /api/projects/[id]', () => {
   });
 
   it('updates a project and revalidates paths', async () => {
-    updateProjectMock.mockResolvedValue({ ...mockProject, title: 'Updated Project' });
+    updateProjectSqlMock.mockResolvedValue({ ...mockProject, title: 'Updated Project' });
 
     const response = await PUT(
       buildPut({ id: 'proj-1', title: 'Updated Project' }) as never,
@@ -213,13 +207,19 @@ describe('PUT /api/projects/[id]', () => {
     expect(response.status).toBe(200);
     expect(body.success).toBe(true);
     expect(body.project.title).toBe('Updated Project');
+    expect(enforceProjectUpdateQuotaMock).toHaveBeenCalled();
+    expect(updateProjectSqlMock).toHaveBeenCalledWith(
+      'default-site',
+      'proj-1',
+      expect.objectContaining({ title: 'Updated Project' })
+    );
     expect(revalidatePathMock).toHaveBeenCalledWith('/', 'layout');
     expect(revalidatePathMock).toHaveBeenCalledWith('/projects');
     expect(revalidatePathMock).toHaveBeenCalledWith('/admin');
   });
 
   it('returns 404 when project not found for update', async () => {
-    updateProjectMock.mockResolvedValue(null);
+    updateProjectSqlMock.mockResolvedValue(null);
     const response = await PUT(
       buildPut({ id: 'proj-1', title: 'Test' }) as never,
       params('proj-1')
@@ -230,28 +230,11 @@ describe('PUT /api/projects/[id]', () => {
     expect(body.error).toBe('Project not found or update failed');
   });
 
-  it('sends Telegram alert with changed fields', async () => {
-    updateProjectMock.mockResolvedValue({
-      ...mockProject,
-      title: 'New Title',
-      client: 'New Client',
-    });
-
-    await PUT(
-      buildPut({ id: 'proj-1', title: 'New Title', client: 'New Client' }) as never,
-      params('proj-1')
-    );
-
-    expect(sendTelegramAlertMock).toHaveBeenCalled();
-    const call = sendTelegramAlertMock.mock.calls[0][0];
-    expect(call).toContain('PROJECT UPDATED');
-  });
-
   it('appends comments when initialCommentCount > 0', async () => {
     generateGenZCommentsMock.mockReturnValue([
       { id: 1, text: 'Love it!', isMe: false, time: '12:00' },
     ]);
-    updateProjectMock.mockResolvedValue(mockProject);
+    updateProjectSqlMock.mockResolvedValue(mockProject);
     valMock.mockReturnValue([{ id: 0, text: 'Existing', isMe: false, time: '11:00' }]);
 
     await PUT(
@@ -267,7 +250,7 @@ describe('PUT /api/projects/[id]', () => {
     const submittedComments = [
       { id: 'generated-1', text: 'Keren banget!', name: 'AI', likes: 2, replies: [] },
     ];
-    updateProjectMock.mockResolvedValue({ ...mockProject, slug: 'test-project' });
+    updateProjectSqlMock.mockResolvedValue({ ...mockProject, slug: 'test-project' });
 
     const response = await PUT(
       buildPut({ id: 'proj-1', title: 'Test', comments: submittedComments }) as never,
@@ -275,7 +258,7 @@ describe('PUT /api/projects/[id]', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(refMock).toHaveBeenCalledWith('comments/test-project');
+    expect(refMock).toHaveBeenCalledWith('comments/default-site/test-project');
     expect(setMock).toHaveBeenCalledWith(submittedComments);
     expect(generateGenZCommentsMock).not.toHaveBeenCalled();
   });
@@ -286,7 +269,6 @@ describe('PUT /api/projects/[id]', () => {
       { id: 'new-1', text: 'Generated', name: 'AI', likes: 0, replies: [] },
     ];
 
-    const projectRef = { once: vi.fn().mockResolvedValue({ val: () => mockProject }) };
     const oldCommentsRef = {
       once: vi.fn().mockResolvedValue({ val: () => previousComments }),
       remove: removeMock,
@@ -297,12 +279,11 @@ describe('PUT /api/projects/[id]', () => {
     };
 
     refMock.mockImplementation((path: string) => {
-      if (path === 'projects/proj-1') return projectRef;
-      if (path === 'comments/test-project') return oldCommentsRef;
-      if (path === 'comments/new-slug') return newCommentsRef;
+      if (path === 'comments/default-site/test-project') return oldCommentsRef;
+      if (path === 'comments/default-site/new-slug') return newCommentsRef;
       return { once: onceMock, set: setMock, remove: removeMock };
     });
-    updateProjectMock.mockResolvedValue({ ...mockProject, slug: 'new-slug' });
+    updateProjectSqlMock.mockResolvedValue({ ...mockProject, slug: 'new-slug' });
 
     const response = await PUT(
       buildPut({ id: 'proj-1', slug: 'new-slug', title: 'Test' }) as never,
@@ -317,7 +298,7 @@ describe('PUT /api/projects/[id]', () => {
   });
 
   it('handles unexpected error in update', async () => {
-    updateProjectMock.mockRejectedValue(new Error('Crash'));
+    updateProjectSqlMock.mockRejectedValue(new Error('Crash'));
     const response = await PUT(
       buildPut({ id: 'proj-1', title: 'Test' }) as never,
       params('proj-1')
@@ -333,8 +314,8 @@ describe('DELETE /api/projects/[id]', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     validateAdminRequestMock.mockResolvedValue(true);
-    deleteProjectMock.mockResolvedValue(true);
-    sendTelegramAlertMock.mockResolvedValue(undefined);
+    resolveProjectSiteIdMock.mockReturnValue('default-site');
+    deleteProjectSqlMock.mockResolvedValue(true);
   });
 
   it('rejects unauthenticated deletes', async () => {
@@ -353,13 +334,12 @@ describe('DELETE /api/projects/[id]', () => {
     expect(response.status).toBe(200);
     expect(body.success).toBe(true);
     expect(body.message).toBe('Project deleted successfully');
-    expect(deleteProjectMock).toHaveBeenCalledWith('proj-1');
+    expect(deleteProjectSqlMock).toHaveBeenCalledWith('default-site', 'proj-1');
     expect(revalidatePathMock).toHaveBeenCalled();
-    expect(sendTelegramAlertMock).toHaveBeenCalled();
   });
 
   it('returns 404 when project not found for delete', async () => {
-    deleteProjectMock.mockResolvedValue(false);
+    deleteProjectSqlMock.mockResolvedValue(false);
     const response = await DELETE(buildDelete() as never, params('proj-1'));
     const body = await response.json();
 
@@ -368,7 +348,7 @@ describe('DELETE /api/projects/[id]', () => {
   });
 
   it('handles unexpected delete error', async () => {
-    deleteProjectMock.mockRejectedValue(new Error('Crash'));
+    deleteProjectSqlMock.mockRejectedValue(new Error('Crash'));
     const response = await DELETE(buildDelete() as never, params('proj-1'));
     const body = await response.json();
 

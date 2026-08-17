@@ -9,10 +9,13 @@
 import * as dotenv from 'dotenv';
 import path from 'path';
 import { bootstrapD1Schema, getMissingD1EnvKeys, isD1Configured } from '../../src/lib/cloudflareD1';
+import { requireProductCloudflareEnvConfirmed } from './product-env';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
 async function main() {
+  requireProductCloudflareEnvConfirmed('apply D1 schema');
+
   if (!isD1Configured()) {
     throw new Error(
       `Cloudflare D1 env is incomplete. Missing: ${getMissingD1EnvKeys().join(', ')}`

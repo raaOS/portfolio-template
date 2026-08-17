@@ -72,7 +72,10 @@ describe('POST /api/admin/about/desktop', () => {
     expect(body.success).toBe(true);
     expect(body.message).toBe('Desktop preferences saved');
 
-    expect(aboutServiceUpdateMock).toHaveBeenCalledWith({ desktopPreferences: prefs });
+    expect(aboutServiceUpdateMock).toHaveBeenCalledWith(
+      { desktopPreferences: prefs },
+      'default-site'
+    );
     expect(invalidateAboutCacheMock).toHaveBeenCalled();
     expect(revalidatePathMock).toHaveBeenCalledWith('/', 'layout');
     expect(revalidatePathMock).toHaveBeenCalledWith('/about');
@@ -94,6 +97,9 @@ describe('POST /api/admin/about/desktop', () => {
   it('passes empty desktopPreferences values', async () => {
     const res = await POST(buildPostRequest({ desktopPreferences: {} }));
     expect(res.status).toBe(200);
-    expect(aboutServiceUpdateMock).toHaveBeenCalledWith({ desktopPreferences: {} });
+    expect(aboutServiceUpdateMock).toHaveBeenCalledWith(
+      { desktopPreferences: {} },
+      'default-site'
+    );
   });
 });

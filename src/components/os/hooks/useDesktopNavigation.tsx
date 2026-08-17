@@ -25,10 +25,12 @@ interface UseDesktopNavigationProps {
   }>;
   _notes: NoteData[];
   projects: Project[];
+  siteId?: string;
   _restoreNote: (id: string) => void;
   _addNote: () => void;
   _isAdmin: boolean;
   setNotesDockBouncing: (bouncing: boolean) => void;
+  isWhatsAppEnabled?: boolean;
 }
 
 export function useDesktopNavigation({
@@ -38,10 +40,12 @@ export function useDesktopNavigation({
   ChatWindow,
   _notes,
   projects,
+  siteId = 'default-site',
   _restoreNote,
   _addNote,
   _isAdmin,
   setNotesDockBouncing,
+  isWhatsAppEnabled = true,
 }: UseDesktopNavigationProps) {
   const { notesVisible, setNotesVisible, hiddenNoteIds, unhideAllNotes } = useOSOverlays();
   const router = useRouter();
@@ -66,19 +70,21 @@ export function useDesktopNavigation({
     (project: Project, originRect?: { x: number; y: number; width: number; height: number }) => {
       openWindow(`project-${project.id}`, {
         title: `Portfolio: ${project.title}`,
-        content: <ProjectDetailWrapper project={project} projects={projects} />,
+        content: <ProjectDetailWrapper project={project} projects={projects} siteId={siteId} />,
         originRect,
         width: 900,
         height: 620,
         noPadding: true,
       });
     },
-    [openWindow, projects]
+    [openWindow, projects, siteId]
   );
 
   // Klik Dynamic Island (dengan chatId spesifik) -> langsung buka chat
   const navToChat = useCallback(
     (chatId?: string) => {
+      if (!isWhatsAppEnabled) return;
+
       openWindow('whatsapp', {
         content: (
           <ChatWindow
@@ -89,11 +95,13 @@ export function useDesktopNavigation({
         ),
       });
     },
-    [openWindow, dynamicContacts, ChatWindow, projects]
+    [isWhatsAppEnabled, openWindow, dynamicContacts, ChatWindow, projects]
   );
 
   // Klik Dock WA -> buka list view (tanpa activeChatId)
   const openWhatsAppList = useCallback(() => {
+    if (!isWhatsAppEnabled) return;
+
     openWindow('whatsapp', {
       content: (
         <ChatWindow
@@ -103,7 +111,7 @@ export function useDesktopNavigation({
         />
       ),
     });
-  }, [openWindow, dynamicContacts, ChatWindow, projects]);
+  }, [isWhatsAppEnabled, openWindow, dynamicContacts, ChatWindow, projects]);
 
   const openContactWindow = useCallback(() => {
     openWindow('contact');

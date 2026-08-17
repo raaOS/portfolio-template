@@ -183,6 +183,28 @@ describe('GET /api/admin/storage-stats', () => {
     expect(cat.sidecarCount).toBe(2);
   });
 
+  it('does not flag bundled or external icons as missing R2 objects', async () => {
+    getAboutDataMock.mockResolvedValue({
+      dockConfig: {
+        notes: { iconUrl: '/assets/icons-library/notes.webp' },
+        custom: { iconUrl: '/r2/assets/icons-library/missing.webp' },
+      },
+    });
+    getHardSkillsMock.mockResolvedValue({
+      skills: [{ iconUrl: 'https://cdn.simpleicons.org/figma' }],
+      lastUpdated: '',
+    });
+
+    const res = await GET(buildGetRequest(true));
+    const body = await res.json();
+    const cat = body.categories.find((c: { id: string }) => c.id === 'hardSkillIcons');
+
+    expect(cat.d1.total).toBe(3);
+    expect(cat.r2.total).toBe(0);
+    expect(cat.dangling).toBe(1);
+    expect(cat.danglingPaths).toEqual(['assets/icons-library/missing.webp']);
+  });
+
   it('returns fallback categories with empty r2 when R2 is not configured', async () => {
     isR2StorageConfiguredMock.mockReturnValue(false);
     getMissingR2EnvKeysMock.mockReturnValue(['CLOUDFLARE_R2_BUCKET']);

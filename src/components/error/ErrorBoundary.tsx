@@ -104,7 +104,7 @@ export class DesktopErrorBoundary extends Component<{ children: ReactNode }, Sta
               </div>
               <div>
                 <h2 className="text-xl font-bold text-white">System Error</h2>
-                <p className="text-sm text-gray-400">Ramos OS encountered a problem</p>
+                <p className="text-sm text-gray-400">Portfolio OS encountered a problem</p>
               </div>
             </div>
 

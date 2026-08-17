@@ -13,6 +13,7 @@ interface DesktopProvidersProps {
   children: React.ReactNode;
   initialWindows: WindowState[];
   aboutData: AboutData | null | undefined;
+  siteId?: string;
   csrfToken?: string;
   isAdmin: boolean;
 }
@@ -21,6 +22,7 @@ export default function DesktopProviders({
   children,
   initialWindows,
   aboutData,
+  siteId,
   csrfToken,
   isAdmin,
 }: DesktopProvidersProps) {
@@ -32,6 +34,7 @@ export default function DesktopProviders({
             <DesktopWindowProvider
               initialWindows={initialWindows}
               aboutData={aboutData}
+              siteId={siteId}
               csrfToken={csrfToken}
               isAdmin={isAdmin}
             >

@@ -4,6 +4,7 @@ import React from 'react';
 import { CheckCircle2, FileText, Globe, Printer } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { localizeProject, localizeText } from '@/lib/i18n/contentLocalization';
+import { DEFAULT_SITE_URL } from '@/lib/constants';
 import type { WorkExperience } from '@/types/experience';
 import type { HardSkillLevel } from '@/types/hardSkill';
 import type { Project } from '@/types/projects';
@@ -40,6 +41,8 @@ interface CvSkillItem {
 
 export const CvWebHeader = ({ displayName, headline, onPrint }: CvWebHeaderProps) => {
   const { locale } = useLanguage();
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || DEFAULT_SITE_URL;
+  const displayUrl = siteUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
   return (
     <div className="no-print flex flex-col justify-between gap-6 border-b-2 border-black/5 pb-8 md:flex-row md:items-end">
@@ -53,11 +56,11 @@ export const CvWebHeader = ({ displayName, headline, onPrint }: CvWebHeaderProps
         <div className="flex flex-col gap-4">
           <p className="text-xl font-medium text-gray-500 md:text-2xl">{headline}</p>
           <a
-            href="https://ramos-portofolio.vercel.app/"
+            href={siteUrl}
             className="inline-flex w-fit items-center gap-2 rounded-md border border-gray-200 bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-800 no-underline shadow-sm transition-colors hover:bg-gray-200"
           >
             <Globe size={14} className="text-gray-500" />
-            ramos-portofolio.vercel.app
+            {displayUrl}
           </a>
         </div>
       </div>
@@ -81,19 +84,24 @@ export const CvPrintHeader = ({
 }: {
   displayName: string;
   headline: string;
-}) => (
-  <div className="print-only hidden pb-4">
-    <h1 className="text-3xl font-bold">{displayName}</h1>
-    <p className="mb-3 text-lg text-gray-600">{headline}</p>
-    <a
-      href="https://ramos-portofolio.vercel.app/"
-      className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-gray-100/80 px-3 py-1.5 text-sm font-medium text-gray-800 no-underline shadow-sm"
-    >
-      <Globe size={14} className="text-gray-500" />
-      ramos-portofolio.vercel.app
-    </a>
-  </div>
-);
+}) => {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || DEFAULT_SITE_URL;
+  const displayUrl = siteUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+
+  return (
+    <div className="print-only hidden pb-4">
+      <h1 className="text-3xl font-bold">{displayName}</h1>
+      <p className="mb-3 text-lg text-gray-600">{headline}</p>
+      <a
+        href={siteUrl}
+        className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-gray-100/80 px-3 py-1.5 text-sm font-medium text-gray-800 no-underline shadow-sm"
+      >
+        <Globe size={14} className="text-gray-500" />
+        {displayUrl}
+      </a>
+    </div>
+  );
+};
 
 export const CvSkills = ({
   hardSkills,

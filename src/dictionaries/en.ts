@@ -60,7 +60,7 @@ export const en: Dictionary = {
     adminMode: 'Admin Mode',
     exitAdmin: 'Exit Admin',
     batteryFull: 'Battery Full (100%)',
-    ramosOS: 'Ramos OS',
+    portfolioOS: 'Portfolio OS',
   },
   controlCenter: {
     label: 'Control Center',
@@ -75,7 +75,7 @@ export const en: Dictionary = {
   },
   calendar: {
     weekdaysShort: ['S', 'M', 'T', 'W', 'T', 'F', 'S'],
-    footer: 'Ramos OS - Desktop Environment',
+    footer: 'Portfolio OS - Desktop Environment',
   },
   spotlight: {
     ariaLabel: 'Spotlight Search',
@@ -89,7 +89,7 @@ export const en: Dictionary = {
     openHint: 'to open',
     escHint: 'Esc',
     closeHint: 'to close',
-    poweredBy: 'Powered by Gemini',
+    poweredBy: 'Powered by AI',
   },
   projects: {
     collectionTitle: 'Project Collection',

@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "portfolio-os-template",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-06-28",
+  "compatibility_flags": ["nodejs_compat"],
+  "minify": true,
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "r2_buckets": [
+    {
+      "binding": "MEDIA_BUCKET",
+      "bucket_name": "portfolio-template-media"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}

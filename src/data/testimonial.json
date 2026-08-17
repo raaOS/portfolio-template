@@ -2,13 +2,13 @@
   "testimonials": [
     {
       "id": 1,
-      "name": "Sari Rahmawati",
-      "notificationText": "Mas, desain kemasannya udah oke nih. Tim produksi juga bilang pas.",
+      "name": "Nadia - Brand Owner",
+      "notificationText": "Konsep visualnya sudah pas dengan arah brand kami.",
       "isActive": true,
       "messages": [
         {
           "id": 1600000000001,
-          "text": "Mas, ini mockup kemasannya ya?",
+          "text": "Halo, konsep visualnya sudah kami review.",
           "isMe": false,
           "time": "09:40",
           "status": "read",
@@ -16,33 +16,15 @@
         },
         {
           "id": 1600000000002,
-          "text": "Iya Mbak, ini desain finalnya",
+          "text": "Terima kasih. Apakah arah warnanya sudah sesuai brief?",
           "isMe": true,
-          "time": "09:41",
-          "status": "read",
-          "type": "project",
-          "imageSrc": "/assets/projects/manipulasi-foto-musik-alam.mp4",
-          "projectId": "gen-1766512146544-1"
-        },
-        {
-          "id": 1600000000003,
-          "text": "Wah, gila sih ini! Hasilnya keren banget mas. Makasih ya!",
-          "isMe": false,
           "time": "09:42",
           "status": "read",
           "type": "text"
         },
         {
-          "id": 1600000000004,
-          "text": "Alhamdulillah kalau gitu Mbak. Berarti fix ya warnanya?",
-          "isMe": true,
-          "time": "09:43",
-          "status": "read",
-          "type": "text"
-        },
-        {
-          "id": 1600000000005,
-          "text": "Iya fix Mas. Suka banget sama feel-nya. Makasih banyak ya!",
+          "id": 1600000000003,
+          "text": "Sudah sesuai. Tim kami suka karena tampilannya bersih dan mudah dipakai.",
           "isMe": false,
           "time": "09:45",
           "status": "read",
@@ -52,209 +34,120 @@
     },
     {
       "id": 2,
-      "name": "Dodi Kurniawan",
-      "notificationText": "Bro, gokil hasil web-nya. Jauh lebih bersih dari yang lama.",
+      "name": "Ardi - Product Lead",
+      "notificationText": "Case study-nya rapi dan mudah dipresentasikan ke stakeholder.",
       "isActive": true,
       "messages": [
         {
           "id": 1600000000004,
-          "text": "Bro, gokil hasil web-nya. Jauh lebih bersih dari yang lama.",
+          "text": "Deck case study sudah kami pakai untuk meeting internal.",
           "isMe": false,
-          "time": "10:15"
+          "time": "10:15",
+          "status": "read"
         },
         {
           "id": 1600000000005,
-          "text": "Sip bro, emang gue bikin simpel biar orang gak pusing pas liat.",
+          "text": "Mantap. Ada bagian yang perlu disederhanakan lagi?",
           "isMe": true,
-          "time": "10:20"
+          "time": "10:18",
+          "status": "read"
         },
         {
           "id": 1600000000006,
-          "text": "Nah itu dia, pas banget. Puas gue. Nanti gue kenalin ke temen-temen gue ya.",
+          "text": "Tidak ada. Flow-nya jelas dan visualnya membantu banget.",
           "isMe": false,
-          "time": "10:25"
+          "time": "10:22",
+          "status": "read"
         }
       ]
     },
     {
       "id": 3,
-      "name": "Pak Bambang",
-      "notificationText": "Siang Mas Ramos. Proposalnya sudah kami review. Desainnya sangat profesional.",
+      "name": "Sinta - Marketing Manager",
+      "notificationText": "Materi campaign-nya konsisten dan siap dipakai lintas kanal.",
       "isActive": true,
       "messages": [
         {
           "id": 1600000000007,
-          "text": "Siang Mas Ramos. Proposalnya sudah kami review. Desainnya sangat profesional.",
+          "text": "Asset campaign sudah masuk folder final ya.",
           "isMe": false,
-          "time": "08:00"
+          "time": "11:00",
+          "status": "read"
         },
         {
           "id": 1600000000008,
-          "text": "Siang Pak Bambang. Terima kasih Pak. Ada bagian yang perlu disesuaikan lagi?",
+          "text": "Siap, semua ukuran sudah saya export sesuai daftar placement.",
           "isMe": true,
-          "time": "08:15"
+          "time": "11:03",
+          "status": "read"
         },
         {
           "id": 1600000000009,
-          "text": "Sepertinya sudah cukup. Kami puas dengan hasilnya. Kerja bagus Mas.",
+          "text": "Bagus. Tinggal kami jadwalkan untuk publish minggu ini.",
           "isMe": false,
-          "time": "08:35"
+          "time": "11:08",
+          "status": "read"
         }
       ]
     },
     {
       "id": 4,
-      "name": "Rini (HRD)",
-      "notificationText": "Halo Mas Ramos. Brief kemarin sudah dieksekusi dengan baik ya.",
+      "name": "Raka - Studio Partner",
+      "notificationText": "Prototype-nya terasa matang dan gampang dijelaskan ke client.",
       "isActive": true,
       "messages": [
         {
           "id": 1600000000010,
-          "text": "Halo Mas Ramos. Brief kemarin sudah dieksekusi dengan baik ya.",
+          "text": "Prototype sudah saya coba. Interaksinya enak.",
           "isMe": false,
-          "time": "09:00"
+          "time": "14:10",
+          "status": "read"
         },
         {
           "id": 1600000000011,
-          "text": "Halo Mbak Rini. Syukurlah kalau sesuai ekspektasi kantor.",
+          "text": "Sip. Saya juga tambahkan catatan supaya handoff-nya jelas.",
           "isMe": true,
-          "time": "09:05"
+          "time": "14:12",
+          "status": "read"
         },
         {
           "id": 1600000000012,
-          "text": "Sangat sesuai Mas. User-nya juga happy liat progresnya. Thank you ya!",
+          "text": "Itu membantu banget. Terima kasih.",
           "isMe": false,
-          "time": "09:15"
+          "time": "14:16",
+          "status": "read"
         }
       ]
     },
     {
       "id": 5,
-      "name": "Andi Fotografer",
-      "notificationText": "Mas, gila sih layout-nya. Foto gue jadi kelihatan lebih 'mahal' di situ.",
+      "name": "Dewi - Founder",
+      "notificationText": "Portfolio ini bikin proses evaluasi vendor jauh lebih cepat.",
       "isActive": true,
       "messages": [
         {
           "id": 1600000000013,
-          "text": "Mas, gila sih layout-nya. Foto gue jadi kelihatan lebih 'mahal' di situ.",
+          "text": "Kami jadi lebih cepat memahami scope dan gaya visual dari portfolio ini.",
           "isMe": false,
-          "time": "11:00"
+          "time": "16:20",
+          "status": "read"
         },
         {
           "id": 1600000000014,
-          "text": "Hehe, dasar fotonya emang udah bagus Mas Andi. Jadi gampang nata-nya.",
+          "text": "Senang dengarnya. Saya memang susun supaya mudah dipindai dari awal.",
           "isMe": true,
-          "time": "11:05"
+          "time": "16:22",
+          "status": "read"
         },
         {
           "id": 1600000000015,
-          "text": "Bisa aja nih hhe. Cocok emang kita. Next project bareng lagi ya!",
+          "text": "Berhasil. Contoh project dan prosesnya jelas.",
           "isMe": false,
-          "time": "11:12"
+          "time": "16:25",
+          "status": "read"
         }
       ]
-    },
-    {
-      "name": "Andi",
-      "notificationText": "Mas Ramos, hasil desain banner ads-nya sesuai brief dan keren banget!",
-      "isActive": true,
-      "messages": [
-        {
-          "text": "Halo Mas Ramos, baru aja saya cek final desain banner ads-nya. Sesuai banget sama brief yang kemarin saya kasih.",
-          "isMe": false,
-          "time": "10:15",
-          "id": 1771318651448
-        },
-        {
-          "text": "Siap Mas Andi, syukurlah kalau sudah cocok. Untuk komposisi warnanya gimana Mas? Sudah oke di mata tim?",
-          "isMe": true,
-          "time": "10:18",
-          "id": 1771318651449
-        },
-        {
-          "text": "Udah oke banget Mas, bersih dan pesannya dapet. Pengerjaannya juga cepet banget ternyata. Makasih banyak ya Mas Ramos!",
-          "isMe": false,
-          "time": "10:22",
-          "id": 1771318651450
-        }
-      ],
-      "id": 6
-    },
-    {
-      "name": "Bagas Pratama - Kopi Sini",
-      "notificationText": "Mas Ramos, logonya mantap banget! Tim saya pada suka.",
-      "isActive": true,
-      "messages": [
-        {
-          "text": "Halo Mas RaLogonya keren banget!mos, file logo barusan saya cek sama tim. Suka banget sama konsepnya, clean dan sesuai brief awal kita.",
-          "isMe": true,
-          "time": "10:15",
-          "id": 1771343259438
-        },
-        {
-          "text": "Sama-sama Terima kasih sudah memesan!Mas Bagas. Senang dengarnya kalau tim suka. Untuk pilihan warnanya sudah pas ya Mas?",
-          "isMe": true,
-          "time": "10:18",
-          "id": 1771343259439
-        }
-      ],
-      "id": 7
-    },
-    {
-      "name": "Bram - Digital Agency",
-      "notificationText": "Mas Ramos, hasil manipulasi fotonya mantap banget, tim puas semua.",
-      "isActive": true,
-      "messages": [
-        {
-          "text": "Siang Mas Ramos, mau update soal project manipulasi foto yang kemarin.",
-          "isMe": false,
-          "time": "14:15",
-          "id": 1772322840256,
-          "type": "project",
-          "projectId": ""
-        },
-        {
-          "text": "Siang Mas Bram. Gimana mas, apa sudah sempat dicek file finalnya?",
-          "isMe": true,
-          "time": "14:18",
-          "id": 1772322840257,
-          "type": "project",
-          "projectId": "gen-1766512146544-15"
-        },
-        {
-          "text": "Sudah Mas, baru aja selesai review bareng tim internal. Hasilnya gokil sih.",
-          "isMe": false,
-          "time": "14:22",
-          "id": 1772322840258
-        },
-        {
-          "text": "Syukurlah kalau cocok mas. Bagian shading sama lighting-nya sudah pas ya?",
-          "isMe": true,
-          "time": "14:25",
-          "id": 1772322840259
-        },
-        {
-          "text": "Iya, pengerjaannya rapi banget, kelihatan natural padahal itu gabungan banyak aset.",
-          "isMe": false,
-          "time": "14:28",
-          "id": 1772322840260
-        },
-        {
-          "text": "Alhamdulillah. Terima kasih banyak ya Mas Bram atas kepercayaannya.",
-          "isMe": true,
-          "time": "14:31",
-          "id": 1772322840261
-        },
-        {
-          "text": "Sama-sama Mas. Nanti kalau ada project sejenis, saya langsung kontak Mas Ramos lagi ya!",
-          "isMe": false,
-          "time": "14:35",
-          "id": 1772322840262
-        }
-      ],
-      "projectId": "gen-1766512146544-14",
-      "id": 8
     }
   ],
-  "lastUpdated": "2026-03-02T19:52:49.514Z"
+  "lastUpdated": "2026-06-27T00:00:00.000Z"
 }

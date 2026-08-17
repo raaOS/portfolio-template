@@ -7,7 +7,7 @@ type DesktopData = Omit<DesktopEnvironmentProps, 'autoStartBoot' | 'children'>;
 type HomeOSRuntimeProps = Partial<DesktopData> & { startRequested?: boolean };
 type HomeOSRuntimeComponent = React.ComponentType<HomeOSRuntimeProps>;
 
-const BOOT_SESSION_KEY = 'ramos_os_booted';
+const BOOT_SESSION_KEY = 'portfolio_os_booted';
 
 let cachedRuntime: HomeOSRuntimeComponent | null = null;
 
@@ -27,8 +27,8 @@ function markBootButtonLoading() {
   if (!startButton) return;
 
   startButton.disabled = true;
-  startButton.setAttribute('aria-label', 'Loading Ramos OS');
-  startButton.dataset.label = 'LOADING RAMOS OS';
+  startButton.setAttribute('aria-label', 'Loading Portfolio OS');
+  startButton.dataset.label = 'LOADING PORTFOLIO OS';
   startButton.style.cursor = 'wait';
   startButton.style.opacity = '0.7';
 }

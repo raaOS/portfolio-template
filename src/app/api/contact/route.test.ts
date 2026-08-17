@@ -8,7 +8,7 @@ const {
   valMock,
   setMock,
   getContactDataMock,
-  invalidateContactCacheMock,
+  updateContactDataMock,
   revalidatePathMock,
 } = vi.hoisted(() => ({
   validateAdminRequestMock: vi.fn(),
@@ -17,7 +17,7 @@ const {
   valMock: vi.fn(),
   setMock: vi.fn(),
   getContactDataMock: vi.fn(),
-  invalidateContactCacheMock: vi.fn(),
+  updateContactDataMock: vi.fn(),
   revalidatePathMock: vi.fn(),
 }));
 
@@ -33,7 +33,7 @@ vi.mock('@/lib/database', () => ({
 
 vi.mock('@/lib/contact', () => ({
   getContactData: getContactDataMock,
-  invalidateContactCache: invalidateContactCacheMock,
+  updateContactData: updateContactDataMock,
 }));
 
 vi.mock('next/cache', () => ({
@@ -87,7 +87,7 @@ describe('GET /api/contact', () => {
 
   it('passes fresh flag when requested', async () => {
     await GET(buildGet('?fresh=true') as never);
-    expect(getContactDataMock).toHaveBeenCalledWith(true);
+    expect(getContactDataMock).toHaveBeenCalledWith(true, 'default-site');
   });
 
   it('returns 500 on unexpected error', async () => {
@@ -109,6 +109,11 @@ describe('PUT /api/contact', () => {
     valMock.mockReturnValue(null);
     setMock.mockResolvedValue(undefined);
     getContactDataMock.mockResolvedValue(mockContactData);
+    updateContactDataMock.mockResolvedValue({
+      ...mockContactData,
+      content: { ...mockContactData.content, title: 'Updated Title' },
+      info: { ...mockContactData.info, email: 'new@example.com' },
+    });
   });
 
   it('rejects unauthenticated updates', async () => {
@@ -128,7 +133,7 @@ describe('PUT /api/contact', () => {
     expect(body.error).toBe('Invalid contact payload');
   });
 
-  it('updates contact and invalidates cache', async () => {
+  it('updates contact and revalidates path', async () => {
     const response = await PUT(buildPut(validUpdatePayload) as never);
     const body = await response.json();
 
@@ -136,12 +141,11 @@ describe('PUT /api/contact', () => {
     expect(body.success).toBe(true);
     expect(body.data.content.title).toBe('Updated Title');
     expect(body.data.info.email).toBe('new@example.com');
-    expect(invalidateContactCacheMock).toHaveBeenCalled();
     expect(revalidatePathMock).toHaveBeenCalled();
   });
 
   it('deep merges with existing D1 data', async () => {
-    valMock.mockReturnValue({
+    updateContactDataMock.mockResolvedValue({
       content: { title: 'Old Title' },
       info: {
         email: 'old@example.com',
@@ -161,14 +165,9 @@ describe('PUT /api/contact', () => {
   });
 
   it('handles severe error cases explicitly', async () => {
-    refMock.mockReturnValue({
-      once: vi
-        .fn()
-        .mockRejectedValue(
-          Object.assign(new Error('Permission denied'), { code: 'PERMISSION_DENIED' })
-        ),
-      set: setMock,
-    });
+    updateContactDataMock.mockRejectedValue(
+      Object.assign(new Error('Permission denied'), { code: 'PERMISSION_DENIED' })
+    );
     const response = await PUT(buildPut(validUpdatePayload) as never);
     const body = await response.json();
 

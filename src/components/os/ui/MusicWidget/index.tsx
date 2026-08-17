@@ -71,7 +71,7 @@ export default function MusicPlayerWidget() {
   const activeProgress = activeTrack && currentTrack?.id === activeTrack.id ? progress : 0;
   const activeDuration = activeTrack && currentTrack?.id === activeTrack.id ? duration : activeTrack?.duration || duration;
   const titleText = activeTrack?.title || t.music.idle;
-  const artistText = activeTrack?.artist || 'Ramos OS';
+  const artistText = activeTrack?.artist || 'Portfolio OS';
 
   const popoverSize = useMemo(
     () => ({

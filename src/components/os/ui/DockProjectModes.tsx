@@ -37,11 +37,16 @@ const STAGGER_INCREMENT = 0.05;
 
 interface DockProjectModesProps {
   onSelect?: () => void;
+  projectsBasePath?: string;
 }
 
-export default function DockProjectModes({ onSelect }: DockProjectModesProps) {
+export default function DockProjectModes({
+  onSelect,
+  projectsBasePath = '',
+}: DockProjectModesProps) {
   const router = useTransitionRouter();
   const [pendingMode, setPendingMode] = useState<string | null>(null);
+  const normalizedBasePath = projectsBasePath && projectsBasePath !== '/' ? projectsBasePath : '';
 
   // Preload NonOSChrome as soon as the popover mounts to act as a fast safety net
   React.useEffect(() => {
@@ -61,10 +66,10 @@ export default function DockProjectModes({ onSelect }: DockProjectModesProps) {
         document.documentElement.removeAttribute('data-vt-direction');
       }
       setPendingMode(mode.id);
-      router.push(`/projects?view=${mode.view}`);
+      router.push(`${normalizedBasePath}/projects?view=${mode.view}`);
       onSelect?.();
     },
-    [onSelect, router]
+    [normalizedBasePath, onSelect, router]
   );
 
   return (
@@ -86,6 +91,7 @@ export default function DockProjectModes({ onSelect }: DockProjectModesProps) {
             key={mode.id}
             mode={mode}
             idx={idx}
+            href={`${normalizedBasePath}/projects?view=${mode.view}`}
             pending={pendingMode === mode.id}
             onClick={handleModeSelect(mode)}
           />
@@ -98,14 +104,15 @@ export default function DockProjectModes({ onSelect }: DockProjectModesProps) {
 interface ModeButtonProps {
   mode: ModeOption;
   idx: number;
+  href: string;
   pending: boolean;
   onClick: (e: React.MouseEvent) => void;
 }
 
-function ModeButton({ mode, idx, pending, onClick }: ModeButtonProps) {
+function ModeButton({ mode, idx, href, pending, onClick }: ModeButtonProps) {
   return (
     <Link
-      href={`/projects?view=${mode.view}`}
+      href={href}
       role="menuitem"
       aria-label={`${mode.label}: ${mode.description}`}
       onClick={onClick}

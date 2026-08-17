@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { checkAdminAuth } from '@/lib/auth';
 import { logAdminActivity } from '@/lib/services/auditLogger';
 import {
@@ -12,7 +11,6 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
     const wasAuthenticated = checkAdminAuth(request);
 
     if (wasAuthenticated) {
@@ -23,28 +21,24 @@ export async function POST(request: NextRequest) {
 
     const response = NextResponse.json({ message: 'Logged out successfully' });
 
-    // 1. Clear via cookieStore (Next.js server-side)
-    cookieStore.delete(ADMIN_TOKEN_COOKIE);
-    cookieStore.delete(ADMIN_TOKEN_COOKIE_LEGACY);
-    cookieStore.delete(CSRF_TOKEN_COOKIE);
-
-    // 2. Aggressively clear via Set-Cookie headers for multiple variations
+    // Expire every cookie used by the admin session on the same root path
+    // used when login creates them.
     const cookieOptions = {
       path: '/',
       maxAge: 0,
       expires: new Date(0),
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax' as const,
+      sameSite: 'strict' as const,
     };
 
     response.cookies.set(ADMIN_TOKEN_COOKIE, '', cookieOptions);
     response.cookies.set(ADMIN_TOKEN_COOKIE_LEGACY, '', cookieOptions);
-    response.cookies.set(CSRF_TOKEN_COOKIE, '', cookieOptions);
-
-    // Also try without path specified just in case
-    response.cookies.set(ADMIN_TOKEN_COOKIE, '', { ...cookieOptions, path: '' });
-    response.cookies.set(ADMIN_TOKEN_COOKIE_LEGACY, '', { ...cookieOptions, path: '' });
+    response.cookies.set(CSRF_TOKEN_COOKIE, '', {
+      ...cookieOptions,
+      httpOnly: false,
+      sameSite: 'lax' as const,
+    });
 
     // Prevent any caching of the logout response
     response.headers.set('Cache-Control', 'no-store, max-age=0, must-revalidate');

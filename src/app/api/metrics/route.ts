@@ -1,38 +1,25 @@
 ﻿import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/database';
-import { projectService } from '@/lib/services/projectService';
 import { enforceRequestRateLimit } from '@/lib/security/request';
 import { z } from 'zod';
+import { buildMetricsPath, normalizeEngagementSiteId } from '@/lib/projectEngagement';
+import { projectSqlService } from '@/lib/services/project/projectSqlService';
 
 interface ProjectMetrics {
   likes: number;
   shares: number;
 }
 
-interface MetricsData {
-  metrics: Record<string, ProjectMetrics>;
-}
-
 const metricsMutationSchema = z.object({
   slug: z.string().min(1).max(200),
+  siteId: z.string().trim().min(1).max(120).optional(),
   action: z.enum(['like', 'unlike', 'share']),
 });
 
-async function getMetricsData(): Promise<MetricsData> {
-  try {
-    const snap = await db.ref('metrics').once('value');
-    const data = snap.val();
-    return data || { metrics: {} };
-  } catch {
-    return { metrics: {} };
-  }
-}
-
 // Helper to get fallback metrics from main project data
-async function getFallbackMetrics(slug: string): Promise<ProjectMetrics> {
+async function getFallbackMetrics(siteId: string, slug: string): Promise<ProjectMetrics> {
   try {
-    const { projects } = await projectService.getProjects();
-    const project = projects.find((p) => p.slug === slug);
+    const project = await projectSqlService.getProjectBySlugSql(siteId, slug);
     if (project) {
       return {
         likes: project.likes || 0,
@@ -47,19 +34,21 @@ async function getFallbackMetrics(slug: string): Promise<ProjectMetrics> {
 
 export async function GET(request: NextRequest) {
   try {
-    const data = await getMetricsData();
     const { searchParams } = new URL(request.url);
     const slug = searchParams.get('slug');
 
     if (slug) {
-      if (data.metrics[slug]) {
-        return NextResponse.json(data.metrics[slug]);
+      const siteId = normalizeEngagementSiteId(searchParams.get('siteId'));
+      const metricsSnap = await db.ref(buildMetricsPath(siteId, slug)).once('value');
+      const storedMetrics = metricsSnap.val() as ProjectMetrics | null;
+      if (storedMetrics) {
+        return NextResponse.json(storedMetrics);
       }
-      const fallback = await getFallbackMetrics(slug);
+      const fallback = await getFallbackMetrics(siteId, slug);
       return NextResponse.json(fallback);
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json({ error: 'Project slug is required' }, { status: 400 });
   } catch (error) {
     console.error('Error loading metrics:', error);
     return NextResponse.json({ likes: 0, shares: 0 });
@@ -83,8 +72,9 @@ export async function POST(request: NextRequest) {
     }
 
     const { slug, action } = validation.data;
-    const metricsRef = db.ref(`metrics/metrics/${slug}`);
-    const fallbackMetrics = await getFallbackMetrics(slug);
+    const siteId = normalizeEngagementSiteId(validation.data.siteId);
+    const metricsRef = db.ref(buildMetricsPath(siteId, slug));
+    const fallbackMetrics = await getFallbackMetrics(siteId, slug);
     let updatedMetrics: ProjectMetrics = fallbackMetrics;
 
     await metricsRef.transaction((current: ProjectMetrics | null) => {

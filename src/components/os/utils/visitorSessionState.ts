@@ -2,7 +2,7 @@ import type { DesktopIconPosition } from '@/types/about';
 import type { WindowState } from '@/components/os/hooks/useWindowManager';
 import type { NoteData } from '../ui/elements/StickyNoteItem';
 
-export const VISITOR_DESKTOP_SESSION_KEY = 'ramos-os-visitor-session-v1';
+export const VISITOR_DESKTOP_SESSION_KEY = 'portfolio-os-visitor-session-v1';
 
 export interface VisitorWindowSnapshot {
   id: string;

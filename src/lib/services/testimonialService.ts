@@ -10,6 +10,7 @@ import { ContentService } from './contentService';
 import { Testimonial, TestimonialData } from '@/types/testimonial';
 import testimonialDataFallback from '@/data/testimonial.json';
 import { deleteStorageAssets } from '@/lib/services/storageCleanup';
+import { db } from '@/lib/database';
 
 // Counter untuk menghindari collision pada timestamp yang sama
 let idCounter = 0;
@@ -26,6 +27,11 @@ const defaultData: TestimonialData = {
   lastUpdated:
     (testimonialDataFallback as TestimonialJsonData).lastUpdated || new Date().toISOString(),
 };
+
+const emptyTenantData = (): TestimonialData => ({
+  testimonials: [],
+  lastUpdated: new Date().toISOString(),
+});
 
 const service = new ContentService<TestimonialData>('testimonial.json', defaultData);
 
@@ -45,15 +51,41 @@ const generateTestimonialId = (): string => {
   idCounter = (idCounter + 1) % 10000;
   return `testimonial-${Date.now()}-${idCounter}-${Math.random().toString(36).slice(2, 8)}`;
 };
-
 export const testimonialService = {
-  async getTestimonials(noCache = false, throwOnError = false): Promise<TestimonialData> {
-    const data = await service.getData(noCache, throwOnError);
+  async getTestimonials(
+    noCache: boolean | string = false,
+    throwOnError = false,
+    siteId = 'default-site'
+  ): Promise<TestimonialData> {
+    const actualNoCache = typeof noCache === 'boolean' ? noCache : false;
+    const actualSiteId = typeof noCache === 'string' ? noCache : siteId;
+    const data = await service.getData(actualNoCache, throwOnError, actualSiteId);
     return normalizeTestimonialData(data);
   },
 
-  async createTestimonial(data: Omit<Testimonial, 'id'>): Promise<Testimonial> {
-    const currentData = await this.getTestimonials(true, true);
+  async getSiteTestimonials(siteId: string): Promise<TestimonialData> {
+    const finalSiteId = siteId.trim() || 'default-site';
+    if (finalSiteId === 'default-site') {
+      return this.getTestimonials(true, true, finalSiteId);
+    }
+
+    const snapshot = await db.ref(`content_${finalSiteId}/testimonial`).once('value');
+    const remoteData = snapshot.val() as TestimonialData | null;
+    if (!remoteData || !Array.isArray(remoteData.testimonials)) {
+      return emptyTenantData();
+    }
+
+    return normalizeTestimonialData({
+      ...remoteData,
+      lastUpdated: remoteData.lastUpdated || new Date().toISOString(),
+    });
+  },
+
+  async createTestimonial(
+    data: Omit<Testimonial, 'id'>,
+    siteId = 'default-site'
+  ): Promise<Testimonial> {
+    const currentData = await this.getSiteTestimonials(siteId);
     const existingIds = new Set(currentData.testimonials.map((t) => t.id));
     let finalId = generateTestimonialId();
     while (existingIds.has(finalId)) {
@@ -69,15 +101,16 @@ export const testimonialService = {
     currentData.testimonials.push(newTestimonial);
     currentData.lastUpdated = new Date().toISOString();
 
-    await service.saveData(currentData, `Add testimonial: ${newTestimonial.name}`);
+    await service.saveData(currentData, `Add testimonial: ${newTestimonial.name}`, siteId);
     return newTestimonial;
   },
 
   async updateTestimonial(
     id: number | string,
-    updates: Partial<Testimonial>
+    updates: Partial<Testimonial>,
+    siteId = 'default-site'
   ): Promise<Testimonial | null> {
-    const currentData = await this.getTestimonials(true, true);
+    const currentData = await this.getSiteTestimonials(siteId);
     const normalizedId = normalizeTestimonialId(id);
     const index = currentData.testimonials.findIndex((t) => t.id === normalizedId);
 
@@ -91,12 +124,12 @@ export const testimonialService = {
     currentData.testimonials[index] = updatedTestimonial;
     currentData.lastUpdated = new Date().toISOString();
 
-    await service.saveData(currentData, `Update testimonial: ${updatedTestimonial.name}`);
+    await service.saveData(currentData, `Update testimonial: ${updatedTestimonial.name}`, siteId);
     return updatedTestimonial;
   },
 
-  async deleteTestimonial(id: number | string): Promise<boolean> {
-    const currentData = await this.getTestimonials(true, true);
+  async deleteTestimonial(id: number | string, siteId = 'default-site'): Promise<boolean> {
+    const currentData = await this.getSiteTestimonials(siteId);
     const normalizedId = normalizeTestimonialId(id);
     const testimonial = currentData.testimonials.find((t) => t.id === normalizedId);
 
@@ -111,7 +144,7 @@ export const testimonialService = {
 
     currentData.testimonials = currentData.testimonials.filter((t) => t.id !== normalizedId);
     currentData.lastUpdated = new Date().toISOString();
-    await service.saveData(currentData, `Delete testimonial ID: ${id}`);
+    await service.saveData(currentData, `Delete testimonial ID: ${id}`, siteId);
     return true;
   },
 };

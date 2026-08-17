@@ -233,11 +233,11 @@ export function generateGenZComments(
         replies.push({
           id: `r-${slug}-${i}-admin`,
           text: replyText,
-          name: 'Ramos',
+          name: 'Owner',
           time: getRandom(TIMES),
           createdAt: new Date(Date.now() - Math.random() * 86400000).toISOString(),
           likes: Math.floor(Math.random() * 20),
-          avatar: `https://ui-avatars.com/api/?name=Ramos&background=000&color=fff`,
+          avatar: `https://ui-avatars.com/api/?name=Owner&background=000&color=fff`,
         });
       } else if (!isOwnerReply && vibe.user_replies.length > 0) {
         const replyText = getRandom(vibe.user_replies);

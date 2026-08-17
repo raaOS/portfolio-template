@@ -153,10 +153,13 @@ describe('PUT /api/experience', () => {
       }) as never
     );
 
-    expect(updateExperienceDataMock).toHaveBeenCalledWith({
-      statistics: expect.objectContaining({ years: '10+' }),
-      workExperience: undefined,
-    });
+    expect(updateExperienceDataMock).toHaveBeenCalledWith(
+      {
+        statistics: expect.objectContaining({ years: '10+' }),
+        workExperience: undefined,
+      },
+      'default-site'
+    );
   });
 
   it('returns 500 on update failure', async () => {

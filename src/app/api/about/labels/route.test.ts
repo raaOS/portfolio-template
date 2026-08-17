@@ -91,7 +91,7 @@ describe('PUT /api/about/labels', () => {
     expect(body.success).toBe(true);
     expect(body.data).toEqual(newLabels);
 
-    expect(serviceSaveDataMock).toHaveBeenCalledWith(newLabels);
+    expect(serviceSaveDataMock).toHaveBeenCalledWith(newLabels, 'Update labels', 'default-site');
     expect(revalidatePathMock).toHaveBeenCalledWith('/', 'layout');
   });
 
@@ -106,6 +106,6 @@ describe('PUT /api/about/labels', () => {
   it('accepts empty array', async () => {
     const res = await PUT(buildPutRequest([]));
     expect(res.status).toBe(200);
-    expect(serviceSaveDataMock).toHaveBeenCalledWith([]);
+    expect(serviceSaveDataMock).toHaveBeenCalledWith([], 'Update labels', 'default-site');
   });
 });

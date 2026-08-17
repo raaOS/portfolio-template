@@ -19,7 +19,7 @@ const localLimits = new Map<
  * 2. Fallback: in-memory Map (HANYA untuk development)
  *
  * Di production, fallback in-memory TIDAK aman karena:
- * - Vercel serverless bikin instance baru per cold-start
+ * - Serverless/edge runtime bisa membuat instance baru per cold-start
  * - Attacker bisa spread attempts ke banyak instance → reset counter
  * - Memori tidak shared antar region
  *

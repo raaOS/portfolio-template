@@ -6,6 +6,7 @@ import { success, badRequest, unauthorized, serverError, rateLimit } from '@/lib
 import { z } from 'zod';
 import { sanitizeInput } from '@/lib/security/sanitization';
 import { getBannedWords, findBannedWord } from '@/lib/services/bannedWordsService';
+import { buildCommentPath, normalizeEngagementSiteId } from '@/lib/projectEngagement';
 
 interface Comment {
   id: string;
@@ -29,16 +30,29 @@ const newCommentSchema = z.object({
   likes: z.number().int().min(0).optional(),
 });
 
+const commentContextSchema = z.object({
+  siteId: z.string().trim().min(1).max(120).optional(),
+  slug: z.string().trim().min(1).max(200),
+});
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const slug = searchParams.get('slug');
 
     if (slug) {
-      const snap = await db.ref(`comments/${slug}`).once('value');
+      const context = commentContextSchema.safeParse({
+        slug,
+        siteId: searchParams.get('siteId') || undefined,
+      });
+      if (!context.success) return badRequest('Invalid comment context');
+      const snap = await db.ref(buildCommentPath(context.data.siteId, context.data.slug)).once('value');
       return success({ comments: snap.val() || [] });
     }
 
+    if (!(await validateAdminRequest(request, { checkCsrf: false }))) {
+      return unauthorized('Admin authentication required');
+    }
     const allSnap = await db.ref('comments').once('value');
     return success({ comments: allSnap.val() || {} });
   } catch (error) {
@@ -51,6 +65,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { slug, website_url } = body;
+    const context = commentContextSchema.safeParse({ slug, siteId: body.siteId });
     const incomingComment =
       body.comment ?? (Array.isArray(body.comments) ? body.comments[0] : undefined);
 
@@ -60,9 +75,10 @@ export async function POST(request: NextRequest) {
       return badRequest('Spam detected');
     }
 
-    if (!slug || !incomingComment) {
+    if (!context.success || !incomingComment) {
       return badRequest('Missing slug or comment');
     }
+    const siteId = normalizeEngagementSiteId(context.data.siteId);
 
     // --- 2. VALIDATE COMMENT STRUCTURE WITH ZOD ---
     let commentToSave: Comment;
@@ -98,7 +114,7 @@ export async function POST(request: NextRequest) {
     }
 
     // --- 4. ATOMIC APPEND + FLOOD CONTROL ---
-    const commentsRef = db.ref(`comments/${slug}`);
+    const commentsRef = db.ref(buildCommentPath(siteId, context.data.slug));
     let abortReason: 'flood' | null = null;
 
     const transactionResult = (await commentsRef.transaction((current: Comment[] | null) => {
@@ -155,16 +171,18 @@ export async function DELETE(request: NextRequest) {
   try {
     const body = await request.json();
     const { slug, commentId } = body;
+    const context = commentContextSchema.safeParse({ slug, siteId: body.siteId });
 
-    if (!slug || !commentId) {
+    if (!context.success || !commentId) {
       return badRequest('Missing slug or commentId');
     }
 
-    const snap = await db.ref(`comments/${slug}`).once('value');
+    const commentsRef = db.ref(buildCommentPath(context.data.siteId, context.data.slug));
+    const snap = await commentsRef.once('value');
     const projectComments = snap.val() || [];
     const updatedComments = removeCommentById(projectComments, commentId);
 
-    await db.ref(`comments/${slug}`).set(updatedComments);
+    await commentsRef.set(updatedComments);
 
     return success({ comments: updatedComments });
   } catch (error) {

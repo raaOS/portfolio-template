@@ -11,7 +11,7 @@ const DEFAULT_CONFIG: BootSequenceConfig = {
   allowSkip: true,
 };
 
-const BOOT_SESSION_KEY = 'ramos_os_booted';
+const BOOT_SESSION_KEY = 'portfolio_os_booted';
 
 function isBootedFastPath(): boolean {
   if (typeof window === 'undefined') return false;

@@ -6,7 +6,6 @@ import { ToastProvider } from '@/contexts/ToastContext';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 
 import UnregisterSW from '@/components/shared/UnregisterSW';
-import { SpeedInsights } from '@vercel/speed-insights/next';
 import DevWebVitalsGate from '@/components/shared/DevWebVitalsGate';
 import { ViewTransitions } from 'next-view-transitions';
 import { APP_VERSION } from '@/lib/constants';
@@ -30,8 +29,7 @@ export const metadata: Metadata = {
     default: baseSEO.title,
     template: `%s | ${baseSEO.title}`,
   },
-  description:
-    'Portofolio kreatif Ramos berisi project desain digital, UI/UX, dan visual yang berfokus pada storytelling, detail, dan pengalaman pengguna yang halus.',
+  description: baseSEO.description,
   keywords: baseSEO.keywords,
   authors: [{ name: baseSEO.author }],
   creator: baseSEO.author,
@@ -100,7 +98,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           */}
           <script
             dangerouslySetInnerHTML={{
-              __html: `(function(){try{var h=document.documentElement,b=sessionStorage.getItem('ramos_os_booted')==='true';if(b){h.setAttribute('data-os-booted','true');h.removeAttribute('data-os-needs-boot');return}var r=document.referrer;if(r){try{if(new URL(r).host===window.location.host){h.setAttribute('data-os-booted','true');h.removeAttribute('data-os-needs-boot');return}}catch(e){}}var s=window.location.search||'';if(s.indexOf('app=')!==-1){h.setAttribute('data-os-booted','true');h.removeAttribute('data-os-needs-boot');return}var p=window.location.pathname||'/';if(p==='/'){h.setAttribute('data-os-needs-boot','true');return}h.removeAttribute('data-os-needs-boot')}catch(e){}})()`,
+              __html: `(function(){try{var h=document.documentElement,b=sessionStorage.getItem('portfolio_os_booted')==='true';if(b){h.setAttribute('data-os-booted','true');h.removeAttribute('data-os-needs-boot');return}var r=document.referrer;if(r){try{if(new URL(r).host===window.location.host){h.setAttribute('data-os-booted','true');h.removeAttribute('data-os-needs-boot');return}}catch(e){}}var s=window.location.search||'';if(s.indexOf('app=')!==-1){h.setAttribute('data-os-booted','true');h.removeAttribute('data-os-needs-boot');return}var p=window.location.pathname||'/';if(p==='/templates/os-desktop/demo'){h.setAttribute('data-os-needs-boot','true');return}h.removeAttribute('data-os-needs-boot')}catch(e){}})()`,
             }}
           />
           <style
@@ -126,7 +124,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <ErrorBoundary>
                 {children}
                 <UnregisterSW />
-                {process.env.VERCEL ? <SpeedInsights /> : null}
                 <DevWebVitalsGate />
               </ErrorBoundary>
             </ToastProvider>

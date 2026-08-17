@@ -30,9 +30,11 @@ import { BackgroundUploadProvider } from '@/contexts/BackgroundUploadContext';
 
 export default function ClientAdminLayout({ children }: ClientAdminLayoutProps) {
   const pathname = usePathname();
+  const isLoginPage = pathname === '/admin/login' || pathname === '/portal/login';
   const queryClient = useQueryClient();
   const { logout } = useAdminAuth();
   const { windows, actions } = useAdminDesktop();
+  const { openApp } = actions;
   const warmedRef = useRef(false);
   const deepLinkedRef = useRef(false);
 
@@ -42,7 +44,7 @@ export default function ClientAdminLayout({ children }: ClientAdminLayoutProps) 
 
   // Prefetch admin data once per session
   useEffect(() => {
-    if (pathname === '/admin/login') return;
+    if (isLoginPage) return;
     if (warmedRef.current) return;
     warmedRef.current = true;
 
@@ -51,27 +53,27 @@ export default function ClientAdminLayout({ children }: ClientAdminLayoutProps) 
     }, 0);
 
     return () => window.clearTimeout(timeout);
-  }, [pathname, queryClient]);
+  }, [isLoginPage, queryClient]);
 
   // Deep-link: if user visits a sub-route directly (e.g. /admin/content/experience),
   // auto-open the corresponding window on the desktop.
   useEffect(() => {
-    if (pathname === '/admin/login' || pathname === '/admin') return;
+    if (isLoginPage || pathname === '/admin') return;
     if (deepLinkedRef.current) return;
 
     const appId = pathnameToAppId(pathname);
     if (appId) {
-      deepLinkedRef.current = true;
       // Small delay to ensure desktop is mounted
       const timeout = window.setTimeout(() => {
-        actions.openApp('', appId);
+        deepLinkedRef.current = true;
+        openApp('', appId);
       }, 100);
       return () => window.clearTimeout(timeout);
     }
-  }, [pathname, actions]);
+  }, [isLoginPage, pathname, openApp]);
 
   // Login page: don't render the desktop shell
-  if (pathname === '/admin/login') {
+  if (isLoginPage) {
     return <ConfirmDialogProvider>{children}</ConfirmDialogProvider>;
   }
 

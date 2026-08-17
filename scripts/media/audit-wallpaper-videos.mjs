@@ -35,7 +35,10 @@ function isVideo(url) {
 }
 
 async function loadAboutFromD1() {
-  const accountId = process.env.CLOUDFLARE_D1_ACCOUNT_ID || process.env.CLOUDFLARE_R2_ACCOUNT_ID;
+  const accountId =
+    process.env.CLOUDFLARE_ACCOUNT_ID ||
+    process.env.CLOUDFLARE_D1_ACCOUNT_ID ||
+    process.env.CLOUDFLARE_R2_ACCOUNT_ID;
   const databaseId = process.env.CLOUDFLARE_D1_DATABASE_ID;
   const apiToken = process.env.CLOUDFLARE_D1_API_TOKEN || process.env.CLOUDFLARE_API_TOKEN;
 
@@ -95,7 +98,10 @@ function probeUrl(url) {
 function resolveAbsoluteUrl(url) {
   if (!url) return url;
   if (url.startsWith('http')) return url;
-  const base = (process.env.NEXT_PUBLIC_SITE_URL || '').replace(/\/$/, '');
+  const base = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || '').replace(
+    /\/$/,
+    ''
+  );
   if (base) return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
   // Fallback: kalau path mulai dengan /r2/, gabungkan dengan public R2 base
   if (url.startsWith('/r2/')) {
@@ -135,7 +141,7 @@ async function main() {
         name: w.name || '-',
         url: w.url,
         status: 'SKIP',
-        reason: 'URL tidak bisa diresolve. Set NEXT_PUBLIC_SITE_URL untuk audit lokal.',
+        reason: 'URL tidak bisa diresolve. Set NEXT_PUBLIC_APP_URL untuk audit lokal.',
       });
       continue;
     }

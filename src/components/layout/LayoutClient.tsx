@@ -7,6 +7,7 @@ import type { DockPreferences } from '@/types/about';
 import GlobalDockSlot from './GlobalDockSlot';
 import { GlobalDock } from '@/components/os/core/Dock';
 import { WindowProvider } from '@/contexts/WindowContext';
+import { isTenantRoute } from '@/lib/routing/tenantRoutes';
 
 /**
  * NonOSChrome (motion + Header + Dock + WindowRenderer + ControlCenter +
@@ -41,8 +42,13 @@ export default function LayoutClient({
 }) {
   const pathname = usePathname();
   const isAdminRequest = pathname?.startsWith('/admin');
+  const isTenantRequest = isTenantRoute(pathname ?? null);
   const isOsMode =
-    pathname === '/' || pathname?.startsWith('/about-test') || pathname?.startsWith('/about');
+    pathname === '/' ||
+    pathname?.startsWith('/about-test') ||
+    pathname?.startsWith('/about') ||
+    pathname?.includes('/demo') ||
+    isTenantRequest;
 
   // Slot dock yang persistent: dirender di level non-lazy supaya element
   // dengan viewTransitionName 'global-dock' selalu ada di kedua snapshot

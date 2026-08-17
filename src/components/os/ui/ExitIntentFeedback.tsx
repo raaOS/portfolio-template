@@ -20,9 +20,9 @@ const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
  * (sinyal "mau nutup tab"). Ngajakin visitor ninggalin rating + pesan singkat.
  *
  * Throttling (mode sopan):
- * - Session flag `ramos_exit_feedback_shown` → modal tidak muncul 2x di session
+ * - Session flag `portfolio_os_exit_feedback_shown` → modal tidak muncul 2x di session
  *   yang sama (satu tab, sampai ditutup).
- * - Session flag `ramos_exit_feedback_sent`  → setelah sukses submit, modal
+ * - Session flag `portfolio_os_exit_feedback_sent`  → setelah sukses submit, modal
  *   langsung disable sampai user buka tab baru.
  * - Engagement minimum 15 detik → modal nggak nongol pas visitor baru nyampe.
  *
@@ -30,11 +30,11 @@ const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
  * clientId (1 jam window).
  */
 
-const SESSION_SHOWN_KEY = 'ramos_exit_feedback_shown';
-const SESSION_SENT_KEY = 'ramos_exit_feedback_sent';
+const SESSION_SHOWN_KEY = 'portfolio_os_exit_feedback_shown';
+const SESSION_SENT_KEY = 'portfolio_os_exit_feedback_sent';
 // localStorage — stable client identifier supaya server bisa dedup lintas
 // session (berbeda dari sessionStorage flag yang reset tiap tab baru).
-const CLIENT_ID_KEY = 'ramos_client_id';
+const CLIENT_ID_KEY = 'portfolio_os_client_id';
 
 type SubmitState = 'idle' | 'submitting' | 'success' | 'error';
 

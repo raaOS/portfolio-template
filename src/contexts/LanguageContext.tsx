@@ -26,7 +26,7 @@ export const localeMeta: Record<
   },
 };
 
-const STORAGE_KEY = 'ramos-ui-locale';
+const STORAGE_KEY = 'portfolio-os-ui-locale';
 
 interface LanguageContextType {
   locale: Locale;

@@ -17,7 +17,7 @@ const getInitialNotes = (): NoteData[] => {
   return [
     {
       id: 'welcome-note',
-      text: 'Halo! Selamat Datang di Ramos OS v2.0 🖥️✨\n\nSaya Ramos, seorang Graphic Designer & Visual Strategist.\n\nQuick Start:\n1. Buka folder "Projects" untuk lihat karya saya.\n2. Klik "Contact" di bawah untuk ngobrol.\n3. Drag note ini ke mana saja!\n\nSelamat mengeksplorasi!',
+      text: 'Halo! Selamat datang di Portfolio OS Template.\n\nIni adalah sticky note demo. Client bisa mengubah teks, posisi, warna, dan visibilitasnya dari dashboard.\n\nQuick Start:\n1. Buka folder "Projects" untuk melihat karya demo.\n2. Klik "Contact" untuk melihat form kontak.\n3. Drag note ini ke posisi yang diinginkan.\n\nSilakan ganti konten ini sebelum publikasi.',
       date: isClient ? new Date().toISOString() : '2024-01-01T00:00:00.000Z', // Static date for SSR
       color: '#fef08a',
       isStarred: true,
@@ -84,7 +84,8 @@ export const useStickyNotes = (
   isAdmin: boolean = false,
   csrfToken?: string,
   requestNextZIndex?: (id?: string, type?: ElementType) => number,
-  isAuthLoading: boolean = false
+  isAuthLoading: boolean = false,
+  siteId = 'default-site'
 ) => {
   const [notes, setNotes] = useState<NoteData[]>([]);
   const [hasLoaded, setHasLoaded] = useState(false);
@@ -120,7 +121,12 @@ export const useStickyNotes = (
         //
         // Net effect untuk visitor: 1 D1 read per page load (bukan per
         // mount) dan TTFB sticky-notes panel turun saat refresh.
-        const url = isAdmin ? `/api/sticky-notes?t=${Date.now()}&force=true` : '/api/sticky-notes';
+        const params = new URLSearchParams({ siteId });
+        if (isAdmin) {
+          params.set('t', String(Date.now()));
+          params.set('force', 'true');
+        }
+        const url = `/api/sticky-notes?${params.toString()}`;
         const response = await fetch(url, {
           signal: controller.signal,
         });
@@ -216,15 +222,17 @@ export const useStickyNotes = (
           // Show welcome note ONLY for guests.
           // Admins should see an empty state if they cleared it in CRUD.
           try {
-            const hasSeenWelcome = sessionStorage.getItem('ramos_os_welcome_seen');
+            // FIX #56: Persist flag selamat datang menggunakan localStorage
+            // (bukan sessionStorage) agar tidak muncul berulang di tab/sesi baru.
+            const hasSeenWelcome = localStorage.getItem('portfolio_os_welcome_seen');
             if (!hasSeenWelcome && !isAdmin) {
               setNotes(getInitialNotes());
-              sessionStorage.setItem('ramos_os_welcome_seen', 'true');
+              localStorage.setItem('portfolio_os_welcome_seen', 'true');
             } else {
               setNotes([]);
             }
           } catch (e) {
-            console.warn('[StickyNotes] Failed to access sessionStorage:', e);
+            console.warn('[StickyNotes] Failed to access localStorage:', e);
             // Fallback: only show welcome to guests on failure
             if (!isAdmin) {
               setNotes(getInitialNotes());
@@ -260,7 +268,7 @@ export const useStickyNotes = (
       isActive = false;
       controller.abort();
     };
-  }, [isAuthLoading, isAdmin]); // Re-runs when auth check finishes to resolve empty state
+  }, [isAuthLoading, isAdmin, siteId]); // Re-runs when auth check finishes to resolve empty state
 
   // Auto-sync for Admins ONLY
   useEffect(() => {
@@ -308,7 +316,7 @@ export const useStickyNotes = (
       clearTimeout(debouncedSave);
       controller.abort();
     };
-  }, [notes, mounted, hasLoaded, isAdmin, csrfToken]);
+  }, [notes, mounted, hasLoaded, isAdmin, csrfToken, siteId]);
 
   // Flusher for logout/exit
   // BUG FIX #3: Capture notes data di awal untuk mencegah race condition

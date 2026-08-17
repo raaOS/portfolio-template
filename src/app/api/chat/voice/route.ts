@@ -15,9 +15,15 @@ const ALLOWED_AUDIO_TYPES = new Set([
 
 export async function POST(request: NextRequest) {
   try {
-    const groqKey = process.env.GROQ_API_KEY;
+    // SECURITY FIX: Validate FEATURE_AI is enabled globally.
+    if (process.env.FEATURE_AI !== 'true') {
+      return NextResponse.json({ error: 'AI features are not enabled' }, { status: 403 });
+    }
+
+    const provider = (process.env.AI_PROVIDER || '').toLowerCase();
+    const groqKey = provider === 'groq' ? process.env.AI_API_KEY : '';
     if (!groqKey) {
-      return NextResponse.json({ error: 'Groq API Key not configured' }, { status: 500 });
+      return NextResponse.json({ error: 'AI voice provider is not configured' }, { status: 500 });
     }
 
     const rateLimit = await enforceRequestRateLimit(

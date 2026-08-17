@@ -1,7 +1,7 @@
 /**
  * Magic Comments Generator — Generator komentar AI untuk chat/testimoni.
  *
- * Menghasilkan komentar balasan otomatis menggunakan Gemini API yang
+ * Menghasilkan komentar balasan otomatis menggunakan Google AI API yang
  * kontekstual terhadap pesan pengunjung di sistem chat portofolio.
  *
  * @module scripts/generators/magic-comments
@@ -11,10 +11,12 @@ require('dotenv').config({ path: path.join(__dirname, '../.env.local') });
 const fs = require('fs');
 const https = require('https');
 
-const API_KEY = process.env.GEMINI_API_KEY;
+const AI_PROVIDER = (process.env.AI_PROVIDER || '').toLowerCase();
+const API_KEY =
+  AI_PROVIDER === 'gemini' || AI_PROVIDER === 'google' ? process.env.AI_API_KEY : '';
 
 if (!API_KEY) {
-  console.error('❌ GEMINI_API_KEY is missing from .env.local');
+  console.error('AI provider key is missing. Set AI_PROVIDER=gemini and AI_API_KEY.');
   process.exit(1);
 }
 const projectsFile = path.join(__dirname, '../src/data/projects.json');
@@ -50,7 +52,7 @@ async function downloadImage(url) {
   });
 }
 
-async function startGemini(buffer, projectTitle) {
+async function startGoogleAi(buffer, projectTitle) {
   const model = 'gemini-flash-latest';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${API_KEY}`;
   const base64Image = buffer.toString('base64');
@@ -117,7 +119,7 @@ async function run() {
     async function generateWithRetry(retries = 3) {
       try {
         const buffer = await downloadImage(project.cover);
-        return await startGemini(buffer, project.title);
+        return await startGoogleAi(buffer, project.title);
       } catch (e) {
         if (e.message.includes('429') && retries > 0) {
           console.log('   ⏳ Rate limit hit. Waiting 30s...');

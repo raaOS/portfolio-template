@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       userAgent: request.headers.get('user-agent') || 'Unknown',
     };
 
-    // Write to CLOUDFLARE_D1 (async, works on Vercel)
+    // Write to CLOUDFLARE_D1 asynchronously.
     const logsSnap = await db.ref(ANALYTICS_PATH).once('value');
     const existing: AnalyticsLog[] = logsSnap.exists() ? Object.values(logsSnap.val()) : [];
 

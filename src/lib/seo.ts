@@ -20,11 +20,11 @@ function getDynamicSiteUrl(): string {
 
 // Base SEO configuration
 export const baseSEO = {
-  title: 'Ramos – Creative Portfolio',
+  title: 'Portfolio OS - Creative Portfolio',
   description:
-    'Portofolio kreatif Ramos berisi project desain digital, UI/UX, dan visual yang berfokus pada storytelling, detail, dan pengalaman pengguna yang halus.',
+    'Template portfolio interaktif untuk menampilkan project, case study, kontak, dan pengalaman kreatif dalam desktop simulator yang siap disesuaikan.',
   keywords: ['portfolio', 'desain', 'ui/ux', 'creative', 'digital design', 'visual design'],
-  author: 'Ramos',
+  author: 'Portfolio Owner',
   get siteUrl() {
     return getDynamicSiteUrl();
   },
@@ -125,7 +125,7 @@ export function generateProjectMetadata(project: Project): Metadata {
 
   // Enhanced fallback description
   const fallbackDesc =
-    `${project.title} - A ${project.tags?.[0] || 'creative'} project by Ramos` +
+    `${project.title} - A ${project.tags?.[0] || 'creative'} project by the portfolio owner` +
     (project.client ? ` for ${project.client}` : '') +
     (project.year ? ` (${project.year})` : '') +
     '. Explore the details, visuals, and story behind this work.';

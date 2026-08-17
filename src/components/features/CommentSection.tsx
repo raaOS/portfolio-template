@@ -3,14 +3,13 @@
 import React, { useState, useEffect, startTransition } from 'react';
 import { motion } from 'motion/react';
 import type { Comment, CommentReply } from '@/lib/magic';
-import dynamic from 'next/dynamic';
 import { useToast } from '@/contexts/ToastContext';
-import { Pencil, Trash2 } from 'lucide-react';
-
-const AITranslator = dynamic(() => import('@/components/features/AITranslator'), { ssr: false });
+import { CommentItem } from './CommentItem';
+import { CommentForm } from './CommentForm';
 
 interface CommentSectionProps {
   slug: string;
+  siteId?: string;
   comments: Comment[];
   setComments: (comments: Comment[]) => void;
   className?: string;
@@ -20,6 +19,7 @@ interface CommentSectionProps {
 
 export default function CommentSection({
   slug,
+  siteId = 'default-site',
   comments,
   setComments,
   className = '',
@@ -142,6 +142,7 @@ export default function CommentSection({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           slug: slug,
+          siteId,
           comment: newComment,
           website_url: '', // Anti-spam honeypot (must be empty)
         }),
@@ -243,232 +244,37 @@ export default function CommentSection({
             </p>
           ) : (
             comments.map((comment) => (
-              <div key={comment.id} className="group">
-                <div className="flex gap-4">
-                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-[13px] font-bold uppercase text-white shadow-lg">
-                    {comment.name?.charAt(0)?.toUpperCase() || '?'}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="mb-1 flex items-baseline gap-2">
-                      <span className="text-sm font-bold text-gray-900 dark:text-white">
-                        {comment.name}
-                      </span>
-                      <span className="text-[10px] text-gray-400">
-                        {formatRelativeTime(comment.createdAt || comment.time || '')}
-                      </span>
-                    </div>
-                    {editingCommentId === comment.id ? (
-                      <div className="mt-1 space-y-2">
-                        <textarea
-                          value={editingText}
-                          onChange={(e) => setEditingText(e.target.value)}
-                          className="w-full rounded border border-indigo-200 p-2 text-sm outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-                          rows={2}
-                        />
-                        <div className="flex gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handleSaveEdit(comment.id)}
-                            className="bg-indigo-650 rounded px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-700"
-                          >
-                            Simpan
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditingCommentId(null)}
-                            className="dark:bg-slate-850 dark:text-slate-350 rounded bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 dark:hover:bg-slate-800"
-                          >
-                            Batal
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="group/text relative flex items-start gap-2">
-                        <p className="flex-1 whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-300">
-                          {comment.text}
-                        </p>
-                        {isAdmin && (
-                          <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover/text:opacity-100">
-                            <button
-                              type="button"
-                              onClick={() => handleStartEdit(comment.id, comment.text)}
-                              className="hover:text-indigo-650 p-1 text-slate-400 dark:hover:text-indigo-400"
-                              title="Edit Ulasan"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteComment(comment.id)}
-                              className="hover:text-red-650 p-1 text-slate-400 dark:hover:text-red-400"
-                              title="Hapus Ulasan"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    <AITranslator text={comment.text} compact={true} />
-                  </div>
-                </div>
-                {/* Render Replies (Read-Only) */}
-                {comment.replies && comment.replies.length > 0 && (
-                  <div className="ml-13 mt-4 space-y-4 border-l-2 border-gray-100 pl-4 dark:border-gray-800">
-                    {comment.replies.map((reply) => (
-                      <div key={reply.id} className="flex gap-3">
-                        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-[10px] font-bold uppercase text-gray-600 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:ring-gray-700">
-                          {reply.name?.charAt(0)?.toUpperCase() || '?'}
-                        </div>
-                        <div className="flex-1">
-                          <div className="mb-1 flex items-baseline gap-2">
-                            <span className="text-xs font-bold text-gray-800 dark:text-gray-200">
-                              {reply.name}
-                            </span>
-                            <span className="text-[9px] text-gray-400">
-                              {formatRelativeTime(reply.createdAt || reply.time || '')}
-                            </span>
-                          </div>
-                          {editingCommentId === reply.id ? (
-                            <div className="mt-1 space-y-2">
-                              <textarea
-                                value={editingText}
-                                onChange={(e) => setEditingText(e.target.value)}
-                                className="w-full rounded border border-indigo-200 p-2 text-xs outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-                                rows={2}
-                              />
-                              <div className="flex gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => handleSaveEdit(reply.id)}
-                                  className="bg-indigo-650 rounded px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-indigo-700"
-                                >
-                                  Simpan
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setEditingCommentId(null)}
-                                  className="dark:bg-slate-850 dark:text-slate-350 rounded bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-600 hover:bg-slate-200 dark:hover:bg-slate-800"
-                                >
-                                  Batal
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="group/text relative flex items-start gap-2">
-                              <p className="flex-1 text-xs text-gray-700 dark:text-gray-400">
-                                {reply.text}
-                              </p>
-                              {isAdmin && (
-                                <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover/text:opacity-100">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleStartEdit(reply.id, reply.text)}
-                                    className="hover:text-indigo-650 p-1 text-slate-400 dark:hover:text-indigo-400"
-                                    title="Edit Balasan"
-                                  >
-                                    <Pencil className="h-3 w-3" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteComment(reply.id)}
-                                    className="hover:text-red-650 p-1 text-slate-400 dark:hover:text-red-400"
-                                    title="Hapus Balasan"
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          <AITranslator text={reply.text} compact={true} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <CommentItem
+                key={comment.id}
+                comment={comment}
+                isAdmin={isAdmin}
+                editingCommentId={editingCommentId}
+                editingText={editingText}
+                formatRelativeTime={formatRelativeTime}
+                setEditingText={setEditingText}
+                setEditingCommentId={setEditingCommentId}
+                handleStartEdit={handleStartEdit}
+                handleSaveEdit={handleSaveEdit}
+                handleDeleteComment={handleDeleteComment}
+              />
             ))
           )}
         </div>
       </motion.div>
 
-      {/* Input Section - Moved Below Toggle & List */}
-      <div className="border-t border-gray-100 pt-4 dark:border-gray-800">
-        {!guestName || isSettingName ? (
-          <div className="space-y-4">
-            <p className="flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-white">
-              Isi namamu dulu untuk mulai berkomentar 😊
-            </p>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={tempGuestName}
-                onChange={(e) => setTempGuestName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleSaveName();
-                  }
-                }}
-                placeholder="Ketik namamu..."
-                className="flex-1 border-b border-none border-black/10 bg-transparent px-0 py-2.5 text-sm outline-none transition-all focus:border-red-500 focus:outline-none focus:ring-0 dark:border-white/10 dark:text-white"
-              />
-              <button
-                type="button"
-                onClick={handleSaveName}
-                disabled={!tempGuestName.trim()}
-                className="rounded-full border-none bg-[#E60023] px-6 py-2.5 text-sm font-bold text-white shadow-sm outline-none transition-colors hover:bg-[#ad001b] disabled:opacity-50"
-              >
-                Simpan
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="relative">
-            <div className="mb-4 flex items-center justify-between">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                Komentar sebagai <span className="text-red-500">{guestName}</span>
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setTempGuestName(guestName);
-                  setIsSettingName(true);
-                }}
-                className="text-[11px] text-gray-300 underline decoration-dotted underline-offset-4 transition-colors hover:text-red-500"
-              >
-                Ganti nama
-              </button>
-            </div>
-            <div className="relative">
-              <input
-                type="text"
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handlePostComment();
-                  }
-                }}
-                placeholder="Tulis komentar..."
-                className="w-full border-b border-none border-black/10 bg-transparent px-0 py-3 pr-12 text-sm outline-none transition-all focus:border-red-500 focus:outline-none focus:ring-0 dark:border-white/10 dark:text-white"
-              />
-              <button
-                type="button"
-                onClick={handlePostComment}
-                disabled={!commentText.trim() || isSubmitting}
-                className="absolute right-0 top-1/2 -translate-y-1/2 p-2 text-red-500 transition-colors hover:text-red-600 disabled:opacity-30"
-              >
-                <svg className="h-5 w-5 rotate-90" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+      {/* Input Section */}
+      <CommentForm
+        guestName={guestName}
+        tempGuestName={tempGuestName}
+        isSettingName={isSettingName}
+        commentText={commentText}
+        isSubmitting={isSubmitting}
+        setTempGuestName={setTempGuestName}
+        setIsSettingName={setIsSettingName}
+        setCommentText={setCommentText}
+        handleSaveName={handleSaveName}
+        handlePostComment={handlePostComment}
+      />
     </div>
   );
 }

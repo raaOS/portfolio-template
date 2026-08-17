@@ -1,34 +1,17 @@
 /**
- * R2 Storage — Client SDK untuk Cloudflare R2 (S3-compatible object storage).
+ * Cloudflare R2 storage adapter.
  *
- * Menyediakan fungsi upload, download, copy, delete, dan presigned URL
- * untuk interaksi dengan bucket Cloudflare R2. Konfigurasi dibaca dari
- * environment variables (R2_BUCKET, R2_ACCOUNT_ID, dll).
- *
- * @module r2Storage
+ * Production runtime uses the native Cloudflare R2 binding so the Worker
+ * bundle does not need the AWS SDK. Node maintenance scripts can still fall
+ * back to the S3-compatible implementation through a non-bundled dynamic
+ * import.
  */
-import {
-  CopyObjectCommand,
-  DeleteObjectCommand,
-  GetObjectCommand,
-  HeadObjectCommand,
-  ListObjectsV2Command,
-  PutObjectCommand,
-  S3Client,
-} from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-
-type R2Config = {
-  accountId: string;
-  accessKeyId: string;
-  secretAccessKey: string;
-  bucket: string;
-  publicBaseUrl: string;
-};
+import { getCloudflareContext } from '@opennextjs/cloudflare';
+import { logOperationalEvent, summarizeError } from './observability/operationalLog';
 
 type UploadToR2Input = {
   key: string;
-  body: Buffer;
+  body: BodyInit | ArrayBufferView | ReadableStream;
   contentType: string;
   cacheControl?: string;
 };
@@ -37,73 +20,114 @@ type ListR2ObjectsInput = {
   prefix: string;
 };
 
-const R2_ENV_KEYS = [
-  'CLOUDFLARE_R2_ACCOUNT_ID',
-  'CLOUDFLARE_R2_ACCESS_KEY_ID',
-  'CLOUDFLARE_R2_SECRET_ACCESS_KEY',
-  'CLOUDFLARE_R2_BUCKET',
-  'CLOUDFLARE_R2_PUBLIC_BASE_URL',
-] as const;
+export type R2ListedObject = {
+  key: string;
+  size: number;
+  uploaded?: Date;
+};
 
-let client: S3Client | null = null;
+type R2TokenPayload = {
+  key: string;
+  contentType: string;
+  cacheControl: string;
+  exp: number;
+  maxSize: number;
+};
 
-function readR2Config(): R2Config | null {
-  const accountId = process.env.CLOUDFLARE_R2_ACCOUNT_ID;
-  const accessKeyId = process.env.CLOUDFLARE_R2_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY;
+type R2LikeObject = {
+  body?: ReadableStream | null;
+  size?: number;
+  etag?: string;
+  uploaded?: Date;
+  httpMetadata?: {
+    contentType?: string;
+    cacheControl?: string;
+  };
+};
+
+type S3LikeObject = {
+  Body?: ReadableStream | null;
+  ContentType?: string;
+  ContentLength?: number;
+  CacheControl?: string;
+  ETag?: string;
+  LastModified?: Date;
+  ContentRange?: string;
+};
+
+type R2BucketLike = {
+  put: (key: string, value: unknown, options?: Record<string, unknown>) => Promise<unknown>;
+  get: (key: string, options?: Record<string, unknown>) => Promise<R2LikeObject | null>;
+  head: (key: string) => Promise<R2LikeObject | null>;
+  delete: (key: string) => Promise<unknown>;
+  list: (options?: Record<string, unknown>) => Promise<{
+    objects: Array<{ key: string; size?: number; uploaded?: Date }>;
+    truncated?: boolean;
+    cursor?: string;
+  }>;
+};
+
+type S3FallbackModule = {
+  uploadToR2: (input: UploadToR2Input) => Promise<{ key: string; url: string }>;
+  createR2PresignedPutUrl: (input: {
+    key: string;
+    contentType: string;
+    cacheControl?: string;
+    expiresInSeconds?: number;
+  }) => Promise<{
+    uploadUrl: string;
+    publicUrl: string;
+    key: string;
+    cacheControl: string;
+    expiresInSeconds: number;
+  }>;
+  headR2Object: (key: string) => Promise<S3LikeObject>;
+  getR2Object: (key: string, range?: string | null) => Promise<S3LikeObject>;
+  deleteFromR2: (key: string) => Promise<void>;
+  copyR2Object: (
+    sourceKey: string,
+    destinationKey: string
+  ) => Promise<{ key: string; url: string }>;
+  listR2Objects: (input: ListR2ObjectsInput) => Promise<R2ListedObject[]>;
+  listR2ObjectKeys: (input: ListR2ObjectsInput) => Promise<string[]>;
+};
+
+const R2_RUNTIME_ENV_KEYS = ['CLOUDFLARE_R2_BUCKET', 'CLOUDFLARE_R2_PUBLIC_BASE_URL'] as const;
+const DEFAULT_R2_BINDING = 'MEDIA_BUCKET';
+const DEFAULT_UPLOAD_CACHE_CONTROL = 'public, max-age=31536000, immutable';
+const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
+
+function readPublicR2Config() {
   const bucket = process.env.CLOUDFLARE_R2_BUCKET;
   const publicBaseUrl = process.env.CLOUDFLARE_R2_PUBLIC_BASE_URL;
 
-  if (!accountId || !accessKeyId || !secretAccessKey || !bucket || !publicBaseUrl) {
-    return null;
-  }
+  if (!bucket || !publicBaseUrl) return null;
 
   return {
-    accountId,
-    accessKeyId,
-    secretAccessKey,
     bucket,
     publicBaseUrl: publicBaseUrl.replace(/\/+$/, ''),
   };
 }
 
 export function hasR2StorageEnv() {
-  return R2_ENV_KEYS.every((key) => Boolean(process.env[key]));
+  return R2_RUNTIME_ENV_KEYS.every((key) => Boolean(process.env[key]));
 }
 
 export function isR2StorageConfigured() {
-  return Boolean(readR2Config());
+  return Boolean(readPublicR2Config());
 }
 
 export function getMissingR2EnvKeys() {
-  return R2_ENV_KEYS.filter((key) => !process.env[key]);
-}
-
-function getR2Client(config: R2Config) {
-  if (!client) {
-    client = new S3Client({
-      region: 'auto',
-      endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
-      credentials: {
-        accessKeyId: config.accessKeyId,
-        secretAccessKey: config.secretAccessKey,
-      },
-    });
-  }
-
-  return client;
+  return R2_RUNTIME_ENV_KEYS.filter((key) => !process.env[key]);
 }
 
 function encodeR2Key(key: string) {
   return key.split('/').map(encodeURIComponent).join('/');
 }
 
-function encodeCopySource(bucket: string, key: string) {
-  return `${bucket}/${encodeR2Key(key)}`;
-}
-
 export function buildR2PublicUrl(key: string) {
-  const config = readR2Config();
+  const config = readPublicR2Config();
   if (!config) {
     throw new Error(
       `Cloudflare R2 env is incomplete. Missing: ${getMissingR2EnvKeys().join(', ')}`
@@ -114,154 +138,211 @@ export function buildR2PublicUrl(key: string) {
 }
 
 export function isR2PublicUrl(src?: string | null) {
-  const config = readR2Config();
+  const config = readPublicR2Config();
   if (!src || !config) return false;
 
   return src.startsWith(`${config.publicBaseUrl}/`);
 }
 
+async function getRuntimeR2Bucket(): Promise<R2BucketLike | null> {
+  if (process.env.NODE_ENV !== 'production') {
+    return null;
+  }
+
+  try {
+    const context = await getCloudflareContext({ async: true });
+    const env = context.env as unknown as Record<string, unknown>;
+    const bindingName = process.env.CLOUDFLARE_R2_BINDING || DEFAULT_R2_BINDING;
+    return (
+      (env[bindingName] as R2BucketLike | undefined) ||
+      (env[DEFAULT_R2_BINDING] as R2BucketLike | undefined) ||
+      (env.R2 as R2BucketLike | undefined) ||
+      null
+    );
+  } catch {
+    return null;
+  }
+}
+
+function getS3FallbackModulePath() {
+  const suffix = String.fromCharCode(83, 51);
+  return `./r2Storage${suffix}`;
+}
+
+async function getS3Fallback(): Promise<S3FallbackModule> {
+  if (process.env.NODE_ENV === 'development') {
+    return import('./r2StorageS3') as Promise<S3FallbackModule>;
+  }
+
+  const modulePath = getS3FallbackModulePath();
+  return import(/* webpackIgnore: true */ modulePath) as Promise<S3FallbackModule>;
+}
+
+async function getR2BucketOrFallback() {
+  const bucket = await getRuntimeR2Bucket();
+  if (bucket) return { bucket, fallback: null };
+
+  return { bucket: null, fallback: await getS3Fallback() };
+}
+
+function createNotFoundError(key: string) {
+  const error = new Error(`R2 object not found: ${key}`) as Error & {
+    name: string;
+    $metadata: { httpStatusCode: number };
+  };
+  error.name = 'NotFound';
+  error.$metadata = { httpStatusCode: 404 };
+  return error;
+}
+
+function toS3LikeObject(
+  key: string,
+  object: R2LikeObject,
+  range?: { offset: number; length: number; totalSize: number }
+): S3LikeObject {
+  const contentLength = range?.length ?? object.size;
+  const end = range ? range.offset + range.length - 1 : undefined;
+
+  return {
+    Body: object.body ?? null,
+    ContentType: object.httpMetadata?.contentType,
+    ContentLength: contentLength,
+    CacheControl: object.httpMetadata?.cacheControl,
+    ETag: object.etag,
+    LastModified: object.uploaded,
+    ContentRange: range ? `bytes ${range.offset}-${end}/${range.totalSize}` : undefined,
+  };
+}
+
+function parseRangeHeader(range: string | null | undefined, totalSize: number) {
+  if (!range) return null;
+
+  const match = /^bytes=(\d*)-(\d*)$/.exec(range.trim());
+  if (!match) return null;
+
+  const [, rawStart, rawEnd] = match;
+  if (!rawStart && !rawEnd) return null;
+
+  if (!rawStart) {
+    const suffixLength = Number(rawEnd);
+    if (!Number.isFinite(suffixLength) || suffixLength <= 0) return null;
+    const offset = Math.max(totalSize - suffixLength, 0);
+    return {
+      r2Range: { offset, length: totalSize - offset },
+      responseRange: { offset, length: totalSize - offset, totalSize },
+    };
+  }
+
+  const offset = Number(rawStart);
+  const requestedEnd = rawEnd ? Number(rawEnd) : totalSize - 1;
+  if (!Number.isFinite(offset) || !Number.isFinite(requestedEnd) || offset < 0) return null;
+  if (offset >= totalSize || requestedEnd < offset) return null;
+
+  const end = Math.min(requestedEnd, totalSize - 1);
+  const length = end - offset + 1;
+
+  return {
+    r2Range: { offset, length },
+    responseRange: { offset, length, totalSize },
+  };
+}
+
 export async function uploadToR2({ key, body, contentType, cacheControl }: UploadToR2Input) {
-  const config = readR2Config();
-  if (!config) {
-    throw new Error(
-      `Cloudflare R2 env is incomplete. Missing: ${getMissingR2EnvKeys().join(', ')}`
-    );
+  try {
+    const { bucket, fallback } = await getR2BucketOrFallback();
+    if (!bucket) {
+      const result = await fallback.uploadToR2({ key, body, contentType, cacheControl });
+      logOperationalEvent({
+        event: 'r2.upload',
+        status: 'success',
+        metadata: {
+          key,
+          contentType,
+          runtime: 's3-fallback',
+        },
+      });
+      return result;
+    }
+
+    await bucket.put(key, body, {
+      httpMetadata: {
+        contentType,
+        cacheControl,
+      },
+    });
+
+    logOperationalEvent({
+      event: 'r2.upload',
+      status: 'success',
+      metadata: {
+        key,
+        contentType,
+        runtime: 'worker-binding',
+      },
+    });
+
+    return {
+      key,
+      url: buildR2PublicUrl(key),
+    };
+  } catch (error) {
+    logOperationalEvent({
+      event: 'r2.upload',
+      level: 'error',
+      status: 'failure',
+      message: 'R2 upload failed',
+      metadata: {
+        key,
+        contentType,
+        error: summarizeError(error),
+      },
+    });
+    throw error;
   }
-
-  await getR2Client(config).send(
-    new PutObjectCommand({
-      Bucket: config.bucket,
-      Key: key,
-      Body: body,
-      ContentType: contentType,
-      CacheControl: cacheControl,
-    })
-  );
-
-  return {
-    key,
-    url: buildR2PublicUrl(key),
-  };
 }
 
-/**
- * Generate a short-lived presigned PUT URL so the browser can upload large
- * binaries (mainly video wallpapers >4.5 MB) directly to R2 without going
- * through the Vercel function body parser, which caps FormData at the
- * platform request body limit.
- *
- * The URL is bound to a specific `key`, `contentType`, and `cacheControl`,
- * so the client cannot upload to arbitrary paths or overwrite arbitrary
- * objects — those are decided on the server before signing.
- */
-export async function createR2PresignedPutUrl({
-  key,
-  contentType,
-  cacheControl = 'public, max-age=31536000, immutable',
-  expiresInSeconds = 600, // 10 menit, cukup untuk upload + retry sekali.
-}: {
-  key: string;
-  contentType: string;
-  cacheControl?: string;
-  expiresInSeconds?: number;
-}): Promise<{
-  uploadUrl: string;
-  publicUrl: string;
-  key: string;
-  cacheControl: string;
-  expiresInSeconds: number;
-}> {
-  const config = readR2Config();
-  if (!config) {
-    throw new Error(
-      `Cloudflare R2 env is incomplete. Missing: ${getMissingR2EnvKeys().join(', ')}`
-    );
-  }
+export async function headR2Object(key: string): Promise<S3LikeObject> {
+  const { bucket, fallback } = await getR2BucketOrFallback();
+  if (!bucket) return fallback.headR2Object(key);
 
-  const command = new PutObjectCommand({
-    Bucket: config.bucket,
-    Key: key,
-    ContentType: contentType,
-    CacheControl: cacheControl,
-  });
+  const object = await bucket.head(key);
+  if (!object) throw createNotFoundError(key);
 
-  const uploadUrl = await getSignedUrl(getR2Client(config), command, {
-    expiresIn: expiresInSeconds,
-  });
-
-  return {
-    uploadUrl,
-    publicUrl: buildR2PublicUrl(key),
-    key,
-    cacheControl,
-    expiresInSeconds,
-  };
+  return toS3LikeObject(key, object);
 }
 
-export async function headR2Object(key: string) {
-  const config = readR2Config();
-  if (!config) {
-    throw new Error(
-      `Cloudflare R2 env is incomplete. Missing: ${getMissingR2EnvKeys().join(', ')}`
-    );
-  }
+export async function getR2Object(key: string, range?: string | null): Promise<S3LikeObject> {
+  const { bucket, fallback } = await getR2BucketOrFallback();
+  if (!bucket) return fallback.getR2Object(key, range);
 
-  return getR2Client(config).send(
-    new HeadObjectCommand({
-      Bucket: config.bucket,
-      Key: key,
-    })
-  );
-}
+  const head = range ? await bucket.head(key) : null;
+  if (range && !head) throw createNotFoundError(key);
 
-export async function getR2Object(key: string, range?: string | null) {
-  const config = readR2Config();
-  if (!config) {
-    throw new Error(
-      `Cloudflare R2 env is incomplete. Missing: ${getMissingR2EnvKeys().join(', ')}`
-    );
-  }
+  const parsedRange =
+    range && typeof head?.size === 'number' ? parseRangeHeader(range, head.size) : null;
+  const object = await bucket.get(key, parsedRange ? { range: parsedRange.r2Range } : undefined);
+  if (!object) throw createNotFoundError(key);
 
-  return getR2Client(config).send(
-    new GetObjectCommand({
-      Bucket: config.bucket,
-      Key: key,
-      Range: range || undefined,
-    })
-  );
+  return toS3LikeObject(key, object, parsedRange?.responseRange);
 }
 
 export async function deleteFromR2(key: string) {
-  const config = readR2Config();
-  if (!config) {
-    throw new Error(
-      `Cloudflare R2 env is incomplete. Missing: ${getMissingR2EnvKeys().join(', ')}`
-    );
-  }
+  const { bucket, fallback } = await getR2BucketOrFallback();
+  if (!bucket) return fallback.deleteFromR2(key);
 
-  await getR2Client(config).send(
-    new DeleteObjectCommand({
-      Bucket: config.bucket,
-      Key: key,
-    })
-  );
+  await bucket.delete(key);
 }
 
 export async function copyR2Object(sourceKey: string, destinationKey: string) {
-  const config = readR2Config();
-  if (!config) {
-    throw new Error(
-      `Cloudflare R2 env is incomplete. Missing: ${getMissingR2EnvKeys().join(', ')}`
-    );
-  }
+  const { bucket, fallback } = await getR2BucketOrFallback();
+  if (!bucket) return fallback.copyR2Object(sourceKey, destinationKey);
 
-  await getR2Client(config).send(
-    new CopyObjectCommand({
-      Bucket: config.bucket,
-      CopySource: encodeCopySource(config.bucket, sourceKey),
-      Key: destinationKey,
-    })
-  );
+  const source = await bucket.get(sourceKey);
+  if (!source?.body) throw createNotFoundError(sourceKey);
+
+  await bucket.put(destinationKey, source.body, {
+    httpMetadata: source.httpMetadata,
+  });
 
   return {
     key: destinationKey,
@@ -269,31 +350,151 @@ export async function copyR2Object(sourceKey: string, destinationKey: string) {
   };
 }
 
-export async function listR2ObjectKeys({ prefix }: ListR2ObjectsInput) {
-  const config = readR2Config();
-  if (!config) {
-    throw new Error(
-      `Cloudflare R2 env is incomplete. Missing: ${getMissingR2EnvKeys().join(', ')}`
-    );
-  }
+export async function listR2Objects({ prefix }: ListR2ObjectsInput) {
+  const { bucket, fallback } = await getR2BucketOrFallback();
+  if (!bucket) return fallback.listR2Objects({ prefix });
 
-  const keys: string[] = [];
-  let continuationToken: string | undefined;
+  const objects: R2ListedObject[] = [];
+  let cursor: string | undefined;
 
   do {
-    const response = await getR2Client(config).send(
-      new ListObjectsV2Command({
-        Bucket: config.bucket,
-        Prefix: prefix,
-        ContinuationToken: continuationToken,
+    const response = await bucket.list({ prefix, cursor });
+    response.objects.forEach((object) =>
+      objects.push({
+        key: object.key,
+        size: Number(object.size || 0),
+        uploaded: object.uploaded,
       })
     );
+    cursor = response.truncated ? response.cursor : undefined;
+  } while (cursor);
 
-    response.Contents?.forEach((item) => {
-      if (item.Key) keys.push(item.Key);
+  return objects;
+}
+
+export async function listR2ObjectKeys(input: ListR2ObjectsInput) {
+  const objects = await listR2Objects(input);
+  return objects.map((object) => object.key);
+}
+
+function getUploadTokenSecret() {
+  const secret = process.env.JWT_SECRET || process.env.REVALIDATION_TOKEN;
+  if (!secret) {
+    throw new Error('JWT_SECRET or REVALIDATION_TOKEN is required to sign R2 upload URLs');
+  }
+  return secret;
+}
+
+function base64UrlEncode(input: string | ArrayBuffer) {
+  const bytes = typeof input === 'string' ? textEncoder.encode(input) : new Uint8Array(input);
+  let binary = '';
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function base64UrlDecode(input: string) {
+  const normalized = input.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), '=');
+  const binary = atob(padded);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return textDecoder.decode(bytes);
+}
+
+async function hmacSha256(data: string, secret: string) {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    textEncoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  return crypto.subtle.sign('HMAC', key, textEncoder.encode(data));
+}
+
+function timingSafeEqual(a: string, b: string) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+async function signUploadPayload(payload: R2TokenPayload) {
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+  const signature = base64UrlEncode(await hmacSha256(encodedPayload, getUploadTokenSecret()));
+  return `${encodedPayload}.${signature}`;
+}
+
+export async function verifyR2UploadToken(token: string): Promise<R2TokenPayload> {
+  const [encodedPayload, signature] = token.split('.');
+  if (!encodedPayload || !signature) {
+    throw new Error('Invalid upload token');
+  }
+
+  const expectedSignature = base64UrlEncode(
+    await hmacSha256(encodedPayload, getUploadTokenSecret())
+  );
+  if (!timingSafeEqual(signature, expectedSignature)) {
+    throw new Error('Invalid upload token signature');
+  }
+
+  const payload = JSON.parse(base64UrlDecode(encodedPayload)) as R2TokenPayload;
+  if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) {
+    throw new Error('Upload token expired');
+  }
+
+  return payload;
+}
+
+/**
+ * Compatibility name retained for existing callers. In Cloudflare runtime this
+ * returns a signed internal Worker PUT endpoint, not an S3 presigned URL.
+ */
+export async function createR2PresignedPutUrl({
+  key,
+  contentType,
+  cacheControl = DEFAULT_UPLOAD_CACHE_CONTROL,
+  expiresInSeconds = 600,
+  maxSize = 60 * 1024 * 1024,
+}: {
+  key: string;
+  contentType: string;
+  cacheControl?: string;
+  expiresInSeconds?: number;
+  maxSize?: number;
+}): Promise<{
+  uploadUrl: string;
+  publicUrl: string;
+  key: string;
+  cacheControl: string;
+  expiresInSeconds: number;
+}> {
+  const { bucket, fallback } = await getR2BucketOrFallback();
+  if (!bucket) {
+    return fallback.createR2PresignedPutUrl({
+      key,
+      contentType,
+      cacheControl,
+      expiresInSeconds,
     });
-    continuationToken = response.NextContinuationToken;
-  } while (continuationToken);
+  }
 
-  return keys;
+  const token = await signUploadPayload({
+    key,
+    contentType,
+    cacheControl,
+    exp: Math.floor(Date.now() / 1000) + expiresInSeconds,
+    maxSize,
+  });
+
+  return {
+    uploadUrl: `/api/admin/upload/direct?token=${encodeURIComponent(token)}`,
+    publicUrl: buildR2PublicUrl(key),
+    key,
+    cacheControl,
+    expiresInSeconds,
+  };
 }

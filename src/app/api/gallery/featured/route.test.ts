@@ -85,7 +85,7 @@ describe('POST /api/gallery/featured', () => {
       buildPost({ featuredProjectIds: ['a', 'b', 'a', 'c', 'b'] }) as never
     );
     expect(response.status).toBe(200);
-    expect(updateFeaturedDataMock).toHaveBeenCalledWith(['a', 'b', 'c']);
+    expect(updateFeaturedDataMock).toHaveBeenCalledWith(['a', 'b', 'c'], 'default-site');
   });
 
   it('triggers revalidatePath on success', async () => {

@@ -47,6 +47,11 @@ function toRequestedStringMap(parsed: unknown, requestedFields: Record<string, s
 
 export async function POST(req: NextRequest) {
   try {
+    // SECURITY FIX: Validate FEATURE_AI is enabled globally.
+    if (process.env.FEATURE_AI !== 'true') {
+      return NextResponse.json({ error: 'AI features are not enabled' }, { status: 403 });
+    }
+
     const rateLimit = await enforceRequestRateLimit(
       req,
       'translate_post',
@@ -87,9 +92,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No translatable fields provided' }, { status: 400 });
     }
 
-    const apiKey = (process.env.GROQ_API_KEY || '').trim();
+    const provider = (process.env.AI_PROVIDER || '').toLowerCase();
+    const apiKey = (provider === 'groq' ? process.env.AI_API_KEY || '' : '').trim();
     if (!apiKey) {
-      return NextResponse.json({ error: 'Groq API Key not configured' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'AI translation provider is not configured' },
+        { status: 500 }
+      );
     }
 
     let systemPrompt: string;

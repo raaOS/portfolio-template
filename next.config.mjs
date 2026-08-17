@@ -84,6 +84,18 @@ const nextConfig = {
   },
   async rewrites() {
     return [
+      {
+        source: '/portal',
+        destination: '/admin',
+      },
+      {
+        source: '/portal/login',
+        destination: '/admin/login',
+      },
+      {
+        source: '/portal/:path*',
+        destination: '/admin/:path*',
+      },
       // Swallow legacy Vite HMR client requests (harmless 404s in Next dev)
       // Handle __webpack_hmr requests to suppress 404 errors in logs
       {

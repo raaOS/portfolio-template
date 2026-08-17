@@ -12,6 +12,7 @@ const CommentSection = dynamic(() => import('@/components/features/CommentSectio
 
 interface ProjectCommentsProps {
   slug: string;
+  siteId?: string;
   comments: Comment[];
   setComments: (comments: Comment[]) => void;
   allowComments?: boolean;
@@ -25,6 +26,7 @@ interface ProjectCommentsProps {
 
 export function ProjectComments({
   slug,
+  siteId = 'default-site',
   comments,
   setComments,
   allowComments = true,
@@ -47,7 +49,13 @@ export function ProjectComments({
         .filter(Boolean)
         .join(' ')}
     >
-      <CommentSection slug={slug} comments={comments} setComments={setComments} isAdmin={isAdmin} />
+      <CommentSection
+        slug={slug}
+        siteId={siteId}
+        comments={comments}
+        setComments={setComments}
+        isAdmin={isAdmin}
+      />
     </div>
   );
 

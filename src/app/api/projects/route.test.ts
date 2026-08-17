@@ -2,20 +2,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   validateAdminRequestMock,
-  getProjectsMock,
-  createProjectMock,
+  getProjectsSqlMock,
+  createProjectSqlMock,
+  enforceProjectCreateQuotaMock,
+  resolveProjectSiteIdMock,
   refMock,
   setMock,
-  sendTelegramAlertMock,
   revalidatePathMock,
   generateGenZCommentsMock,
 } = vi.hoisted(() => ({
   validateAdminRequestMock: vi.fn(),
-  getProjectsMock: vi.fn(),
-  createProjectMock: vi.fn(),
+  getProjectsSqlMock: vi.fn(),
+  createProjectSqlMock: vi.fn(),
+  enforceProjectCreateQuotaMock: vi.fn(),
+  resolveProjectSiteIdMock: vi.fn(),
   refMock: vi.fn(),
   setMock: vi.fn(),
-  sendTelegramAlertMock: vi.fn(),
   revalidatePathMock: vi.fn(),
   generateGenZCommentsMock: vi.fn(),
 }));
@@ -24,21 +26,35 @@ vi.mock('@/lib/auth', () => ({
   validateAdminRequest: validateAdminRequestMock,
 }));
 
-vi.mock('@/lib/services/projectService', () => ({
-  projectService: {
-    getProjects: getProjectsMock,
-    createProject: createProjectMock,
+vi.mock('@/lib/services/project/projectSqlService', () => ({
+  projectSqlService: {
+    getProjectsSql: getProjectsSqlMock,
+    createProjectSql: createProjectSqlMock,
   },
 }));
+
+vi.mock('@/lib/admin/projectSiteContext', () => {
+  class ProjectQuotaError extends Error {
+    constructor(
+      message: string,
+      public readonly errorCode: string,
+      public readonly details?: Record<string, unknown>
+    ) {
+      super(message);
+    }
+  }
+
+  return {
+    enforceProjectCreateQuota: enforceProjectCreateQuotaMock,
+    resolveProjectSiteId: resolveProjectSiteIdMock,
+    ProjectQuotaError,
+  };
+});
 
 vi.mock('@/lib/database', () => ({
   db: {
     ref: refMock,
   },
-}));
-
-vi.mock('@/lib/telegram', () => ({
-  sendTelegramAlert: sendTelegramAlertMock,
 }));
 
 vi.mock('@/lib/magic', () => ({
@@ -96,7 +112,8 @@ function buildPost(body: unknown): Request {
 describe('GET /api/projects', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    getProjectsMock.mockResolvedValue({
+    resolveProjectSiteIdMock.mockReturnValue('default-site');
+    getProjectsSqlMock.mockResolvedValue({
       projects: [mockProject],
       lastUpdated: '2025-01-01T00:00:00Z',
     });
@@ -114,16 +131,16 @@ describe('GET /api/projects', () => {
 
   it('passes status filter to service', async () => {
     await GET(buildGet('?status=draft') as never);
-    expect(getProjectsMock).toHaveBeenCalledWith('draft', false);
+    expect(getProjectsSqlMock).toHaveBeenCalledWith('default-site', 'published');
   });
 
-  it('passes fresh flag to service', async () => {
+  it('uses SQL service even when legacy fresh flag is present', async () => {
     await GET(buildGet('?fresh=true') as never);
-    expect(getProjectsMock).toHaveBeenCalledWith(undefined, true);
+    expect(getProjectsSqlMock).toHaveBeenCalledWith('default-site', 'published');
   });
 
   it('returns server error on service failure', async () => {
-    getProjectsMock.mockRejectedValue(new Error('DB down'));
+    getProjectsSqlMock.mockRejectedValue(new Error('DB down'));
     const response = await GET(buildGet('') as never);
     const body = await response.json();
 
@@ -137,8 +154,9 @@ describe('POST /api/projects', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     validateAdminRequestMock.mockResolvedValue(true);
-    createProjectMock.mockResolvedValue(mockProject);
-    sendTelegramAlertMock.mockResolvedValue(undefined);
+    createProjectSqlMock.mockResolvedValue(mockProject);
+    enforceProjectCreateQuotaMock.mockResolvedValue(undefined);
+    resolveProjectSiteIdMock.mockReturnValue('default-site');
     refMock.mockReturnValue({ set: setMock });
     setMock.mockResolvedValue(undefined);
     generateGenZCommentsMock.mockReturnValue([]);
@@ -161,7 +179,7 @@ describe('POST /api/projects', () => {
     expect(response.status).toBe(400);
     expect(body.success).toBe(false);
     expect(body.error).toBe('Validation failed');
-    expect(createProjectMock).not.toHaveBeenCalled();
+    expect(createProjectSqlMock).not.toHaveBeenCalled();
   });
 
   it('creates a project and triggers revalidation', async () => {
@@ -171,15 +189,11 @@ describe('POST /api/projects', () => {
     expect(response.status).toBe(201);
     expect(body.success).toBe(true);
     expect(body.data.id).toBe('proj-1');
-    expect(createProjectMock).toHaveBeenCalled();
+    expect(enforceProjectCreateQuotaMock).toHaveBeenCalled();
+    expect(createProjectSqlMock).toHaveBeenCalled();
     expect(revalidatePathMock).toHaveBeenCalledWith('/', 'layout');
     expect(revalidatePathMock).toHaveBeenCalledWith('/projects');
     expect(revalidatePathMock).toHaveBeenCalledWith('/admin');
-  });
-
-  it('sends Telegram alert on creation', async () => {
-    await POST(buildPost(validProjectPayload) as never);
-    expect(sendTelegramAlertMock).toHaveBeenCalled();
   });
 
   it('does not generate comments when initialCommentCount is 0', async () => {
@@ -195,12 +209,12 @@ describe('POST /api/projects', () => {
     await POST(buildPost({ ...validProjectPayload, initialCommentCount: 2 }) as never);
 
     expect(generateGenZCommentsMock).toHaveBeenCalledWith('test-project', 2);
-    expect(refMock).toHaveBeenCalledWith('comments/test-project');
+    expect(refMock).toHaveBeenCalledWith('comments/default-site/test-project');
   });
 
   it('handles service ZodError as validation error', async () => {
     const { ZodError } = await import('zod');
-    createProjectMock.mockRejectedValue(new ZodError([]));
+    createProjectSqlMock.mockRejectedValue(new ZodError([]));
     const response = await POST(buildPost(validProjectPayload) as never);
     const body = await response.json();
 
@@ -209,7 +223,7 @@ describe('POST /api/projects', () => {
   });
 
   it('returns server error on unexpected failure', async () => {
-    createProjectMock.mockRejectedValue(new Error('Unexpected'));
+    createProjectSqlMock.mockRejectedValue(new Error('Unexpected'));
     const response = await POST(buildPost(validProjectPayload) as never);
     const body = await response.json();
 
@@ -221,7 +235,24 @@ describe('POST /api/projects', () => {
   it('converts year correctly when passed as number', async () => {
     await POST(buildPost({ ...validProjectPayload, year: 2025 }) as never);
 
-    const callArg = createProjectMock.mock.calls[0][0];
+    const callArg = createProjectSqlMock.mock.calls[0][1];
     expect(callArg.year).toBe(2025);
+  });
+
+  it('returns quota errors from plan guard', async () => {
+    const { ProjectQuotaError } = await import('@/lib/admin/projectSiteContext');
+    enforceProjectCreateQuotaMock.mockRejectedValue(
+      new ProjectQuotaError('Project quota exceeded. Limit: 5', 'PROJECT_LIMIT_EXCEEDED', {
+        limit: 5,
+      })
+    );
+
+    const response = await POST(buildPost(validProjectPayload) as never);
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.success).toBe(false);
+    expect(body.errorCode).toBe('PROJECT_LIMIT_EXCEEDED');
+    expect(createProjectSqlMock).not.toHaveBeenCalled();
   });
 });

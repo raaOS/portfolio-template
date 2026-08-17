@@ -86,12 +86,23 @@ export function useAdminLogin(location: LocationData | null) {
 
       if (response.ok) {
         const redirectTarget = searchParams.get('redirect');
-        const safeRedirectTarget =
-          redirectTarget?.startsWith('/') &&
-          !redirectTarget.startsWith('//') &&
-          !redirectTarget.startsWith('/admin/login')
-            ? redirectTarget
-            : '/admin';
+        // SECURITY FIX: Validasi redirect dengan URL-parser, bukan string
+        // startsWith — `/\evil.com` atau `%5C%5Cevil.com` bisa lolos cek lama
+        // karena browser menormalkan backslash menjadi forward slash.
+        let safeRedirectTarget = '/admin';
+        if (redirectTarget && redirectTarget.startsWith('/') && !redirectTarget.startsWith('//')) {
+          try {
+            const parsed = new URL(redirectTarget, window.location.origin);
+            if (
+              parsed.origin === window.location.origin &&
+              !parsed.pathname.startsWith('/admin/login')
+            ) {
+              safeRedirectTarget = parsed.pathname + parsed.search + parsed.hash;
+            }
+          } catch {
+            // abaikan, tetap fallback ke /admin
+          }
+        }
 
         window.location.href = safeRedirectTarget;
       } else {

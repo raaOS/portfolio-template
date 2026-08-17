@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGeminiApiKey, guardAdminAiRequest } from '../_shared';
+import { getGoogleAiApiKey, guardAdminAiRequest } from '../_shared';
 
 export async function POST(req: NextRequest) {
   const guardResponse = await guardAdminAiRequest(req, 'ai_notif');
   if (guardResponse) return guardResponse;
 
-  const API_KEY = getGeminiApiKey();
+  const API_KEY = getGoogleAiApiKey();
   if (!API_KEY) {
     return NextResponse.json({ error: 'API Key not configured' }, { status: 500 });
   }
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
 
     const prompt = `BERTINDAK SEBAGAI: WhatsApp Notification Generator.
         
-        TUGAS: Buatlah 1 (Satu) baris pesan notifikasi WhatsApp yang kreatif dan masuk akal dari pengirim bernama "${senderName}" untuk Ramos.
+        TUGAS: Buatlah 1 (Satu) baris pesan notifikasi WhatsApp yang kreatif dan masuk akal dari pengirim bernama "${senderName}" untuk pemilik portfolio.
         
         GAYA BAHASA:
         - Bahasa Indonesia Natural (WA).
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
         - Bisa berupa ajakan meeting, testimoni, tanya kabar, atau tawaran kerja.
         
         CONTOH:
-        - Jika "Rini HRD": "Halo Ramos, ada waktu untuk interview besok?"
+        - Jika "Rini HRD": "Halo, ada waktu untuk interview besok?"
         - Jika "BCA": "Transfer masuk Rp 5.000.000 dari Client X."
         - Jika "Gojek": "Pesanan sate ayam kamu sudah sampai depan pagar!"
         
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const txt = await response.text();
-      throw new Error(`Gemini API Error: ${txt}`);
+      throw new Error(`Google AI API Error: ${txt}`);
     }
 
     const data = await response.json();

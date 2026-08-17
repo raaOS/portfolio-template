@@ -9,8 +9,19 @@ const { validateAdminRequestMock, isConfiguredMock, missingKeysMock, createPresi
     createPresignedMock: vi.fn(),
   }));
 
-vi.mock('@/lib/auth', () => ({
-  validateAdminRequest: validateAdminRequestMock,
+vi.mock('@/lib/admin/siteMutationAuth', () => ({
+  validateSiteMutationRequest: validateAdminRequestMock,
+}));
+
+vi.mock('@/lib/admin/siteRequestContext', () => ({
+  assertKnownSite: vi.fn().mockResolvedValue({ id: 'default-site', slug: null }),
+  resolveRequestSiteId: vi.fn().mockResolvedValue('default-site'),
+  stripSiteContext: (body: unknown) => body,
+  SiteContextError: class SiteContextError extends Error {
+    constructor(message: string, public readonly status = 400) {
+      super(message);
+    }
+  },
 }));
 
 vi.mock('@/lib/r2Storage', () => ({
@@ -32,6 +43,8 @@ function buildRequest(body: Record<string, unknown>): NextRequest {
 describe('POST /api/upload/presign', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    isConfiguredMock.mockReturnValue(true);
+    missingKeysMock.mockReturnValue([]);
   });
 
   it('blocks unauthenticated requests', async () => {

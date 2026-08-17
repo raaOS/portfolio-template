@@ -8,6 +8,8 @@ import type { Label } from '@/types/labels';
 import type { Project } from '@/types/projects';
 import type { TestimonialData } from '@/types/testimonial';
 import type { NoteData } from '@/components/os/ui/elements/StickyNoteItem';
+import type { PlanQuota, ProductPlan, SiteQuotaOverride } from '@/lib/product/sitePlan';
+import type { SiteStorageUsage } from '@/lib/product/siteStorageUsage';
 import aboutFallback from '@/data/about.json';
 import contactFallback from '@/data/contact.json';
 import experienceFallback from '@/data/experience.json';
@@ -24,6 +26,7 @@ export const ADMIN_DATA_GC_TIME = 60 * 60 * 1000;
 export const ADMIN_QUERY_KEYS = {
   about: ['admin', 'about'] as const,
   aboutPhilosophy: ['admin', 'about', 'philosophy'] as const,
+  clientSites: ['admin', 'client-sites'] as const,
   commentCounts: ['comments', 'counts'] as const,
   contact: ['admin', 'contact'] as const,
   experience: ['admin', 'experience'] as const,
@@ -38,6 +41,7 @@ export const ADMIN_QUERY_KEYS = {
 
 export const ADMIN_PREFETCH_HREFS = [
   '/admin/projects',
+  '/admin/client-dashboard',
   '/admin/content/experience',
   '/admin/communications/notifications',
   '/admin/communications/contacts',
@@ -57,6 +61,48 @@ export interface AdminProjectsResponse {
     projects?: Project[];
     lastUpdated?: string;
   };
+}
+
+export interface AdminSiteSummary {
+  id: string;
+  slug: string;
+  name: string;
+  plan: ProductPlan;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  quota: PlanQuota;
+  quotaDefault: PlanQuota;
+  quotaOverride: SiteQuotaOverride;
+  usage: {
+    projects: number;
+    storage: SiteStorageUsage;
+  };
+  clientAccess: {
+    id: string;
+    email: string;
+    status: string;
+    updatedAt: string;
+    lastLoginAt: string | null;
+  } | null;
+  billing: {
+    plan: ProductPlan;
+    status: string;
+    currentPeriodEnd: string | null;
+    externalCustomerId: string | null;
+    externalSubscriptionId: string | null;
+    updatedAt: string;
+  } | null;
+  customDomain: {
+    customDomain: string | null;
+    status: string;
+    sslStatus: string;
+  } | null;
+}
+
+export interface AdminSitesResponse {
+  sites: AdminSiteSummary[];
+  defaultSiteId: string | null;
 }
 
 export interface Lead extends Record<string, unknown> {
@@ -89,6 +135,10 @@ export const ADMIN_PLACEHOLDER_DATA = {
   hardSkills: placeholderHardSkills,
   labels: labelsFallback as Label[],
   leads: [] as Lead[],
+  clientSites: {
+    sites: [],
+    defaultSiteId: null,
+  } satisfies AdminSitesResponse,
   projects: {
     data: {
       projects: (projectsFallback as { projects?: Project[] }).projects || [],
@@ -172,6 +222,10 @@ export function fetchAdminLeads() {
   return fetchJson<Lead[]>('/api/leads').then((data) => (Array.isArray(data) ? data : []));
 }
 
+export function fetchAdminSites() {
+  return fetchJson<AdminSitesResponse>('/api/admin/sites');
+}
+
 export function fetchAdminProjects() {
   return fetchJson<AdminProjectsResponse>('/api/projects');
 }
@@ -208,6 +262,15 @@ function prefetchJobsForRoute(href: string) {
         prefetch(queryClient, ADMIN_QUERY_KEYS.labels, fetchAdminLabels),
       (queryClient: QueryClient) =>
         prefetch(queryClient, ADMIN_QUERY_KEYS.commentCounts, fetchAdminCommentCounts),
+    ];
+  }
+
+  if (href.startsWith('/admin/client-dashboard')) {
+    return [
+      (queryClient: QueryClient) =>
+        prefetch(queryClient, ADMIN_QUERY_KEYS.clientSites, fetchAdminSites),
+      (queryClient: QueryClient) =>
+        prefetch(queryClient, ADMIN_QUERY_KEYS.labels, fetchAdminLabels),
     ];
   }
 
@@ -319,6 +382,7 @@ export function warmAdminCrudQueries(queryClient: QueryClient) {
     prefetch(queryClient, ADMIN_QUERY_KEYS.testimonial, fetchAdminTestimonials),
     prefetch(queryClient, ADMIN_QUERY_KEYS.contact, fetchAdminContact),
     prefetch(queryClient, ADMIN_QUERY_KEYS.leads, fetchAdminLeads),
+    prefetch(queryClient, ADMIN_QUERY_KEYS.clientSites, fetchAdminSites),
     prefetch(queryClient, ADMIN_QUERY_KEYS.labels, fetchAdminLabels),
     prefetch(queryClient, ADMIN_QUERY_KEYS.commentCounts, fetchAdminCommentCounts),
   ]);

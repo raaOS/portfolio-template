@@ -1,20 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { validateAdminRequest } from '@/lib/auth';
 import {
   createR2PresignedPutUrl,
   getMissingR2EnvKeys,
   isR2StorageConfigured,
 } from '@/lib/r2Storage';
+import { validateSiteMutationRequest } from '@/lib/admin/siteMutationAuth';
+import {
+  assertKnownSite,
+  resolveRequestSiteId,
+  SiteContextError,
+  stripSiteContext,
+} from '@/lib/admin/siteRequestContext';
 
-export const runtime = 'nodejs';
 
 /**
- * Issues a short-lived presigned PUT URL so the admin browser can upload
- * large videos (typically wallpapers > 4.5 MB) directly to Cloudflare R2.
+ * Issues a short-lived signed PUT URL so the admin browser can upload
+ * large videos (typically wallpapers > 4.5 MB) through the Cloudflare Worker
+ * R2 binding without using FormData.
  *
  * Why bypass /api/upload?
- *   /api/upload reads the request as FormData via `req.formData()`. Vercel
- *   caps Route Handler request bodies at the platform body size limit
+ *   /api/upload reads the request as FormData via `req.formData()`. Runtime
+ *   platforms cap Route Handler request bodies at a platform body size limit
  *   (4.5 MB on Hobby), so any FormData larger than that fails to parse and
  *   surfaces as "Failed to parse body as FormData" in the toast. Wallpaper
  *   videos at 1920x1080 routinely cross that threshold even after client
@@ -28,6 +34,7 @@ export const runtime = 'nodejs';
  *   - Content-Type is bound into the signature, so the browser PUT must
  *     match exactly. R2 rejects mismatches.
  *   - Signed URL is valid for 10 minutes only.
+ *   - Upload byte ceiling is embedded in the signed token.
  */
 
 const ALLOWED_FOLDERS = new Set(['wallpapers']);
@@ -41,8 +48,7 @@ const ALLOWED_EXTENSIONS = new Set(['mp4', 'webm', 'mov']);
 //   - Live wallpaper 4K dari source internet tipikal 30-50 MB, jadi
 //     ceiling 60 MB cukup longgar untuk pass-through Ultra profile.
 //   - File > 60 MB akan merusak Lighthouse LCP visitor mobile dan
-//     bikin Vercel function bandwidth (Fast Origin Transfer 10 GB
-//     Hobby) habis terlalu cepat saat cold-cache hit.
+//     bikin bandwidth/cache cold-hit habis terlalu cepat.
 const MAX_VIDEO_SIZE_BYTES = 60 * 1024 * 1024; // 60 MB hard ceiling.
 
 interface PresignRequestBody {
@@ -65,10 +71,6 @@ function sanitizeBaseName(input: string): string {
 
 export async function POST(req: NextRequest) {
   try {
-    if (!(await validateAdminRequest(req))) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     if (!isR2StorageConfigured()) {
       return NextResponse.json(
         {
@@ -82,11 +84,17 @@ export async function POST(req: NextRequest) {
     if (!body) {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
+    const siteId = await resolveRequestSiteId(req, body);
+    if (!(await validateSiteMutationRequest(req, siteId))) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    await assertKnownSite(siteId);
 
-    const folder = body.folder ?? '';
-    const filename = body.filename ?? '';
-    const contentType = body.contentType ?? '';
-    const size = Number(body.size ?? 0);
+    const payload = stripSiteContext(body) as PresignRequestBody;
+    const folder = payload.folder ?? '';
+    const filename = payload.filename ?? '';
+    const contentType = payload.contentType ?? '';
+    const size = Number(payload.size ?? 0);
 
     if (!ALLOWED_FOLDERS.has(folder)) {
       return NextResponse.json(
@@ -118,11 +126,15 @@ export async function POST(req: NextRequest) {
     const sourceExt = (filename.split('.').pop() || 'mp4').toLowerCase();
     const ext = ALLOWED_EXTENSIONS.has(sourceExt) ? sourceExt : 'mp4';
     const base = sanitizeBaseName(filename || 'wallpaper');
-    const key = `assets/wallpapers/${Date.now()}-${base}.${ext}`;
+    const key =
+      siteId === 'default-site'
+        ? `assets/wallpapers/${Date.now()}-${base}.${ext}`
+        : `sites/${siteId}/wallpapers/${Date.now()}-${base}.${ext}`;
 
     const presigned = await createR2PresignedPutUrl({
       key,
       contentType,
+      maxSize: size,
     });
 
     return NextResponse.json({
@@ -135,6 +147,9 @@ export async function POST(req: NextRequest) {
       expiresInSeconds: presigned.expiresInSeconds,
     });
   } catch (e) {
+    if (e instanceof SiteContextError) {
+      return NextResponse.json({ error: e.message }, { status: e.status });
+    }
     console.error('Presign error:', e);
     return NextResponse.json(
       {

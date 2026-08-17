@@ -13,7 +13,7 @@ import React, { startTransition, useCallback, useEffect, useMemo } from 'react';
 import { AnimatePresence, m, LazyMotion, domMax } from 'motion/react';
 import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
-import { useAdminAuth } from '@/hooks/useAdminAuth';
+import { useClientSiteAuth } from '@/hooks/useClientSiteAuth';
 import { useLayoutPersistence } from '../contexts/LayoutPersistenceContext';
 import { useDesktopWindowContext } from '../context/DesktopWindowContext';
 import { useStickyNotes } from '../hooks/useStickyNotes';
@@ -79,6 +79,9 @@ const NOTES_ENTRANCE_AFTER_WINDOWS_MS = 220;
 
 export interface DesktopEnvironmentProps {
   children?: React.ReactNode;
+  siteId?: string;
+  siteSlug?: string;
+  loginUrl?: string;
   aboutData?: AboutData | null;
   experienceData?: ExperienceData | null;
   hardSkillsData?: HardSkillsData | null;
@@ -88,6 +91,9 @@ export interface DesktopEnvironmentProps {
 }
 
 interface DesktopMainBaseProps {
+  siteId: string;
+  siteSlug?: string;
+  loginUrl?: string;
   aboutData?: AboutData | null;
   experienceData?: ExperienceData | null;
   hardSkillsData?: HardSkillsData | null;
@@ -100,6 +106,7 @@ interface DesktopMainBaseProps {
   dynamicContacts: Record<string, ContactProfile>;
   testimonialContacts: ContactProfile[];
   isAuthLoading: boolean;
+  isWhatsAppEnabled: boolean;
 }
 
 interface DesktopMainWithLogoutProps extends DesktopMainBaseProps {
@@ -113,6 +120,9 @@ interface DesktopMainProps extends DesktopMainBaseProps {
 }
 
 export default function DesktopEnvironment({
+  siteId = 'default-site',
+  siteSlug,
+  loginUrl,
   aboutData,
   experienceData,
   hardSkillsData,
@@ -123,7 +133,8 @@ export default function DesktopEnvironment({
   const { mounted, isMobile } = useDesktopLock();
   const bootSequence = useBootSequence();
   const { needsPowerOn, isBooting } = bootSequence;
-  const { isAdmin, csrfToken, logout: originalLogout, isLoading: isAuthLoading } = useAdminAuth();
+  const { isAdmin, csrfToken, logout: originalLogout, isLoading: isAuthLoading } = useClientSiteAuth(siteId);
+  const isWhatsAppEnabled = aboutData?.dockConfig?.whatsapp?.isHidden !== true;
   const { dynamicContacts, testimonialContacts } = useChatContacts(testimonialsData);
 
   const commercialProjects = useMemo(() => {
@@ -142,6 +153,7 @@ export default function DesktopEnvironment({
         experienceData,
         hardSkillsData,
         contactData,
+        siteId,
         projects,
         dynamicContacts,
         isAdmin,
@@ -152,6 +164,7 @@ export default function DesktopEnvironment({
       experienceData,
       hardSkillsData,
       contactData,
+      siteId,
       projects,
       dynamicContacts,
       isAdmin,
@@ -167,10 +180,14 @@ export default function DesktopEnvironment({
     <DesktopProviders
       initialWindows={initialWindows}
       aboutData={aboutData}
+      siteId={siteId}
       csrfToken={csrfToken || undefined}
       isAdmin={isAdmin}
     >
       <DesktopMainWithLogout
+        siteId={siteId}
+        siteSlug={siteSlug}
+        loginUrl={loginUrl}
         aboutData={aboutData}
         experienceData={experienceData}
         hardSkillsData={hardSkillsData}
@@ -184,6 +201,7 @@ export default function DesktopEnvironment({
         dynamicContacts={dynamicContacts}
         testimonialContacts={testimonialContacts}
         isAuthLoading={isAuthLoading}
+        isWhatsAppEnabled={isWhatsAppEnabled}
         bootSequence={bootSequence}
       />
     </DesktopProviders>
@@ -210,6 +228,9 @@ function DesktopMainWithLogout({ originalLogout, ...props }: DesktopMainWithLogo
 }
 
 function DesktopMain({
+  siteId,
+  siteSlug,
+  loginUrl,
   aboutData,
   experienceData: _experienceData,
   hardSkillsData: _hardSkillsData,
@@ -223,6 +244,7 @@ function DesktopMain({
   dynamicContacts,
   testimonialContacts,
   isAuthLoading,
+  isWhatsAppEnabled,
   bootSequence,
 }: DesktopMainProps) {
   const { needsPowerOn, isBooting, finishBooting } = bootSequence;
@@ -303,7 +325,14 @@ function DesktopMain({
     bringToFrontNote,
     setNotes,
     hasLoaded: notesLoaded,
-  } = useStickyNotes(true, isAdmin, csrfToken ?? undefined, requestNextZIndex, isAuthLoading);
+  } = useStickyNotes(
+    true,
+    isAdmin,
+    csrfToken ?? undefined,
+    requestNextZIndex,
+    isAuthLoading,
+    siteId
+  );
   const {
     openProjectWindow: baseOpenProjectWindow,
     navToChat,
@@ -317,10 +346,12 @@ function DesktopMain({
     ChatWindow,
     _notes: notes,
     projects,
+    siteId,
     _restoreNote: restoreNote,
     _addNote: addNote,
     _isAdmin: isAdmin,
     setNotesDockBouncing: () => {},
+    isWhatsAppEnabled,
   });
 
   // Wrap openProjectWindow to also track which icons are morphing
@@ -336,6 +367,7 @@ function DesktopMain({
       aboutData,
       isAdmin,
       csrfToken,
+      siteId,
     });
   const { projectIcons } = useDesktopIcons({
     mounted: true,
@@ -399,7 +431,9 @@ function DesktopMain({
               width: snapshot.width ?? 900,
               height: snapshot.height ?? 620,
               content: null,
-              contentFactory: () => <ProjectDetailWrapper project={project} projects={projects} />,
+              contentFactory: () => (
+                <ProjectDetailWrapper project={project} projects={projects} siteId={siteId} />
+              ),
             },
             snapshot
           );
@@ -418,6 +452,7 @@ function DesktopMain({
     markVisitorWindowsReady,
     projects,
     setWindows,
+    siteId,
   ]);
 
   useEffect(() => {
@@ -526,7 +561,9 @@ function DesktopMain({
 
     const app = rawApp === 'mail' ? 'contact' : rawApp;
     if (app === 'whatsapp') {
-      openWhatsAppList();
+      if (isWhatsAppEnabled) {
+        openWhatsAppList();
+      }
     } else if (app === 'notes') {
       showNotes();
     } else if (app === 'mission-control') {
@@ -541,7 +578,14 @@ function DesktopMain({
       nextUrl.searchParams.delete('app');
       window.history.replaceState({}, '', nextUrl.pathname + nextUrl.search + window.location.hash);
     }
-  }, [searchParams, openWindow, openWhatsAppList, showNotes, setShowMissionControl]);
+  }, [
+    searchParams,
+    openWindow,
+    openWhatsAppList,
+    showNotes,
+    setShowMissionControl,
+    isWhatsAppEnabled,
+  ]);
 
   const isDesktopReady = wasBootSkipped || startScreenReady;
   const isDesktopRevealed = wasBootSkipped || isRevealed;
@@ -605,12 +649,11 @@ function DesktopMain({
     };
   }, [setIsWindowOpen, setIsDesktopRevealed]);
 
-  // Pre-mount desktop layers as soon as StartScreen is mounted (sebelum
-  // hollow-O pecah). Tujuannya: chunk JS untuk DesktopIconsLayer / UnifiedLayer
-  // / UIOverlaysLayer sudah selesai di-import dan sticky-notes sudah ter-fetch
-  // saat user pertama kali melihat desktop. Tanpa pre-mount, semua chunk + API
-  // request baru kicked-off saat reveal, dan user melihat wallpaper kosong
-  // selama beberapa ratus milidetik di belakang lubang.
+  // Pre-mount desktop layers as soon as StartScreen is mounted. Tujuannya:
+  // chunk JS untuk DesktopIconsLayer / UnifiedLayer / UIOverlaysLayer sudah
+  // selesai di-import dan sticky-notes sudah ter-fetch saat user pertama kali
+  // melihat desktop. Tanpa pre-mount, semua chunk + API request baru kicked-off
+  // saat reveal, dan user melihat wallpaper kosong selama beberapa ratus ms.
   //
   // Layers yang di-mount tetap invisible secara visual sampai `isRevealed`
   // true (lihat opacity wrapper di JSX bawah), dan StartScreen di
@@ -652,14 +695,14 @@ function DesktopMain({
               isActive={needsPowerOn || isBooting}
               onReady={() => {
                 // `body::before` only protects the SSR gap before
-                // StartScreen mounts. Keeping it during the hollow-O
-                // reveal blocks the desktop behind the transparent mask.
+                // StartScreen mounts. Keeping it during the Lottie boot
+                // would hide the desktop after the reveal starts.
                 releaseBootCover();
                 setStartScreenReady(true);
               }}
               onReveal={() => {
-                // Pre-reveal desktop layers DI BELAKANG hollow-O
-                // supaya saat lubang membesar, user langsung lihat
+                // Reveal desktop layers while the Lottie boot fades out so
+                // user langsung lihat
                 // wallpaper, icons, dock, menubar — bukan layar kosong.
                 soundManager.suppressSound('window-open', 2500);
                 soundManager.suppressSound('notification', 1500);
@@ -694,8 +737,8 @@ function DesktopMain({
            * pre-mount, semua chunk + API request baru kicked-off
            * saat reveal -> wallpaper kosong selama beberapa ratus ms
            * di belakang lubang. Visibility di-gate via opacity —
-           * StartScreen di z=BOOT menutupi semuanya sampai hollow-O
-           * pecah. `pointer-events-none` saat belum revealed wajib
+           * StartScreen di z=BOOT menutupi semuanya sampai reveal dimulai.
+           * `pointer-events-none` saat belum revealed wajib
            * supaya icon/dock di belakang StartScreen tidak menerima
            * klik yang seharusnya men-trigger boot.
            */}
@@ -707,7 +750,7 @@ function DesktopMain({
                 opacity: isDesktopRevealed ? 1 : 0,
                 pointerEvents: isDesktopRevealed ? 'auto' : 'none',
                 // Tidak transition opacity — layer harus instan visible
-                // bersamaan dengan hollow-O reveal. Animasi entrance
+                // bersamaan dengan boot reveal. Animasi entrance
                 // (icons stagger, notes fade) tetap di-handle di masing-masing
                 // layer, tapi dipicu sedikit setelah reveal mulai supaya
                 // tidak selesai saat masih tertutup StartScreen.
@@ -777,10 +820,14 @@ function DesktopMain({
                 />
               </React.Suspense>
               <UIOverlaysLayer
+                siteId={siteId}
+                siteSlug={siteSlug}
+                loginUrl={loginUrl}
                 navToChat={navToChat}
                 openWhatsAppList={openWhatsAppList}
                 testimonialContacts={testimonialContacts}
                 aboutData={aboutData}
+                isWhatsAppEnabled={isWhatsAppEnabled}
                 isAdmin={isAdmin}
                 logout={logout}
                 toggleNotesVisibility={toggleNotesVisibility}

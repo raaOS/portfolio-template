@@ -20,7 +20,9 @@ function mockGroqResponse(body: Record<string, unknown>, ok = true) {
 describe('POST /api/translate', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.stubEnv('GROQ_API_KEY', 'test-groq-key');
+    vi.stubEnv('FEATURE_AI', 'true');
+    vi.stubEnv('AI_PROVIDER', 'groq');
+    vi.stubEnv('AI_API_KEY', 'test-groq-key');
   });
 
   it('blocks rate-limited translation requests before invoking Groq', async () => {
@@ -94,8 +96,9 @@ describe('POST /api/translate', () => {
     });
   });
 
-  it('returns 500 when GROQ_API_KEY is missing', async () => {
-    vi.stubEnv('GROQ_API_KEY', '');
+  it('returns 500 when AI translation provider is missing', async () => {
+    vi.stubEnv('AI_PROVIDER', 'groq');
+    vi.stubEnv('AI_API_KEY', '');
     enforceRequestRateLimitMock.mockResolvedValue({ allowed: true, retryAfter: 0 });
 
     const response = await POST(
@@ -108,6 +111,6 @@ describe('POST /api/translate', () => {
 
     expect(response.status).toBe(500);
     const body = await response.json();
-    expect(body.error).toBe('Groq API Key not configured');
+    expect(body.error).toBe('AI translation provider is not configured');
   });
 });

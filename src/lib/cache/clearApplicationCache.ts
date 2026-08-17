@@ -1,14 +1,11 @@
 import 'server-only';
 
-import fs from 'node:fs/promises';
-import path from 'node:path';
 import { CacheManager } from '@/lib/cache/CacheManager';
 
 // Import known cache owners so their CacheManager instances are registered
 // before a global clear runs in a fresh serverless runtime.
 import '@/lib/contact';
 import '@/lib/services/contentService';
-import '@/lib/services/instagramExtractService';
 import '@/lib/services/project/projectCache';
 
 export interface CacheClearStep {
@@ -24,39 +21,19 @@ export interface CacheClearResult {
   cloudflareCdn: CacheClearStep;
 }
 
-async function removeDirectoryIfExists(targetPath: string, name: string): Promise<CacheClearStep> {
-  try {
-    await fs.rm(targetPath, { recursive: true, force: true });
-    return {
-      name,
-      status: 'cleared',
-      detail: targetPath,
-    };
-  } catch (error) {
-    return {
-      name,
-      status: 'error',
-      detail: error instanceof Error ? error.message : String(error),
-    };
-  }
-}
-
-async function clearNextFilesystemCache(): Promise<CacheClearStep[]> {
-  if (process.env.VERCEL === '1') {
-    return [
-      {
-        name: '.next cache',
-        status: 'skipped',
-        detail: 'Vercel runtime filesystem is read-only/ephemeral. Use redeploy for build cache.',
-      },
-    ];
-  }
-
-  const cwd = process.cwd();
-  return Promise.all([
-    removeDirectoryIfExists(path.join(cwd, '.next', 'cache'), '.next/cache'),
-    removeDirectoryIfExists(path.join(cwd, 'node_modules', '.cache'), 'node_modules/.cache'),
-  ]);
+function clearNextFilesystemCache(): CacheClearStep[] {
+  return [
+    {
+      name: '.next/cache',
+      status: 'skipped',
+      detail: 'Cloudflare Workers runtime has no writable Next.js filesystem cache.',
+    },
+    {
+      name: 'node_modules/.cache',
+      status: 'skipped',
+      detail: 'Local tooling cache is not cleared from the deployed Worker runtime.',
+    },
+  ];
 }
 
 async function purgeCloudflareCdn(): Promise<CacheClearStep> {
@@ -125,7 +102,7 @@ export async function clearApplicationCache(): Promise<CacheClearResult> {
   }));
 
   const [nextFilesystem, cloudflareCdn] = await Promise.all([
-    clearNextFilesystemCache(),
+    Promise.resolve(clearNextFilesystemCache()),
     purgeCloudflareCdn(),
   ]);
 

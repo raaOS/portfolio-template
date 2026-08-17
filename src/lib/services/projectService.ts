@@ -1,4 +1,4 @@
-﻿import { cache } from 'react';
+import { cache } from 'react';
 import { Project, CreateProjectData, UpdateProjectData } from '@/types/projects';
 import { ProjectSchema, CreateProjectSchema, UpdateProjectSchema } from '@/lib/validations';
 import { db } from '@/lib/database';
@@ -13,6 +13,9 @@ import {
 } from '@/lib/services/project/projectCache';
 import { extractProjectAssets, purgeStorageAssets } from '@/lib/services/project/projectStorage';
 import { generateUniqueSlug } from '@/lib/services/project/projectSlug';
+import { projectSqlService } from '@/lib/services/project/projectSqlService';
+import { generateProjectId } from '@/lib/mappers/projectMapper';
+import { buildCommentPath } from '@/lib/projectEngagement';
 
 function normalizeProject(project: Project): Project {
   if (!project.galleryGroups?.length) {
@@ -148,14 +151,14 @@ export const projectService = {
     }
   },
 
-  async createProject(data: CreateProjectData): Promise<Project> {
+  async createProject(data: CreateProjectData, siteId = 'default-site'): Promise<Project> {
     CreateProjectSchema.parse(data);
 
     const snapshot = await db.ref('projects').once('value');
     const currentCount = snapshot.numChildren();
 
     const slug = await generateUniqueSlug(data.title);
-    const id = `project-${Date.now()}`;
+    const id = generateProjectId();
 
     const newProject: Project = {
       ...data,
@@ -183,16 +186,30 @@ export const projectService = {
       updatedAt: new Date().toISOString(),
     };
 
-    await Promise.all([
-      db.ref(`projects/${id}`).set(newProject),
-      db.ref('lastUpdated').set(new Date().toISOString()),
-    ]);
+    // FIX: JSON tree `projects` bersifat GLOBAL (lintas tenant). Untuk site
+    // tenant, jangan menulis ke tree global — SQL adalah sumber kebenaran.
+    if (siteId === 'default-site') {
+      await Promise.all([
+        db.ref(`projects/${id}`).set(newProject),
+        db.ref('lastUpdated').set(new Date().toISOString()),
+      ]);
+    } else {
+      await db.ref('lastUpdated').set(new Date().toISOString());
+    }
+
+    // --- DUAL-WRITE TO SQL (Sprint C) ---
+    try {
+      await projectSqlService.createProjectSql(siteId, data, id);
+    } catch (e) {
+      console.error('[DualWrite] Failed to create project in SQL:', e);
+    }
+    // ------------------------------------
 
     clearProjectCache();
     return newProject;
   },
 
-  async updateProject(id: string, data: UpdateProjectData): Promise<Project | null> {
+  async updateProject(id: string, data: UpdateProjectData, siteId = 'default-site'): Promise<Project | null> {
     UpdateProjectSchema.parse({ ...data, id });
 
     const projectRef = db.ref(`projects/${id}`);
@@ -209,7 +226,9 @@ export const projectService = {
         .once('value');
       if (collisionSnap.exists()) {
         const collisionData = collisionSnap.val();
-        if (Object.keys(collisionData)[0] !== id) {
+        // FIX: Bisa ada >1 project dengan slug sama; pastikan collision-nya
+        // benar-benar project lain (bukan project yang sedang diupdate).
+        if (Object.keys(collisionData).some((key) => key !== id)) {
           data.slug = `${data.slug}-${Date.now().toString().slice(-4)}`;
         }
       }
@@ -226,11 +245,19 @@ export const projectService = {
       db.ref('lastUpdated').set(new Date().toISOString()),
     ]);
 
+    // --- DUAL-WRITE TO SQL (Sprint C) ---
+    try {
+      await projectSqlService.updateProjectSql(siteId, id, data);
+    } catch (e) {
+      console.error('[DualWrite] Failed to update project in SQL:', e);
+    }
+    // ------------------------------------
+
     clearProjectCache();
     return updatedProject;
   },
 
-  async deleteProject(id: string): Promise<boolean> {
+  async deleteProject(id: string, siteId = 'default-site'): Promise<boolean> {
     const projectRef = db.ref(`projects/${id}`);
     const snap = await projectRef.once('value');
     if (!snap.exists()) return false;
@@ -246,13 +273,21 @@ export const projectService = {
 
     try {
       if (project.slug) {
-        await db.ref(`comments/${project.slug}`).remove();
+        await db.ref(buildCommentPath(siteId, project.slug)).remove();
       }
     } catch (e) {
       console.warn('[ProjectService] Failed to cleanup comments:', e);
     }
 
     await Promise.all([projectRef.remove(), db.ref('lastUpdated').set(new Date().toISOString())]);
+
+    // --- DUAL-WRITE TO SQL (Sprint C) ---
+    try {
+      await projectSqlService.deleteProjectSql(siteId, id);
+    } catch (e) {
+      console.error('[DualWrite] Failed to delete project in SQL:', e);
+    }
+    // ------------------------------------
 
     clearProjectCache();
 

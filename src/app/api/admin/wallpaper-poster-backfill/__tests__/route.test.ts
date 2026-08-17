@@ -17,6 +17,17 @@ vi.mock('@/lib/auth', () => ({
   validateAdminRequest: vi.fn().mockResolvedValue(true),
 }));
 
+vi.mock('@/lib/admin/siteRequestContext', () => ({
+  assertKnownSite: vi.fn().mockResolvedValue({ id: 'default-site', slug: null }),
+  revalidateSiteContentPaths: vi.fn().mockResolvedValue(undefined),
+  resolveRequestSiteId: vi.fn().mockResolvedValue('default-site'),
+  SiteContextError: class SiteContextError extends Error {
+    constructor(message: string, public readonly status = 400) {
+      super(message);
+    }
+  },
+}));
+
 const getAboutData = vi.fn();
 const updateAboutData = vi.fn();
 

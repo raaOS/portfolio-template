@@ -7,6 +7,7 @@ import { ChevronRight, Monitor, Zap } from 'lucide-react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { markBack } from '@/lib/navigationDirection';
 import { useDictionary } from '@/contexts/LanguageContext';
+import { buildTenantHomeHref, isProjectsRoute } from '@/lib/routing/tenantRoutes';
 
 interface SystemNavFrameProps {
   children: React.ReactNode;
@@ -28,14 +29,15 @@ export default function SystemNavFrame({
   const is3D = view === '3d';
   const isList = view === 'list';
   const isContact = pathname === '/contact' || pathname?.startsWith('/contact');
-  const isProjects = pathname?.startsWith('/projects');
+  const isProjects = isProjectsRoute(pathname);
+  const homeHref = buildTenantHomeHref(pathname);
   const effectiveHideFooter = hideFooter || isContact || is3D;
   const showSystemHeader = !isProjects && !isPrintMode;
 
   // Generate Breadcrumbs from pathname
   const pathSegments = pathname.split('/').filter(Boolean);
   const breadcrumbs = [
-    { label: 'Ramos OS', href: '/', isLast: pathSegments.length === 0 },
+    { label: 'Portfolio OS', href: homeHref, isLast: pathSegments.length === 0 },
     ...pathSegments.map((segment, i) => ({
       label: segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, ' '),
       href: `/${pathSegments.slice(0, i + 1).join('/')}`,
@@ -58,7 +60,7 @@ export default function SystemNavFrame({
             <div className="flex items-center gap-2 border-r border-gray-300 pr-4">
               <Monitor size={14} className="text-gray-600" />
               <span className="text-[11px] font-bold tracking-tight text-gray-800">
-                Ramos v2.0{' '}
+                Portfolio OS{' '}
                 <span className="ml-1 font-normal text-gray-500">({t.systemNav.connected})</span>
               </span>
             </div>
@@ -116,7 +118,7 @@ export default function SystemNavFrame({
             </div>
             <div className="flex gap-6">
               <Link
-                href="/"
+                href={homeHref}
                 onClickCapture={markBack}
                 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 transition-colors hover:text-black"
               >

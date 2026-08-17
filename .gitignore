@@ -1,11 +1,15 @@
 
 .vercel
+.open-next/
+.wrangler/
 node_modules/
 .next/
 
 # Backup files
 src/data/*.backup.json
 src/data/backups/
+backups/
+.backup-drill/
 
 # System Files
 .DS_Store
@@ -18,6 +22,10 @@ tsconfig.tsbuildinfo
 .env
 .env.local
 .env.*
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+cloudflare-env.d.ts
 
 # Editor
 .vscode/
@@ -27,12 +35,10 @@ test-results/
 # Local AI/tooling state
 .claude/settings.local.json
 .playwright-cli/
+.tmp/playwright-npm-cache/
 
 # Local scratchpad (debug/one-offs)
 scratch/
-
-# Local job-bot browser sessions
-.job-bot/
 
 # Test scripts (may contain API keys/tokens)
 *-env.js
@@ -43,9 +49,6 @@ add-*.js
 
 
 .env*.local
-
-# Secrets
-src/data/telegram.json
 
 # Debug/build output files
 *_output.txt
@@ -81,3 +84,7 @@ _a")sxsx214be5b4520cdd.md
 # Local temporary files
 tmp/
 ts-error.txt
+
+# Internal product assets (do not publish)
+qris MIB.jpg
+PRD_ContextPack_*.docx

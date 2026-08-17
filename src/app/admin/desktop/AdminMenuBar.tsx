@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useState, useSyncExternalStore } from 'react';
-import { Eye, LogOut, Wifi, Database, Settings, Bot } from 'lucide-react';
+import { Eye, LogOut, Wifi, Database, Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { mutate as mutateSWR } from 'swr';
@@ -9,7 +9,6 @@ import { useDataStatus } from '../hooks/useDataStatus';
 import {
   DatabasePopout,
   NetworkPopout,
-  WatchdogPopout,
   SettingsPopout,
   UploadsPopout,
 } from './status-popouts';
@@ -22,7 +21,6 @@ import {
 } from '../components/ClearCacheProgressModal';
 import { useToast } from '@/contexts/ToastContext';
 import { useCsrfToken } from '@/hooks/useCsrfToken';
-import type { WatchdogStatusData } from './status-popouts';
 import { useBackgroundUpload } from '@/contexts/BackgroundUploadContext';
 import { CloudUpload } from 'lucide-react';
 
@@ -30,7 +28,7 @@ interface AdminMenuBarProps {
   onLogout: () => Promise<void>;
 }
 
-type OpenPopout = 'db' | 'net' | 'settings' | 'watchdog' | 'uploads' | null;
+type OpenPopout = 'db' | 'net' | 'settings' | 'uploads' | null;
 
 type ServerCacheStep = {
   name: string;
@@ -149,7 +147,6 @@ export default function AdminMenuBar({ onLogout }: AdminMenuBarProps) {
   const [openPopout, setOpenPopout] = useState<OpenPopout>(null);
   const dbAnchorRef = useRef<HTMLButtonElement | null>(null);
   const netAnchorRef = useRef<HTMLButtonElement | null>(null);
-  const watchdogAnchorRef = useRef<HTMLButtonElement | null>(null);
   const uploadsAnchorRef = useRef<HTMLButtonElement | null>(null);
   const settingsAnchorRef = useRef<HTMLButtonElement | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -212,11 +209,6 @@ export default function AdminMenuBar({ onLogout }: AdminMenuBarProps) {
     });
     return [header, '', ...rows].join('\n');
   }, [tasks, completedUploadCount, totalUploadCount, inFlightUploadProgress]);
-  const [watchdogStatus, setWatchdogStatus] = useState<WatchdogStatusData>({
-    status: 'checking',
-  });
-  const [isRefreshingWatchdog, setIsRefreshingWatchdog] = useState(false);
-
   const { connectionStatus, serverStatus, latencyMs, lastCheckedAt, errorMessage, health } =
     useDataStatus();
 
@@ -235,33 +227,6 @@ export default function AdminMenuBar({ onLogout }: AdminMenuBarProps) {
         step.status === 'pending' ? { ...step, status: 'skipped', detail } : step
       )
     );
-  }, []);
-
-  const refreshWatchdogStatus = React.useCallback(async () => {
-    setIsRefreshingWatchdog(true);
-    try {
-      const res = await fetch('/api/admin/telegram-watchdog-status', {
-        cache: 'no-store',
-      });
-      const data = (await res.json().catch(() => null)) as WatchdogStatusData | null;
-
-      if (!res.ok || !data) {
-        setWatchdogStatus({
-          status: 'error',
-          message: data?.message || `Status request failed (${res.status})`,
-        });
-        return;
-      }
-
-      setWatchdogStatus(data);
-    } catch (error) {
-      setWatchdogStatus({
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Gagal membaca status watchdog',
-      });
-    } finally {
-      setIsRefreshingWatchdog(false);
-    }
   }, []);
 
   const handleClearCache = async () => {
@@ -428,20 +393,6 @@ export default function AdminMenuBar({ onLogout }: AdminMenuBarProps) {
     };
   }, []);
 
-  React.useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      void refreshWatchdogStatus();
-    }, 0);
-    const interval = window.setInterval(() => {
-      void refreshWatchdogStatus();
-    }, 60_000);
-
-    return () => {
-      window.clearTimeout(timeout);
-      window.clearInterval(interval);
-    };
-  }, [refreshWatchdogStatus]);
-
   const dbColorClass =
     connectionStatus === 'connected'
       ? 'text-emerald-500'
@@ -456,19 +407,7 @@ export default function AdminMenuBar({ onLogout }: AdminMenuBarProps) {
         ? 'text-amber-500'
         : 'text-emerald-500';
 
-  const watchdogColorClass =
-    watchdogStatus.status === 'healthy'
-      ? 'text-emerald-500'
-      : watchdogStatus.status === 'checking' ||
-          watchdogStatus.status === 'local-polling' ||
-          watchdogStatus.status === 'watchdog-stale'
-        ? 'text-amber-500'
-        : 'text-rose-500';
-
   const togglePopout = (which: Exclude<OpenPopout, null>) => {
-    if (which === 'watchdog') {
-      void refreshWatchdogStatus();
-    }
     setOpenPopout((prev) => (prev === which ? null : which));
   };
 
@@ -476,7 +415,7 @@ export default function AdminMenuBar({ onLogout }: AdminMenuBarProps) {
     <header className="admin-menubar">
       <div className="admin-menubar-left">
         <span className="admin-menubar-logo">◆</span>
-        <span className="admin-menubar-title">Ramos Admin</span>
+        <span className="admin-menubar-title">Portfolio Admin</span>
       </div>
 
       <div className="admin-menubar-right">
@@ -506,20 +445,6 @@ export default function AdminMenuBar({ onLogout }: AdminMenuBarProps) {
           aria-expanded={openPopout === 'net'}
         >
           <Wifi className={`h-3.5 w-3.5 transition-colors ${netColorClass}`} />
-        </button>
-
-        <button
-          ref={watchdogAnchorRef}
-          type="button"
-          onClick={() => togglePopout('watchdog')}
-          className={`admin-menubar-status-btn ${
-            openPopout === 'watchdog' ? 'admin-menubar-status-btn-active' : ''
-          }`}
-          title="Watchdog status"
-          aria-label="Watchdog status"
-          aria-expanded={openPopout === 'watchdog'}
-        >
-          <Bot className={`h-3.5 w-3.5 transition-colors ${watchdogColorClass}`} />
         </button>
 
         <button
@@ -598,14 +523,6 @@ export default function AdminMenuBar({ onLogout }: AdminMenuBarProps) {
         latencyMs={latencyMs}
         lastCheckedAt={lastCheckedAt}
         errorMessage={serverStatus === 'online' ? null : errorMessage}
-      />
-      <WatchdogPopout
-        isOpen={openPopout === 'watchdog'}
-        onClose={() => setOpenPopout(null)}
-        anchorRef={watchdogAnchorRef}
-        status={watchdogStatus}
-        onRefresh={refreshWatchdogStatus}
-        isRefreshing={isRefreshingWatchdog}
       />
       <UploadsPopout
         isOpen={openPopout === 'uploads'}

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Link, useTransitionRouter } from 'next-view-transitions';
+import { Link } from 'next-view-transitions';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { Search, Wifi, Volume2 } from 'lucide-react';
 import { useAnalytics } from '@/hooks/useAnalytics';
@@ -9,10 +9,14 @@ import { useOSOverlays } from '@/components/os/context/OSSystemContext';
 import { markBack } from '@/lib/navigationDirection';
 import dynamic from 'next/dynamic';
 import { useReducedMotion } from 'motion/react';
-import IOSPinModal from './IOSPinModal';
 import logoAnimationData from '../../../public/lottie/mata.json';
 import LanguageSwitch from './LanguageSwitch';
 import { useLanguage } from '@/contexts/LanguageContext';
+import {
+  buildTenantHomeHref,
+  buildTenantProjectsHref,
+  isProjectsRoute,
+} from '@/lib/routing/tenantRoutes';
 
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
@@ -22,8 +26,6 @@ const Header: React.FC = () => {
   const searchParams = useSearchParams();
   const { trackEvent } = useAnalytics();
   const { setShowControlCenter, showCalendar, setShowCalendar } = useOSOverlays();
-  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
-  const router = useTransitionRouter();
   const { dictionary: t, meta } = useLanguage();
 
   const prefersReducedMotion = useReducedMotion();
@@ -31,6 +33,8 @@ const Header: React.FC = () => {
   const lottieRef = useRef<any>(null);
 
   const isPrintMode = searchParams.get('print') === 'true';
+  const projectsHref = buildTenantProjectsHref(pathname);
+  const homeHref = buildTenantHomeHref(pathname);
 
   useEffect(() => {
     const instance = lottieRef.current;
@@ -72,14 +76,14 @@ const Header: React.FC = () => {
   // Memoize app name to avoid recalculating on every timer tick
   const appName = useMemo(() => {
     if (pathname === '/') return t.header.appNames.finder;
-    if (pathname?.startsWith('/projects')) return t.header.appNames.portfolio;
+    if (isProjectsRoute(pathname)) return t.header.appNames.portfolio;
     if (pathname?.startsWith('/cv')) return t.header.appNames.resume;
     if (pathname?.startsWith('/contact')) return t.header.appNames.contact;
     if (pathname?.startsWith('/about')) return t.header.appNames.about;
     return t.header.appNames.portfolio;
   }, [pathname, t]);
 
-  const isProjectsPage = pathname?.startsWith('/projects');
+  const isProjectsPage = isProjectsRoute(pathname);
 
   return (
     <header
@@ -94,10 +98,6 @@ const Header: React.FC = () => {
       <div className="flex items-center gap-4">
         <Link
           href="/admin/login?redirect=%2Fadmin"
-          onClick={(e) => {
-            e.preventDefault();
-            setIsPinModalOpen(true);
-          }}
           className="relative flex h-8 w-12 shrink-0 cursor-pointer items-center justify-center"
           aria-label="Admin Login"
         >
@@ -119,13 +119,13 @@ const Header: React.FC = () => {
         {!isProjectsPage && !isPrintMode && (
           <nav className="hidden items-center gap-1 font-medium md:flex">
             <Link
-              href="/projects"
+              href={projectsHref}
               className="cursor-pointer rounded px-3 py-1 transition-colors hover:bg-black/5"
             >
               {t.header.works}
             </Link>
             <Link
-              href="/"
+              href={homeHref}
               onClickCapture={markBack}
               className="cursor-pointer rounded px-3 py-1 transition-colors hover:bg-black/5"
             >
@@ -200,11 +200,6 @@ const Header: React.FC = () => {
           )}
         </div>
       </div>
-      <IOSPinModal
-        isOpen={isPinModalOpen}
-        onClose={() => setIsPinModalOpen(false)}
-        onSuccess={() => router.push('/admin/login?redirect=%2Fadmin')}
-      />
     </header>
   );
 };

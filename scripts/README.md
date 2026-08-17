@@ -1,6 +1,6 @@
 # Dokumentasi Script Proyek
 
-Direktori ini berisi berbagai script utilitas dan alat bantu untuk proyek Ramos Portfolio.
+Direktori ini berisi berbagai script utilitas dan alat bantu untuk Portfolio OS Template.
 
 ## 📂 Struktur Folder
 
@@ -49,6 +49,14 @@ Untuk mengoptimasi gambar dan video yang ada di repository:
 
 ```bash
 node scripts/media/optimize-assets.js
+```
+
+### Audit Media Project Cloudflare
+
+Untuk memeriksa sinkronisasi D1/R2 media project multi-site:
+
+```bash
+npm run media:audit-projects
 ```
 
 ## ⚠️ Catatan

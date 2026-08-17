@@ -65,7 +65,7 @@
     ],
     "availability": {
       "status": "available",
-      "text": "Available for new Jobs"
+      "text": "Available for Projects"
     },
     "backgroundColor": "",
     "textColor": "",
@@ -74,16 +74,16 @@
   },
   "professional": {
     "contacts": {
-      "email": "ramosapply@gmail.com",
-      "whatsapp": "08817472310",
-      "linkedin": "linkedin.com/in/ramos-design"
+      "email": "hello@portfolio-os.example",
+      "whatsapp": "+6280000000000",
+      "linkedin": "linkedin.com/in/portfolio-owner"
     },
     "motto": {
       "badge": "Motto kerja",
       "quote": "Desain adalah Hook: Bikin mereka berhenti scroll, lalu mengerti."
     },
     "bio": {
-      "content": "Berpengalaman lebih dari 14 tahun di industri desain, saya berkembang sebagai Desainer Visual yang menggabungkan strategi dan estetika. Terbiasa bekerja di lingkungan korporasi maupun secara freelance, saya fokus pada Graphic Design, Branding, dan Visual Storytelling yang relevan dengan kebutuhan bisnis."
+      "content": "Profil demo untuk Portfolio OS Template. Gunakan area ini untuk memperkenalkan pemilik site, menjelaskan keahlian utama, pengalaman relevan, dan jenis project yang ingin ditampilkan kepada calon client atau recruiter."
     }
   },
   "softSkills": {
@@ -566,7 +566,7 @@
       "conversation": [
         {
           "id": 1,
-          "text": "Selamat siang Mas Ramos.",
+          "text": "Selamat siang, proposalnya sudah kami baca.",
           "isMe": false,
           "time": "08:00",
           "status": "read"

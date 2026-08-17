@@ -1,19 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const { validateAdminRequestMock, projectServiceBulkMock } = vi.hoisted(() => ({
+const { validateAdminRequestMock, bulkUpdateProjectsSqlMock, resolveProjectSiteIdMock } = vi.hoisted(() => ({
   validateAdminRequestMock: vi.fn(),
-  projectServiceBulkMock: vi.fn(),
+  bulkUpdateProjectsSqlMock: vi.fn(),
+  resolveProjectSiteIdMock: vi.fn(),
 }));
 
 vi.mock('@/lib/auth', () => ({
   validateAdminRequest: validateAdminRequestMock,
 }));
 
-vi.mock('@/lib/services/projectService', () => ({
-  projectService: {
-    bulkUpdateProjects: projectServiceBulkMock,
+vi.mock('@/lib/services/project/projectSqlService', () => ({
+  projectSqlService: {
+    bulkUpdateProjectsSql: bulkUpdateProjectsSqlMock,
   },
+}));
+
+vi.mock('@/lib/admin/projectSiteContext', () => ({
+  resolveProjectSiteId: resolveProjectSiteIdMock,
 }));
 
 vi.mock('next/cache', () => ({
@@ -33,6 +38,7 @@ function buildRequest(body: Record<string, unknown>): NextRequest {
 describe('POST /api/projects/bulk', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    resolveProjectSiteIdMock.mockReturnValue('default-site');
   });
 
   it('blocks unauthenticated requests', async () => {
@@ -77,7 +83,7 @@ describe('POST /api/projects/bulk', () => {
 
   it('performs bulk delete successfully', async () => {
     validateAdminRequestMock.mockResolvedValue(true);
-    projectServiceBulkMock.mockResolvedValue(true);
+    bulkUpdateProjectsSqlMock.mockResolvedValue(true);
 
     const response = await POST(buildRequest({ action: 'delete', ids: ['1', '2', '3'] }) as never);
     const body = await response.json();
@@ -85,11 +91,15 @@ describe('POST /api/projects/bulk', () => {
     expect(response.status).toBe(200);
     expect(body.success).toBe(true);
     expect(body.message).toContain('delete');
+    expect(bulkUpdateProjectsSqlMock).toHaveBeenCalledWith('default-site', {
+      ids: ['1', '2', '3'],
+      delete: true,
+    });
   });
 
   it('performs bulk publish successfully', async () => {
     validateAdminRequestMock.mockResolvedValue(true);
-    projectServiceBulkMock.mockResolvedValue(true);
+    bulkUpdateProjectsSqlMock.mockResolvedValue(true);
 
     const response = await POST(buildRequest({ action: 'publish', ids: ['1', '2'] }) as never);
     const body = await response.json();
@@ -97,11 +107,15 @@ describe('POST /api/projects/bulk', () => {
     expect(response.status).toBe(200);
     expect(body.success).toBe(true);
     expect(body.message).toContain('publish');
+    expect(bulkUpdateProjectsSqlMock).toHaveBeenCalledWith('default-site', {
+      ids: ['1', '2'],
+      status: 'published',
+    });
   });
 
   it('performs bulk draft successfully', async () => {
     validateAdminRequestMock.mockResolvedValue(true);
-    projectServiceBulkMock.mockResolvedValue(true);
+    bulkUpdateProjectsSqlMock.mockResolvedValue(true);
 
     const response = await POST(buildRequest({ action: 'draft', ids: ['1'] }) as never);
     const body = await response.json();
@@ -109,22 +123,30 @@ describe('POST /api/projects/bulk', () => {
     expect(response.status).toBe(200);
     expect(body.success).toBe(true);
     expect(body.message).toContain('draft');
+    expect(bulkUpdateProjectsSqlMock).toHaveBeenCalledWith('default-site', {
+      ids: ['1'],
+      status: 'draft',
+    });
   });
 
   it('performs bulk reorder successfully', async () => {
     validateAdminRequestMock.mockResolvedValue(true);
-    projectServiceBulkMock.mockResolvedValue(true);
+    bulkUpdateProjectsSqlMock.mockResolvedValue(true);
 
     const response = await POST(buildRequest({ action: 'reorder', ids: ['3', '1', '2'] }) as never);
     const body = await response.json();
 
     expect(response.status).toBe(200);
     expect(body.success).toBe(true);
+    expect(bulkUpdateProjectsSqlMock).toHaveBeenCalledWith('default-site', {
+      ids: ['3', '1', '2'],
+      reorder: true,
+    });
   });
 
   it('returns 500 when service returns false', async () => {
     validateAdminRequestMock.mockResolvedValue(true);
-    projectServiceBulkMock.mockResolvedValue(false);
+    bulkUpdateProjectsSqlMock.mockResolvedValue(false);
 
     const response = await POST(buildRequest({ action: 'publish', ids: ['1'] }) as never);
     const body = await response.json();
@@ -135,7 +157,7 @@ describe('POST /api/projects/bulk', () => {
 
   it('returns 500 on unexpected error', async () => {
     validateAdminRequestMock.mockResolvedValue(true);
-    projectServiceBulkMock.mockRejectedValue(new Error('Database down'));
+    bulkUpdateProjectsSqlMock.mockRejectedValue(new Error('Database down'));
 
     const response = await POST(buildRequest({ action: 'delete', ids: ['1'] }) as never);
     const body = await response.json();

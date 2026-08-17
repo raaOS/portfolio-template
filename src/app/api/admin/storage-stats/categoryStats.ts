@@ -184,14 +184,14 @@ export function describeCategory(cat: CategoryStats): string {
   }
 
   if (cat.id === 'hardSkillIcons') {
-    if (cat.d1.total > 0 && cat.r2.total === 0) {
-      return `${cat.d1.total} icon URL tersimpan di database. Semua mengarah ke CDN eksternal, bukan R2 - wajar kalau R2 kosong untuk kategori ini.`;
-    }
     if (cat.dangling > 0) {
       return `${cat.dangling} icon URL dirujuk di database tapi file-nya hilang dari R2.`;
     }
     if (cat.orphans > 0) {
       return `${cat.orphans} icon di R2 tidak dipakai oleh skill atau dock item manapun.`;
+    }
+    if (cat.d1.total > 0 && cat.r2.total === 0) {
+      return `${cat.d1.total} icon URL tersimpan di database. Semuanya memakai icon bawaan lokal atau CDN eksternal, jadi R2 kosong adalah kondisi normal.`;
     }
     return `${cat.d1.total} icon URL tersimpan di database.`;
   }

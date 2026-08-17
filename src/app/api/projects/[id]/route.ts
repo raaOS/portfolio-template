@@ -1,21 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
-import { UpdateProjectData, Project } from '@/types/projects';
-import { validateAdminRequest } from '@/lib/auth';
-import { projectService } from '@/lib/services/projectService';
+import { UpdateProjectData } from '@/types/projects';
+import { projectSqlService } from '@/lib/services/project/projectSqlService';
 import { generateGenZComments } from '@/lib/magic';
 import { db } from '@/lib/database';
-import { sendTelegramAlert } from '@/lib/telegram';
 import { commentSchema, UpdateProjectSchema } from '@/lib/validations';
+import {
+  enforceProjectUpdateQuota,
+  ProjectQuotaError,
+  resolveProjectSiteId,
+} from '@/lib/admin/projectSiteContext';
+import { validateSiteMutationRequest } from '@/lib/admin/siteMutationAuth';
+import { validateAdminRequest } from '@/lib/auth';
+import { validateClientRequest } from '@/lib/clientAuth';
+import { revalidateSiteProjectPaths } from '@/lib/admin/siteRequestContext';
+import { buildCommentPath } from '@/lib/projectEngagement';
 
 const submittedCommentsSchema = commentSchema.array().max(1000, 'Too many comments');
 
-async function moveCommentsWhenSlugChanges(previousSlug?: string, nextSlug?: string) {
+async function moveCommentsWhenSlugChanges(siteId: string, previousSlug?: string, nextSlug?: string) {
   if (!previousSlug || !nextSlug || previousSlug === nextSlug) return;
 
   try {
-    const previousRef = db.ref(`comments/${previousSlug}`);
-    const nextRef = db.ref(`comments/${nextSlug}`);
+    const previousRef = db.ref(buildCommentPath(siteId, previousSlug));
+    const nextRef = db.ref(buildCommentPath(siteId, nextSlug));
     const [previousSnap, nextSnap] = await Promise.all([
       previousRef.once('value'),
       nextRef.once('value'),
@@ -44,16 +52,20 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
 
     // PERF FIX: Fetch langsung by id — sebelumnya load SEMUA project
     // lalu .find() yang inefficient buat banyak project.
-    const snap = await db.ref(`projects/${id}`).once('value');
-    let project: Project | null = snap.val();
-
-    if (!project) {
-      const { projects } = await projectService.getProjects();
-      project = projects.find((p) => p.id === id) ?? null;
-    }
+    const siteId = resolveProjectSiteId(request);
+    const project = await projectSqlService.getProjectByIdSql(siteId, id);
 
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+    }
+
+    // SECURITY FIX: Unauthenticated callers cannot view draft projects.
+    if (project.status !== 'published') {
+      const isAdmin = await validateAdminRequest(request, { checkCsrf: false });
+      const isClient = !isAdmin ? await validateClientRequest(request, { checkCsrf: false, siteId }) : null;
+      if (!isAdmin && !isClient) {
+        return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      }
     }
 
     return NextResponse.json({ project });
@@ -66,13 +78,14 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
 // PUT - Update project (admin only)
 export async function PUT(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   try {
-    if (!(await validateAdminRequest(request))) {
-      return NextResponse.json({ error: 'Unauthorized or invalid CSRF token' }, { status: 401 });
-    }
-
     const params = await props.params;
     const { id } = params;
     const rawBody = await request.json();
+    const siteId = resolveProjectSiteId(request, rawBody);
+    if (!(await validateSiteMutationRequest(request, siteId))) {
+      return NextResponse.json({ error: 'Unauthorized or invalid CSRF token' }, { status: 401 });
+    }
+
     const submittedCommentsResult = Array.isArray(rawBody.comments)
       ? submittedCommentsSchema.safeParse(rawBody.comments)
       : null;
@@ -94,12 +107,13 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
     }
 
     const { id: _validatedId, ...updateData } = validationResult.data;
-    const currentProjectSnap = await db.ref(`projects/${id}`).once('value');
-    const currentProject = currentProjectSnap.val() as Project | null;
+    await enforceProjectUpdateQuota(siteId, validationResult.data as UpdateProjectData);
+
+    const currentProject = await projectSqlService.getProjectByIdSql(siteId, id);
     const previousSlug = currentProject?.slug;
 
-    // 1. Update Project
-    const updatedProject = await projectService.updateProject(
+    const updatedProject = await projectSqlService.updateProjectSql(
+      siteId,
       id,
       updateData as UpdateProjectData & { initialCommentCount?: number }
     );
@@ -108,7 +122,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
       return NextResponse.json({ error: 'Project not found or update failed' }, { status: 404 });
     }
 
-    await moveCommentsWhenSlugChanges(previousSlug, updatedProject.slug);
+    await moveCommentsWhenSlugChanges(siteId, previousSlug, updatedProject.slug);
 
     // Track apakah persistensi komentar sempat gagal, supaya bisa di-bubble ke
     // response tanpa menggagalkan update project (yang sudah sukses di step 1).
@@ -118,7 +132,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
 
     if (submittedCommentsResult?.success) {
       try {
-        await db.ref(`comments/${updatedProject.slug}`).set(submittedCommentsResult.data);
+        await db.ref(buildCommentPath(siteId, updatedProject.slug)).set(submittedCommentsResult.data);
       } catch (commentError) {
         console.error('Failed to persist submitted comments:', commentError);
         commentsPersistWarning =
@@ -128,7 +142,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
       try {
         const newComments = generateGenZComments(updatedProject.slug, rawBody.initialCommentCount);
 
-        const commentsRef = db.ref(`comments/${updatedProject.slug}`);
+        const commentsRef = db.ref(buildCommentPath(siteId, updatedProject.slug));
         const snap = await commentsRef.once('value');
         const existingComments = snap.val() || [];
 
@@ -145,21 +159,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
       }
     }
 
-    // --- Telegram Notification ---
-    const changedFields = Object.keys(rawBody)
-      .filter((k) => k !== 'initialCommentCount' && k !== 'comments')
-      .join(', ');
-    const updateMessage = `✏️ **PROJECT UPDATED**\n\n**Title:** ${updatedProject.title}\n**ID:** ${updatedProject.id}\n**Changes:** ${changedFields || 'No specific fields'}\n**Time:** ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}`;
-    sendTelegramAlert(updateMessage).catch((err) =>
-      console.error('[Telegram] Failed to send update alert:', err)
-    );
-
-    revalidatePath('/', 'layout');
-    revalidatePath('/projects');
-    if (previousSlug && previousSlug !== updatedProject.slug) {
-      revalidatePath(`/projects/${previousSlug}`);
-    }
-    revalidatePath(`/projects/${updatedProject.slug}`);
+    await revalidateSiteProjectPaths(siteId, [previousSlug || '', updatedProject.slug]);
     revalidatePath('/admin');
 
     return NextResponse.json({
@@ -169,6 +169,16 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
     });
   } catch (error) {
     console.error('Error updating project:', error);
+    if (error instanceof ProjectQuotaError) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          errorCode: error.errorCode,
+          details: error.details,
+        },
+        { status: error.errorCode === 'MEDIA_PER_PROJECT_EXCEEDED' ? 400 : 403 }
+      );
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to update project' },
       { status: 500 }
@@ -179,26 +189,20 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
 // DELETE - Delete project (admin only)
 export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   try {
-    if (!(await validateAdminRequest(request))) {
+    const params = await props.params;
+    const { id } = params;
+    const siteId = resolveProjectSiteId(request);
+    if (!(await validateSiteMutationRequest(request, siteId))) {
       return NextResponse.json({ error: 'Unauthorized or invalid CSRF token' }, { status: 401 });
     }
 
-    const params = await props.params;
-    const { id } = params;
-
-    const success = await projectService.deleteProject(id);
+    const success = await projectSqlService.deleteProjectSql(siteId, id);
 
     if (!success) {
       return NextResponse.json({ error: 'Project not found or delete failed' }, { status: 404 });
     }
 
-    const successMessage = `🗑️ **PROJECT DELETED**\n\n**ID:** ${id}\n**By:** Admin\n**Time:** ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}`;
-    sendTelegramAlert(successMessage).catch((err) =>
-      console.error('[Telegram] Failed to send delete alert:', err)
-    );
-
-    revalidatePath('/', 'layout');
-    revalidatePath('/projects');
+    await revalidateSiteProjectPaths(siteId);
     revalidatePath('/admin');
 
     return NextResponse.json({

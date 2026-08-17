@@ -12,14 +12,14 @@ export default function FullPageChatHeader() {
         <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-white/50 bg-gray-200">
           <img
             src={`https://ui-avatars.com/api/?background=ffffff&color=000000&name=R&size=128&bold=true&length=1`}
-            alt="Ramos"
+            alt="Portfolio Owner"
             className="h-full w-full object-cover"
           />
         </div>
 
         <div className="ml-1 flex flex-col">
           <span className="line-clamp-1 text-sm font-semibold leading-tight text-[#111b21]">
-            Ramos
+            Portfolio Owner
           </span>
           <span className="text-[11px] font-medium leading-tight text-[#00a884]">
             {t.chat.online}

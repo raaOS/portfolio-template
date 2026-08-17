@@ -10,9 +10,15 @@ interface UseDesktopLayoutProps {
   aboutData?: AboutData | null;
   isAdmin: boolean;
   csrfToken: string | null;
+  siteId?: string;
 }
 
-export function useDesktopLayout({ aboutData, isAdmin, csrfToken }: UseDesktopLayoutProps) {
+export function useDesktopLayout({
+  aboutData,
+  isAdmin,
+  csrfToken,
+  siteId = 'default-site',
+}: UseDesktopLayoutProps) {
   const { registerFlush, unregisterFlush } = useLayoutPersistence();
 
   // Admin localStorage / in-session drags are overrides. Cloudflare D1 remains
@@ -129,11 +135,11 @@ export function useDesktopLayout({ aboutData, isAdmin, csrfToken }: UseDesktopLa
     if (!isAdmin || !csrfToken) return;
     try {
       const { flushPositions } = await import('../utils/positionSync');
-      await flushPositions(csrfToken);
+      await flushPositions(csrfToken, siteId);
     } catch (error) {
       console.error('[DesktopLayout] Failed to flush icons:', error);
     }
-  }, [isAdmin, csrfToken]);
+  }, [isAdmin, csrfToken, siteId]);
 
   useEffect(() => {
     registerFlush('desktopIcons', flushIcons);

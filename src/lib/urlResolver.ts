@@ -57,3 +57,35 @@ export function extractStoragePath(url: string): string | null {
     return null;
   }
 }
+
+type ProjectMediaLike = {
+  cover: string;
+  galleryItems?: Array<{ src: string; poster?: string }>;
+  gallery?: string[];
+};
+
+/**
+ * Resolve all media URLs on a single project object.
+ * Consolidates the repeated cover/galleryItems/gallery mapping pattern.
+ */
+export function resolveProjectMediaUrl<T extends ProjectMediaLike>(project: T): T {
+  return {
+    ...project,
+    cover: resolveStorageUrl(project.cover),
+    galleryItems: project.galleryItems?.map((item) => ({
+      ...item,
+      src: resolveStorageUrl(item.src),
+      poster: resolveStorageUrl(item.poster ?? ''),
+    })),
+    gallery: project.gallery?.map((url) => resolveStorageUrl(url) || url),
+  };
+}
+
+/**
+ * Resolve media URLs for an array of projects.
+ */
+export function resolveProjectMediaUrls<T extends ProjectMediaLike>(projects: T[]): T[] {
+  return projects.map(resolveProjectMediaUrl);
+}
+
+

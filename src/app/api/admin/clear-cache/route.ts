@@ -4,7 +4,6 @@ import { checkAdminAuth } from '@/lib/auth';
 import { clearApplicationCache } from '@/lib/cache/clearApplicationCache';
 import { logAdminActivity } from '@/lib/services/auditLogger';
 
-export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const REVALIDATE_PATHS = [

@@ -1,14 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { revalidatePath } from 'next/cache';
-import { validateAdminRequest } from '@/lib/auth';
 import { aboutService } from '@/lib/services/aboutService';
 import aboutDataFallback from '@/data/about.json';
 import { updateDesignPhilosophySchema } from '@/lib/validations';
+import { validateSiteMutationRequest } from '@/lib/admin/siteMutationAuth';
+import {
+  assertKnownSite,
+  revalidateSiteContentPaths,
+  resolveRequestSiteId,
+  SiteContextError,
+  stripSiteContext,
+} from '@/lib/admin/siteRequestContext';
 
-// GET Handler - Return Design Philosophy section
-export async function GET() {
+export async function GET(request?: NextRequest) {
   try {
-    const aboutData = await aboutService.getAboutData();
+    const siteId = await resolveRequestSiteId(
+      request ?? new NextRequest('http://localhost/api/about/philosophy')
+    );
+    const aboutData = await aboutService.getAboutData(false, false, siteId);
     const philosophy = aboutData.designPhilosophy;
 
     const result = {
@@ -24,6 +32,9 @@ export async function GET() {
 
     return NextResponse.json(result);
   } catch (error) {
+    if (error instanceof SiteContextError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error('Failed to fetch Design Philosophy:', error);
     return NextResponse.json({
       heading: aboutDataFallback.designPhilosophy?.heading || 'Design Philosophy',
@@ -33,16 +44,16 @@ export async function GET() {
   }
 }
 
-// POST Handler (Update) - Route via aboutService so cache stays consistent
 export async function POST(request: NextRequest) {
   try {
-    if (!(await validateAdminRequest(request))) {
+    const body = await request.json();
+    const siteId = await resolveRequestSiteId(request, body);
+    if (!(await validateSiteMutationRequest(request, siteId))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    await assertKnownSite(siteId);
 
-    const body = await request.json();
-
-    const validation = updateDesignPhilosophySchema.safeParse(body);
+    const validation = updateDesignPhilosophySchema.safeParse(stripSiteContext(body));
     if (!validation.success) {
       return NextResponse.json(
         {
@@ -53,16 +64,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // CACHE-CONSISTENCY FIX: tulis via aboutService.updateAboutData sehingga
-    // contentCache(`CLOUDFLARE_D1:content/about`) ikut ter-invalidate dan realtime
-    // sync tetap akurat. Sebelumnya bypass service bikin cache stale sampai TTL.
-    await aboutService.updateAboutData({
-      designPhilosophy: validation.data,
-    });
+    await aboutService.updateAboutData(
+      {
+        designPhilosophy: validation.data,
+      },
+      siteId
+    );
 
-    // ISR revalidation — /about pakai revalidate = 60
-    revalidatePath('/', 'layout');
-    revalidatePath('/about');
+    await revalidateSiteContentPaths(siteId, ['/', '/about']);
 
     return NextResponse.json({
       success: true,
@@ -70,6 +79,9 @@ export async function POST(request: NextRequest) {
       message: 'Data berhasil disimpan',
     });
   } catch (error) {
+    if (error instanceof SiteContextError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error('Failed to update Design Philosophy:', error);
     return NextResponse.json(
       {

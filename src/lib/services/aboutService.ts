@@ -95,8 +95,8 @@ function extractAboutAssets(data: AboutData): string[] {
  * Cached version untuk Server Components.
  * Menghindari redundant fetch ke CLOUDFLARE_D1 dalam satu request.
  */
-export const getCachedAboutData = cache(async () => {
-  return aboutService.getAboutData();
+export const getCachedAboutData = cache(async (siteId = 'default-site') => {
+  return aboutService.getAboutData(false, false, siteId);
 });
 
 export const aboutService = {
@@ -106,8 +106,10 @@ export const aboutService = {
    *
    * @returns A promise that resolves to the AboutData.
    */
-  async getAboutData(noCache = false, throwOnError = false) {
-    return await service.getData(noCache, throwOnError);
+  async getAboutData(noCache: boolean | string = false, throwOnError = false, siteId = 'default-site') {
+    const actualNoCache = typeof noCache === 'boolean' ? noCache : false;
+    const actualSiteId = typeof noCache === 'string' ? noCache : siteId;
+    return await service.getData(actualNoCache, throwOnError, actualSiteId);
   },
 
   /**
@@ -117,9 +119,9 @@ export const aboutService = {
    * @param updates - The partial data to update.
    * @returns A promise that resolves to the updated merged data.
    */
-  async updateAboutData(updates: UpdateAboutData) {
+  async updateAboutData(updates: UpdateAboutData, siteId = 'default-site') {
     try {
-      const current = await this.getAboutData(true, true);
+      const current = await this.getAboutData(true, true, siteId);
 
       // Explicit merging since updates contains Partials
       const mergedData: AboutData = {
@@ -157,7 +159,7 @@ export const aboutService = {
       const newAssets = extractAboutAssets(mergedData);
       const orphanedAssets = oldAssets.filter((url) => !newAssets.includes(url));
 
-      const success = await service.saveData(mergedData, 'Update about page content');
+      const success = await service.saveData(mergedData, 'Update about page content', siteId);
       if (!success) {
         throw new Error('ContentService failed to save data');
       }

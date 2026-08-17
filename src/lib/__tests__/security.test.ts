@@ -9,7 +9,6 @@ import {
   hashPasswordSha256,
   verifyStoredPassword,
 } from '../security';
-import { buildTelegramWebhookSecret, isValidTelegramWebhookSecret } from '../telegram';
 
 describe('security utils', () => {
   describe('generateSecureToken', () => {
@@ -64,7 +63,7 @@ describe('security utils', () => {
     });
 
     it('should sanitize email', () => {
-      expect(sanitize.email(' RAMOS@Example.com ')).toBe('ramos@example.com');
+      expect(sanitize.email(' USER@Example.com ')).toBe('user@example.com');
     });
 
     it('should sanitize filenames', () => {
@@ -120,14 +119,4 @@ describe('security utils', () => {
     });
   });
 
-  describe('telegram webhook secret', () => {
-    it('should accept only the derived secret token', () => {
-      const botToken = '123456:telegram-bot-token';
-      const secret = buildTelegramWebhookSecret(botToken);
-
-      expect(isValidTelegramWebhookSecret(botToken, secret)).toBe(true);
-      expect(isValidTelegramWebhookSecret(botToken, `${secret}-tampered`)).toBe(false);
-      expect(isValidTelegramWebhookSecret(botToken, null)).toBe(false);
-    });
-  });
 });

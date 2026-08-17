@@ -10,6 +10,7 @@ interface ChatMessage {
   text: string;
   sender: 'visitor' | 'admin';
   timestamp: number;
+  failed?: boolean;
 }
 
 interface FullPageChatMessagesProps {
@@ -83,7 +84,13 @@ export default function FullPageChatMessages({
                         minute: '2-digit',
                       })}
                     </span>
-                    {isMe && <CheckCheck className="h-3.5 w-3.5 text-blue-500" />}
+                    {msg.failed ? (
+                      <span className="text-[9px] font-bold uppercase tracking-tighter text-red-500">
+                        Gagal terkirim
+                      </span>
+                    ) : (
+                      isMe && <CheckCheck className="h-3.5 w-3.5 text-blue-500" />
+                    )}
                   </div>
                 </div>
               </m.div>

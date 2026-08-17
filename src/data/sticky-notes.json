@@ -1,8 +1,8 @@
 [
   {
     "id": "welcome-note",
-    "text": "Halo! Selamat Datang di Ramos OS v2.0 🖥️✨\n\nSaya Ramos, seorang Graphic Designer & Visual Strategist.\n\nQuick Start:\n1. Buka folder \"Projects\" untuk lihat karya saya.\n2. Klik \"Contact\" di bawah untuk ngobrol.\n3. Drag note ini ke mana saja!\n\nSelamat mengeksplorasi!",
-    "date": "2026-02-22T18:17:10.544Z",
+    "text": "Halo! Selamat datang di Portfolio OS Template.\n\nIni adalah sticky note demo. Client bisa mengubah teks, posisi, warna, dan visibilitasnya dari dashboard.\n\nQuick Start:\n1. Buka folder \"Projects\" untuk melihat karya demo.\n2. Klik \"Contact\" untuk melihat form kontak.\n3. Drag note ini ke posisi yang diinginkan.\n\nSilakan ganti konten ini sebelum publikasi.",
+    "date": "2026-06-27T00:00:00.000Z",
     "color": "#fef08a",
     "isStarred": false,
     "isDeleted": false,

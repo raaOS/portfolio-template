@@ -58,15 +58,16 @@ describe('GET /api/admin/icons', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns empty list when R2 is not configured', async () => {
+  it('returns bundled default icons when R2 is not configured', async () => {
     isR2StorageConfiguredMock.mockReturnValue(false);
     const res = await GET(buildGetRequest());
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.icons).toEqual([]);
+    expect(body.icons.length).toBeGreaterThan(0);
+    expect(body.icons[0]).toMatch(/^\/assets\/icons-library\/.+\.webp$/);
   });
 
-  it('filters dot-files and temp variants, returns sorted public URLs', async () => {
+  it('filters dot-files and temp variants, returns sorted public URLs before bundled icons', async () => {
     listR2ObjectKeysMock.mockResolvedValue([
       'assets/icons-library/react.webp',
       'assets/icons-library/.hidden',
@@ -80,18 +81,20 @@ describe('GET /api/admin/icons', () => {
     const body = await res.json();
 
     // Should contain 3 icons (excluding .hidden and *_temp)
-    expect(body.icons).toEqual([
+    expect(body.icons.slice(0, 3)).toEqual([
       '/r2/assets/icons-library/vue.png',
       '/r2/assets/icons-library/react.webp',
       '/r2/assets/icons-library/angular.svg',
     ]);
+    expect(body.icons).toContainEqual(expect.stringMatching(/^\/assets\/icons-library\/.+\.webp$/));
   });
 
-  it('returns empty when no icons in bucket', async () => {
+  it('returns bundled default icons when no icons in bucket', async () => {
     listR2ObjectKeysMock.mockResolvedValue([]);
     const res = await GET(buildGetRequest());
     const body = await res.json();
-    expect(body.icons).toEqual([]);
+    expect(body.icons.length).toBeGreaterThan(0);
+    expect(body.icons[0]).toMatch(/^\/assets\/icons-library\/.+\.webp$/);
   });
 
   it('handles R2 list error gracefully', async () => {

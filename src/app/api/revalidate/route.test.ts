@@ -26,7 +26,7 @@ function buildRequest(body: Record<string, unknown> = {}): NextRequest {
 describe('POST /api/revalidate', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    delete process.env.REVALIDATION_TOKEN;
+    delete (process.env as Partial<NodeJS.ProcessEnv>).REVALIDATION_TOKEN;
   });
 
   it('returns 500 when REVALIDATION_TOKEN is not configured', async () => {

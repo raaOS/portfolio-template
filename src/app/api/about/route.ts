@@ -1,17 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { revalidatePath } from 'next/cache';
 import { UpdateAboutData } from '@/types/about';
-import { validateAdminRequest } from '@/lib/auth';
 import { aboutService } from '@/lib/services/aboutService';
 import { invalidateAboutCache } from '@/lib/about';
 import { updateAboutSchema } from '@/lib/validations';
 import { validationError } from '@/lib/api-response';
+import { validateSiteMutationRequest } from '@/lib/admin/siteMutationAuth';
+import {
+  assertKnownSite,
+  revalidateSiteContentPaths,
+  resolveRequestSiteId,
+  SiteContextError,
+  stripSiteContext,
+} from '@/lib/admin/siteRequestContext';
 
 // GET - Read about content
 export async function GET(request: NextRequest) {
   try {
     const fresh = request.nextUrl.searchParams.get('fresh') === 'true';
-    const data = await aboutService.getAboutData(fresh, true);
+    const siteId = await resolveRequestSiteId(request);
+    const data = await aboutService.getAboutData(fresh, true, siteId);
     return NextResponse.json(data);
   } catch (error) {
     console.error(
@@ -25,12 +32,14 @@ export async function GET(request: NextRequest) {
 // PUT - Update about content (admin only)
 export async function PUT(request: NextRequest) {
   try {
-    if (!(await validateAdminRequest(request))) {
+    const rawBody = await request.json();
+    const siteId = await resolveRequestSiteId(request, rawBody);
+    if (!(await validateSiteMutationRequest(request, siteId))) {
       return NextResponse.json({ error: 'Unauthorized or invalid CSRF token' }, { status: 401 });
     }
+    await assertKnownSite(siteId);
 
-    const rawBody = await request.json();
-    const validationResult = updateAboutSchema.safeParse(rawBody);
+    const validationResult = updateAboutSchema.safeParse(stripSiteContext(rawBody));
 
     if (!validationResult.success) {
       return validationError(validationResult.error);
@@ -39,20 +48,22 @@ export async function PUT(request: NextRequest) {
     const updates: UpdateAboutData = validationResult.data;
 
     // The service handles the merging logic now
-    const updatedData = await aboutService.updateAboutData(updates);
+    const updatedData = await aboutService.updateAboutData(updates, siteId);
 
     // Invalidate cache agar visitor langsung lihat perubahan
     invalidateAboutCache();
 
     // Revalidate ISR pages
-    revalidatePath('/', 'layout');
-    revalidatePath('/about');
+    await revalidateSiteContentPaths(siteId, ['/', '/about']);
 
     return NextResponse.json({
       success: true,
       data: updatedData,
     });
   } catch (error: unknown) {
+    if (error instanceof SiteContextError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error('[API/About] Update Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(

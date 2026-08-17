@@ -4,7 +4,7 @@
 import type { DesktopIconSize, WindowPreference } from '@/types/about';
 import { clearVisitorDesktopSession } from './visitorSessionState';
 
-const STORAGE_KEY = 'ramos-positions-v2';
+const STORAGE_KEY = 'portfolio-os-positions-v1';
 
 type WindowPosition = { x: number; y: number; width: number; height: number; zIndex?: number };
 type IconPosition = { x: number; y: number };
@@ -77,7 +77,7 @@ export function clearVisitorPositions() {
   try {
     // Legacy key — remove if it still exists from older versions
     clearVisitorDesktopSession();
-    sessionStorage.removeItem('ramos-session-positions');
+    sessionStorage.removeItem('portfolio-os-session-positions');
   } catch {}
 }
 
@@ -341,7 +341,7 @@ export function saveNotePosition(
 }
 
 // Flush semua ke server (admin)
-export async function flushPositions(csrfToken: string): Promise<boolean> {
+export async function flushPositions(csrfToken: string, siteId = 'default-site'): Promise<boolean> {
   try {
     const positions = loadPositions();
 
@@ -359,7 +359,7 @@ export async function flushPositions(csrfToken: string): Promise<boolean> {
         'X-CSRF-Token': csrfToken,
       },
       credentials: 'include',
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, siteId }),
     });
 
     return res.ok;

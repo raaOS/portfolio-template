@@ -58,7 +58,7 @@ export const id = {
     adminMode: 'Mode Admin',
     exitAdmin: 'Keluar Admin',
     batteryFull: 'Baterai Penuh (100%)',
-    ramosOS: 'Ramos OS',
+    portfolioOS: 'Portfolio OS',
   },
   controlCenter: {
     label: 'Control Center',
@@ -73,7 +73,7 @@ export const id = {
   },
   calendar: {
     weekdaysShort: ['M', 'S', 'S', 'R', 'K', 'J', 'S'],
-    footer: 'Ramos OS - Desktop Environment',
+    footer: 'Portfolio OS - Desktop Environment',
   },
   spotlight: {
     ariaLabel: 'Pencarian Spotlight',
@@ -87,7 +87,7 @@ export const id = {
     openHint: 'untuk membuka',
     escHint: 'Esc',
     closeHint: 'untuk menutup',
-    poweredBy: 'Didukung Gemini',
+    poweredBy: 'Didukung AI',
   },
   projects: {
     collectionTitle: 'Koleksi Project',

@@ -8,6 +8,8 @@ import { resolvePreviewCover } from '@/lib/images';
 import { Heart, Share2 } from 'lucide-react';
 import { useImageProtection } from '@/hooks/useImageProtection';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { usePathname } from 'next/navigation';
+import { buildTenantProjectDetailHref } from '@/lib/routing/tenantRoutes';
 import { localizeText } from '@/lib/i18n/contentLocalization';
 import {
   prepareProjectCoverTransition,
@@ -35,6 +37,7 @@ export default function ProjectCardPinterest({
   onClick,
 }: ProjectCardPinterestProps & { onClick?: () => void }) {
   const { slug, title, tags, likes, shares } = project;
+  const pathname = usePathname();
   const { locale } = useLanguage();
   const localizedTitle = localizeText(title, locale);
   const cover = resolvePreviewCover(project);
@@ -60,7 +63,8 @@ export default function ProjectCardPinterest({
       : tags?.[0];
 
   const Component: React.ElementType = onClick ? 'div' : interactive ? Link : 'div';
-  const hrefProps = !onClick && interactive ? { href: `/projects/${slug}` } : {};
+  const hrefProps =
+    !onClick && interactive ? { href: buildTenantProjectDetailHref(pathname, slug) } : {};
   const isInteractive = interactive || !!onClick;
 
   const handleClick = () => {

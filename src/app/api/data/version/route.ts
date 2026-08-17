@@ -1,9 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db, getDatabaseBackend } from '@/lib/database';
 
-// Edge runtime: endpoint trivial yang cuma baca 1 key dari Cloudflare D1 via REST.
-// Cold start lebih cepat dibanding Node lambda dan tidak ada Node-only dependency.
-export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {

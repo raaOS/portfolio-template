@@ -9,6 +9,9 @@
  *
  * @module cloudflareD1
  */
+import { D1_SCHEMA_QUERIES } from './d1-schema';
+import { logOperationalEvent, summarizeSqlOperation } from './observability/operationalLog';
+
 type D1Param = string | number | boolean | null;
 
 interface D1QueryResponse<T = Record<string, unknown>> {
@@ -36,8 +39,12 @@ function readEnv(name: string) {
 
 export function getMissingD1EnvKeys() {
   const missing: string[] = [];
-  if (!readEnv('CLOUDFLARE_D1_ACCOUNT_ID') && !readEnv('CLOUDFLARE_R2_ACCOUNT_ID')) {
-    missing.push('CLOUDFLARE_D1_ACCOUNT_ID');
+  if (
+    !readEnv('CLOUDFLARE_ACCOUNT_ID') &&
+    !readEnv('CLOUDFLARE_D1_ACCOUNT_ID') &&
+    !readEnv('CLOUDFLARE_R2_ACCOUNT_ID')
+  ) {
+    missing.push('CLOUDFLARE_ACCOUNT_ID');
   }
   if (!readEnv('CLOUDFLARE_D1_DATABASE_ID')) {
     missing.push('CLOUDFLARE_D1_DATABASE_ID');
@@ -53,7 +60,10 @@ export function isD1Configured() {
 }
 
 export function getD1Config(): D1Config {
-  const accountId = readEnv('CLOUDFLARE_D1_ACCOUNT_ID') || readEnv('CLOUDFLARE_R2_ACCOUNT_ID');
+  const accountId =
+    readEnv('CLOUDFLARE_ACCOUNT_ID') ||
+    readEnv('CLOUDFLARE_D1_ACCOUNT_ID') ||
+    readEnv('CLOUDFLARE_R2_ACCOUNT_ID');
   const databaseId = readEnv('CLOUDFLARE_D1_DATABASE_ID');
   const apiToken = readEnv('CLOUDFLARE_D1_API_TOKEN') || readEnv('CLOUDFLARE_API_TOKEN');
 
@@ -88,11 +98,32 @@ export async function queryD1<T = Record<string, unknown>>(
       ?.map((error) => error.message)
       .filter(Boolean)
       .join('; ');
+    logOperationalEvent({
+      event: 'd1.query_error',
+      level: 'error',
+      status: 'failure',
+      message: 'Cloudflare D1 REST query failed',
+      metadata: {
+        ...summarizeSqlOperation(sql),
+        responseStatus: response.status,
+        detail: detail || response.statusText,
+      },
+    });
     throw new Error(`Cloudflare D1 query failed: ${detail || response.statusText}`);
   }
 
   const firstResult = payload.result?.[0];
   if (firstResult && firstResult.success === false) {
+    logOperationalEvent({
+      event: 'd1.query_error',
+      level: 'error',
+      status: 'failure',
+      message: 'Cloudflare D1 SQL failed',
+      metadata: {
+        ...summarizeSqlOperation(sql),
+        detail: firstResult.error || 'SQL failed',
+      },
+    });
     throw new Error(`Cloudflare D1 SQL failed: ${firstResult.error || sql}`);
   }
 
@@ -100,14 +131,86 @@ export async function queryD1<T = Record<string, unknown>>(
 }
 
 export async function bootstrapD1Schema() {
+  if (!isD1Configured()) return;
   if (!schemaPromise) {
-    schemaPromise = queryD1(`
+    schemaPromise = (async () => {
+      // Legacy app_kv
+      await queryD1(`
             CREATE TABLE IF NOT EXISTS ${D1_TABLE_NAME} (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             ) STRICT
-        `).then(() => undefined);
+        `);
+
+      // New Relational Schema (Sprint B)
+      for (const sql of D1_SCHEMA_QUERIES) {
+        await queryD1(sql);
+      }
+
+      // Self-healing migration for existing projects, sites, and orders tables
+      try {
+        const info = await queryD1<{ name: string }>('PRAGMA table_info(projects)');
+        const hasMetadata = info.some((col) => col.name === 'metadata_json');
+        if (!hasMetadata) {
+          await queryD1('ALTER TABLE projects ADD COLUMN metadata_json TEXT');
+        }
+
+        const sitesInfo = await queryD1<{ name: string }>('PRAGMA table_info(sites)');
+        const hasActiveTpl = sitesInfo.some((col) => col.name === 'active_template_key');
+        if (!hasActiveTpl) {
+          await queryD1('ALTER TABLE sites ADD COLUMN active_template_key TEXT DEFAULT "os-desktop"');
+        }
+        const hasSlugChangeCount = sitesInfo.some(
+          (col) => col.name === 'client_slug_change_count'
+        );
+        if (!hasSlugChangeCount) {
+          await queryD1(
+            'ALTER TABLE sites ADD COLUMN client_slug_change_count INTEGER NOT NULL DEFAULT 0'
+          );
+        }
+        const hasSlugChangedAt = sitesInfo.some((col) => col.name === 'client_slug_changed_at');
+        if (!hasSlugChangedAt) {
+          await queryD1('ALTER TABLE sites ADD COLUMN client_slug_changed_at TEXT');
+        }
+
+        const ordersInfo = await queryD1<{ name: string }>('PRAGMA table_info(orders)');
+        const hasTplId = ordersInfo.some((col) => col.name === 'template_id');
+        if (!hasTplId) {
+          await queryD1('ALTER TABLE orders ADD COLUMN template_id TEXT');
+        }
+        const hasAccessTokenHash = ordersInfo.some((col) => col.name === 'access_token_hash');
+        if (!hasAccessTokenHash) {
+          await queryD1('ALTER TABLE orders ADD COLUMN access_token_hash TEXT');
+        }
+        const hasCancelReason = ordersInfo.some((col) => col.name === 'cancel_reason');
+        if (!hasCancelReason) {
+          await queryD1('ALTER TABLE orders ADD COLUMN cancel_reason TEXT');
+        }
+        const hasPaymentProofUrl = ordersInfo.some((col) => col.name === 'payment_proof_url');
+        if (!hasPaymentProofUrl) {
+          await queryD1('ALTER TABLE orders ADD COLUMN payment_proof_url TEXT');
+        }
+
+        // Migrate: replace plain desired_slug index with partial unique index
+        // (without 'activated' — slug must be reusable after a site is created;
+        // situs nyata sudah dijaga oleh index slug di tabel sites)
+        try {
+          await queryD1('DROP INDEX IF EXISTS idx_orders_desired_slug');
+          await queryD1('DROP INDEX IF EXISTS idx_orders_desired_slug_active');
+          await queryD1(
+            `CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_desired_slug_active ON orders(desired_slug) WHERE status IN ('pending_payment', 'waiting_verification', 'activating')`
+          );
+          await queryD1(
+            `CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_amount_active ON orders(amount) WHERE status IN ('pending_payment', 'waiting_verification', 'activating')`
+          );
+        } catch {
+          // Index may already be migrated — safe to ignore
+        }
+      } catch (e) {
+        console.warn('D1 schema self-healing migration skipped:', e);
+      }
+    })();
   }
   return schemaPromise;
 }

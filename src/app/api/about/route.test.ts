@@ -74,7 +74,7 @@ describe('GET /api/about', () => {
 
   it('passes fresh flag to service', async () => {
     await GET(buildGet('?fresh=true') as never);
-    expect(getAboutDataMock).toHaveBeenCalledWith(true, true);
+    expect(getAboutDataMock).toHaveBeenCalledWith(true, true, 'default-site');
   });
 
   it('returns 500 on error', async () => {
@@ -126,7 +126,10 @@ describe('PUT /api/about', () => {
 
   it('passes updates to service', async () => {
     await PUT(buildPut(validUpdatePayload) as never);
-    expect(updateAboutDataMock).toHaveBeenCalledWith({ hero: { title: 'Senior Designer' } });
+    expect(updateAboutDataMock).toHaveBeenCalledWith(
+      { hero: { title: 'Senior Designer' } },
+      'default-site'
+    );
   });
 
   it('returns 500 on update failure', async () => {

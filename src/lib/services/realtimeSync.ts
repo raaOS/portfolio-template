@@ -4,13 +4,13 @@
  * Realtime Sync Hook — Polling versi data untuk mendeteksi pembaruan.
  *
  * Mengirim request ke `/api/data/version` setiap 30 detik untuk mengecek
- * apakah ada data baru di database. Interval dioptimasi untuk Vercel Hobby.
+ * apakah ada data baru di database. Interval dioptimasi untuk quota Cloudflare/D1.
  *
  * @module realtimeSync
  */
 import { useEffect, useRef } from 'react';
 
-// Vercel Hobby Free Tier guard — interval 5s adalah peninggalan era
+// Cloudflare/D1 quota guard — interval 5s adalah peninggalan era
 // "instant admin sync" yang berlebihan untuk skala portfolio. Hitungan
 // kasar: admin tab open 1 jam = 720 polls = 720 invocations untuk single
 // admin session, sementara payload dari `/api/data/version` cuma version

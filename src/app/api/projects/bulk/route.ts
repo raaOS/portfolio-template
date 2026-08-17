@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { validateAdminRequest } from '@/lib/auth';
-import { projectService } from '@/lib/services/projectService';
+import { projectSqlService } from '@/lib/services/project/projectSqlService';
+import { resolveProjectSiteId } from '@/lib/admin/projectSiteContext';
+import { revalidateSiteProjectPaths } from '@/lib/admin/siteRequestContext';
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,6 +13,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { action, ids } = body;
+    const siteId = resolveProjectSiteId(request, body);
 
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       return NextResponse.json({ error: 'No project IDs provided' }, { status: 400 });
@@ -19,14 +22,14 @@ export async function POST(request: NextRequest) {
     let success = false;
 
     if (action === 'delete') {
-      success = await projectService.bulkUpdateProjects({ ids, delete: true });
+      success = await projectSqlService.bulkUpdateProjectsSql(siteId, { ids, delete: true });
     } else if (action === 'publish' || action === 'draft') {
-      success = await projectService.bulkUpdateProjects({
+      success = await projectSqlService.bulkUpdateProjectsSql(siteId, {
         ids,
         status: action === 'publish' ? 'published' : 'draft',
       });
     } else if (action === 'reorder') {
-      success = await projectService.bulkUpdateProjects({ ids, reorder: true });
+      success = await projectSqlService.bulkUpdateProjectsSql(siteId, { ids, reorder: true });
     } else {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
@@ -35,8 +38,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to perform bulk update' }, { status: 500 });
     }
 
-    revalidatePath('/', 'layout');
-    revalidatePath('/projects');
+    await revalidateSiteProjectPaths(siteId);
     revalidatePath('/admin');
 
     return NextResponse.json({ success: true, message: `Bulk ${action} successful` });

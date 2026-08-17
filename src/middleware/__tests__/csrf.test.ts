@@ -1,11 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-vi.mock('@/lib/security', () => ({
+vi.mock('@/lib/security/token', () => ({
   validateCSRFToken: vi.fn(),
 }));
 
-import { validateCSRFToken } from '@/lib/security';
+import { validateCSRFToken } from '@/lib/security/token';
 import { checkCSRF } from '../csrf';
 
 const CSRF_VALID = 'a'.repeat(64);
@@ -51,7 +51,6 @@ describe('checkCSRF middleware', () => {
       '/api/comments',
       '/api/analytics',
       '/api/chat/send',
-      '/api/webhook/telegram',
       '/api/translate',
       '/api/admin/login',
       '/api/admin/logout',

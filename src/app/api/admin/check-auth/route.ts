@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdminAuth } from '@/lib/auth';
 import { generateCSRFToken } from '@/lib/security';
+import { CSRF_TOKEN_MAX_AGE } from '@/lib/security/constants';
 
 export async function GET(request: NextRequest) {
   const isAuthenticated = checkAdminAuth(request);
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
     httpOnly: false,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: 60 * 60 * 24 * 7, // 7 days
+    maxAge: CSRF_TOKEN_MAX_AGE,
     path: '/',
   });
 

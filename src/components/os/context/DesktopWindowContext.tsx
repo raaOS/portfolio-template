@@ -18,6 +18,7 @@ interface DesktopWindowProviderProps {
   children: ReactNode;
   initialWindows: WindowState[];
   aboutData?: AboutData | null;
+  siteId?: string;
   csrfToken?: string;
   isAdmin?: boolean;
 }
@@ -26,12 +27,14 @@ export function DesktopWindowProvider({
   children,
   initialWindows,
   aboutData,
+  siteId,
   csrfToken,
   isAdmin,
 }: DesktopWindowProviderProps) {
   const windowManager = useWindowManager({
     initialWindows,
     aboutData,
+    siteId,
     csrfToken,
     isAdmin,
   });

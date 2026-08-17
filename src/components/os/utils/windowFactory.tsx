@@ -36,6 +36,7 @@ interface WindowFactoryProps {
   experienceData: ExperienceData | null | undefined;
   hardSkillsData: HardSkillsData | null | undefined;
   contactData: ContactData | null | undefined;
+  siteId?: string;
   projects: Project[];
   dynamicContacts: Record<string, ContactProfile>;
   isAdmin?: boolean;
@@ -47,6 +48,7 @@ export const createInitialWindows = ({
   experienceData,
   hardSkillsData,
   contactData,
+  siteId = 'default-site',
   projects: _projects,
   dynamicContacts,
   isAdmin = false,
@@ -103,7 +105,7 @@ export const createInitialWindows = ({
       width: 520,
       height: 720,
       content: null,
-      contentFactory: () => <ContactWindow initialData={contactData} />,
+      contentFactory: () => <ContactWindow initialData={contactData} siteId={siteId} />,
     },
     {
       id: 'trash-bin',

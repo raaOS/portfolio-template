@@ -1,6 +1,7 @@
 import { memo, useRef } from 'react';
 import Image from 'next/image';
 import { useTransitionRouter } from 'next-view-transitions';
+import { usePathname } from 'next/navigation';
 import { getCoverPosterUrl, getPreviewCoverUrl, isVideoUrl } from '@/utils/canvas-helpers';
 import { saveCameraState } from '@/lib/canvasCameraPersistence';
 import {
@@ -10,6 +11,7 @@ import {
 } from '@/lib/projectCoverTransition';
 import type { CanvasItem } from './infiniteCanvasEngine';
 import type { Project } from '@/types/projects';
+import { buildTenantProjectDetailHref } from '@/lib/routing/tenantRoutes';
 
 const CARD_WIDTH = 700;
 
@@ -35,6 +37,7 @@ export function CanvasCardInner({
   getCamera,
 }: CanvasCardProps) {
   const router = useTransitionRouter();
+  const pathname = usePathname();
 
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
   const dragDistance = useRef(0);
@@ -97,7 +100,7 @@ export function CanvasCardInner({
           prepareProjectCoverTransition(transitionElementRef.current);
         }
 
-        router.push(`/projects/${item.project.slug}`);
+        router.push(buildTenantProjectDetailHref(pathname, item.project.slug));
       }}
       onPointerEnter={() => onHoverChange?.(item.project)}
       onPointerLeave={() => onHoverChange?.(null)}
@@ -109,13 +112,9 @@ export function CanvasCardInner({
           ...innerMediaStyle,
           // Back navigation: browser needs this name on the new page snapshot
           // to morph from detail-page cover back to this canvas card.
-          ...(isTransitionTarget
-            ? { viewTransitionName: PROJECT_COVER_TRANSITION_NAME }
-            : {}),
+          ...(isTransitionTarget ? { viewTransitionName: PROJECT_COVER_TRANSITION_NAME } : {}),
         }}
-        {...(isTransitionTarget
-          ? { [PROJECT_COVER_TRANSITION_ATTRIBUTE]: '' }
-          : {})}
+        {...(isTransitionTarget ? { [PROJECT_COVER_TRANSITION_ATTRIBUTE]: '' } : {})}
       >
         {isVideo ? (
           <video

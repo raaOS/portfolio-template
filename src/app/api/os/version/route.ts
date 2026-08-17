@@ -4,10 +4,7 @@ import { APP_VERSION } from '@/lib/constants';
 /**
  * API to get the current application version from the server.
  * Used by VersionGuard for client-side auto-update notifications.
- *
- * Runs on the Edge Runtime: trivial workload, no Node-only deps.
  */
-export const runtime = 'edge';
 
 export async function GET() {
   return NextResponse.json(

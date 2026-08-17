@@ -89,7 +89,8 @@ export function useFFmpeg(onStatusUpdate: (status: string) => void) {
 
     const ffmpeg = new FFmpeg();
     try {
-      const baseURL = window.location.origin + '/ffmpeg';
+      const configuredBaseURL = process.env.NEXT_PUBLIC_FFMPEG_BASE_URL?.replace(/\/+$/, '');
+      const baseURL = configuredBaseURL || window.location.origin + '/ffmpeg';
       await ffmpeg.load({
         coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
         wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),

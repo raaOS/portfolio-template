@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { getGeminiApiKeyMock, guardAdminAiRequestMock } = vi.hoisted(() => ({
-  getGeminiApiKeyMock: vi.fn(),
+const { getGoogleAiApiKeyMock, guardAdminAiRequestMock } = vi.hoisted(() => ({
+  getGoogleAiApiKeyMock: vi.fn(),
   guardAdminAiRequestMock: vi.fn(),
 }));
 
 vi.mock('../_shared', () => ({
-  getGeminiApiKey: getGeminiApiKeyMock,
+  getGoogleAiApiKey: getGoogleAiApiKeyMock,
   guardAdminAiRequest: guardAdminAiRequestMock,
 }));
 
@@ -20,7 +20,7 @@ function request(body: Record<string, unknown>) {
   }) as never;
 }
 
-function geminiConversationResponse(conversation: unknown[]) {
+function googleAiConversationResponse(conversation: unknown[]) {
   return new Response(
     JSON.stringify({
       candidates: [
@@ -38,18 +38,18 @@ function geminiConversationResponse(conversation: unknown[]) {
 describe('POST /api/ai/generate-conversation', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    getGeminiApiKeyMock.mockReturnValue('test-key');
+    getGoogleAiApiKeyMock.mockReturnValue('test-key');
     guardAdminAiRequestMock.mockResolvedValue(null);
   });
 
-  it('generates conversation array from Gemini response', async () => {
+  it('generates conversation array from Google AI response', async () => {
     const conversation = [
       { id: 1, text: 'Halo, makasih infonya!', isMe: true, time: '10:01', status: 'read' },
       { id: 2, text: 'Sama2 mas, kpn bisa mulai?', isMe: false, time: '10:03', status: 'read' },
       { id: 3, text: 'Besok sdh bisa', isMe: true, time: '10:04', status: 'read' },
     ];
 
-    const fetchMock = vi.fn().mockResolvedValue(geminiConversationResponse(conversation));
+    const fetchMock = vi.fn().mockResolvedValue(googleAiConversationResponse(conversation));
     vi.stubGlobal('fetch', fetchMock);
 
     const response = await POST(
@@ -80,7 +80,7 @@ describe('POST /api/ai/generate-conversation', () => {
   });
 
   it('returns 500 when API key is not configured', async () => {
-    getGeminiApiKeyMock.mockReturnValue('');
+    getGoogleAiApiKeyMock.mockReturnValue('');
 
     const response = await POST(request({ senderName: 'Budi', notifMessage: 'Halo ada project' }));
     const body = await response.json();
@@ -101,7 +101,7 @@ describe('POST /api/ai/generate-conversation', () => {
     expect(body.error).toBe('Unauthorized');
   });
 
-  it('returns 500 when Gemini API responds with HTTP error', async () => {
+  it('returns 500 when Google AI API responds with HTTP error', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response('Internal error', { status: 500 }));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -109,7 +109,7 @@ describe('POST /api/ai/generate-conversation', () => {
     const body = await response.json();
 
     expect(response.status).toBe(500);
-    expect(body.error).toContain('Gemini API Error');
+    expect(body.error).toContain('Google AI API Error');
   });
 
   it('returns 500 when AI returns empty candidates', async () => {

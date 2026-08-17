@@ -4,9 +4,8 @@ import { NextResponse } from 'next/server';
  * Legacy service worker handler.
  *
  * Returns 410 Gone untuk memaksa browser unregister SW yang lama.
- * Edge runtime karena trivial dan dipanggil setiap visit (warm path).
+ * Runtime eksplisit tidak disetel agar kompatibel dengan OpenNext Cloudflare.
  */
-export const runtime = 'edge';
 
 export async function GET() {
   return new NextResponse('Service worker disabled', {

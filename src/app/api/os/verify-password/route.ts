@@ -2,6 +2,7 @@
 import { cookies } from 'next/headers';
 import { db } from '@/lib/database';
 import { generateCSRFToken, validateCSRFToken, verifyStoredPassword } from '@/lib/security';
+import { CSRF_TOKEN_MAX_AGE } from '@/lib/security/constants';
 import { enforceRequestRateLimit } from '@/lib/security/request';
 
 const MAX_VERIFY_ATTEMPTS = 5;
@@ -38,7 +39,7 @@ export async function GET() {
     httpOnly: false,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: 3600,
+    maxAge: CSRF_TOKEN_MAX_AGE,
     path: '/',
   });
 

@@ -2,13 +2,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import { Check, ChevronDown, Search, Wifi, LogOut, Users } from 'lucide-react';
+import { Check, ChevronDown, Search, Wifi, LogOut, Users, ShoppingCart } from 'lucide-react';
 import { useOSOverlays } from '../context/OSSystemContext';
 import { Z_LAYERS } from '../utils/zIndexLayers';
 import { useReducedMotion } from 'motion/react';
-import { useTransitionRouter } from 'next-view-transitions';
+import { Link } from 'next-view-transitions';
 import type { LottieRefCurrentProps } from 'lottie-react';
-import IOSPinModal from '@/components/shared/IOSPinModal';
 import logoAnimationData from '../../../../public/lottie/mata.json';
 import LanguageSwitch from '@/components/shared/LanguageSwitch';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -17,6 +16,9 @@ import MusicPlayerWidget from '../ui/MusicWidget';
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
 interface MenuBarProps {
+  siteId?: string;
+  siteSlug?: string;
+  loginUrl?: string;
   onSearch?: () => void;
   activeWindow?: string;
   onAbout?: () => void;
@@ -30,6 +32,9 @@ interface MenuBarProps {
 }
 
 export default function MenuBar({
+  siteId,
+  siteSlug,
+  loginUrl,
   onSearch,
   activeWindow = 'Finder',
   onAbout,
@@ -38,13 +43,18 @@ export default function MenuBar({
   onLogout,
   onToggleControlCenter,
 }: MenuBarProps) {
+  const effectiveLoginUrl =
+    loginUrl ||
+    (siteSlug && siteSlug !== 'default-site'
+      ? `/${siteSlug}/login`
+      : siteId && siteId !== 'default-site'
+      ? `/${siteId}/login`
+      : '/client/login');
   const { showCalendar, setShowCalendar, showGhostCursors, toggleGhostCursors } = useOSOverlays();
   const { dictionary: t, meta } = useLanguage();
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
   const viewMenuRef = useRef<HTMLDivElement>(null);
   const [time, setTime] = useState(new Date());
-  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
-  const router = useTransitionRouter();
 
   const prefersReducedMotion = useReducedMotion();
   const lottieRef = useRef<LottieRefCurrentProps | null>(null);
@@ -130,11 +140,10 @@ export default function MenuBar({
     >
       {/* Left Side */}
       <div className="flex min-w-0 flex-1 items-center gap-1 sm:gap-2 lg:gap-4">
-        <div
-          onClick={() => setIsPinModalOpen(true)}
+        <Link
+          href={effectiveLoginUrl}
           className="relative flex h-8 w-12 shrink-0 cursor-pointer items-center justify-center"
-          aria-label={t.menuBar.ramosOS}
-          role="img"
+          aria-label={t.menuBar.portfolioOS}
         >
           <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             <Lottie
@@ -147,7 +156,7 @@ export default function MenuBar({
               aria-hidden="true"
             />
           </div>
-        </div>
+        </Link>
         <div
           className="hidden max-w-[clamp(5rem,22vw,12rem)] cursor-pointer truncate whitespace-nowrap rounded px-2 py-1 font-bold transition-colors hover:bg-black/5 sm:block"
           onClick={onAbout}
@@ -255,6 +264,14 @@ export default function MenuBar({
         )}
 
         <MusicPlayerWidget />
+        <Link
+          href="/checkout"
+          className="group flex items-center gap-1.5 px-2 py-1 text-xs font-semibold text-gray-700 transition-colors hover:text-blue-600 active:text-blue-700 active:scale-95"
+          title="Pesan Portfolio OS"
+        >
+          <ShoppingCart size={13} className="text-gray-500 transition-colors group-hover:text-blue-600 group-active:text-blue-700" aria-hidden="true" />
+          <span className="hidden sm:inline">Pesan OS</span>
+        </Link>
         <LanguageSwitch className="hidden md:inline-grid" />
 
         {/* Icons */}
@@ -303,11 +320,6 @@ export default function MenuBar({
           <span>{formattedTime}</span>
         </div>
       </div>
-      <IOSPinModal
-        isOpen={isPinModalOpen}
-        onClose={() => setIsPinModalOpen(false)}
-        onSuccess={() => router.push('/admin/login?redirect=%2Fadmin')}
-      />
     </div>
   );
 }

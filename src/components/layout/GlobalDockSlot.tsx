@@ -58,7 +58,21 @@ function getServerSnapshot(): HTMLElement | null {
 export function DockPortal({ children }: { children: ReactNode }) {
   const target = useSyncExternalStore(subscribeSlot, getSlotSnapshot, getServerSnapshot);
 
-  if (!target) return null;
+  if (!target) {
+    return (
+      <div
+        id={GLOBAL_DOCK_SLOT_ID}
+        className="pb-safe pointer-events-none fixed bottom-4 left-0 right-0 flex justify-center print:hidden"
+        style={{
+          viewTransitionName: 'global-dock',
+          zIndex: 99999,
+        }}
+        aria-hidden="false"
+      >
+        {children}
+      </div>
+    );
+  }
   return createPortal(children, target);
 }
 

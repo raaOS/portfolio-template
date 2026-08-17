@@ -8,7 +8,7 @@
  * @module middleware/csrf
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { validateCSRFToken } from '@/lib/security';
+import { validateCSRFToken } from '@/lib/security/token';
 import { isAPIRoute } from './utils';
 import { CSRF_TOKEN_COOKIE, CSRF_TOKEN_HEADER } from '@/lib/security/constants';
 
@@ -22,8 +22,6 @@ export function checkCSRF(request: NextRequest) {
       '/api/admin/logout',
       '/api/chat/send',
       '/api/chat/voice',
-      '/api/webhook/telegram',
-      '/api/webhook/job-telegram',
       '/api/translate',
       '/api/admin/pin/verify',
       // Visitor-reachable mutation endpoints yang tidak memerlukan sesi admin.
@@ -33,8 +31,14 @@ export function checkCSRF(request: NextRequest) {
       '/api/comments',
       '/api/analytics',
       '/api/feedback',
+      '/api/billing/checkout',
+      '/api/billing/orders',
+      '/api/telegram/webhook',
+      // Webhook eksternal (GitHub push) — diproteksi HMAC signature
+      // `x-hub-signature-256` di handler, bukan cookie CSRF.
+      '/api/revalidate',
     ];
-    if (!allowlistPaths.includes(pathname)) {
+    if (!allowlistPaths.some((p) => pathname.startsWith(p))) {
       const csrfToken = request.headers.get(CSRF_TOKEN_HEADER);
       const sessionCsrfToken = request.cookies.get(CSRF_TOKEN_COOKIE)?.value;
 

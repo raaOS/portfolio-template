@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { validateAdminRequest } from '@/lib/auth';
+import {
+  assertKnownSite,
+  revalidateSiteContentPaths,
+  resolveRequestSiteId,
+  SiteContextError,
+} from '@/lib/admin/siteRequestContext';
 import { aboutService } from '@/lib/services/aboutService';
 import {
   buildR2PublicUrl,
@@ -54,7 +60,6 @@ import type { Wallpaper } from '@/types/about';
  */
 
 const VIDEO_PATTERN = /\.(mp4|webm|mov)([?#].*)?$/i;
-const ASSET_PATH_PATTERN = /(^|\/)assets\//i;
 
 interface BackfillCandidate {
   id: string;
@@ -72,9 +77,13 @@ interface BackfillResult {
 
 function urlToR2Key(url: string): string | null {
   const clean = url.split(/[?#]/)[0];
-  const idx = clean.indexOf('assets/');
-  if (idx < 0) return null;
-  return clean.slice(idx);
+  const assetIdx = clean.indexOf('assets/');
+  if (assetIdx >= 0) return clean.slice(assetIdx);
+
+  const siteIdx = clean.indexOf('sites/');
+  if (siteIdx >= 0) return clean.slice(siteIdx);
+
+  return null;
 }
 
 async function r2KeyExists(key: string): Promise<boolean> {
@@ -94,7 +103,6 @@ async function r2KeyExists(key: string): Promise<boolean> {
 async function findExistingPosterUrl(videoUrl: string): Promise<string | null> {
   const videoKey = urlToR2Key(videoUrl);
   if (!videoKey) return null;
-  if (!ASSET_PATH_PATTERN.test(videoKey)) return null;
 
   const baseKey = videoKey.replace(/\.(mp4|webm|mov)$/i, '');
   // Order matches current pipeline preference: .jpg first, .webp legacy.
@@ -123,7 +131,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const about = await aboutService.getAboutData(true);
+    const siteId = await resolveRequestSiteId(req);
+    await assertKnownSite(siteId);
+
+    const about = await aboutService.getAboutData(true, false, siteId);
     const collection: Wallpaper[] = (about?.wallpaperConfig?.collection || []) as Wallpaper[];
 
     const candidates: BackfillCandidate[] = [];
@@ -139,6 +150,9 @@ export async function GET(req: NextRequest) {
       totalWallpapers: collection.length,
     });
   } catch (error) {
+    if (error instanceof SiteContextError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error('[API/Admin/WallpaperPosterBackfill] GET error:', error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
@@ -157,6 +171,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized or invalid CSRF token' }, { status: 401 });
     }
 
+    const siteId = await resolveRequestSiteId(req);
+    await assertKnownSite(siteId);
+
     if (!isR2StorageConfigured()) {
       return NextResponse.json(
         {
@@ -166,7 +183,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const about = await aboutService.getAboutData(true);
+    const about = await aboutService.getAboutData(true, false, siteId);
     const cfg = about?.wallpaperConfig;
     const collection: Wallpaper[] = (cfg?.collection || []) as Wallpaper[];
 
@@ -226,15 +243,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, result });
     }
 
-    await aboutService.updateAboutData({
-      wallpaperConfig: {
-        ...(cfg || {}),
-        collection: updated,
-      },
-    } as Parameters<typeof aboutService.updateAboutData>[0]);
+    await aboutService.updateAboutData(
+      {
+        wallpaperConfig: {
+          ...(cfg || {}),
+          collection: updated,
+        },
+      } as Parameters<typeof aboutService.updateAboutData>[0],
+      siteId
+    );
+
+    await revalidateSiteContentPaths(siteId, ['/']);
 
     return NextResponse.json({ success: true, result });
   } catch (error) {
+    if (error instanceof SiteContextError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error('[API/Admin/WallpaperPosterBackfill] POST error:', error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(

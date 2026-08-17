@@ -28,6 +28,7 @@ interface ProjectDetailTwoColumnProps {
   gallery: GalleryItem[];
   ratio: number;
   otherProjects: Project[];
+  siteId?: string;
   isWindowMode?: boolean;
 }
 
@@ -37,6 +38,7 @@ export default function ProjectDetailTwoColumn({
   gallery,
   ratio,
   otherProjects,
+  siteId = 'default-site',
   isWindowMode = false,
 }: ProjectDetailTwoColumnProps) {
   const { locale } = useLanguage();
@@ -65,7 +67,7 @@ export default function ProjectDetailTwoColumn({
     handleProjectLike,
     handleProjectShare,
     translateAll,
-  } = useProjectDetail({ project });
+  } = useProjectDetail({ project, siteId });
   const displayProject = translations ? project : localizedProject;
   const isEnglish = locale === 'en' || !!translations;
 
@@ -247,6 +249,7 @@ export default function ProjectDetailTwoColumn({
                 <div className="flex-1 overflow-y-auto p-4">
                   <ProjectComments
                     slug={project.slug}
+                    siteId={siteId}
                     comments={comments}
                     setComments={setComments}
                     allowComments={project.allowComments}
@@ -420,6 +423,7 @@ export default function ProjectDetailTwoColumn({
                       <div className="flex-1 overflow-y-auto p-4">
                         <ProjectComments
                           slug={project.slug}
+                          siteId={siteId}
                           comments={comments}
                           setComments={setComments}
                           allowComments={project.allowComments}

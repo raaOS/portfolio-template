@@ -1,7 +1,7 @@
 'use client';
 import { useEffect } from 'react';
 
-const SW_CLEANUP_FLAG = 'ramos_sw_cleaned';
+const SW_CLEANUP_FLAG = 'portfolio_os_sw_cleaned';
 
 /**
  * Service Worker Cleanup

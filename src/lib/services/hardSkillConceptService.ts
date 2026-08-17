@@ -15,12 +15,17 @@ const defaultData: HardSkillConceptsData = {
 const service = new ContentService<HardSkillConceptsData>('hardSkillConcepts.json', defaultData);
 
 export const hardSkillConceptService = {
-  async getConcepts(noCache = false, throwOnError = false) {
-    return await service.getData(noCache, throwOnError);
+  async getConcepts(noCache: boolean | string = false, throwOnError = false, siteId = 'default-site') {
+    const actualNoCache = typeof noCache === 'boolean' ? noCache : false;
+    const actualSiteId = typeof noCache === 'string' ? noCache : siteId;
+    return await service.getData(actualNoCache, throwOnError, actualSiteId);
   },
 
-  async createConcept(conceptData: Omit<HardSkillConcept, 'id' | 'createdAt' | 'updatedAt'>) {
-    const data = await this.getConcepts(true, true);
+  async createConcept(
+    conceptData: Omit<HardSkillConcept, 'id' | 'createdAt' | 'updatedAt'>,
+    siteId = 'default-site'
+  ) {
+    const data = await this.getConcepts(true, true, siteId);
     const newConcept: HardSkillConcept = {
       id: `concept-${Date.now()}`,
       ...conceptData,
@@ -31,12 +36,12 @@ export const hardSkillConceptService = {
     data.concepts.push(newConcept);
     data.lastUpdated = new Date().toISOString();
 
-    await service.saveData(data, `Add concept: ${newConcept.title}`);
+    await service.saveData(data, `Add concept: ${newConcept.title}`, siteId);
     return newConcept;
   },
 
-  async updateConcept(id: string, updates: Partial<HardSkillConcept>) {
-    const data = await this.getConcepts(true, true);
+  async updateConcept(id: string, updates: Partial<HardSkillConcept>, siteId = 'default-site') {
+    const data = await this.getConcepts(true, true, siteId);
     const index = data.concepts.findIndex((c) => c.id === id);
     if (index === -1) return null;
 
@@ -47,19 +52,19 @@ export const hardSkillConceptService = {
     };
     data.lastUpdated = new Date().toISOString();
 
-    await service.saveData(data, `Update concept: ${data.concepts[index].title}`);
+    await service.saveData(data, `Update concept: ${data.concepts[index].title}`, siteId);
     return data.concepts[index];
   },
 
-  async deleteConcept(id: string) {
-    const data = await this.getConcepts(true, true);
+  async deleteConcept(id: string, siteId = 'default-site') {
+    const data = await this.getConcepts(true, true, siteId);
     const initialLen = data.concepts.length;
     data.concepts = data.concepts.filter((c) => c.id !== id);
 
     if (data.concepts.length === initialLen) return false;
 
     data.lastUpdated = new Date().toISOString();
-    await service.saveData(data, `Delete concept ID: ${id}`);
+    await service.saveData(data, `Delete concept ID: ${id}`, siteId);
     return true;
   },
 };

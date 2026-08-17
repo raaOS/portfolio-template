@@ -21,6 +21,7 @@ interface FullPageChatContactInfo {
 
 interface ContactWindowProps {
   initialData?: ContactData | null;
+  siteId?: string;
 }
 
 const fetcher = async (url: string) => {
@@ -44,9 +45,10 @@ function toContactInfo(
   };
 }
 
-export default function ContactWindow({ initialData }: ContactWindowProps) {
+export default function ContactWindow({ initialData, siteId = 'default-site' }: ContactWindowProps) {
   const { locale } = useLanguage();
-  const { data } = useSWR('/api/contact', fetcher, {
+  const contactUrl = `/api/contact?siteId=${encodeURIComponent(siteId)}`;
+  const { data } = useSWR(contactUrl, fetcher, {
     fallbackData: initialData ?? undefined,
     revalidateOnFocus: false,
     revalidateIfStale: false,

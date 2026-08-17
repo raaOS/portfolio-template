@@ -3,9 +3,14 @@ import { useRef, useCallback, useEffect } from 'react';
 interface UseWindowPersistenceProps {
   csrfToken?: string;
   isAdmin?: boolean;
+  siteId?: string;
 }
 
-export function useWindowPersistence({ csrfToken, isAdmin }: UseWindowPersistenceProps) {
+export function useWindowPersistence({
+  csrfToken,
+  isAdmin,
+  siteId = 'default-site',
+}: UseWindowPersistenceProps) {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const persistTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isPersistingRef = useRef(false);
@@ -115,6 +120,7 @@ export function useWindowPersistence({ csrfToken, isAdmin }: UseWindowPersistenc
             },
             credentials: 'include',
             body: JSON.stringify({
+              siteId,
               windowPreferences,
             }),
           });
@@ -132,7 +138,7 @@ export function useWindowPersistence({ csrfToken, isAdmin }: UseWindowPersistenc
         }
       }, 800);
     },
-    [csrfToken, isAdmin]
+    [csrfToken, isAdmin, siteId]
   );
 
   const flushWindowPositions = useCallback(async () => {
@@ -140,11 +146,11 @@ export function useWindowPersistence({ csrfToken, isAdmin }: UseWindowPersistenc
 
     try {
       const { flushPositions } = await import('@/components/os/utils/positionSync');
-      await flushPositions(csrfToken);
+      await flushPositions(csrfToken, siteId);
     } catch (error) {
       console.error('[WindowManager] Failed to flush:', error);
     }
-  }, [isAdmin, csrfToken]);
+  }, [isAdmin, csrfToken, siteId]);
 
   return {
     saveWindowPreference,

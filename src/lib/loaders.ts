@@ -1,18 +1,20 @@
 import { cache } from 'react';
 import { getCachedAboutData } from './services/aboutService';
-import { projectService } from './services/projectService';
+import { projectSqlService } from './services/project/projectSqlService';
 import { experienceService } from './services/experienceService';
 import { hardSkillService } from './services/hardSkillService';
 import { testimonialService } from './services/testimonialService';
-import { getD1Values, isD1Configured } from './cloudflareD1';
-import { ProjectSchema } from '@/lib/validations';
+import { getContactData } from './contact';
+import { getD1Value, isD1Configured } from './cloudflareD1';
 import experienceFallback from '@/data/experience.json';
 import hardSkillsFallback from '@/data/hardSkills.json';
 import testimonialFallback from '@/data/testimonial.json';
+import contactFallback from '@/data/contact.json';
 import type { AboutData } from '@/types/about';
+import type { ContactData } from '@/types/contact';
 import type { ExperienceData, WorkExperience } from '@/types/experience';
 import type { HardSkill, HardSkillsData } from '@/types/hardSkill';
-import type { Project, ProjectsData } from '@/types/projects';
+import type { Project } from '@/types/projects';
 import type { Testimonial, TestimonialData } from '@/types/testimonial';
 
 export type HomepageData = {
@@ -21,21 +23,15 @@ export type HomepageData = {
   experienceData: ExperienceData;
   hardSkillsData: HardSkillsData;
   testimonialsData: TestimonialData;
+  contactData: ContactData;
 };
 
-const HOMEPAGE_D1_KEYS = [
-  // Sengaja skip `content/about` di batch — layout (site) sudah panggil
-  // aboutService.getAboutData() yang punya cache layer ContentService (5s) +
-  // path invalidation eksplisit via invalidateAboutCache(). Bagikan instance
-  // itu supaya admin update langsung kelihatan tanpa double fetch.
-  'projects',
-  'lastUpdated',
-  // Baca row 'content' secara utuh lalu ekstrak nested fields di bawah.
-  // getD1Values mencari row LITERAL — `content/experience` tidak ada
-  // sebagai row terpisah karena ContentService menulis nested field
-  // experience/hardSkills/testimonial di bawah row `content`.
-  'content',
-];
+type HomepageContentRow = {
+  contact?: unknown;
+  experience?: unknown;
+  hardSkills?: unknown;
+  testimonial?: unknown;
+};
 
 function deepMerge<T>(base: T, override: unknown): T {
   if (override === null || override === undefined) return base;
@@ -117,39 +113,25 @@ function normalizeTestimonialData(data: TestimonialData): TestimonialData {
   };
 }
 
-function normalizeProjects(rawProjects: unknown, lastUpdated: unknown): ProjectsData {
-  const projectsObject =
-    rawProjects && typeof rawProjects === 'object' ? (rawProjects as Record<string, unknown>) : {};
-  const projects: Project[] = [];
-
-  Object.values(projectsObject).forEach((project) => {
-    const parsed = ProjectSchema.safeParse(project);
-    if (parsed.success) {
-      projects.push(parsed.data as unknown as Project);
-    }
-  });
-
-  projects.sort(
-    (a, b) =>
-      (a.order || 0) - (b.order || 0) ||
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
-
+function emptyTenantTestimonials(): TestimonialData {
   return {
-    projects,
-    lastUpdated: typeof lastUpdated === 'string' ? lastUpdated : new Date().toISOString(),
+    testimonials: [],
+    lastUpdated: new Date().toISOString(),
   };
 }
 
-async function loadHomepageDataFromD1(): Promise<HomepageData> {
-  // Parallel: batch read 5 keys + cached about loader (yang juga reuse cache
-  // layer antar layout & page lewat React cache()).
-  const [values, aboutData] = await Promise.all([
-    getD1Values(HOMEPAGE_D1_KEYS),
-    getCachedAboutData(),
+async function loadHomepageDataFromD1(siteId = 'default-site'): Promise<HomepageData> {
+  const [contentVal, projectsResult, aboutData] = await Promise.all([
+    getD1Value<HomepageContentRow>(`content_${siteId}`),
+    projectSqlService.getProjectsSql(siteId, 'published'),
+    getCachedAboutData(siteId),
   ]);
 
-  const contentRow = (values['content'] as Record<string, unknown>) ?? {};
+  let contentRow = contentVal ?? {};
+  if (!contentVal && siteId === 'default-site') {
+    contentRow = (await getD1Value<HomepageContentRow>('content')) ?? {};
+  }
+
   const experienceData = deepMerge(
     experienceFallback as unknown as ExperienceData,
     contentRow.experience
@@ -158,15 +140,17 @@ async function loadHomepageDataFromD1(): Promise<HomepageData> {
     hardSkillsFallback as unknown as HardSkillsData,
     contentRow.hardSkills
   );
-  const testimonialsData = deepMerge(
-    testimonialFallback as unknown as TestimonialData,
-    contentRow.testimonial
-  );
-  const projectsResult = normalizeProjects(values.projects, values.lastUpdated);
+  const testimonialsData =
+    siteId === 'default-site'
+      ? deepMerge(testimonialFallback as unknown as TestimonialData, contentRow.testimonial)
+      : contentRow.testimonial
+        ? deepMerge(emptyTenantTestimonials(), contentRow.testimonial)
+        : emptyTenantTestimonials();
+  const contactData = deepMerge(contactFallback as ContactData, contentRow.contact);
 
   return {
     aboutData,
-    projects: projectsResult.projects.filter((p) => p.status !== 'draft'),
+    projects: projectsResult.projects,
     experienceData: {
       ...experienceData,
       workExperience: normalizeWorkExperience(experienceData.workExperience || []),
@@ -177,25 +161,28 @@ async function loadHomepageDataFromD1(): Promise<HomepageData> {
       lastUpdated: hardSkillsData.lastUpdated || new Date().toISOString(),
     },
     testimonialsData: normalizeTestimonialData(testimonialsData),
+    contactData,
   };
 }
 
-async function loadHomepageDataFromServices(): Promise<HomepageData> {
-  const [aboutData, projectsResult, experienceData, hardSkillsData, testimonialsData] =
+async function loadHomepageDataFromServices(siteId = 'default-site'): Promise<HomepageData> {
+  const [aboutData, projectsResult, experienceData, hardSkillsData, testimonialsData, contactData] =
     await Promise.all([
-      getCachedAboutData(),
-      projectService.getProjects(),
-      experienceService.getExperienceData(),
-      hardSkillService.getHardSkills(),
-      testimonialService.getTestimonials(),
+      getCachedAboutData(siteId),
+      projectSqlService.getProjectsSql(siteId, 'published'),
+      experienceService.getExperienceData(siteId),
+      hardSkillService.getHardSkills(siteId),
+      testimonialService.getSiteTestimonials(siteId),
+      getContactData(false, siteId),
     ]);
 
   return {
     aboutData,
-    projects: (projectsResult.projects || []).filter((p) => p.status !== 'draft'),
+    projects: projectsResult.projects,
     experienceData,
     hardSkillsData,
     testimonialsData,
+    contactData,
   };
 }
 
@@ -207,7 +194,7 @@ async function loadHomepageDataFromServices(): Promise<HomepageData> {
  * - **Per-request dedup** via React `cache()` — kalau dipanggil dari layout DAN page
  *   dalam satu request (mis. `(site)/layout.tsx` + `(site)/page.tsx` saat render
  *   homepage), cuma satu kali batch D1 read terjadi.
- * - **Cross-request caching** diserahkan ke ISR (`revalidate = 60`) di Vercel Edge,
+ * - **Cross-request caching** diserahkan ke ISR/runtime cache (`revalidate = 60`),
  *   yang konsisten dengan `revalidatePath('/', 'layout')` di admin routes.
  *
  * Catatan: module-level cache di-drop karena bug tersembunyi — `revalidatePath`
@@ -215,14 +202,14 @@ async function loadHomepageDataFromServices(): Promise<HomepageData> {
  * lihat data stale sampai TTL habis. ISR + per-request dedup lebih konsisten
  * dan tidak butuh dance invalidation manual.
  */
-export const loadHomepageData = cache(async (): Promise<HomepageData> => {
+export const loadHomepageData = cache(async (siteId = 'default-site'): Promise<HomepageData> => {
   return isD1Configured()
-    ? await loadHomepageDataFromD1().catch((error) => {
+    ? await loadHomepageDataFromD1(siteId).catch((error) => {
         console.warn(
-          '[HomepageLoader] D1 batch read failed, falling back to service loaders:',
+          `[HomepageLoader] D1 batch read failed for site ${siteId}, falling back to service loaders:`,
           error
         );
-        return loadHomepageDataFromServices();
+        return loadHomepageDataFromServices(siteId);
       })
-    : await loadHomepageDataFromServices();
+    : await loadHomepageDataFromServices(siteId);
 });

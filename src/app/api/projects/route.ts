@@ -1,16 +1,24 @@
 import { NextRequest } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { validateAdminRequest } from '@/lib/auth';
-import { projectService } from '@/lib/services/projectService';
+import { projectSqlService } from '@/lib/services/project/projectSqlService';
 import { generateGenZComments } from '@/lib/magic';
 import { db } from '@/lib/database';
-import { sendTelegramAlert } from '@/lib/telegram';
 import { CreateProjectSchema, commentSchema } from '@/lib/validations';
 import { success, created, unauthorized, serverError, validationError } from '@/lib/api-response';
+import {
+  enforceProjectCreateQuota,
+  ProjectQuotaError,
+  resolveProjectSiteId,
+} from '@/lib/admin/projectSiteContext';
+import { validateSiteMutationRequest } from '@/lib/admin/siteMutationAuth';
+import { resolveProjectMediaUrls } from '@/lib/urlResolver';
+import { validateAdminRequest } from '@/lib/auth';
+import { validateClientRequest } from '@/lib/clientAuth';
+import { revalidateSiteProjectPaths } from '@/lib/admin/siteRequestContext';
+import { buildCommentPath } from '@/lib/projectEngagement';
 
 const submittedCommentsSchema = commentSchema.array().max(1000, 'Too many comments');
-import { resolveStorageUrl } from '@/lib/urlResolver';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,23 +26,20 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status') || undefined;
-    const fresh = searchParams.get('fresh') === 'true';
+    const siteId = resolveProjectSiteId(request);
 
-    // Jika admin minta fresh data, skip cache (noCache=true)
-    const { projects, lastUpdated } = await projectService.getProjects(status, fresh);
+    // SECURITY FIX: Unauthenticated callers can only see published projects.
+    // Admin and client-authenticated callers retain full status filtering.
+    const isAdmin = await validateAdminRequest(request, { checkCsrf: false });
+    const isClient = !isAdmin ? await validateClientRequest(request, { checkCsrf: false, siteId }) : null;
+    const isAuthenticated = Boolean(isAdmin || isClient);
+    const status = isAuthenticated
+      ? (searchParams.get('status') || undefined)
+      : 'published';
+    const { projects, lastUpdated } = await projectSqlService.getProjectsSql(siteId, status);
 
     // Normalize local/R2 media paths before returning data.
-    const fixedProjects = projects.map((p) => ({
-      ...p,
-      cover: resolveStorageUrl(p.cover),
-      galleryItems: p.galleryItems?.map((item) => ({
-        ...item,
-        src: resolveStorageUrl(item.src),
-        poster: resolveStorageUrl(item.poster ?? ''),
-      })),
-      gallery: p.gallery?.map((url) => resolveStorageUrl(url) || url),
-    }));
+    const fixedProjects = resolveProjectMediaUrls(projects);
 
     return success({ projects: fixedProjects, lastUpdated });
   } catch (error) {
@@ -46,11 +51,11 @@ export async function GET(request: NextRequest) {
 // POST - Create new project (admin only)
 export async function POST(request: NextRequest) {
   try {
-    if (!(await validateAdminRequest(request))) {
+    const rawBody = await request.json();
+    const siteId = resolveProjectSiteId(request, rawBody);
+    if (!(await validateSiteMutationRequest(request, siteId))) {
       return unauthorized('Invalid or missing CSRF token');
     }
-
-    const rawBody = await request.json();
 
     const submittedCommentsResult = Array.isArray(rawBody.comments)
       ? submittedCommentsSchema.safeParse(rawBody.comments)
@@ -76,12 +81,17 @@ export async function POST(request: NextRequest) {
     };
 
     // Type assertion needed due to Zod schema allowing nulls that CreateProjectData doesn't.
-    // NOTE: `projectService.createProject` may re-validate via its own Zod schema.
+    // SQL service may re-validate via its own Zod schema.
     // Kalau schema service divergen, ia throw ZodError → ditangkap di bawah
     // dan return 400 (bukan 500) agar perilaku konsisten dengan route-level validation.
+    await enforceProjectCreateQuota(
+      siteId,
+      projectData as unknown as import('@/types/projects').CreateProjectData
+    );
     let newProject;
     try {
-      newProject = await projectService.createProject(
+      newProject = await projectSqlService.createProjectSql(
+        siteId,
         projectData as unknown as import('@/types/projects').CreateProjectData
       );
     } catch (innerError) {
@@ -93,7 +103,7 @@ export async function POST(request: NextRequest) {
 
     if (submittedCommentsResult?.success) {
       try {
-        await db.ref(`comments/${newProject.slug}`).set(submittedCommentsResult.data);
+        await db.ref(buildCommentPath(siteId, newProject.slug)).set(submittedCommentsResult.data);
       } catch (commentErr) {
         console.error('[API/Projects] Failed to persist submitted comments:', commentErr);
       }
@@ -107,22 +117,29 @@ export async function POST(request: NextRequest) {
           validationResult.data.initialCommentCount
         );
 
-        await db.ref(`comments/${newProject.slug}`).set(generatedComments);
+        await db.ref(buildCommentPath(siteId, newProject.slug)).set(generatedComments);
       } catch (commentErr) {
         console.warn('[API/Projects] Failed to auto-generate comments:', commentErr);
       }
     }
 
-    const successMessage = `✨ **NEW PROJECT CREATED**\n\n**Title:** ${newProject.title}\n**Client:** ${newProject.client}\n**ID:** ${newProject.id}\n**Time:** ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}`;
-    await sendTelegramAlert(successMessage).catch(() => {});
-
-    revalidatePath('/', 'layout');
-    revalidatePath('/projects');
+    await revalidateSiteProjectPaths(siteId, [newProject.slug]);
     revalidatePath('/admin');
 
     return created(newProject, 'Project created successfully');
   } catch (error) {
     console.error('[API /projects POST] Error:', error);
+    if (error instanceof ProjectQuotaError) {
+      return Response.json(
+        {
+          success: false,
+          error: error.message,
+          errorCode: error.errorCode,
+          details: error.details,
+        },
+        { status: error.errorCode === 'MEDIA_PER_PROJECT_EXCEEDED' ? 400 : 403 }
+      );
+    }
     if (error instanceof z.ZodError) return validationError(error);
     return serverError('Failed to create project');
   }

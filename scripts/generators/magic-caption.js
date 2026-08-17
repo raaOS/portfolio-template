@@ -1,7 +1,7 @@
 /**
  * Magic Caption Generator — Generator caption otomatis menggunakan AI.
  *
- * Menghasilkan caption kreatif untuk proyek menggunakan Gemini API
+ * Menghasilkan caption kreatif untuk proyek menggunakan Google AI API
  * berdasarkan metadata dan deskripsi proyek yang tersimpan.
  *
  * @module scripts/generators/magic-caption
@@ -14,10 +14,12 @@ const fs = require('fs');
 const https = require('https');
 
 // --- 1. Configuration ---
-const API_KEY = process.env.GEMINI_API_KEY;
+const AI_PROVIDER = (process.env.AI_PROVIDER || '').toLowerCase();
+const API_KEY =
+  AI_PROVIDER === 'gemini' || AI_PROVIDER === 'google' ? process.env.AI_API_KEY : '';
 
 if (!API_KEY) {
-  console.error('❌ GEMINI_API_KEY is missing from .env.local');
+  console.error('AI provider key is missing. Set AI_PROVIDER=gemini and AI_API_KEY.');
   process.exit(1);
 }
 
@@ -52,7 +54,7 @@ function downloadImage(url) {
   });
 }
 
-async function startGemini(buffer, mimeType = 'image/jpeg') {
+async function startGoogleAi(buffer, mimeType = 'image/jpeg') {
   const model = 'gemini-flash-latest';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${API_KEY}`;
 
@@ -92,7 +94,7 @@ async function startGemini(buffer, mimeType = 'image/jpeg') {
 
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(`Gemini API Error ${response.status}: ${errText}`);
+      throw new Error(`Google AI API Error ${response.status}: ${errText}`);
     }
 
     const data = await response.json();
@@ -106,7 +108,7 @@ async function startGemini(buffer, mimeType = 'image/jpeg') {
       .trim();
     return JSON.parse(cleanText);
   } catch (error) {
-    console.error('Gemini Error:', error.message);
+    console.error('Google AI Error:', error.message);
     return null;
   }
 }
@@ -138,7 +140,7 @@ async function main() {
 
     async function generateWithRetry(buffer, retries = 3) {
       try {
-        return await startGemini(buffer);
+        return await startGoogleAi(buffer);
       } catch (e) {
         if (e.message.includes('429') && retries > 0) {
           console.log('   ⏳ Rate limit hit. Waiting 30s...');

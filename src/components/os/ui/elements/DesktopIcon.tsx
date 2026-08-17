@@ -157,7 +157,7 @@ export default function DesktopIcon({
 
   return (
     <m.div
-      drag
+      drag={!isMobile} // Hanya bisa di-drag di Desktop (mouse), di HP matikan agar mudah di-tap
       dragMomentum={false}
       dragElastic={0.05}
       onDragStart={handleDragStart}

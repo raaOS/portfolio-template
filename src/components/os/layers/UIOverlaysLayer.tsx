@@ -46,10 +46,14 @@ const MissionControl = dynamic(() => import('../core/MissionControl'), {
 });
 
 interface UIOverlaysLayerProps {
+  siteId?: string;
+  siteSlug?: string;
+  loginUrl?: string;
   navToChat: (chatId?: string) => void;
   openWhatsAppList: () => void;
   testimonialContacts: ContactProfile[];
   aboutData?: AboutData | null;
+  isWhatsAppEnabled?: boolean;
   isAdmin: boolean;
   logout: () => void;
   toggleNotesVisibility: () => void;
@@ -63,10 +67,14 @@ interface UIOverlaysLayerProps {
 }
 
 export default function UIOverlaysLayer({
+  siteId,
+  siteSlug,
+  loginUrl,
   navToChat,
   openWhatsAppList,
   testimonialContacts,
   aboutData,
+  isWhatsAppEnabled = true,
   isAdmin,
   logout,
   toggleNotesVisibility,
@@ -105,18 +113,18 @@ export default function UIOverlaysLayer({
       conversation: [],
       avatar: '',
     };
-    return [tipContact, ...(testimonialContacts || [])];
-  }, [testimonialContacts]);
+    return [tipContact, ...(isWhatsAppEnabled ? testimonialContacts || [] : [])];
+  }, [isWhatsAppEnabled, testimonialContacts]);
 
   const handleOpenChat = React.useCallback(
     (chatId?: string) => {
       if (chatId === 'system-tip-snapping') {
         toggleNotesVisibility();
-      } else {
+      } else if (isWhatsAppEnabled) {
         navToChat(chatId);
       }
     },
-    [navToChat, toggleNotesVisibility]
+    [isWhatsAppEnabled, navToChat, toggleNotesVisibility]
   );
 
   const isWindowOpen = (id: string) => windows?.find((w) => w.id === id)?.isOpen ?? false;
@@ -155,6 +163,9 @@ export default function UIOverlaysLayer({
             transition={{ duration: 0.15 }}
           >
             <MenuBar
+              siteId={siteId}
+              siteSlug={siteSlug}
+              loginUrl={loginUrl}
               activeWindow={topWindowTitle || 'Finder'}
               onAbout={() => openWindow('about')}
               onSearch={() => setShowSpotlight(true)}
@@ -182,6 +193,7 @@ export default function UIOverlaysLayer({
               {aboutData && (
                 <OSDock
                   aboutData={aboutData}
+                  siteId={siteId}
                   onOpenWindow={openWindow}
                   onOpenWhatsApp={openWhatsAppList}
                   onOpenContact={() => openWindow('contact')}
@@ -210,11 +222,15 @@ export default function UIOverlaysLayer({
                 isOpen={showSpotlight}
                 onClose={() => setShowSpotlight(false)}
                 projects={commercialProjects}
+                hiddenAppIds={isWhatsAppEnabled ? undefined : ['whatsapp']}
                 onOpenProject={(project: Project) => {
                   setShowSpotlight(false);
                   openProjectWindow(project);
                 }}
-                onOpenApp={(id) => openWindow(id)}
+                onOpenApp={(id) => {
+                  if (id === 'whatsapp' && !isWhatsAppEnabled) return;
+                  openWindow(id);
+                }}
               />
             </div>
           </div>

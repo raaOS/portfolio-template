@@ -3,17 +3,11 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   verifyAdminPasswordMock,
   getAdminTokenMock,
-  sendTelegramAlertMock,
-  sendTelegramToGroupMock,
-  sendSecurityAlertMock,
   checkDataRateLimitMock,
   cookiesMock,
 } = vi.hoisted(() => ({
   verifyAdminPasswordMock: vi.fn(),
   getAdminTokenMock: vi.fn(),
-  sendTelegramAlertMock: vi.fn(),
-  sendTelegramToGroupMock: vi.fn(),
-  sendSecurityAlertMock: vi.fn(),
   checkDataRateLimitMock: vi.fn(),
   cookiesMock: vi.fn(),
 }));
@@ -21,12 +15,6 @@ const {
 vi.mock('@/lib/auth', () => ({
   verifyAdminPassword: verifyAdminPasswordMock,
   getAdminToken: getAdminTokenMock,
-}));
-
-vi.mock('@/lib/telegram', () => ({
-  sendTelegramAlert: sendTelegramAlertMock,
-  sendTelegramToGroup: sendTelegramToGroupMock,
-  sendSecurityAlert: sendSecurityAlertMock,
 }));
 
 vi.mock('@/lib/dataRateLimit', () => ({
@@ -68,7 +56,7 @@ describe('POST /api/admin/login', () => {
     vi.unstubAllGlobals();
   });
 
-  it('ignores x-test-bypass in production and still enforces rate limits', async () => {
+  it('enforces rate limits in production even with test-bypass headers', async () => {
     checkDataRateLimitMock.mockResolvedValue({ allowed: false, retryAfter: 120 });
 
     const response = await POST(
@@ -89,7 +77,6 @@ describe('POST /api/admin/login', () => {
     expect(response.status).toBe(429);
     expect(body.retryAfter).toBe(120);
     expect(checkDataRateLimitMock).toHaveBeenCalledTimes(1);
-    expect(sendSecurityAlertMock).toHaveBeenCalledTimes(1);
   });
 
   it('returns sanitized 500 responses without leaking internal error details', async () => {

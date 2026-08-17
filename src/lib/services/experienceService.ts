@@ -44,8 +44,10 @@ export const experienceService = {
    *
    * @returns A promise that resolves to the ExperienceData.
    */
-  async getExperienceData(noCache = false, throwOnError = false) {
-    const data = await service.getData(noCache, throwOnError);
+  async getExperienceData(noCache: boolean | string = false, throwOnError = false, siteId = 'default-site') {
+    const actualNoCache = typeof noCache === 'boolean' ? noCache : false;
+    const actualSiteId = typeof noCache === 'string' ? noCache : siteId;
+    const data = await service.getData(actualNoCache, throwOnError, actualSiteId);
     return {
       ...data,
       workExperience: normalizeWorkExperience(data.workExperience || []),
@@ -59,8 +61,8 @@ export const experienceService = {
    * @param updates - The partial experience data to update.
    * @returns A promise that resolves to the updated experience data.
    */
-  async updateExperienceData(updates: Partial<ExperienceData>) {
-    const current = await this.getExperienceData(true, true);
+  async updateExperienceData(updates: Partial<ExperienceData>, siteId = 'default-site') {
+    const current = await this.getExperienceData(true, true, siteId);
     const normalizedIncomingWorkExperience = updates.workExperience
       ? normalizeWorkExperience(updates.workExperience)
       : undefined;
@@ -73,7 +75,7 @@ export const experienceService = {
       lastUpdated: new Date().toISOString(),
     };
 
-    await service.saveData(mergedData, 'Update experience content');
+    await service.saveData(mergedData, 'Update experience content', siteId);
     return mergedData;
   },
 };

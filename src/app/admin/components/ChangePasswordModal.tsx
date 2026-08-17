@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Lock, KeyRound, ShieldCheck, AlertCircle, Eye, EyeOff, Smartphone } from 'lucide-react';
+import { X, Lock, KeyRound, ShieldCheck, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { useCsrfToken } from '@/hooks/useCsrfToken';
 
 interface ChangePasswordModalProps {
@@ -10,23 +10,19 @@ interface ChangePasswordModalProps {
   onClose: () => void;
 }
 
+type ActiveTab = 'password' | 'pin';
+
 export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProps) {
   const [mounted, setMounted] = useState(false);
-  const [activeTab, setActiveTab] = useState<'password' | 'pin'>('password');
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1); // 1: Form, 2: Polling, 3: OTP, 4: Rejected
-
+  const [activeTab, setActiveTab] = useState<ActiveTab>('password');
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
-  const [otpCode, setOtpCode] = useState('');
-
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-
-  // State untuk toggle hide/show password / PIN
   const [showOld, setShowOld] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -35,7 +31,13 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
 
   const csrfToken = useCsrfToken();
 
-  // Password strength logic
+  useEffect(() => {
+    const timer = window.setTimeout(() => setMounted(true), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  if (!isOpen || !mounted) return null;
+
   const getPasswordStrength = (pass: string) => {
     if (!pass) return { score: 0, label: '', color: 'bg-gray-200' };
 
@@ -45,49 +47,16 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
     if (/\d/.test(pass)) score += 1;
     if (/[^a-zA-Z\d]/.test(pass)) score += 1;
 
-    if (score <= 1 || pass.length < 8)
-      return { score: 1, label: 'Lemah', color: 'bg-red-500', width: '33.33%' };
-    if (score === 2 || score === 3)
-      return { score: 2, label: 'Sedang', color: 'bg-orange-500', width: '66.66%' };
-    return { score: 3, label: 'Sangat Kuat', color: 'bg-[#00AA5B]', width: '100%' };
+    if (score <= 1 || pass.length < 8) {
+      return { score: 1, label: 'Lemah', color: 'bg-red-500' };
+    }
+    if (score === 2 || score === 3) {
+      return { score: 2, label: 'Sedang', color: 'bg-orange-500' };
+    }
+    return { score: 3, label: 'Sangat Kuat', color: 'bg-[#00AA5B]' };
   };
 
   const strength = getPasswordStrength(newPassword);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setMounted(true), 0);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Polling Effect
-  useEffect(() => {
-    if (step !== 2) return;
-
-    const pollStatus = async () => {
-      try {
-        const url =
-          activeTab === 'password' ? '/api/admin/password/otp-status' : '/api/admin/pin/otp-status';
-        const res = await fetch(url);
-        const data = await res.json();
-
-        if (data.status === 'approved') {
-          setStep(3);
-        } else if (data.status === 'rejected') {
-          setStep(4);
-        } else if (data.status === 'expired') {
-          setError('Sesi persetujuan telah kadaluarsa.');
-          setStep(1);
-        }
-      } catch (err) {
-        console.error('Polling error:', err);
-      }
-    };
-
-    const intervalId = setInterval(pollStatus, 2000);
-    return () => clearInterval(intervalId);
-  }, [step, activeTab]);
-
-  if (!isOpen || !mounted) return null;
 
   const resetState = () => {
     setOldPassword('');
@@ -95,10 +64,13 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
     setConfirmPassword('');
     setNewPin('');
     setConfirmPin('');
-    setOtpCode('');
-    setStep(1);
     setError(null);
     setSuccess(false);
+    setShowOld(false);
+    setShowNew(false);
+    setShowConfirm(false);
+    setShowNewPin(false);
+    setShowConfirmPin(false);
   };
 
   const handleClose = () => {
@@ -106,9 +78,14 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
     onClose();
   };
 
-  const handleRequestOtp = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (!oldPassword) {
+      setError('Sandi lama wajib diisi.');
+      return;
+    }
 
     if (activeTab === 'password') {
       if (newPassword !== confirmPassword) {
@@ -135,9 +112,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
     setIsLoading(true);
 
     try {
-      const url =
-        activeTab === 'password' ? '/api/admin/password/otp-request' : '/api/admin/pin/otp-request';
-
+      const url = activeTab === 'password' ? '/api/admin/password' : '/api/admin/pin';
       const payload =
         activeTab === 'password' ? { oldPassword, newPassword } : { oldPassword, newPin };
 
@@ -150,13 +125,18 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
-
+      const data = await res.json().catch(() => null);
       if (!res.ok) {
-        throw new Error(data.error || 'Gagal mengirim peringatan');
+        throw new Error(
+          data?.error ||
+            (activeTab === 'password' ? 'Gagal mengubah sandi' : 'Gagal mengubah PIN')
+        );
       }
 
-      setStep(2); // Lanjut ke mode Polling
+      setSuccess(true);
+      window.setTimeout(() => {
+        handleClose();
+      }, 1600);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Terjadi kesalahan sistem');
     } finally {
@@ -164,50 +144,10 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
     }
   };
 
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const switchTab = (tab: ActiveTab) => {
+    setActiveTab(tab);
     setError(null);
-
-    if (otpCode.length !== 6) {
-      setError('Kode OTP harus 6 digit angka.');
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      const url = activeTab === 'password' ? '/api/admin/password' : '/api/admin/pin';
-      const payload =
-        activeTab === 'password'
-          ? { oldPassword, newPassword, otpCode }
-          : { oldPassword, newPin, otpCode };
-
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-csrf-token': csrfToken || '',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(
-          data.error || (activeTab === 'password' ? 'Gagal mengubah sandi' : 'Gagal mengubah PIN')
-        );
-      }
-
-      setSuccess(true);
-      setTimeout(() => {
-        handleClose();
-      }, 2000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Terjadi kesalahan sistem');
-    } finally {
-      setIsLoading(false);
-    }
+    setSuccess(false);
   };
 
   const modalContent = (
@@ -216,7 +156,6 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
         className="animate-in fade-in zoom-in-95 w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50/50 px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
@@ -228,12 +167,12 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
             onClick={handleClose}
             className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
             disabled={isLoading || success}
+            type="button"
           >
             <X size={18} />
           </button>
         </div>
 
-        {/* Content */}
         <div className="p-6">
           {success ? (
             <div className="animate-in slide-in-from-bottom-4 flex flex-col items-center justify-center py-8 text-center">
@@ -245,20 +184,16 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
               </h3>
               <p className="text-sm text-gray-500">
                 {activeTab === 'password'
-                  ? 'Sandi admin Anda telah diperbarui dengan aman menggunakan OTP 2FA.'
-                  : 'PIN admin Anda telah diperbarui dengan aman menggunakan OTP 2FA.'}
+                  ? 'Sandi admin telah diperbarui.'
+                  : 'PIN admin telah diperbarui.'}
               </p>
             </div>
-          ) : step === 1 ? (
+          ) : (
             <div className="animate-in fade-in slide-in-from-left-4 space-y-4">
-              {/* Tab Switcher */}
               <div className="mb-2 flex border-b border-gray-100">
                 <button
                   type="button"
-                  onClick={() => {
-                    setError(null);
-                    setActiveTab('password');
-                  }}
+                  onClick={() => switchTab('password')}
                   className={`flex-1 border-b-2 pb-3 text-center text-sm font-medium transition-all duration-150 ${
                     activeTab === 'password'
                       ? 'border-blue-600 font-semibold text-blue-600'
@@ -269,10 +204,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setError(null);
-                    setActiveTab('pin');
-                  }}
+                  onClick={() => switchTab('pin')}
                   className={`flex-1 border-b-2 pb-3 text-center text-sm font-medium transition-all duration-150 ${
                     activeTab === 'pin'
                       ? 'border-blue-600 font-semibold text-blue-600'
@@ -283,11 +215,11 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
                 </button>
               </div>
 
-              <form onSubmit={handleRequestOtp} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <p className="text-xs leading-relaxed text-gray-500">
                   {activeTab === 'password'
-                    ? 'Ubah sandi admin Anda. Untuk keamanan, kode OTP akan dikirim ke Telegram Anda sebelum sandi disimpan.'
-                    : 'Ubah PIN console admin Anda. PIN harus berupa 4 digit angka. OTP akan dikirim ke Telegram Anda.'}
+                    ? 'Ubah sandi admin dengan verifikasi sandi lama.'
+                    : 'Ubah PIN console admin. PIN harus berupa 4 digit angka.'}
                 </p>
 
                 {error && (
@@ -297,7 +229,6 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
                   </div>
                 )}
 
-                {/* Sandi Lama */}
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-gray-700">Sandi Lama</label>
                   <div className="relative">
@@ -316,7 +247,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
                     />
                     <button
                       type="button"
-                      onClick={() => setShowOld(!showOld)}
+                      onClick={() => setShowOld((value) => !value)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                     >
                       {showOld ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -326,7 +257,6 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
 
                 {activeTab === 'password' ? (
                   <>
-                    {/* Password Tab Fields */}
                     <div className="space-y-1.5">
                       <label className="text-sm font-medium text-gray-700">Sandi Baru</label>
                       <div className="relative">
@@ -346,13 +276,12 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
                         />
                         <button
                           type="button"
-                          onClick={() => setShowNew(!showNew)}
+                          onClick={() => setShowNew((value) => !value)}
                           className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                         >
                           {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
                         </button>
                       </div>
-                      {/* Password Strength Indicator */}
                       {newPassword.length > 0 && (
                         <div className="animate-in fade-in slide-in-from-top-1 mt-2">
                           <div className="flex h-1.5 w-full gap-1 overflow-hidden rounded-full bg-gray-100">
@@ -405,7 +334,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
                         />
                         <button
                           type="button"
-                          onClick={() => setShowConfirm(!showConfirm)}
+                          onClick={() => setShowConfirm((value) => !value)}
                           className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                         >
                           {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -415,7 +344,6 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
                   </>
                 ) : (
                   <>
-                    {/* PIN Tab Fields */}
                     <div className="space-y-1.5">
                       <label className="text-sm font-medium text-gray-700">
                         PIN Baru (4 Digit)
@@ -439,7 +367,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
                         />
                         <button
                           type="button"
-                          onClick={() => setShowNewPin(!showNewPin)}
+                          onClick={() => setShowNewPin((value) => !value)}
                           className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                         >
                           {showNewPin ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -470,7 +398,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
                         />
                         <button
                           type="button"
-                          onClick={() => setShowConfirmPin(!showConfirmPin)}
+                          onClick={() => setShowConfirmPin((value) => !value)}
                           className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                         >
                           {showConfirmPin ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -490,119 +418,17 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
                         ? !newPassword || !confirmPassword || strength.score < 1
                         : newPin.length !== 4 || confirmPin.length !== 4)
                     }
-                    className="flex w-full items-center justify-center rounded-lg bg-blue-600 py-2.5 text-sm font-medium font-semibold text-white shadow-sm transition-all hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100"
+                    className="flex w-full items-center justify-center rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100"
                   >
-                    {isLoading ? 'Memverifikasi...' : 'Lanjut Verifikasi OTP'}
+                    {isLoading
+                      ? 'Menyimpan...'
+                      : activeTab === 'password'
+                        ? 'Simpan Sandi Baru'
+                        : 'Simpan PIN Baru'}
                   </button>
                 </div>
               </form>
             </div>
-          ) : step === 2 ? (
-            <div className="animate-in fade-in slide-in-from-right-4 flex flex-col items-center justify-center py-10 text-center">
-              <div className="relative mb-6">
-                <div className="absolute inset-0 animate-ping rounded-full bg-blue-100 opacity-75"></div>
-                <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-                  <Smartphone size={32} className="animate-pulse" />
-                </div>
-              </div>
-              <h3 className="text-lg font-bold text-gray-800">Menunggu Konfirmasi...</h3>
-              <p className="mt-2 max-w-xs text-sm font-normal leading-relaxed text-gray-500">
-                Peringatan telah dikirim ke Telegram Admin. Silakan periksa pesan Anda dan klik
-                "Iya, Ini Saya" untuk mendapatkan OTP.
-              </p>
-              <button
-                onClick={() => setStep(1)}
-                className="mt-6 text-sm text-gray-400 underline hover:text-gray-600"
-              >
-                Batalkan
-              </button>
-            </div>
-          ) : step === 4 ? (
-            <div className="animate-in fade-in slide-in-from-bottom-4 flex flex-col items-center justify-center py-10 text-center">
-              <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-red-100 text-red-600">
-                <AlertCircle size={40} />
-              </div>
-              <h3 className="text-xl font-bold uppercase tracking-wide text-red-600">
-                Akses Digagalkan
-              </h3>
-              <p className="mt-3 max-w-sm rounded-r-lg border-l-2 border-red-500 bg-red-50 p-3 text-sm font-normal leading-relaxed text-gray-600">
-                Kamu terdeteksi bukan pemilik asli, akses ganti{' '}
-                {activeTab === 'password' ? 'password' : 'PIN'} digagalkan! Sesi kamu telah direkam.
-              </p>
-              <button
-                onClick={handleClose}
-                className="mt-8 flex w-full items-center justify-center rounded-lg bg-red-600 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-red-700 active:scale-[0.98]"
-              >
-                Tutup Peringatan
-              </button>
-            </div>
-          ) : (
-            <form
-              onSubmit={handleVerifyOtp}
-              className="animate-in fade-in slide-in-from-right-4 space-y-4"
-            >
-              <div className="mb-6 flex flex-col items-center justify-center text-center">
-                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-                  <Smartphone size={24} />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-800">Verifikasi 2 Langkah</h3>
-                <p className="mt-1 text-sm font-normal leading-relaxed text-gray-500">
-                  Kode 6-digit (OTP) telah dikirim ke Telegram Anda. Kode akan kadaluarsa dalam 5
-                  menit.
-                </p>
-              </div>
-
-              {error && (
-                <div className="animate-in slide-in-from-top-2 flex items-start gap-3 rounded-lg border border-red-100 bg-red-50 p-4 text-red-600">
-                  <AlertCircle size={18} className="mt-0.5 shrink-0" />
-                  <p className="text-sm">{error}</p>
-                </div>
-              )}
-
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-gray-700">Kode OTP Telegram</label>
-                <div className="relative">
-                  <Lock
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                    size={16}
-                  />
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    maxLength={6}
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))} // Hanya izinkan angka
-                    className="w-full rounded-lg border border-gray-200 bg-white py-3 pl-10 pr-4 text-center text-xl tracking-[0.5em] text-gray-800 placeholder-gray-300 transition-shadow focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    placeholder="••••••"
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2 pt-4">
-                <button
-                  type="submit"
-                  disabled={isLoading || otpCode.length !== 6}
-                  className="flex w-full items-center justify-center rounded-lg bg-blue-600 py-2.5 text-sm font-medium font-semibold text-white shadow-sm transition-all hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100"
-                >
-                  {isLoading
-                    ? 'Mengecek...'
-                    : activeTab === 'password'
-                      ? 'Verifikasi & Simpan Sandi'
-                      : 'Verifikasi & Simpan PIN'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStep(1)}
-                  disabled={isLoading}
-                  className="flex w-full items-center justify-center rounded-lg border border-gray-200 bg-white py-2.5 text-sm font-medium text-gray-600 shadow-sm transition-all hover:bg-gray-50 active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100"
-                >
-                  Kembali
-                </button>
-              </div>
-            </form>
           )}
         </div>
       </div>

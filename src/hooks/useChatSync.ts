@@ -7,7 +7,7 @@ import { soundManager } from '@/components/os/utils/SoundManager';
  * Chat Sync Hook — Real-time messaging untuk visitor ↔ admin.
  *
  * Mengelola state chat (messages, typing indicator, sync error) dengan
- * polling SWR yang dioptimasi untuk Vercel Hobby Free Tier:
+ * polling SWR yang dioptimasi untuk quota Cloudflare/D1:
  * - 8 detik saat tab aktif, 60 detik saat background (~62% penghematan).
  * - Deduplikasi pesan server-side dengan temp message client-side.
  * - Notifikasi suara saat pesan admin baru diterima (hanya di tab visible).
@@ -49,13 +49,13 @@ export function useChatSync(initialGreeting?: string) {
   // Initial Visitor ID
   useEffect(() => {
     try {
-      const storedId = localStorage.getItem('ramos_visitor_id');
+      const storedId = localStorage.getItem('portfolio_os_visitor_id');
       startTransition(() => {
         if (storedId) {
           setVisitorId(storedId);
         } else {
           const newId = uuidv4();
-          localStorage.setItem('ramos_visitor_id', newId);
+          localStorage.setItem('portfolio_os_visitor_id', newId);
           setVisitorId(newId);
         }
       });
@@ -93,7 +93,7 @@ export function useChatSync(initialGreeting?: string) {
 
   const [syncError, setSyncError] = useState(false);
 
-  // Polling with Smart Interval — Vercel Hobby Free Tier guard.
+  // Polling with Smart Interval — Cloudflare/D1 quota guard.
   //
   // Sebelumnya: 3s active / 30s background. Untuk 1 visitor yang buka chat
   // window 5 menit = 100 invocations dari satu visitor. Worst case (tab
@@ -202,9 +202,15 @@ export function useChatSync(initialGreeting?: string) {
 
       if (data.success && data.message) {
         setMessages((prev) => prev.map((m) => (m.id === tempId ? data.message : m)));
+      } else {
+        // Server menolak (validasi/rate-limit) — tandai gagal, jangan biarkan
+        // pesan temp nyangkut selamanya tanpa indikator.
+        setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, failed: true } : m)));
       }
     } catch (error) {
       console.error('Send failed', error);
+      // Network error — tandai pesan temp sebagai gagal agar user sadar.
+      setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, failed: true } : m)));
     } finally {
       setIsSending(false);
     }

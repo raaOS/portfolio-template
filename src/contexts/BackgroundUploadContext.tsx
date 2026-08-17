@@ -14,7 +14,7 @@
  *
  * Mengelola antrean kompresi WASM FFmpeg di client-side, progress tracking,
  * dan direct upload ke R2 via presigned URL. Digunakan oleh admin panel
- * untuk upload wallpaper video besar (bypass batas 4.5MB Vercel).
+ * untuk upload wallpaper video besar (bypass batas body runtime aplikasi).
  *
  * @module BackgroundUploadContext
  */
@@ -271,7 +271,7 @@ export function BackgroundUploadProvider({ children }: { children: ReactNode }) 
         //   - Tidak perlu poster side-car (image-nya sendiri jadi
         //     "poster"-nya).
         //   - Tidak perlu direct-to-R2 presign (image <30 MB fit di
-        //     Vercel function body limit, lewat /api/upload langsung).
+        //     batas body runtime aplikasi, lewat /api/upload langsung).
         //   - Tidak perlu serialize encode chain (sharp di server
         //     paralel-friendly).
         //

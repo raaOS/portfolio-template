@@ -88,8 +88,8 @@ export default function AdminFileUpload({
 
           // ---------- WALLPAPER VIDEO: direct-to-R2 path ----------
           // Wallpaper videos go straight to Cloudflare R2 via a
-          // presigned PUT URL, bypassing the Vercel function body
-          // limit (4.5 MB on Hobby) that was failing the upload with
+          // presigned PUT URL, bypassing the application function body
+          // limit that was failing the upload with
           // "Failed to parse body as FormData". The poster is captured
           // in-browser (canvas) so the server never has to decode the
           // mp4 just to make a thumbnail.

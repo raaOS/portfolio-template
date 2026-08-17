@@ -140,9 +140,12 @@ describe('POST /api/about/philosophy', () => {
     expect(body.data).toEqual(validPayload);
     expect(body.message).toBe('Data berhasil disimpan');
 
-    expect(aboutServiceUpdateMock).toHaveBeenCalledWith({
-      designPhilosophy: validPayload,
-    });
+    expect(aboutServiceUpdateMock).toHaveBeenCalledWith(
+      {
+        designPhilosophy: validPayload,
+      },
+      'default-site'
+    );
     expect(revalidatePathMock).toHaveBeenCalledWith('/', 'layout');
     expect(revalidatePathMock).toHaveBeenCalledWith('/about');
   });

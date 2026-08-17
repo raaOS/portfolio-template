@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTransitionRouter } from 'next-view-transitions';
 import { Grid, Filter, Search as SearchIcon, X, Check, Box } from 'lucide-react';
 import { saveProjectsViewMode } from '@/lib/projectsViewMode';
 import { useDictionary } from '@/contexts/LanguageContext';
+import { buildTenantProjectsHref } from '@/lib/routing/tenantRoutes';
 
 import { Label } from '@/types/labels';
 
@@ -23,6 +24,7 @@ export default function ProjectsFinderHeader({
   // Router khusus untuk transisi visual saat ganti mode grid ↔ 3D canvas
   const vtRouter = useTransitionRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   // FIX: Remove useTransition - not needed for simple router.push
   const [isNavigating, setIsNavigating] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -78,13 +80,13 @@ export default function ProjectsFinderHeader({
       }
       // FIX: Direct router.push without startTransition
       setIsNavigating(true);
-      router.push(`/projects?${params.toString()}`, { scroll: false });
+      router.push(buildTenantProjectsHref(pathname, params.toString()), { scroll: false });
       // Reset navigating state after a short delay
       setTimeout(() => setIsNavigating(false), 300);
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, router, searchParams]);
+  }, [searchQuery, router, searchParams, pathname]);
 
   const handleViewChange = (view: 'grid' | '3d') => {
     if (view === currentView) return;
@@ -92,7 +94,7 @@ export default function ProjectsFinderHeader({
     params.set('view', view);
     // Pakai vtRouter biar ganti mode grid <-> 3D canvas dapat slide animation
     setIsNavigating(true);
-    vtRouter.push(`/projects?${params.toString()}`, { scroll: false });
+    vtRouter.push(buildTenantProjectsHref(pathname, params.toString()), { scroll: false });
     setTimeout(() => setIsNavigating(false), 300);
   };
 
@@ -106,7 +108,7 @@ export default function ProjectsFinderHeader({
     setIsFilterOpen(false);
     // FIX: Direct router.push without startTransition
     setIsNavigating(true);
-    router.push(`/projects?${params.toString()}`, { scroll: false });
+    router.push(buildTenantProjectsHref(pathname, params.toString()), { scroll: false });
     setTimeout(() => setIsNavigating(false), 300);
   };
 
@@ -116,17 +118,7 @@ export default function ProjectsFinderHeader({
 
   return (
     <div className="relative z-50 mt-8 flex flex-col items-center justify-between gap-4 px-4 py-4 sm:flex-row sm:px-8">
-      {/* Title */}
-      <div className="flex w-full items-center gap-3 sm:w-auto">
-        <div>
-          <h1 className="whitespace-nowrap text-xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
-            {t.projects.collectionTitle}
-          </h1>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
-            {itemCount} {t.projects.items}
-          </p>
-        </div>
-      </div>
+
 
       {/* Search Input Integrated into Header */}
       <div

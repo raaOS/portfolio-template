@@ -3,7 +3,6 @@ import { checkDataRateLimit } from '@/lib/dataRateLimit';
 import {
   CLOUDFLARE_CONNECTING_IP_HEADER,
   UNKNOWN_IP,
-  VERCEL_FORWARDED_FOR_HEADER,
   X_FORWARDED_FOR_HEADER,
   X_REAL_IP_HEADER,
 } from '@/lib/security/constants';
@@ -12,26 +11,19 @@ import {
  * Get client IP address from request
  *
  * SECURITY: Only trust headers set by trusted proxies/CDN.
- * - x-vercel-forwarded-for: Set by Vercel's edge network (trusted)
  * - cf-connecting-ip: Set by Cloudflare when proxying (trusted when using Cloudflare proxy)
  *
  * Headers like x-forwarded-for and x-real-ip are client-spoofable
  * and should NOT be trusted for rate limiting decisions.
  */
 export function getClientIP(request: Request | NextRequest): string {
-  // Vercel sets this header - cannot be spoofed from client
-  const vercelIP = request.headers.get(VERCEL_FORWARDED_FOR_HEADER);
-  if (vercelIP) {
-    return vercelIP.split(',')[0].trim();
-  }
-
   // Cloudflare proxy IP (trusted when using Cloudflare)
   const cfIP = request.headers.get(CLOUDFLARE_CONNECTING_IP_HEADER);
   if (cfIP) {
     return cfIP.trim();
   }
 
-  // Fallback for non-Vercel/Cloudflare environments
+  // Fallback for local/non-Cloudflare environments
   // Note: These can be spoofed, so rate limiting based on this is not fully reliable
   const forwarded = request.headers.get(X_FORWARDED_FOR_HEADER);
   if (forwarded) {

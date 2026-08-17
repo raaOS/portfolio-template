@@ -38,21 +38,32 @@ export async function logActivity(
   }
 }
 
-function getRequestMetadata(request: NextRequest): Record<string, unknown> {
+function getRequestPath(request: Request | NextRequest) {
+  const nextUrl = (request as NextRequest).nextUrl;
+  if (nextUrl?.pathname) return nextUrl.pathname;
+
+  try {
+    return new URL(request.url).pathname;
+  } catch {
+    return request.url || 'unknown';
+  }
+}
+
+function getRequestMetadata(request: Request | NextRequest): Record<string, unknown> {
   const forwardedFor = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
   const realIp = request.headers.get('x-real-ip');
   const ip = forwardedFor || realIp || 'unknown';
 
   return {
     method: request.method,
-    path: request.nextUrl.pathname,
+    path: getRequestPath(request),
     ip,
     userAgent: request.headers.get('user-agent') || 'unknown',
   };
 }
 
 export async function logAdminActivity(
-  request: NextRequest,
+  request: Request | NextRequest,
   action: string,
   metadata?: Record<string, unknown>
 ): Promise<void> {

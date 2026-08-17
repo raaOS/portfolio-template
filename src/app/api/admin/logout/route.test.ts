@@ -1,20 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { checkAdminAuthMock, cookiesMock, logAdminActivityMock, cookieDeleteMock, cookieGetMock } =
-  vi.hoisted(() => ({
+const { checkAdminAuthMock, logAdminActivityMock } = vi.hoisted(() => ({
     checkAdminAuthMock: vi.fn(),
-    cookiesMock: vi.fn(),
     logAdminActivityMock: vi.fn(),
-    cookieDeleteMock: vi.fn(),
-    cookieGetMock: vi.fn(),
   }));
 
 vi.mock('@/lib/auth', () => ({
   checkAdminAuth: checkAdminAuthMock,
-}));
-
-vi.mock('next/headers', () => ({
-  cookies: cookiesMock,
 }));
 
 vi.mock('@/lib/services/auditLogger', () => ({
@@ -27,12 +19,6 @@ import { NextRequest } from 'next/server';
 describe('POST /api/admin/logout', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    cookieDeleteMock.mockReturnValue(undefined);
-    cookieGetMock.mockReturnValue({ value: 'some-token' });
-    cookiesMock.mockResolvedValue({
-      delete: cookieDeleteMock,
-      get: cookieGetMock,
-    });
     logAdminActivityMock.mockResolvedValue(undefined);
   });
 
@@ -44,13 +30,7 @@ describe('POST /api/admin/logout', () => {
     const body = await res.json();
     expect(body.message).toBe('Logged out successfully');
 
-    expect(cookieDeleteMock).toHaveBeenCalledWith('admin_token');
-    expect(cookieDeleteMock).toHaveBeenCalledWith('admin-token');
-    expect(cookieDeleteMock).toHaveBeenCalledWith('csrf_token');
-
     expect(logAdminActivityMock).toHaveBeenCalledTimes(1);
-
-    void (res.cookies as unknown as Map<string, unknown>);
     expect(res.headers.get('Cache-Control')).toContain('no-store');
   });
 
@@ -81,8 +61,12 @@ describe('POST /api/admin/logout', () => {
     const res = await POST(req);
     expect(res.status).toBe(200);
 
-    const _setCookieHeader = res.headers.get('Set-Cookie');
-    // We can't easily inspect the cookie jar in tests, but the headers should exist
+    const setCookieHeader = res.headers.get('Set-Cookie') ?? '';
+    expect(setCookieHeader).toContain('admin_token=;');
+    expect(setCookieHeader).toContain('admin-token=;');
+    expect(setCookieHeader).toContain('csrf_token=;');
+    expect(setCookieHeader.match(/Expires=Thu, 01 Jan 1970 00:00:00 GMT/g)).toHaveLength(3);
+    expect(setCookieHeader.match(/Path=\//g)).toHaveLength(3);
     expect(res.headers.get('Cache-Control')).toBe('no-store, max-age=0, must-revalidate');
     expect(res.headers.get('Pragma')).toBe('no-cache');
   });

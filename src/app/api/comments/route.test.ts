@@ -51,7 +51,7 @@ describe('POST /api/comments', () => {
         };
       }
 
-      if (path === 'comments/demo-project') {
+      if (path === 'comments/default-site/demo-project') {
         return {
           transaction: vi.fn(
             async (updater: (current: StoredComment[] | null) => StoredComment[] | void) => {
@@ -170,7 +170,7 @@ describe('POST /api/comments', () => {
         };
       }
 
-      if (path === 'comments/demo-project') {
+      if (path === 'comments/default-site/demo-project') {
         return {
           transaction: vi.fn(
             async (updater: (current: StoredComment[] | null) => StoredComment[] | void) => {
@@ -198,5 +198,34 @@ describe('POST /api/comments', () => {
 
     expect(response.status).toBe(429);
     expect(body.error).toBe('Please wait 5 seconds before posting again');
+  });
+
+  it('writes a comment into the requesting tenant namespace', async () => {
+    const transaction = vi.fn(async (updater: (current: StoredComment[] | null) => StoredComment[]) => {
+      updater(null);
+      return { committed: true };
+    });
+    refMock.mockImplementation((path: string) => {
+      if (path === 'settings/bannedWords') {
+        return { once: vi.fn().mockResolvedValue({ exists: () => true, val: () => [] }) };
+      }
+      if (path === 'comments/tenant-a/demo-project') return { transaction };
+      throw new Error(`Unexpected CLOUDFLARE_D1 path: ${path}`);
+    });
+
+    const response = await POST(
+      new Request('http://localhost/api/comments', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          siteId: 'tenant-a',
+          slug: 'demo-project',
+          comment: { id: 'tenant-comment', text: 'Tenant-only', name: 'Alice' },
+        }),
+      }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(refMock).toHaveBeenCalledWith('comments/tenant-a/demo-project');
   });
 });

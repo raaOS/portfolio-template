@@ -33,13 +33,16 @@ import {
  *   ListObjectsV2.
  */
 
-export const runtime = 'nodejs';
 
 interface StorageStatsResponse {
   categories: CategoryStats[];
   generatedAt: number;
   cached: boolean;
   warnings: string[];
+}
+
+function extractR2IconStoragePath(url: string) {
+  return url.startsWith('/assets/icons-library/') ? null : extractStoragePath(url);
 }
 
 const CACHE_TTL_MS = 30_000;
@@ -113,7 +116,7 @@ async function runStats(): Promise<StorageStatsResponse> {
     if (skill?.iconUrl) {
       iconRefs.push({
         url: skill.iconUrl,
-        storagePath: extractStoragePath(skill.iconUrl),
+        storagePath: extractR2IconStoragePath(skill.iconUrl),
       });
     }
   }
@@ -124,7 +127,7 @@ async function runStats(): Promise<StorageStatsResponse> {
     if (item?.iconUrl) {
       iconRefs.push({
         url: item.iconUrl,
-        storagePath: extractStoragePath(item.iconUrl),
+        storagePath: extractR2IconStoragePath(item.iconUrl),
       });
     }
   }

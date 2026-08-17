@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateGenZComments, generateViralMetrics } from '@/lib/magic';
 import type { Comment } from '@/lib/magic';
 import { validateAdminRequest } from '@/lib/auth';
-import { getGeminiApiKey, getOpenRouterApiKey } from '../../../ai/_shared';
+import { getGoogleAiApiKey, getOpenRouterApiKey } from '../../../ai/_shared';
 import {
   fetchLocalMediaAsBase64,
   fetchRemoteMediaAsBase64,
@@ -20,10 +20,10 @@ async function generateAiCommentsWithFallback(params: {
   imageBase64?: string;
   reqUrl: string;
 }): Promise<Comment[]> {
-  const geminiApiKey = getGeminiApiKey();
+  const googleAiApiKey = getGoogleAiApiKey();
   const openRouterApiKey = getOpenRouterApiKey();
 
-  if (!geminiApiKey && !openRouterApiKey) {
+  if (!googleAiApiKey && !openRouterApiKey) {
     console.log('[AI Comments] No API keys configured. Using local mock generator.');
     return generateGenZComments(params.slug, params.count, params.tone, params.reply);
   }
@@ -80,7 +80,7 @@ async function generateAiCommentsWithFallback(params: {
         - "${params.tone}" -> ${toneDescription}
         
         ATURAN BALASAN (REPLY):
-        - Jika reply = true: buatlah 1 balasan dari pemilik portofolio ("Ramos") atau pengunjung lain yang membalas konteks komentar tersebut secara relevan, gaul, dan ramah.
+        - Jika reply = true: buatlah 1 balasan dari pemilik portofolio ("Owner") atau pengunjung lain yang membalas konteks komentar tersebut secara relevan, gaul, dan ramah.
         - Jika reply = false: jangan berikan balasan (replies harus berupa array kosong).
         
         ATURAN PENTING:
@@ -97,8 +97,8 @@ async function generateAiCommentsWithFallback(params: {
             "likes": 42, // Angka random 0-100
             "replies": [
               {
-                "text": "Balasan dari Ramos (pemilik) atau pengunjung lain",
-                "name": "Ramos", // atau nama lain
+                "text": "Balasan dari Owner (pemilik) atau pengunjung lain",
+                "name": "Owner", // atau nama lain
                 "likes": 12 // Angka random 0-20
               }
             ]
@@ -110,12 +110,12 @@ async function generateAiCommentsWithFallback(params: {
     // 3. Request AI Models
     let text = '';
 
-    // Attempt Gemini first
-    if (geminiApiKey) {
+    // Attempt Google AI first
+    if (googleAiApiKey) {
       const modelCandidates = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-flash-latest'];
-      type GeminiPart = { text: string } | { inline_data: { mime_type: string; data: string } };
+      type GoogleAiPart = { text: string } | { inline_data: { mime_type: string; data: string } };
       const requestBody: {
-        contents: Array<{ parts: GeminiPart[] }>;
+        contents: Array<{ parts: GoogleAiPart[] }>;
         generationConfig: { response_mime_type: string };
       } = {
         contents: [
@@ -145,7 +145,7 @@ async function generateAiCommentsWithFallback(params: {
         try {
           const response = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiApiKey },
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': googleAiApiKey },
             body: JSON.stringify(requestBody),
             signal: controller.signal,
           });
@@ -157,14 +157,14 @@ async function generateAiCommentsWithFallback(params: {
             const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
             text = typeof candidateText === 'string' ? candidateText : '';
             if (text) {
-              console.log(`[AI Comments] Comments generated via Gemini ${model}`);
+              console.log(`[AI Comments] Comments generated via Google AI ${model}`);
               break;
             }
           } else {
-            console.warn(`[AI Comments] Gemini ${model} failed:`, await response.text());
+            console.warn(`[AI Comments] Google AI ${model} failed:`, await response.text());
           }
         } catch (err) {
-          console.warn(`[AI Comments] Gemini ${model} request error:`, err);
+          console.warn(`[AI Comments] Google AI ${model} request error:`, err);
         } finally {
           clearTimeout(timeoutId);
         }
@@ -277,7 +277,7 @@ async function generateAiCommentsWithFallback(params: {
       const replyDrafts = Array.isArray(c.replies) ? c.replies : [];
       const replies = replyDrafts.map((replyItem, ri: number) => {
         const r = replyItem as AiReplyDraft;
-        const replyName = toOptionalString(r.name) || 'Ramos';
+        const replyName = toOptionalString(r.name) || 'Owner';
         return {
           id: `r-${params.slug}-${i}-${ri}-ai`,
           text: toOptionalString(r.text) || 'Keren!',
@@ -286,8 +286,8 @@ async function generateAiCommentsWithFallback(params: {
           createdAt: new Date(Date.now() - Math.random() * 3600000).toISOString(),
           likes: typeof r.likes === 'number' ? r.likes : Math.floor(Math.random() * 10),
           avatar:
-            replyName === 'Ramos'
-              ? `https://ui-avatars.com/api/?name=Ramos&background=000&color=fff`
+            replyName === 'Owner'
+              ? `https://ui-avatars.com/api/?name=Owner&background=000&color=fff`
               : `https://ui-avatars.com/api/?name=${replyName}&background=random`,
         };
       });

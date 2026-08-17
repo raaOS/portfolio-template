@@ -16,7 +16,7 @@ function hashStr(str: string) {
     h = (h << 5) - h + str.charCodeAt(i);
     h = h & h;
   }
-  return `gemini_inline_${h}`;
+  return `ai_inline_${h}`;
 }
 
 // Safe localStorage wrapper

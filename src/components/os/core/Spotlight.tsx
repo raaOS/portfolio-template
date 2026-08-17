@@ -16,6 +16,7 @@ interface SpotlightProps {
   projects: Project[];
   onOpenProject: (project: Project) => void;
   onOpenApp: (id: string) => void;
+  hiddenAppIds?: string[];
 }
 
 /**
@@ -52,21 +53,23 @@ export default function Spotlight({
   projects,
   onOpenProject,
   onOpenApp,
+  hiddenAppIds,
 }: SpotlightProps) {
   const t = useDictionary();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const systemApps = useMemo<SystemApp[]>(
-    () => [
+  const systemApps = useMemo<SystemApp[]>(() => {
+    const hidden = new Set(hiddenAppIds || []);
+    const apps: SystemApp[] = [
       { id: 'about', title: t.dock.about, type: 'app' },
       { id: 'whatsapp', title: 'WhatsApp', type: 'app' },
       { id: 'contact', title: t.dock.contact, type: 'app' },
       { id: 'trash-bin', title: t.dock.trash, type: 'app' },
-    ],
-    [t]
-  );
+    ];
+    return apps.filter((app) => !hidden.has(app.id));
+  }, [hiddenAppIds, t]);
 
   const results = useMemo<SpotlightResult[]>(() => {
     if (!query.trim()) {
@@ -184,7 +187,7 @@ export default function Spotlight({
         width: { type: 'spring', stiffness: 430, damping: 34, mass: 0.85 },
         height: { type: 'spring', stiffness: 320, damping: 34, mass: 0.9 },
       }}
-      className="pointer-events-auto fixed right-4 top-11 flex flex-col items-end overflow-hidden rounded-2xl border border-white/20 bg-white/80 text-black shadow-2xl backdrop-blur-2xl print:hidden dark:border-white/10 dark:bg-black/70 dark:text-white"
+      className="pointer-events-auto fixed right-4 top-11 flex flex-col items-end overflow-hidden rounded-2xl border border-white/20 bg-white/80 text-black shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-black/70 dark:text-white print:hidden"
       style={{ zIndex: Z_LAYERS.POPOUT_CONTENT }}
     >
       <motion.div
@@ -235,12 +238,18 @@ export default function Spotlight({
                 {result.type === 'app' ? (
                   <AppWindow
                     size={16}
-                    className={index === safeSelectedIndex ? 'text-white dark:text-black' : 'text-black/40 dark:text-white/40'}
+                    className={
+                      index === safeSelectedIndex
+                        ? 'text-white dark:text-black'
+                        : 'text-black/40 dark:text-white/40'
+                    }
                   />
                 ) : (
                   <FileText
                     size={16}
-                    className={index === safeSelectedIndex ? 'text-white dark:text-black' : 'text-orange-500'}
+                    className={
+                      index === safeSelectedIndex ? 'text-white dark:text-black' : 'text-orange-500'
+                    }
                   />
                 )}
                 <span className="flex-1 text-sm font-medium">{result.title}</span>

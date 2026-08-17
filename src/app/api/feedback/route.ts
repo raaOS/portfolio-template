@@ -11,7 +11,6 @@ import {
 } from '@/lib/api-response';
 import { enforceRequestRateLimit, getClientIP } from '@/lib/security/request';
 import { sanitizeInput } from '@/lib/security/sanitization';
-import { sendFeedbackNotification } from '@/lib/telegram';
 import { validateAdminRequest } from '@/lib/auth';
 import { getBannedWords, containsBannedWord } from '@/lib/services/bannedWordsService';
 
@@ -52,14 +51,6 @@ async function hasRecentSubmissionFromClient(clientId: string): Promise<boolean>
   }
 }
 
-function escapeTelegramMarkdown(value: string): string {
-  return value.replace(/([_*`[\]])/g, '\\$1');
-}
-
-function telegramCode(value: string | null | undefined): string {
-  return `\`${String(value ?? '').replace(/`/g, "'")}\``;
-}
-
 /**
  * POST /api/feedback
  *
@@ -69,7 +60,6 @@ function telegramCode(value: string | null | undefined): string {
  * - Honeypot + minimum-fill-time untuk filter bot
  * - Banned words check (kata kasar otomatis direject)
  * - Default status: 'pending' — admin moderate sebelum dipajang publik
- * - Notifikasi Telegram feedback topic (best-effort)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -153,31 +143,6 @@ export async function POST(request: NextRequest) {
     };
 
     const ref = await db.ref('feedback').push(payload);
-
-    // Notifikasi admin ke Telegram topic (best-effort)
-    const stars = '⭐'.repeat(rating) + '☆'.repeat(5 - rating);
-    const telegramName = escapeTelegramMarkdown(payload.name);
-    const telegramDevice = escapeTelegramMarkdown(payload.device ?? 'unknown');
-    const telegramMessage = escapeTelegramMarkdown(safeMessage);
-    const telegramLines = [
-      `*💬 New Feedback — Portfolio*`,
-      ``,
-      `*Rating:* ${stars} (${rating}/5)`,
-      `*Nama:* ${telegramName}`,
-      `*Device:* ${telegramDevice}`,
-      `*Dari:* ${telegramCode(payload.fromPath)}`,
-      `*Status:* \`pending\` (butuh moderasi)`,
-      telegramMessage ? `\n*Pesan:*\n${telegramMessage}` : `\n_Tidak ada pesan tambahan._`,
-      ``,
-      `_ID:_ ${telegramCode(ref.key)}`,
-    ];
-
-    void sendFeedbackNotification(telegramLines.join('\n')).catch((err) => {
-      console.warn(
-        '[Feedback] Telegram notification failed',
-        err instanceof Error ? err.message : err
-      );
-    });
 
     return success({ id: ref.key, received: true }, 'Terima kasih atas feedback-nya');
   } catch (error) {

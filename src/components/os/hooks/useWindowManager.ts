@@ -20,6 +20,7 @@ export type { WindowState };
 interface UseWindowManagerProps {
   initialWindows: WindowState[];
   aboutData?: AboutData | null;
+  siteId?: string;
   csrfToken?: string;
   isAdmin?: boolean;
 }
@@ -27,6 +28,7 @@ interface UseWindowManagerProps {
 export const useWindowManager = ({
   initialWindows,
   aboutData,
+  siteId,
   csrfToken,
   isAdmin = false,
 }: UseWindowManagerProps) => {
@@ -41,6 +43,7 @@ export const useWindowManager = ({
   const { saveWindowPreference, flushWindowPositions } = useWindowPersistence({
     csrfToken,
     isAdmin,
+    siteId,
   });
 
   // 3. Initialization

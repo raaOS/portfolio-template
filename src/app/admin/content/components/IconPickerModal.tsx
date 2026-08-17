@@ -183,6 +183,7 @@ export default function IconPickerModal({
                 {filteredIcons.map((iconUrl, idx) => {
                   const isSelected = selectedUrl === iconUrl;
                   const isActive = currentIcon === iconUrl || isSelected;
+                  const isBundledIcon = iconUrl.startsWith('/assets/icons-library/');
 
                   return (
                     <div
@@ -202,18 +203,20 @@ export default function IconPickerModal({
                       )}
 
                       {/* Delete Button - Using X icon now, top-left */}
-                      <button
-                        onClick={(e) => handleDelete(e, iconUrl)}
-                        onContextMenu={(e) => {
-                          e.preventDefault();
-                          handleDelete(e, iconUrl);
-                        }}
-                        className="absolute -left-2 -top-2 z-20 flex h-5 !min-h-0 w-5 !min-w-0 items-center justify-center rounded-full bg-red-500 p-0 text-white opacity-0 shadow-md transition-all duration-200 group-hover:opacity-100"
-                        title="Hapus ikon (Klik kanan juga bisa)"
-                        type="button"
-                      >
-                        <X size={12} strokeWidth={3} />
-                      </button>
+                      {!isBundledIcon && (
+                        <button
+                          onClick={(e) => handleDelete(e, iconUrl)}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            handleDelete(e, iconUrl);
+                          }}
+                          className="absolute -left-2 -top-2 z-20 flex h-5 !min-h-0 w-5 !min-w-0 items-center justify-center rounded-full bg-red-500 p-0 text-white opacity-0 shadow-md transition-all duration-200 group-hover:opacity-100"
+                          title="Hapus ikon (Klik kanan juga bisa)"
+                          type="button"
+                        >
+                          <X size={12} strokeWidth={3} />
+                        </button>
+                      )}
 
                       <div className="absolute inset-0 rounded-xl bg-emerald-500/0 transition-colors group-hover:bg-emerald-500/5" />
                     </div>

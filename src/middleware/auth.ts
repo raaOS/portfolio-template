@@ -1,7 +1,7 @@
 /**
  * Auth Middleware — Verifikasi JWT admin token pada protected routes.
  *
- * Digunakan oleh `proxy.ts` untuk memfilter request ke endpoint admin.
+ * Digunakan oleh `middleware.ts` untuk memfilter request ke endpoint admin.
  * Mendukung sliding-window token refresh.
  *
  * @module middleware/auth
@@ -77,7 +77,7 @@ export async function checkAdminAuth(request: NextRequest) {
       request.headers.get('authorization')?.replace(BEARER_PREFIX, '');
 
     // NOTE: debug log hanya saat development. Di production kita hindari
-    // mencetak daftar cookie dan token state ke log Vercel (noise + info leak).
+    // mencetak daftar cookie dan token state ke log production (noise + info leak).
     if (process.env.NODE_ENV === 'development') {
       const allCookies = request.cookies
         .getAll()
@@ -115,8 +115,6 @@ export async function checkAdminAuth(request: NextRequest) {
       if (process.env.NODE_ENV === 'development') {
         console.log(`[AUTH-DEBUG] Token invalid or missing! Redirecting to login.`);
       }
-      const loginUrl = new URL('/admin/login', request.url);
-      loginUrl.searchParams.set('redirect', pathname);
 
       if (pathname.startsWith('/api/')) {
         return {
@@ -124,6 +122,17 @@ export async function checkAdminAuth(request: NextRequest) {
           response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
         };
       }
+
+      // Sembunyikan rute /admin dari publik (mengembalikan 404 Not Found jika diakses langsung tanpa token)
+      if (pathname.startsWith('/admin')) {
+        return {
+          authenticated: false,
+          response: NextResponse.rewrite(new URL('/404', request.url)),
+        };
+      }
+
+      const loginUrl = new URL('/portal/login', request.url);
+      loginUrl.searchParams.set('redirect', pathname);
       return { authenticated: false, response: NextResponse.redirect(loginUrl) };
     }
 

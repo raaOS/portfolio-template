@@ -16,17 +16,20 @@ const defaultData: GalleryFeaturedData = {
 const service = new ContentService<GalleryFeaturedData>('gallery-featured.json', defaultData);
 
 export const galleryFeaturedService = {
-  async getFeaturedData(): Promise<GalleryFeaturedData> {
-    return await service.getData();
+  async getFeaturedData(siteId = 'default-site'): Promise<GalleryFeaturedData> {
+    return service.getData(false, false, siteId);
   },
 
-  async updateFeaturedData(featuredProjectIds: string[]): Promise<GalleryFeaturedData> {
+  async updateFeaturedData(
+    featuredProjectIds: string[],
+    siteId = 'default-site'
+  ): Promise<GalleryFeaturedData> {
     const newData: GalleryFeaturedData = {
       featuredProjectIds,
       lastUpdated: new Date().toISOString(),
     };
 
-    const success = await service.saveData(newData);
+    const success = await service.saveData(newData, 'Update featured gallery data', siteId);
     if (!success) {
       throw new Error('Failed to save featured gallery data');
     }

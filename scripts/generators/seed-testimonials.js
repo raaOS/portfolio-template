@@ -1,8 +1,8 @@
 /**
- * Seed Testimonials — Generator data seed testimonial.
+ * Seed Testimonials - Generator data testimonial demo.
  *
- * Membuat data testimonial dummy yang realistis untuk keperluan
- * development dan preview tanpa data production.
+ * Membuat data testimonial dummy yang realistis untuk development dan preview
+ * tanpa data production atau identitas pribadi.
  *
  * @module scripts/generators/seed-testimonials
  */
@@ -14,63 +14,36 @@ const dataFilePath = path.join(process.cwd(), 'src/data/testimonial.json');
 const testimonials = [
   {
     id: 1,
-    name: 'Rekan di PT. Bitlabs Academy',
-    role: 'Senior Designer',
-    company: 'PT. Bitlabs Academy',
-    content:
-      'Jujurly, kerja bareng Ramos tuh vibes-nya asik parah! Skill desainnya no debat, selalu on point dan estetik abis. Dia juga cepet banget nangkep brief, jadi revisi minim banget. Pokoknya slay!',
-    rating: 5,
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Bitlabs',
+    name: 'Nadia - Brand Owner',
+    notificationText: 'Konsep visualnya sudah pas dengan arah brand kami.',
+    isActive: true,
+    messages: [
+      { id: 1, text: 'Konsep visualnya sudah kami review.', isMe: false, time: '09:40' },
+      { id: 2, text: 'Terima kasih. Apakah arah warnanya sudah sesuai brief?', isMe: true, time: '09:42' },
+      { id: 3, text: 'Sudah sesuai dan mudah dipakai lintas kanal.', isMe: false, time: '09:45' },
+    ],
   },
   {
     id: 2,
-    name: 'Student di Sekolah Desain',
-    role: 'Mentee',
-    company: 'Sekolah Desain',
-    content:
-      'Kak Ramos ngajarnya chill banget tapi daging semua materinya. Gak pelit ilmu dan sabar banget ngadepin kita yang masih newbie. Valid no debat, mentor ter-best!',
-    rating: 5,
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Student',
+    name: 'Ardi - Product Lead',
+    notificationText: 'Case study-nya rapi dan mudah dipresentasikan.',
+    isActive: true,
+    messages: [
+      { id: 4, text: 'Deck case study sudah kami pakai untuk meeting internal.', isMe: false, time: '10:15' },
+      { id: 5, text: 'Mantap. Ada bagian yang perlu disederhanakan lagi?', isMe: true, time: '10:18' },
+      { id: 6, text: 'Tidak ada. Flow-nya jelas dan visualnya membantu.', isMe: false, time: '10:22' },
+    ],
   },
   {
     id: 3,
-    name: 'Manager di PT. Duta Mode',
-    role: 'Marketing Manager',
-    company: 'PT. Duta Mode',
-    content:
-      'Visual yang dibikin Ramos bener-bener bikin brand kita stand out. Dia ngerti banget selera pasar zaman now. Kerjanya sat-set tapi hasilnya tetep premium. Approved!',
-    rating: 5,
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=DutaMode',
-  },
-  {
-    id: 4,
-    name: 'Owner Sthal.Co',
-    role: 'Owner',
-    company: 'Sthal.Co',
-    content:
-      'Ramos tuh multitalenta banget! Gak cuma jago desain kaos yang hypebeast, tapi juga rapi banget ngurus admin. Bener-bener definisi karyawan idaman yang beyond expectation.',
-    rating: 5,
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sthal',
-  },
-  {
-    id: 5,
-    name: 'Supervisor Starbucks',
-    role: 'Store Manager',
-    company: 'PT Sari Coffee Indonesia',
-    content:
-      'Customer service skill-nya Ramos tuh next level. Dia bisa bikin customer happy cuma gara-gara ngobrolin kopi. Energinya positif banget, bikin shift pagi jadi gak ngantuk!',
-    rating: 5,
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Starbucks',
-  },
-  {
-    id: 6,
-    name: 'Owner Wulan Boutique',
-    role: 'Owner',
-    company: 'Wulan Boutique',
-    content:
-      'Desain feed IG yang dibikin Ramos bikin olshop aku jadi aesthetic parah. Penjualan naik gara-gara visualnya eye-catching. Fix bakal hire lagi sih kalo ada project baru.',
-    rating: 5,
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Wulan',
+    name: 'Sinta - Marketing Manager',
+    notificationText: 'Materi campaign-nya konsisten dan siap publish.',
+    isActive: true,
+    messages: [
+      { id: 7, text: 'Asset campaign sudah masuk folder final ya.', isMe: false, time: '11:00' },
+      { id: 8, text: 'Siap, semua ukuran sudah saya export sesuai placement.', isMe: true, time: '11:03' },
+      { id: 9, text: 'Bagus. Tinggal kami jadwalkan minggu ini.', isMe: false, time: '11:08' },
+    ],
   },
 ];
 
@@ -79,7 +52,6 @@ const data = {
   lastUpdated: new Date().toISOString(),
 };
 
-// Ensure directory exists
 const dir = path.dirname(dataFilePath);
 if (!fs.existsSync(dir)) {
   fs.mkdirSync(dir, { recursive: true });
@@ -87,5 +59,5 @@ if (!fs.existsSync(dir)) {
 
 fs.writeFileSync(dataFilePath, JSON.stringify(data, null, 2));
 
-console.log('✅ Gen Z Testimonials seeded successfully!');
-console.log(`📍 File created at: ${dataFilePath}`);
+console.log('Demo testimonials seeded successfully.');
+console.log(`File created at: ${dataFilePath}`);

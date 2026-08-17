@@ -19,6 +19,7 @@ import { config as loadEnv } from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 import { PutBucketCorsCommand, GetBucketCorsCommand, S3Client } from '@aws-sdk/client-s3';
+import { requireProductCloudflareEnvConfirmed } from './product-env';
 
 // Match Next.js loading order: .env.local overrides .env. Both are optional.
 const envFiles = ['.env.local', '.env'];
@@ -30,7 +31,6 @@ for (const file of envFiles) {
 }
 
 const REQUIRED_ENV = [
-  'CLOUDFLARE_R2_ACCOUNT_ID',
   'CLOUDFLARE_R2_ACCESS_KEY_ID',
   'CLOUDFLARE_R2_SECRET_ACCESS_KEY',
   'CLOUDFLARE_R2_BUCKET',
@@ -47,13 +47,18 @@ function parseOriginsArg(): string[] {
 }
 
 async function main() {
+  requireProductCloudflareEnvConfirmed('apply R2 CORS policy');
+
   const missing = REQUIRED_ENV.filter((k) => !process.env[k]);
+  if (!process.env.CLOUDFLARE_R2_ACCOUNT_ID && !process.env.CLOUDFLARE_ACCOUNT_ID) {
+    missing.unshift('CLOUDFLARE_ACCOUNT_ID');
+  }
   if (missing.length > 0) {
     console.error(`Missing env: ${missing.join(', ')}`);
     process.exit(1);
   }
 
-  const accountId = process.env.CLOUDFLARE_R2_ACCOUNT_ID!;
+  const accountId = process.env.CLOUDFLARE_R2_ACCOUNT_ID || process.env.CLOUDFLARE_ACCOUNT_ID!;
   const bucket = process.env.CLOUDFLARE_R2_BUCKET!;
   const customOrigins = parseOriginsArg();
 
@@ -64,9 +69,9 @@ async function main() {
           'http://localhost:3000',
           'http://127.0.0.1:3000',
           'http://localhost:3100',
-          // Pakai NEXT_PUBLIC_SITE_URL kalau ada supaya prod origin ikut.
+          // Add the configured app/site origin when available.
+          ...(process.env.NEXT_PUBLIC_APP_URL ? [process.env.NEXT_PUBLIC_APP_URL] : []),
           ...(process.env.NEXT_PUBLIC_SITE_URL ? [process.env.NEXT_PUBLIC_SITE_URL] : []),
-          ...(process.env.VERCEL_URL ? [`https://${process.env.VERCEL_URL}`] : []),
         ];
 
   const client = new S3Client({

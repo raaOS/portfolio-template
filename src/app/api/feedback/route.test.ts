@@ -8,7 +8,6 @@ const mocks = vi.hoisted(() => ({
   getClientIP: vi.fn(),
   validateAdminRequest: vi.fn(),
   dbRef: vi.fn(),
-  sendFeedbackNotification: vi.fn(),
 }));
 
 vi.mock('@/lib/database', () => ({
@@ -20,10 +19,6 @@ vi.mock('@/lib/database', () => ({
 vi.mock('@/lib/security/request', () => ({
   enforceRequestRateLimit: mocks.enforceRequestRateLimit,
   getClientIP: mocks.getClientIP,
-}));
-
-vi.mock('@/lib/telegram', () => ({
-  sendFeedbackNotification: mocks.sendFeedbackNotification,
 }));
 
 vi.mock('@/lib/auth', () => ({

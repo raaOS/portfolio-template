@@ -22,7 +22,7 @@ function mockProject(overrides?: Partial<Project>): Project {
 describe('SEO Utilities', () => {
   beforeEach(() => {
     vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://raa.is');
+    vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://portfolio-os.example');
   });
 
   afterEach(() => {
@@ -33,7 +33,7 @@ describe('SEO Utilities', () => {
     it('should include site URL and base routes', () => {
       const sitemap = generateSitemap([]);
 
-      expect(sitemap).toContain('https://raa.is');
+      expect(sitemap).toContain('https://portfolio-os.example');
       expect(sitemap).toContain('/projects');
       expect(sitemap).toContain('/contact');
       expect(sitemap).toContain('<?xml version="1.0"');
@@ -91,7 +91,7 @@ describe('SEO Utilities', () => {
     it('should include canonical URL', () => {
       const metadata = generateMetadata({ path: '/about' });
 
-      expect(metadata.alternates?.canonical).toBe('https://raa.is/about');
+      expect(metadata.alternates?.canonical).toBe('https://portfolio-os.example/about');
     });
 
     it('should include OpenGraph data', () => {

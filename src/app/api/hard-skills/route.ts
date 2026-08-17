@@ -1,15 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { revalidatePath } from 'next/cache';
 import { hardSkillService } from '@/lib/services/hardSkillService';
-import { validateAdminRequest } from '@/lib/auth';
 import { enforceRequestRateLimit } from '@/lib/security/request';
 import { bulkUpdateHardSkillsSchema } from '@/lib/validations';
+import { validateSiteMutationRequest } from '@/lib/admin/siteMutationAuth';
+import {
+  assertKnownSite,
+  revalidateSiteContentPaths,
+  resolveRequestSiteId,
+  SiteContextError,
+} from '@/lib/admin/siteRequestContext';
 
-export async function GET() {
+function resolveSkillsPayload(body: unknown) {
+  return body;
+}
+
+export async function GET(request: NextRequest) {
   try {
-    const data = await hardSkillService.getHardSkills();
+    const siteId = await resolveRequestSiteId(request);
+    const data = await hardSkillService.getHardSkills(false, false, siteId);
     return NextResponse.json(data.skills);
   } catch (error) {
+    if (error instanceof SiteContextError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error('Error loading hard skills:', error);
     return NextResponse.json({ error: 'Failed to load hard skills' }, { status: 500 });
   }
@@ -17,15 +30,16 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    // Auth check FIRST to prevent unauthenticated rate limit flooding
-    if (!(await validateAdminRequest(request))) {
+    const body = await request.json();
+    const siteId = await resolveRequestSiteId(request, body);
+    if (!(await validateSiteMutationRequest(request, siteId))) {
       return NextResponse.json({ error: 'Unauthorized or invalid CSRF token' }, { status: 401 });
     }
+    await assertKnownSite(siteId);
 
-    // Rate limit: 5 requests per minute for bulk updates
     const rateLimit = await enforceRequestRateLimit(
       request,
-      'hard_skills_post',
+      `hard_skills_post:${siteId}`,
       5,
       60_000,
       300_000
@@ -38,10 +52,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-
-    // Validate with Zod — prevents malformed payload & injection
-    const validation = bulkUpdateHardSkillsSchema.safeParse(body);
+    const validation = bulkUpdateHardSkillsSchema.safeParse(resolveSkillsPayload(body));
     if (!validation.success) {
       return NextResponse.json(
         {
@@ -53,19 +64,23 @@ export async function POST(request: NextRequest) {
     }
 
     const skills = validation.data;
-
-    // Save
-    const success = await hardSkillService.saveHardSkills(skills, 'Bulk update via Admin API');
+    const success = await hardSkillService.saveHardSkills(
+      skills,
+      'Bulk update via Admin API',
+      siteId
+    );
 
     if (!success) {
       return NextResponse.json({ error: 'Failed to save skills' }, { status: 500 });
     }
 
-    revalidatePath('/', 'layout');
-    revalidatePath('/about');
+    await revalidateSiteContentPaths(siteId, ['/', '/about']);
 
     return NextResponse.json({ success: true, count: skills.length });
   } catch (error) {
+    if (error instanceof SiteContextError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error('Error saving hard skills:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }

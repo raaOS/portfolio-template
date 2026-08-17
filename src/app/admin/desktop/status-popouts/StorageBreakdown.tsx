@@ -66,8 +66,16 @@ export function StorageBreakdownSection({ state, onRefresh }: StorageBreakdownSe
       {showGlossary && <StorageGlossary />}
 
       {isError && (
-        <div className="mx-1 mb-2 rounded-md bg-rose-50 px-2 py-1.5 text-[10px] text-rose-700">
-          {state.message}
+        <div
+          className={`mx-1 mb-2 rounded-md px-2 py-1.5 text-[10px] ${
+            state.message === 'AUTH_REQUIRED'
+              ? 'bg-zinc-100 text-zinc-600'
+              : 'bg-rose-50 text-rose-700'
+          }`}
+        >
+          {state.message === 'AUTH_REQUIRED'
+            ? 'Login admin diperlukan untuk melihat storage stats.'
+            : state.message}
         </div>
       )}
 

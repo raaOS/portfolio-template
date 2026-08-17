@@ -162,10 +162,10 @@ export function useStorageUpload(options: UseStorageUploadOptions = {}) {
    * Flow:
    *  1. POST /api/upload/presign  -> { uploadUrl, publicUrl, ... }
    *     Server signs a PUT URL bound to a server-chosen R2 key.
-   *  2. PUT  uploadUrl            -> R2 directly
-   *     Browser sends raw bytes to Cloudflare, bypassing the Vercel
-   *     function body parser (which caps at 4.5 MB on Hobby and dies
-   *     with "Failed to parse body as FormData" on bigger payloads).
+   *  2. PUT  uploadUrl            -> Cloudflare Worker R2 binding
+   *     Browser sends raw bytes without FormData, bypassing the application
+   *     FormData parser and avoiding "Failed to parse body as FormData"
+   *     on bigger payloads.
    *  3. POST /api/upload          -> small JPG poster as FormData
    *     The poster is captured in-browser via canvas, so it's tiny
    *     and always fits within the function body limit.
@@ -216,6 +216,9 @@ export function useStorageUpload(options: UseStorageUploadOptions = {}) {
           xhr.open('PUT', presigned.uploadUrl);
           xhr.setRequestHeader('Content-Type', presigned.contentType);
           xhr.setRequestHeader('Cache-Control', presigned.cacheControl);
+          if (csrfToken) {
+            xhr.setRequestHeader('x-csrf-token', csrfToken);
+          }
 
           xhr.upload.onprogress = (event) => {
             if (!event.lengthComputable || event.total <= 0) return;

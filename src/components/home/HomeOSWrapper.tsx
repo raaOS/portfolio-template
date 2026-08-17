@@ -9,7 +9,7 @@ import { GhostCursorsLayer } from '@/components/os/layers/GhostCursorsLayer';
 import { useOSOverlays } from '@/components/os/context/OSSystemContext';
 
 type DesktopComponent = React.ComponentType<DesktopEnvironmentProps>;
-const BOOT_SESSION_KEY = 'ramos_os_booted';
+const BOOT_SESSION_KEY = 'portfolio_os_booted';
 
 function shouldLoadDesktopImmediately() {
   try {

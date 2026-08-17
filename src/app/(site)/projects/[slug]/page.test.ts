@@ -35,6 +35,6 @@ describe('projects/[slug]/page', () => {
     expect(revalidate).toBe(60);
     expect(getProjectBySlugAsyncMock).toHaveBeenCalledWith('case-study');
     expect(allProjectsAsyncMock).not.toHaveBeenCalled();
-    expect(metadata.title).toBe('Case Study | Ramos – Creative Portfolio');
+    expect(metadata.title).toBe('Case Study | Portfolio OS - Creative Portfolio');
   });
 });

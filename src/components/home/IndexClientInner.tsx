@@ -11,6 +11,8 @@ import { useQuickLook } from '@/components/os/hooks/useQuickLook';
 import QuickLookModal from '@/components/ui/QuickLookModal';
 import { resolveCover } from '@/lib/images';
 import { useDictionary } from '@/contexts/LanguageContext';
+import { usePathname } from 'next/navigation';
+import { buildTenantProjectDetailHref } from '@/lib/routing/tenantRoutes';
 
 import Projects3DView from '@/components/canvas/Projects3DView';
 
@@ -57,6 +59,7 @@ export default function IndexClientInner({
   view = 'grid',
 }: Props) {
   const t = useDictionary();
+  const pathname = usePathname();
   const { filteredProjects } = useProjectFiltering(projects, tag, searchQuery);
   const { visibleCount, isLoadingMore, hasMore, resetCount, initialCount } = useInfiniteScroll(
     filteredProjects.length
@@ -211,7 +214,12 @@ export default function IndexClientInner({
               type={cover.kind}
               url={cover.src}
               metadata={quickLookProject.tags?.join(', ')}
-              onGoToDetail={() => (window.location.href = `/projects/${quickLookProject.slug}`)}
+              onGoToDetail={() =>
+                (window.location.href = buildTenantProjectDetailHref(
+                  pathname,
+                  quickLookProject.slug
+                ))
+              }
             />
           );
         })()}

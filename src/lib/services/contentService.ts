@@ -47,6 +47,14 @@ export function clearContentCache() {
   return entriesCleared;
 }
 
+function isBuildFallbackNoise(error: unknown) {
+  return (
+    process.env.CLOUDFLARE_OPENNEXT_BUILD === 'true' &&
+    error instanceof Error &&
+    error.message === 'Data backend timeout'
+  );
+}
+
 /**
  * Generic service to handle content storage via Cloudflare D1.
  * Cache TTL: Default 30 detik, tapi bisa custom (about data pakai 5 detik).
@@ -56,6 +64,7 @@ export class ContentService<T> {
   private fallbackData: T;
   private cacheTTL: number;
   private skipFallbackMerge: boolean;
+  private nodeName: string;
 
   /**
    * @param filename - Nama file JSON (tanpa .json)
@@ -65,16 +74,17 @@ export class ContentService<T> {
    *   Ini mencegah field yang dihapus admin muncul lagi dari fallback JSON.
    */
   constructor(filename: string, fallbackData: T, cacheTTL?: number, skipFallbackMerge = false) {
-    const nodeName = filename.replace('.json', '');
-    this.dataPath = `content/${nodeName}`;
+    this.nodeName = filename.replace('.json', '');
+    this.dataPath = `content/${this.nodeName}`;
     this.fallbackData = fallbackData;
     // About data pakai TTL lebih pendek karena positions sering berubah
-    this.cacheTTL = cacheTTL || (nodeName === 'about' ? ABOUT_CACHE_TTL : 30_000);
+    this.cacheTTL = cacheTTL || (this.nodeName === 'about' ? ABOUT_CACHE_TTL : 30_000);
     this.skipFallbackMerge = skipFallbackMerge;
   }
 
-  async getData(noCache = false, throwOnError = false): Promise<T> {
-    const cacheKey = getCacheKey(this.dataPath);
+  async getData(noCache = false, throwOnError = false, siteId = 'default-site'): Promise<T> {
+    const tenantPath = `content_${siteId}/${this.nodeName}`;
+    const cacheKey = getCacheKey(tenantPath);
 
     // Cek memory cache dulu (kecuali noCache=true)
     if (!noCache) {
@@ -91,19 +101,28 @@ export class ContentService<T> {
     });
 
     try {
-      const snapshot = (await Promise.race([db.ref(this.dataPath).once('value'), timeout])) as {
+      // 1. Try site-specific path: content_siteId/nodeName
+      const snapshot = (await Promise.race([db.ref(tenantPath).once('value'), timeout])) as {
         val: () => unknown;
-      };
+      } | null;
 
-      const remoteData = snapshot?.val?.() ?? snapshot?.val;
+      let remoteData = typeof snapshot?.val === 'function' ? snapshot.val() : snapshot?.val;
+
+      // 2. Fallback to legacy path content/nodeName if not found
+      // SECURITY FIX: Only fall back to legacy content for default-site.
+      // Other tenants must not see shared/demo data from the legacy path.
+      if (!remoteData && siteId === 'default-site') {
+        const legacySnapshot = (await Promise.race([db.ref(this.dataPath).once('value'), timeout])) as {
+          val: () => unknown;
+        } | null;
+        remoteData = typeof legacySnapshot?.val === 'function' ? legacySnapshot.val() : legacySnapshot?.val;
+      }
 
       if (!remoteData) {
         return this.fallbackData;
       }
 
       // Merge dengan fallback (kecuali skipFallbackMerge=true).
-      // skipFallbackMerge penting untuk domain di mana admin delete
-      // field harus benar-benar hilang, bukan restored dari fallback.
       const finalData = this.skipFallbackMerge
         ? (remoteData as T)
         : (this.deepMerge(this.fallbackData, remoteData) as T);
@@ -113,7 +132,9 @@ export class ContentService<T> {
 
       return finalData;
     } catch (error) {
-      console.error(`[ContentService] Error loading data from ${this.dataPath}:`, error);
+      if (!isBuildFallbackNoise(error)) {
+        console.error(`[ContentService] Error loading data from ${tenantPath}:`, error);
+      }
       if (throwOnError) {
         throw error;
       }
@@ -161,8 +182,8 @@ export class ContentService<T> {
   // Track ongoing saves untuk mencegah race condition
   private pendingSave: Promise<boolean> | null = null;
 
-  async saveData(data: T, _message?: string): Promise<boolean> {
-    // MEDIUM FIX: Queue multiple saves to prevent race condition
+  async saveData(data: T, _message?: string, siteId?: string): Promise<boolean> {
+    // Queue multiple saves to prevent race condition
     if (this.pendingSave) {
       try {
         await this.pendingSave;
@@ -171,7 +192,8 @@ export class ContentService<T> {
       }
     }
 
-    this.pendingSave = this._doSave(data, _message);
+    const finalSiteId = siteId || 'default-site';
+    this.pendingSave = this._doSave(data, _message, finalSiteId);
     try {
       const result = await this.pendingSave;
       return result;
@@ -180,7 +202,8 @@ export class ContentService<T> {
     }
   }
 
-  private async _doSave(data: T, _message?: string): Promise<boolean> {
+  private async _doSave(data: T, _message: string | undefined, siteId: string): Promise<boolean> {
+    const tenantPath = `content_${siteId}/${this.nodeName}`;
     try {
       // For arrays, we save them directly to avoid converting to object with numeric keys.
       // For objects, we merge with updatedAt.
@@ -188,25 +211,23 @@ export class ContentService<T> {
         ? data
         : { ...(data as Record<string, unknown>), updatedAt: new Date().toISOString() };
 
-      // MEDIUM FIX: Clear cache SEBELUM save untuk mencegah stale data read
-      contentCache.delete(getCacheKey(this.dataPath));
+      // Clear cache SEBELUM save untuk mencegah stale data read
+      contentCache.delete(getCacheKey(tenantPath));
 
-      await db.ref(this.dataPath).set(payload);
+      await db.ref(tenantPath).set(payload);
 
-      // CRITICAL FIX: Cache `payload` (dengan updatedAt), bukan raw `data`.
-      // Kalau cache tanpa updatedAt, next-read dalam TTL return data stale,
-      // dan komparasi lastUpdated di client jadi broken.
-      contentCache.set(getCacheKey(this.dataPath), payload as unknown as object, this.cacheTTL);
+      // Cache `payload` (dengan updatedAt), bukan raw `data`.
+      contentCache.set(getCacheKey(tenantPath), payload as unknown as object, this.cacheTTL);
 
       // Log the activity (await to prevent serverless function termination before write finishes)
       const actionMessage = _message
-        ? `Update ${this.dataPath}: ${_message}`
-        : `Update ${this.dataPath}`;
+        ? `Update ${tenantPath}: ${_message}`
+        : `Update ${tenantPath}`;
       await logActivity(actionMessage).catch((err) => console.error('[Audit] Failed to log:', err));
 
       return true;
     } catch (error) {
-      console.error(`[ContentService] Error saving data to ${this.dataPath}:`, error);
+      console.error(`[ContentService] Error saving data to ${tenantPath}:`, error);
       return false;
     }
   }
