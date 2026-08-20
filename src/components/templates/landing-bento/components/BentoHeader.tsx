@@ -24,7 +24,7 @@ export function BentoHeader({ data }: { data: PortfolioTemplateData }) {
           )}
           <div>
             <h1 className="text-sm font-extrabold text-zinc-900 tracking-tight">{site.title}</h1>
-            <p className="text-[11px] font-mono text-emerald-600 font-semibold">{about.hero.title || 'Portfolio'}</p>
+            <p className="text-[11px] font-mono text-[var(--bento-accent)] font-semibold">{about.hero.title || 'Portfolio'}</p>
           </div>
         </div>
 

@@ -4,7 +4,13 @@ import React, { useState } from 'react';
 import type { Project } from '@/types/projects';
 import { X, ArrowUpRight, FolderGit2 } from 'lucide-react';
 
-export function BentoProjects({ projects }: { projects: Project[] }) {
+export function BentoProjects({
+  projects,
+  variant = 'grid',
+}: {
+  projects: Project[];
+  variant?: 'grid' | 'list';
+}) {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   if (!projects || projects.length === 0) {
@@ -19,29 +25,23 @@ export function BentoProjects({ projects }: { projects: Project[] }) {
     <section id="projects" className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <FolderGit2 className="h-5 w-5 text-emerald-600" />
+          <FolderGit2 className="h-5 w-5 text-[var(--bento-accent)]" />
           <h2 className="text-xl font-extrabold text-zinc-900 tracking-tight">Featured Projects</h2>
         </div>
-        <span className="rounded-full border border-zinc-200 bg-white px-3 py-1 font-mono text-xs font-semibold text-emerald-700 shadow-xs">
+        <span className="rounded-full border border-zinc-200 bg-white px-3 py-1 font-mono text-xs font-semibold text-[var(--bento-accent)] shadow-xs">
           {projects.length} Published
         </span>
       </div>
 
-      {/* Asymmetric Bento Projects Grid (Clean Light Mode) */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-        {projects.map((proj, idx) => {
-          const isFeatured = idx === 0;
-
-          return (
+      {variant === 'list' ? (
+        <div className="space-y-3">
+          {projects.map((proj) => (
             <div
               key={proj.id}
               onClick={() => setSelectedProject(proj)}
-              className={`group relative cursor-pointer overflow-hidden rounded-3xl border border-zinc-200/90 bg-white p-5 shadow-xs transition duration-300 hover:-translate-y-1 hover:border-zinc-300 hover:shadow-md ${
-                isFeatured ? 'md:col-span-2' : ''
-              }`}
+              className="group flex cursor-pointer items-center gap-4 rounded-3xl border border-zinc-200/90 bg-white p-4 shadow-xs transition duration-300 hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-md"
             >
-              {/* Media Preview Box */}
-              <div className={`relative w-full overflow-hidden rounded-2xl bg-zinc-100 border border-zinc-200/60 ${isFeatured ? 'h-64 sm:h-72' : 'h-48'}`}>
+              <div className="relative h-24 w-36 shrink-0 overflow-hidden rounded-2xl bg-zinc-100 border border-zinc-200/60">
                 {proj.cover ? (
                   <img
                     src={proj.cover}
@@ -49,36 +49,28 @@ export function BentoProjects({ projects }: { projects: Project[] }) {
                     className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center text-xs font-mono text-zinc-400">
-                    No Media Preview
+                  <div className="flex h-full w-full items-center justify-center text-[10px] font-mono text-zinc-400">
+                    No Preview
                   </div>
                 )}
-
-                <div className="absolute top-3 right-3 rounded-full bg-white/90 p-2 text-zinc-800 opacity-0 group-hover:opacity-100 transition shadow-sm border border-zinc-200">
-                  <ArrowUpRight className="h-4 w-4 text-emerald-600" />
-                </div>
-
-                <div className="absolute bottom-3 left-3">
-                  <span className="rounded-full bg-white/90 px-2.5 py-0.5 font-mono text-[10px] font-bold text-emerald-800 border border-zinc-200 shadow-xs">
+                <div className="absolute bottom-2 left-2">
+                  <span className="rounded-full bg-white/90 px-2 py-0.5 font-mono text-[10px] font-bold text-[var(--bento-accent)] border border-zinc-200 shadow-xs">
                     {proj.year}
                   </span>
                 </div>
               </div>
 
-              {/* Text Info */}
-              <div className="mt-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-bold text-lg text-zinc-900 group-hover:text-emerald-600 transition">
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="truncate font-bold text-lg text-zinc-900 group-hover:text-[var(--bento-accent)] transition">
                     {proj.title}
                   </h3>
-                  <span className="text-xs font-mono text-zinc-400">{proj.client}</span>
+                  <span className="shrink-0 text-xs font-mono text-zinc-400">{proj.client}</span>
                 </div>
-
                 <p className="line-clamp-2 text-xs text-zinc-600 leading-relaxed font-normal">
                   {proj.description}
                 </p>
-
-                <div className="pt-2 flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-1.5 pt-1">
                   {proj.tags?.slice(0, 4).map((tag, i) => (
                     <span
                       key={i}
@@ -89,10 +81,78 @@ export function BentoProjects({ projects }: { projects: Project[] }) {
                   ))}
                 </div>
               </div>
+
+              <ArrowUpRight className="h-5 w-5 shrink-0 text-[var(--bento-accent)] opacity-0 transition group-hover:opacity-100" />
             </div>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+          {projects.map((proj, idx) => {
+            const isFeatured = idx === 0;
+
+            return (
+              <div
+                key={proj.id}
+                onClick={() => setSelectedProject(proj)}
+                className={`group relative cursor-pointer overflow-hidden rounded-3xl border border-zinc-200/90 bg-white p-5 shadow-xs transition duration-300 hover:-translate-y-1 hover:border-zinc-300 hover:shadow-md ${
+                  isFeatured ? 'md:col-span-2' : ''
+                }`}
+              >
+                {/* Media Preview Box */}
+                <div className={`relative w-full overflow-hidden rounded-2xl bg-zinc-100 border border-zinc-200/60 ${isFeatured ? 'h-64 sm:h-72' : 'h-48'}`}>
+                  {proj.cover ? (
+                    <img
+                      src={proj.cover}
+                      alt={proj.title}
+                      className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-xs font-mono text-zinc-400">
+                      No Media Preview
+                    </div>
+                  )}
+
+                  <div className="absolute top-3 right-3 rounded-full bg-white/90 p-2 text-zinc-800 opacity-0 group-hover:opacity-100 transition shadow-sm border border-zinc-200">
+                    <ArrowUpRight className="h-4 w-4 text-[var(--bento-accent)]" />
+                  </div>
+
+                  <div className="absolute bottom-3 left-3">
+                    <span className="rounded-full bg-white/90 px-2.5 py-0.5 font-mono text-[10px] font-bold text-[var(--bento-accent)] border border-zinc-200 shadow-xs">
+                      {proj.year}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Text Info */}
+                <div className="mt-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-lg text-zinc-900 group-hover:text-[var(--bento-accent)] transition">
+                      {proj.title}
+                    </h3>
+                    <span className="text-xs font-mono text-zinc-400">{proj.client}</span>
+                  </div>
+
+                  <p className="line-clamp-2 text-xs text-zinc-600 leading-relaxed font-normal">
+                    {proj.description}
+                  </p>
+
+                  <div className="pt-2 flex flex-wrap gap-1.5">
+                    {proj.tags?.slice(0, 4).map((tag, i) => (
+                      <span
+                        key={i}
+                        className="rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-0.5 font-mono text-[10px] font-semibold text-zinc-700"
+                      >
+                        #{tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Clean Light Case Study Modal Detail */}
       {selectedProject && (

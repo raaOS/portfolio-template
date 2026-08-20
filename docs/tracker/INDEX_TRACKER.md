@@ -288,3 +288,31 @@ Jika membuat modul atau sprint baru:
    - *Status:* 🟢 Completed
    - *Isi:* Menghapus total template `landing-editorial` (Sprint 57) dan `3d-spatial` (Sprint 58) dari kode, seed SQL, test, dan seluruh jejak dokumentasi (termasuk log Sprint 57/58, INDEX, architecture doc). Katalog tersisa 2 template: `os-desktop` & `landing-bento`. Verifikasi: tsc 0 error, lint 0 error, 836 tests PASS.
 
+## 🚀 Program Bento Studio (Sprint 68 – 72) — COMPLETED 🟢
+
+Kustomisasi per-section template `landing-bento` (Pro-only): kontrak settings zod + normalizer, service/API D1 `site_template_settings`, renderer config-driven + 2 variant/section + preset animasi, editor `/client/studio` (draft → Publish → revalidate), dan verifikasi build production + 873 tests.
+
+87. **[Sprint 68 - Bento Studio Foundation](file:///C:/Users/USER/Documents/portfolio-template/docs/tracker/logs/sprint_68_bento_studio_foundation.md)**
+   - *Status:* 🟢 Completed
+   - *Isi:* Fondasi program Bento Studio (kustomisasi per-section template `landing-bento`, Pro-only). Fix tier bento→pro di seed SQL, kontrak settings zod + `normalizeBentoSettings()` (5 section, 2 variant, 5 preset animasi), service D1 `site_template_settings` (upsert), API `GET/PUT /api/client/template-settings` (Pro guard + CSRF + revalidate + audit), dan wiring loader tenant/demo. Verifikasi: tsc 0 error, lint bersih, 118 files / 860 tests PASS.
+
+88. **[Sprint 69 - BentoRenderer Config-Driven](file:///C:/Users/USER/Documents/portfolio-template/docs/tracker/logs/sprint_69_bento_renderer_config_driven.md)**
+   - *Status:* 🟢 Completed
+   - *Isi:* Refactor `BentoRenderer` menjadi config-driven: urutan/visibilitas/variant section dari settings; 2 variant per section (hero default/compact, sequence full/minimal, projects grid/list, experience timeline/cards, contact split/centered); theme token diterapkan via CSS vars di root; registry `{type, variant}` → komponen. Verifikasi: tsc 0 error, lint bersih, 118 files / 863 tests PASS.
+
+89. **[Sprint 70 - Bento Animation Presets](file:///C:/Users/USER/Documents/portfolio-template/docs/tracker/logs/sprint_70_bento_animation_presets.md)**
+   - *Status:* 🟢 Completed
+   - *Isi:* Implementasi preset animasi `none`/`fade-up`/`slide-in`/`scale`/`stagger` lewat `AnimatedSection` (IntersectionObserver, hydration-safe, honor prefers-reduced-motion) + parallax ringan dari `motion.parallax`; registry membungkus setiap section dengan `section.animation`. Verifikasi: tsc 0 error, lint bersih, 119 files / 868 tests PASS.
+
+90. **[Sprint 71 - Bento Studio Editor](file:///C:/Users/USER/Documents/portfolio-template/docs/tracker/logs/sprint_71_bento_studio_editor.md)**
+   - *Status:* 🟢 Completed
+   - *Isi:* Editor fullscreen `/client/studio` (Pro-only, client auth): preview live config-driven, panel Theme/Motion/Sections (urutan, visibility, variant, animasi), Publish → `PUT /api/client/template-settings` (CSRF + normalize + D1 + revalidate); entry card "Bento Studio" di Client Dashboard. Verifikasi: tsc 0 error, lint bersih, 120 files / 873 tests PASS.
+
+91. **[Sprint 72 - Bento Studio Program Verification](file:///C:/Users/USER/Documents/portfolio-template/docs/tracker/logs/sprint_72_bento_studio_program_verification.md)**
+   - *Status:* 🟢 Completed
+   - *Isi:* Verifikasi produksi penutup program Bento Studio: build production PASS, 120 files / 873 tests PASS, tsc/lint bersih, wrap-up dokumentasi & INDEX. Backlog tercatat: adaptasi dark-mode contrast & `TemplateDemoCustomizer` dead code.
+
+92. **[Sprint 73 - Bento Studio Serious Debugging & Fixes](file:///C:/Users/USER/Documents/portfolio-template/docs/tracker/logs/sprint_73_bento_debugging_fixes.md)**
+   - *Status:* 🟢 Completed
+   - *Isi:* Mode debugging serius program Bento Studio. Terverifikasi BUKAN bug: pola insert `audit_logs`, signature `revalidateSiteContentPaths`, skema `site_template_settings`, kebijakan middleware untuk `/api/client/*`, dan self-healing `normalizeBentoSettings`. Dua bug nyata diperbaiki: (1) hydration mismatch `AnimatedSection` karena `prefersReducedMotion()` saat render (dipindah ke effect + state `reducedMotion`), (2) layout regression variant `full` `BentoImageSequence` (restore `lg:flex-row`). Verifikasi: 120 files / 873 tests PASS, tsc 0 error, lint bersih.
+

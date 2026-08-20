@@ -45,7 +45,7 @@ CREATE INDEX IF NOT EXISTS idx_template_settings_site_tpl ON site_template_setti
 INSERT OR IGNORE INTO portfolio_templates (id, name, description, category, tier_required, price_idr, is_active)
 VALUES 
   ('os-desktop', 'macOS Desktop Simulator', 'Simulasi desktop macOS interaktif dengan windowing, dock, dan audio.', 'os', 'lite', 0, 1),
-  ('landing-bento', 'Modern Bento Landing', 'Landing page modern dengan tata letak Bento Grid yang dinamis dan elegan.', 'landing', 'lite', 0, 1);
+  ('landing-bento', 'Modern Bento Landing', 'Landing page modern dengan tata letak Bento Grid yang dinamis dan elegan. Termasuk Bento Studio (kustomisasi per-section).', 'landing', 'pro', 0, 1);
 
 -- 7. Cleanup template yang sudah di-retire dari katalog (aman dijalankan berulang)
 DELETE FROM portfolio_templates WHERE id IN ('landing-editorial', '3d-spatial');

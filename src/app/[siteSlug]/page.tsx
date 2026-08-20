@@ -5,6 +5,7 @@ import { loadHomepageData } from '@/lib/loaders';
 import { canUseWhatsappTestimonials } from '@/lib/product/sitePlan';
 import { mapD1ToTemplateData } from '@/lib/templates/dataMapper';
 import { templateRegistryService } from '@/lib/services/templateRegistryService';
+import { templateSettingsService } from '@/lib/services/templateSettingsService';
 import TemplateDispatcher from '@/components/templates/TemplateDispatcher';
 
 export const revalidate = 60;
@@ -59,12 +60,15 @@ export default async function TenantPage({ params, searchParams }: TenantPagePro
     requestedKey
   );
 
+  const templateSettings = await templateSettingsService.getSettings(site.id, resolvedTemplateKey);
+
   const templateData = mapD1ToTemplateData({
     site: {
       ...site,
       active_template_key: resolvedTemplateKey,
     },
     homepageData: effectiveHomepageData,
+    settings: templateSettings ?? undefined,
   });
 
   return <TemplateDispatcher data={templateData} isPreview={Boolean(resolvedSearchParams.preview_template)} />;

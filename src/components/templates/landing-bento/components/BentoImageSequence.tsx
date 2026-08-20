@@ -8,6 +8,7 @@ interface BentoImageSequenceProps {
   subtitle?: string;
   frameCount?: number;
   fps?: number;
+  variant?: 'full' | 'minimal';
 }
 
 export function BentoImageSequence({
@@ -15,6 +16,7 @@ export function BentoImageSequence({
   subtitle = 'Teknologi Canvas Image Sequence: Geser kursor untuk memutar objek 360° secara real-time tanpa frame lag.',
   frameCount = 36,
   fps = 24,
+  variant = 'full',
 }: BentoImageSequenceProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [currentFrame, setCurrentFrame] = useState(0);
@@ -199,11 +201,19 @@ export function BentoImageSequence({
   };
 
   return (
-    <section className="rounded-3xl border border-zinc-200/90 bg-white p-6 sm:p-8 shadow-xs hover:border-zinc-300 transition-all">
-      <div className="flex flex-col lg:flex-row items-center gap-8">
-        <div className="space-y-4 max-w-md">
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-mono font-semibold text-emerald-800">
-            <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
+    <section
+      className={`rounded-3xl border border-zinc-200/90 bg-white shadow-xs hover:border-zinc-300 transition-all ${
+        variant === 'minimal' ? 'p-5 sm:p-6' : 'p-6 sm:p-8'
+      }`}
+    >
+      <div
+        className={`flex items-center gap-6 ${
+          variant === 'minimal' ? 'flex-col' : 'flex-col lg:flex-row'
+        }`}
+      >
+        <div className="space-y-3 max-w-md">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-[color-mix(in_srgb,var(--bento-accent)_30%,white)] bg-[color-mix(in_srgb,var(--bento-accent)_10%,white)] px-3 py-1 text-xs font-mono font-semibold text-[var(--bento-accent)]">
+            <Sparkles className="h-3.5 w-3.5" />
             <span>Interactive 360° Sequence</span>
           </div>
 
@@ -211,29 +221,33 @@ export function BentoImageSequence({
             {title}
           </h2>
 
-          <p className="text-xs sm:text-sm text-zinc-600 leading-relaxed font-normal">
-            {subtitle}
-          </p>
+          {variant === 'full' && subtitle && (
+            <p className="text-xs sm:text-sm text-zinc-600 leading-relaxed font-normal">
+              {subtitle}
+            </p>
+          )}
 
-          <div className="flex flex-wrap items-center gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => setAutoPlay(!autoPlay)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-zinc-100 hover:bg-zinc-200 px-4 py-2 text-xs font-semibold text-zinc-800 transition"
-            >
-              <RotateCcw className="h-3.5 w-3.5 text-emerald-600" />
-              <span>{autoPlay ? 'Pause Auto-Play' : 'Putar Otomatis'}</span>
-            </button>
+          {variant === 'full' && (
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setAutoPlay(!autoPlay)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-zinc-100 hover:bg-zinc-200 px-4 py-2 text-xs font-semibold text-zinc-800 transition"
+              >
+                <RotateCcw className="h-3.5 w-3.5 text-[var(--bento-accent)]" />
+                <span>{autoPlay ? 'Pause Auto-Play' : 'Putar Otomatis'}</span>
+              </button>
 
-            <div className="inline-flex items-center gap-1.5 text-xs text-zinc-400 font-mono">
-              <MoveHorizontal className="h-3.5 w-3.5 text-emerald-600" />
-              <span>Drag Kursor ↔</span>
+              <div className="inline-flex items-center gap-1.5 text-xs text-zinc-400 font-mono">
+                <MoveHorizontal className="h-3.5 w-3.5 text-[var(--bento-accent)]" />
+                <span>Drag Kursor ↔</span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Canvas Player Box */}
-        <div className="relative flex-1 w-full overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50 p-2 shadow-xs">
+        <div className={`relative flex-1 w-full overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50 shadow-xs ${variant === 'minimal' ? 'p-1.5' : 'p-2'}`}>
           <canvas
             ref={canvasRef}
             width={600}

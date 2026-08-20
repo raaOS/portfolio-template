@@ -3,6 +3,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import BentoRenderer from './BentoRenderer';
 import type { PortfolioTemplateData } from '@/types/template';
+import { DEFAULT_BENTO_SETTINGS } from '@/lib/templates/bento/settings';
 
 describe('BentoRenderer', () => {
   const dummyTemplateData: PortfolioTemplateData = {
@@ -94,5 +95,69 @@ describe('BentoRenderer', () => {
     expect(screen.getByText('Fintech Mobile App')).toBeInTheDocument();
     expect(screen.getByText('Lead Designer')).toBeInTheDocument();
     expect(screen.getAllByText('Figma').length).toBeGreaterThan(0);
+  });
+
+  it('renders all default sections in config order', () => {
+    render(<BentoRenderer data={dummyTemplateData} />);
+
+    const containers = [
+      screen.getByTestId('bento-section-hero-default'),
+      screen.getByTestId('bento-section-sequence-full'),
+      screen.getByTestId('bento-section-projects-grid'),
+      screen.getByTestId('bento-section-experience-timeline'),
+      screen.getByTestId('bento-section-contact-split'),
+    ];
+
+    for (let idx = 0; idx < containers.length - 1; idx += 1) {
+      expect(
+        containers[idx].compareDocumentPosition(containers[idx + 1]) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+    }
+  });
+
+  it('skips hidden sections and honors custom order', () => {
+    const data: PortfolioTemplateData = {
+      ...dummyTemplateData,
+      settings: {
+        templateId: 'landing-bento',
+        options: {
+          ...DEFAULT_BENTO_SETTINGS,
+          sections: [
+            { id: 'contact', type: 'contact', order: 0, visible: true, variant: 'split', animation: 'none' },
+            { id: 'hero', type: 'hero', order: 1, visible: false, variant: 'compact', animation: 'none' },
+            { id: 'projects', type: 'projects', order: 2, visible: true, variant: 'list', animation: 'none' },
+          ],
+        },
+      },
+    };
+
+    render(<BentoRenderer data={data} />);
+
+    expect(screen.queryByTestId('bento-section-hero-compact')).not.toBeInTheDocument();
+    expect(screen.getByTestId('bento-section-contact-split')).toBeInTheDocument();
+    expect(screen.getByTestId('bento-section-projects-list')).toBeInTheDocument();
+    // Sequence/experience hilang dari config → normalizer menambahkan kembali default-nya
+    expect(screen.getByTestId('bento-section-sequence-full')).toBeInTheDocument();
+    expect(screen.getByTestId('bento-section-experience-timeline')).toBeInTheDocument();
+  });
+
+  it('applies theme accent token as CSS variable on root', () => {
+    const data: PortfolioTemplateData = {
+      ...dummyTemplateData,
+      settings: {
+        templateId: 'landing-bento',
+        options: {
+          ...DEFAULT_BENTO_SETTINGS,
+          theme: { accent: 'rose', font: 'outfit', background: 'light' },
+        },
+      },
+    };
+
+    const { container } = render(<BentoRenderer data={data} />);
+    const root = container.firstChild as HTMLElement;
+
+    expect(root.style.getPropertyValue('--bento-accent')).toBe('#f43f5e');
+    expect(root.style.fontFamily).toContain('Outfit');
   });
 });

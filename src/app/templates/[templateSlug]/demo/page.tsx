@@ -4,6 +4,7 @@ import { getSiteBySlug } from '@/lib/adapters/siteDataAdapter';
 import { loadHomepageData } from '@/lib/loaders';
 import { mapD1ToTemplateData } from '@/lib/templates/dataMapper';
 import { templateRegistryService } from '@/lib/services/templateRegistryService';
+import { templateSettingsService } from '@/lib/services/templateSettingsService';
 import TemplateDispatcher from '@/components/templates/TemplateDispatcher';
 import HomeOSWrapper from '@/components/home/HomeOSWrapper';
 import { DemoThemeWrapper } from '@/components/templates/demo/DemoThemeWrapper';
@@ -39,6 +40,7 @@ export default async function TemplateDemoPage({ params }: DemoPageProps) {
     'pro',
     templateSlug
   );
+  const templateSettings = await templateSettingsService.getSettings(site.id, resolvedTemplateKey);
 
   const templateData = mapD1ToTemplateData({
     site: {
@@ -46,6 +48,7 @@ export default async function TemplateDemoPage({ params }: DemoPageProps) {
       active_template_key: resolvedTemplateKey,
     },
     homepageData,
+    settings: templateSettings ?? undefined,
   });
 
   return (
