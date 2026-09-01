@@ -34,11 +34,11 @@ describe('templateEntitlementService', () => {
   it('returns list of template IDs for site', async () => {
     vi.spyOn(cloudflareD1, 'isD1Configured').mockReturnValue(true);
     vi.spyOn(cloudflareD1, 'queryD1').mockResolvedValue([
-      { template_id: 'landing-bento' },
+      { template_id: 'custom-editorial' },
       { template_id: 'custom-pro-landing' },
     ]);
 
     const entitlements = await templateEntitlementService.getSiteEntitlements('site-100');
-    expect(entitlements).toEqual(['landing-bento', 'custom-pro-landing']);
+    expect(entitlements).toEqual(['custom-editorial', 'custom-pro-landing']);
   });
 });

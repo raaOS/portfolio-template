@@ -44,11 +44,10 @@ CREATE INDEX IF NOT EXISTS idx_template_settings_site_tpl ON site_template_setti
 -- 6. Seed Default Templates
 INSERT OR IGNORE INTO portfolio_templates (id, name, description, category, tier_required, price_idr, is_active)
 VALUES 
-  ('os-desktop', 'macOS Desktop Simulator', 'Simulasi desktop macOS interaktif dengan windowing, dock, dan audio.', 'os', 'lite', 0, 1),
-  ('landing-bento', 'Modern Bento Landing', 'Landing page modern dengan tata letak Bento Grid yang dinamis dan elegan. Termasuk Bento Studio (kustomisasi per-section).', 'landing', 'pro', 0, 1);
+  ('os-desktop', 'macOS Desktop Simulator', 'Simulasi desktop macOS interaktif dengan windowing, dock, dan audio.', 'os', 'lite', 0, 1);
 
 -- 7. Cleanup template yang sudah di-retire dari katalog (aman dijalankan berulang)
-DELETE FROM portfolio_templates WHERE id IN ('landing-editorial', '3d-spatial');
-DELETE FROM site_template_entitlements WHERE template_id IN ('landing-editorial', '3d-spatial');
-DELETE FROM site_template_settings WHERE template_id IN ('landing-editorial', '3d-spatial');
-UPDATE sites SET active_template_key = 'os-desktop' WHERE active_template_key IN ('landing-editorial', '3d-spatial');
+DELETE FROM portfolio_templates WHERE id IN ('landing-editorial', '3d-spatial', 'landing-bento');
+DELETE FROM site_template_entitlements WHERE template_id IN ('landing-editorial', '3d-spatial', 'landing-bento');
+DELETE FROM site_template_settings WHERE template_id IN ('landing-editorial', '3d-spatial', 'landing-bento');
+UPDATE sites SET active_template_key = 'os-desktop' WHERE active_template_key IN ('landing-editorial', '3d-spatial', 'landing-bento');

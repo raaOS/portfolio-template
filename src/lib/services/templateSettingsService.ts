@@ -8,11 +8,6 @@
 
 import { queryD1, isD1Configured, bootstrapD1Schema } from '@/lib/cloudflareD1';
 import type { SiteTemplateSettings } from '@/types/template';
-import {
-  BENTO_TEMPLATE_ID,
-  normalizeBentoSettings,
-  type BentoTemplateSettings,
-} from '@/lib/templates/bento/settings';
 
 export class TemplateSettingsService {
   /**
@@ -72,17 +67,3 @@ export class TemplateSettingsService {
 }
 
 export const templateSettingsService = new TemplateSettingsService();
-
-/** Mengambil settings Bento yang sudah dinormalisasi (selalu lengkap & valid). */
-export async function getBentoSettings(siteId: string): Promise<BentoTemplateSettings> {
-  const stored = await templateSettingsService.getSettings(siteId, BENTO_TEMPLATE_ID);
-  return normalizeBentoSettings(stored?.options);
-}
-
-/** Menyimpan settings Bento (payload sudah harus lolos `normalizeBentoSettings`). */
-export async function saveBentoSettings(
-  siteId: string,
-  settings: BentoTemplateSettings
-): Promise<boolean> {
-  return templateSettingsService.saveSettings(siteId, BENTO_TEMPLATE_ID, { options: settings });
-}

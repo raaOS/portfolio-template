@@ -60,7 +60,7 @@ export function ClientOnboardingWizard({
   });
 
   // Step 3 State: Template Selection
-  const [selectedTemplate, setSelectedTemplate] = useState<'os-desktop' | 'landing-bento'>('os-desktop');
+  const [selectedTemplate, setSelectedTemplate] = useState<'os-desktop'>('os-desktop');
 
   if (!isOpen) return null;
 
@@ -468,12 +468,6 @@ export function ClientOnboardingWizard({
                     name: '💻 OS Desktop Simulator',
                     desc: 'Antarmuka bergaya macOS lengkap dengan Window Manager, Dock, & Spotlight.',
                     badge: 'Bawaan / Populer',
-                  },
-                  {
-                    id: 'landing-bento',
-                    name: '🍱 Bento Grid Layout',
-                    desc: 'Tampilan grid modern yang ringkas, responsif, dan estetis.',
-                    badge: 'Modern',
                   },
                 ].map((t) => (
                   <button

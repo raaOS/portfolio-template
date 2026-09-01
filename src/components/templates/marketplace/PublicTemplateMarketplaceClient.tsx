@@ -95,18 +95,7 @@ export function PublicTemplateMarketplaceClient({
                     </div>
                   )}
 
-                  {tpl.id === 'landing-bento' && (
-                    <div className="grid h-full w-full grid-cols-3 gap-2">
-                      <div className="col-span-2 rounded-lg border border-zinc-200 bg-white p-3 shadow-xs">
-                        <span className="text-[10px] font-bold text-emerald-700 font-mono block">Bento Hero</span>
-                        <p className="text-[11px] font-bold text-zinc-800 mt-1">Fullstack Portfolio</p>
-                      </div>
-                      <div className="rounded-lg border border-zinc-200 bg-white p-3 flex flex-col justify-between text-[10px] font-bold text-zinc-800 shadow-xs">
-                        <span className="text-zinc-400 text-[9px]">STACK</span>
-                        <span>React 19</span>
-                      </div>
-                    </div>
-                  )}
+
                 </div>
 
                 {/* Info & Single Action Bar */}

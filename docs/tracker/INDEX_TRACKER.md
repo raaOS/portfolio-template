@@ -316,3 +316,7 @@ Kustomisasi per-section template `landing-bento` (Pro-only): kontrak settings zo
    - *Status:* 🟢 Completed
    - *Isi:* Mode debugging serius program Bento Studio. Terverifikasi BUKAN bug: pola insert `audit_logs`, signature `revalidateSiteContentPaths`, skema `site_template_settings`, kebijakan middleware untuk `/api/client/*`, dan self-healing `normalizeBentoSettings`. Dua bug nyata diperbaiki: (1) hydration mismatch `AnimatedSection` karena `prefersReducedMotion()` saat render (dipindah ke effect + state `reducedMotion`), (2) layout regression variant `full` `BentoImageSequence` (restore `lg:flex-row`). Verifikasi: 120 files / 873 tests PASS, tsc 0 error, lint bersih.
 
+93. **[Sprint 74 - UI/UX Bento Tokens + Demo Cinematic](file:///C:/Users/USER/Documents/portfolio-template/docs/tracker/logs/sprint_74_uiux_bento_tokens_cinematic_demo.md)**
+   - *Status:* 🟢 Completed
+   - *Isi:* Konsistensi UI template bento via token bersama `src/components/templates/landing-bento/ui.ts` (button/card/title/badge/tag + warna aksen `--bento-accent`, hapus hardcode emerald/teal; canvas 3D `BentoImageSequence` kini baca aksen via `getComputedStyle`). Rombak total demo `/templates/landing-bento/demo` → halaman cinematic scroll "Mostar city" (vanilla statis di `public/cinematic-mostar/`, demo page render iframe fullscreen; terisolasi dari Tailwind). Verifikasi: 120 files / 873 tests PASS, tsc 0 error, lint bersih, runtime engine animasi + slider 15 kartu aktif.
+

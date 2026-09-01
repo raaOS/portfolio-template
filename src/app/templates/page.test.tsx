@@ -10,6 +10,5 @@ describe('PublicTemplatesPage', () => {
     expect(screen.getByText('Portfolio OS')).toBeInTheDocument();
     expect(screen.getByText(/Template Portofolio/i)).toBeInTheDocument();
     expect(screen.getByText('macOS Desktop Simulator')).toBeInTheDocument();
-    expect(screen.getByText('Modern Bento Landing')).toBeInTheDocument();
   });
 });

@@ -30,7 +30,7 @@ describe('API /api/client/template', () => {
 
       vi.spyOn(cloudflareD1, 'queryD1').mockImplementation(async (sql: string) => {
         if (sql.includes('SELECT active_template_key')) {
-          return [{ active_template_key: 'landing-bento' }];
+          return [{ active_template_key: 'os-desktop' }];
         }
         return [];
       });
@@ -40,13 +40,13 @@ describe('API /api/client/template', () => {
       expect(res.status).toBe(200);
 
       const json = await res.json();
-      expect(json.activeKey).toBe('landing-bento');
+      expect(json.activeKey).toBe('os-desktop');
       expect(Array.isArray(json.templates)).toBe(true);
       expect(json.templates.length).toBeGreaterThan(0);
 
-      const bento = json.templates.find((t: { id: string }) => t.id === 'landing-bento');
-      expect(bento?.isActive).toBe(true);
-      expect(bento?.isEntitled).toBe(true);
+      const osDesktop = json.templates.find((t: { id: string }) => t.id === 'os-desktop');
+      expect(osDesktop?.isActive).toBe(true);
+      expect(osDesktop?.isEntitled).toBe(true);
     });
   });
 
@@ -55,7 +55,7 @@ describe('API /api/client/template', () => {
       vi.spyOn(clientAuth, 'getClientSessionFromRequest').mockResolvedValue(null);
       const req = new NextRequest('http://localhost/api/client/template', {
         method: 'POST',
-        body: JSON.stringify({ templateId: 'landing-bento' }),
+        body: JSON.stringify({ templateId: 'os-desktop' }),
       });
       const res = await POST(req);
       expect(res.status).toBe(401);
@@ -97,14 +97,14 @@ describe('API /api/client/template', () => {
 
       const req = new NextRequest('http://localhost/api/client/template', {
         method: 'POST',
-        body: JSON.stringify({ templateId: 'landing-bento' }),
+        body: JSON.stringify({ templateId: 'os-desktop' }),
       });
       const res = await POST(req);
       expect(res.status).toBe(200);
 
       const json = await res.json();
       expect(json.success).toBe(true);
-      expect(json.activeTemplateKey).toBe('landing-bento');
+      expect(json.activeTemplateKey).toBe('os-desktop');
     });
   });
 });

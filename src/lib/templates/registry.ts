@@ -23,21 +23,7 @@ export const BUILTIN_TEMPLATES: TemplateMetadata[] = [
       'Integrated Chat & Contact Window',
     ],
   },
-  {
-    id: 'landing-bento',
-    name: 'Modern Bento Landing',
-    description: 'Tata letak Bento Grid modern yang sangat responsif, presisi, dan estetis untuk menampilkan karya & profil profesional.',
-    category: 'landing',
-    tierRequired: 'pro',
-    priceIdr: 0,
-    isActive: true,
-    features: [
-      'Bento Grid Responsive Auto-Layout',
-      'Fast loading & Edge SEO Optimized',
-      'Interactive Case Study Modal & Gallery',
-      'Clean Typography & Glassmorphism UI',
-    ],
-  },
+
 ];
 
 

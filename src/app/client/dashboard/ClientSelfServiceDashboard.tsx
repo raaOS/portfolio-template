@@ -6,7 +6,7 @@ import {
   BarChart3,
   FilePlus2,
   FolderKanban,
-  LayoutGrid,
+
   Loader2,
   LogOut,
   MessageSquare,
@@ -1292,21 +1292,7 @@ export default function ClientSelfServiceDashboard() {
       iconClass: 'bg-purple-600 text-white',
       enabled: Boolean(site),
     },
-    {
-      id: 'bento-studio' as const,
-      label: 'Bento Studio',
-      tier: 'Pro',
-      status: site?.plan === 'pro' ? 'Aktif' : 'Terkunci',
-      description: 'Kustomisasi per-section template Landing Bento',
-      helper:
-        site?.plan === 'pro'
-          ? 'Susun section, variant, animasi, & theme lalu publish.'
-          : 'Upgrade ke Pro untuk kustomisasi template.',
-      Icon: LayoutGrid,
-      iconClass: 'bg-emerald-700 text-white',
-      enabled: Boolean(site) && site?.plan === 'pro',
-      route: '/client/studio',
-    },
+
   ];
 
   // ════════════════════════════════════════════════════════════
@@ -1390,10 +1376,6 @@ export default function ClientSelfServiceDashboard() {
               type="button"
               className="admin-zone-folder"
               onClick={() => {
-                if (module.route) {
-                  window.location.href = module.route;
-                  return;
-                }
                 openModuleWindow(module.id as ClientModuleId);
               }}
               disabled={!module.enabled}

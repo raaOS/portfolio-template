@@ -12,20 +12,27 @@ describe('templateRegistryService', () => {
     expect(isAllowed).toBe(true);
   });
 
-  it('blocks pro landing-bento template for lite site without entitlement', async () => {
+  it('blocks pro custom-editorial template for lite site without entitlement', async () => {
     vi.spyOn(cloudflareD1, 'isD1Configured').mockReturnValue(false);
-    const isAllowed = await templateRegistryService.canSiteUseTemplate('site-1', 'lite', 'landing-bento');
+    const isAllowed = await templateRegistryService.canSiteUseTemplate('site-1', 'lite', 'custom-editorial');
     expect(isAllowed).toBe(false);
   });
 
-  it('allows pro landing-bento template for pro site', async () => {
-    const isAllowed = await templateRegistryService.canSiteUseTemplate('site-1', 'pro', 'landing-bento');
+  it('allows pro custom-editorial template for pro site', async () => {
+    vi.spyOn(cloudflareD1, 'isD1Configured').mockReturnValue(true);
+    vi.spyOn(cloudflareD1, 'queryD1').mockImplementation(async (sql: string) => {
+      if (sql.includes('portfolio_templates')) {
+        return [{ id: 'custom-editorial', name: 'Custom Editorial', description: 'Custom', category: 'landing', tier_required: 'pro', price_idr: 0, is_active: 1 }];
+      }
+      return [];
+    });
+    const isAllowed = await templateRegistryService.canSiteUseTemplate('site-1', 'pro', 'custom-editorial');
     expect(isAllowed).toBe(true);
   });
 
   it('fallbacks to os-desktop if requestedKey is unauthorized for lite site', async () => {
     vi.spyOn(cloudflareD1, 'isD1Configured').mockReturnValue(false);
-    const resolved = await templateRegistryService.resolveActiveTemplate('site-1', 'lite', 'landing-bento');
+    const resolved = await templateRegistryService.resolveActiveTemplate('site-1', 'lite', 'custom-editorial');
     expect(resolved).toBe('os-desktop');
   });
 

@@ -182,9 +182,9 @@ describe('orderService', () => {
     it('rejects a Pro-only template on a Lite order', async () => {
       vi.mocked(slugService.isSlugAvailable).mockResolvedValueOnce(true);
       vi.mocked(templateRegistryService.getTemplateMetadata).mockResolvedValueOnce({
-        id: 'landing-bento',
-        name: 'Modern Bento Landing',
-        description: 'Bento template',
+        id: 'custom-editorial',
+        name: 'Custom Editorial',
+        description: 'Custom template',
         category: 'landing',
         tierRequired: 'pro',
         priceIdr: 0,
@@ -203,7 +203,7 @@ describe('orderService', () => {
         buyerWhatsapp: '628123456789',
         plan: 'lite',
         desiredSlug: 'nanda-design',
-        templateId: 'landing-bento',
+        templateId: 'custom-editorial',
       });
 
       expect(res.success).toBe(false);
