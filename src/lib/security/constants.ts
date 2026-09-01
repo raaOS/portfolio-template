@@ -21,9 +21,6 @@ export const ADMIN_TOKEN_COOKIE = 'admin_token';
 /** Legacy cookie name (read-only, untuk backward compat). */
 export const ADMIN_TOKEN_COOKIE_LEGACY = 'admin-token';
 
-/** Cookie name untuk client-site JWT. */
-export const CLIENT_TOKEN_COOKIE = 'client_token';
-
 /** Cookie name untuk CSRF token (di-share dengan client via GET /api/admin/login). */
 export const CSRF_TOKEN_COOKIE = 'csrf_token';
 

@@ -5,13 +5,9 @@ export type OperationalEventStatus = 'success' | 'failure' | 'blocked' | 'warnin
 
 export type OperationalEventName =
   | 'admin.login'
-  | 'client.login'
-  | 'client.password_reset.request'
-  | 'client.password_reset.confirm'
   | 'site.create'
   | 'site.update'
   | 'site.delete'
-  | 'client_access.save'
   | 'project.create'
   | 'project.update'
   | 'project.delete'

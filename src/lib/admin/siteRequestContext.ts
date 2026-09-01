@@ -1,7 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { queryD1 } from '@/lib/cloudflareD1';
-import { getClientSessionFromRequest } from '@/lib/clientAuth';
 
 const DEFAULT_SITE_ID = 'default-site';
 
@@ -85,8 +84,7 @@ export async function resolveRequestSiteId(request: NextRequest, body?: unknown)
     return site.id;
   }
 
-  const session = await getClientSessionFromRequest(request).catch(() => null);
-  return session?.siteId || DEFAULT_SITE_ID;
+  return DEFAULT_SITE_ID;
 }
 
 export async function assertKnownSite(siteId: string) {

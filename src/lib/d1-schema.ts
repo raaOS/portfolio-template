@@ -34,19 +34,6 @@ export const D1_SCHEMA_QUERIES = [
     updated_at TEXT NOT NULL
   ) STRICT;`,
 
-  // 1b. Client Access
-  `CREATE TABLE IF NOT EXISTS client_access (
-    id TEXT PRIMARY KEY,
-    site_id TEXT NOT NULL,
-    email TEXT NOT NULL,
-    password_hash TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'active',
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    last_login_at TEXT,
-    UNIQUE(site_id, email)
-  ) STRICT;`,
-
   // 1c. Site Subscription Metadata
   `CREATE TABLE IF NOT EXISTS site_subscriptions (
     id TEXT PRIMARY KEY,
@@ -58,20 +45,6 @@ export const D1_SCHEMA_QUERIES = [
     external_subscription_id TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
-  ) STRICT;`,
-
-  // 1c-2. Client Password Reset Tokens
-  `CREATE TABLE IF NOT EXISTS client_password_resets (
-    id TEXT PRIMARY KEY,
-    site_id TEXT NOT NULL,
-    access_id TEXT NOT NULL,
-    email TEXT NOT NULL,
-    token_hash TEXT NOT NULL UNIQUE,
-    status TEXT NOT NULL DEFAULT 'pending',
-    expires_at TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    used_at TEXT
   ) STRICT;`,
 
   // 1d. Site Quota Overrides
@@ -166,40 +139,7 @@ export const D1_SCHEMA_QUERIES = [
     updated_at TEXT NOT NULL
   ) STRICT;`,
 
-  // 9. Portfolio Templates Catalog
-  `CREATE TABLE IF NOT EXISTS portfolio_templates (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    description TEXT,
-    category TEXT NOT NULL DEFAULT 'landing',
-    tier_required TEXT NOT NULL DEFAULT 'lite',
-    price_idr INTEGER NOT NULL DEFAULT 0,
-    is_active INTEGER NOT NULL DEFAULT 1,
-    preview_image_url TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  ) STRICT;`,
-
-  // 10. Site Template Entitlements
-  `CREATE TABLE IF NOT EXISTS site_template_entitlements (
-    id TEXT PRIMARY KEY,
-    site_id TEXT NOT NULL,
-    template_id TEXT NOT NULL,
-    granted_by TEXT NOT NULL DEFAULT 'system',
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE(site_id, template_id)
-  ) STRICT;`,
-
-  // 11. Site Template Settings Overrides
-  `CREATE TABLE IF NOT EXISTS site_template_settings (
-    id TEXT PRIMARY KEY,
-    site_id TEXT NOT NULL,
-    template_id TEXT NOT NULL,
-    settings_json TEXT NOT NULL DEFAULT '{}',
-    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE(site_id, template_id)
-  ) STRICT;`,
-
-  // 12. Site Custom Domains
+  // 10. Site Custom Domains
   `CREATE TABLE IF NOT EXISTS site_custom_domains (
     site_id TEXT PRIMARY KEY,
     hostname TEXT NOT NULL UNIQUE,
@@ -233,10 +173,6 @@ export const D1_SCHEMA_QUERIES = [
   // INDEXES
   // ==========================================
   `CREATE INDEX IF NOT EXISTS idx_sites_slug ON sites(slug);`,
-  `CREATE INDEX IF NOT EXISTS idx_client_access_site_status ON client_access(site_id, status);`,
-  `CREATE INDEX IF NOT EXISTS idx_client_access_email ON client_access(email);`,
-  `CREATE INDEX IF NOT EXISTS idx_client_password_resets_token ON client_password_resets(token_hash);`,
-  `CREATE INDEX IF NOT EXISTS idx_client_password_resets_access_status ON client_password_resets(access_id, status);`,
   `CREATE INDEX IF NOT EXISTS idx_site_subscriptions_site ON site_subscriptions(site_id);`,
   SITE_QUOTA_OVERRIDES_INDEX_SQL,
   `CREATE INDEX IF NOT EXISTS idx_projects_site_status_order ON projects(site_id, status, order_index);`,
@@ -249,8 +185,6 @@ export const D1_SCHEMA_QUERIES = [
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_amount_active ON orders(amount) WHERE status IN ('pending_payment', 'waiting_verification', 'activating');`,
   `CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);`,
   `CREATE INDEX IF NOT EXISTS idx_orders_email ON orders(buyer_email);`,
-  `CREATE INDEX IF NOT EXISTS idx_template_entitlements_site ON site_template_entitlements(site_id);`,
-  `CREATE INDEX IF NOT EXISTS idx_template_settings_site_tpl ON site_template_settings(site_id, template_id);`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_site_custom_domains_hostname ON site_custom_domains(hostname);`,
   `CREATE INDEX IF NOT EXISTS idx_site_analytics_site ON site_analytics(site_id);`,
 ];

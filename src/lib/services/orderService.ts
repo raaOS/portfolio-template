@@ -2,8 +2,6 @@ import crypto from 'crypto';
 import { queryD1 } from '@/lib/cloudflareD1';
 import { cleanEnvVar } from '@/lib/utils/env';
 import { isSlugAvailable } from './slugService';
-import { templateEntitlementService } from './templateEntitlementService';
-import { templateRegistryService } from './templateRegistryService';
 import { getPaymentConfig, type PaymentConfig } from './paymentConfigService';
 import { PLAN_BASE_PRICES } from '@/constants/plans';
 
@@ -251,34 +249,6 @@ function normalizePaymentProofUrl(proofUrl: string): string | null {
   } catch {
     return null;
   }
-}
-
-export async function resolveOrderTemplate(
-  templateId: string | undefined,
-  plan: 'lite' | 'pro'
-): Promise<{
-  templateId?: string;
-  templateName?: string;
-  extraAmount: number;
-  error?: string;
-}> {
-  const normalizedTemplateId = templateId?.trim();
-  if (!normalizedTemplateId) return { extraAmount: 0 };
-
-  const template = await templateRegistryService.getTemplateMetadata(normalizedTemplateId);
-  if (!template || !template.isActive) {
-    return { extraAmount: 0, error: 'Template tidak tersedia atau sudah dinonaktifkan.' };
-  }
-
-  if (template.tierRequired === 'pro' && plan !== 'pro') {
-    return { extraAmount: 0, error: 'Template ini membutuhkan paket Pro.' };
-  }
-
-  return {
-    templateId: template.id,
-    templateName: template.name,
-    extraAmount: Math.max(0, Number(template.priceIdr) || 0),
-  };
 }
 
 async function resolveOrderAmount(
@@ -545,16 +515,7 @@ export async function createOrder(
   const buyerEmailLower = input.buyerEmail.trim().toLowerCase();
   const available = await isSlugAvailable(slugLower);
   if (!available) {
-    const ownerRows = (await queryD1<{ id: string }>(
-      `SELECT s.id FROM client_access ca
-       JOIN sites s ON s.id = ca.site_id
-       WHERE LOWER(ca.email) = ? AND LOWER(s.slug) = ? AND ca.status = 'active'
-       LIMIT 1`,
-      [buyerEmailLower, slugLower]
-    )) || [];
-    if (ownerRows.length === 0) {
-      return { success: false, error: 'Slug tidak tersedia atau sudah digunakan. Silakan pilih slug lain.' };
-    }
+    return { success: false, error: 'Slug tidak tersedia atau sudah digunakan. Silakan pilih slug lain.' };
   }
 
   let orderId = '';
@@ -582,12 +543,7 @@ export async function createOrder(
     };
   }
 
-  const templateSelection = await resolveOrderTemplate(input.templateId, input.plan);
-  if (templateSelection.error) {
-    return { success: false, error: templateSelection.error };
-  }
-
-  const baseAmount = (input.amount ?? getBasePlanAmount(input.plan)) + templateSelection.extraAmount;
+  const baseAmount = input.amount ?? getBasePlanAmount(input.plan);
   let amount = baseAmount;
   let forceUniqueAmount = false;
 
@@ -609,12 +565,11 @@ export async function createOrder(
     try {
       await queryD1(
         `INSERT INTO orders (
-          id, template_id, desired_slug, buyer_name, buyer_email, buyer_whatsapp,
+          id, desired_slug, buyer_name, buyer_email, buyer_whatsapp,
           plan, amount, payment_method, access_token_hash, status, expires_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manual_qris', ?, 'pending_payment', ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'manual_qris', ?, 'pending_payment', ?, ?, ?)`,
         [
           attemptOrderId,
-          templateSelection.templateId || null,
           slugLower,
           input.buyerName.trim(),
           input.buyerEmail.trim().toLowerCase(),
@@ -650,7 +605,7 @@ export async function createOrder(
 
   const newOrder: OrderRecord = {
     id: orderId,
-    template_id: templateSelection.templateId || null,
+    template_id: null,
     desired_slug: slugLower,
     buyer_name: input.buyerName.trim(),
     buyer_email: input.buyerEmail.trim().toLowerCase(),
@@ -665,13 +620,9 @@ export async function createOrder(
   };
 
   // Notify Telegram Admin (Information only)
-  const templateLine = templateSelection.templateName
-    ? `Template: <b>${escapeTelegramHtml(templateSelection.templateName)}</b>\n`
-    : '';
   const tgMsg = `🛒 <b>ORDER BARU (BELUM DIBAYAR)</b>\n\n` +
     `ID: <code>${escapeTelegramHtml(orderId)}</code>\n` +
     `Paket: <b>${escapeTelegramHtml(input.plan.toUpperCase())}</b>\n` +
-    templateLine +
     `Slug: <code>${escapeTelegramHtml(slugLower)}</code>\n` +
     `Buyer: ${escapeTelegramHtml(input.buyerName)}\n` +
     `WA: ${escapeTelegramHtml(input.buyerWhatsapp)}\n` +
@@ -911,135 +862,32 @@ export async function activateOrder(
 
   const order = lockedOrders[0];
   let siteId: string;
-  let isExistingBuyer = false;
-  let actualSlug = order.desired_slug;
+  const actualSlug = order.desired_slug;
 
   // Wrap provisioning in try/catch with compensating cleanup (no orphan rows)
   type CreatedRow =
     | { kind: 'site'; id: string }
-    | { kind: 'client_access'; id: string }
-    | { kind: 'site_subscription'; id: string }
-    | { kind: 'entitlement'; siteId: string; templateId: string };
+    | { kind: 'site_subscription'; id: string };
 
   const createdRows: CreatedRow[] = [];
-  let upgradePrevious: {
-    siteId: string;
-    plan: string;
-    activeTemplateKey: string | null;
-    subPlan: string | null;
-    subStatus: string | null;
-  } | null = null;
 
   try {
-    // Check if buyer email already exists in client_access
-    const existingClients = await queryD1<{ site_id: string }>(
-      'SELECT site_id FROM client_access WHERE LOWER(email) = ? AND status = "active"',
-      [order.buyer_email.toLowerCase()]
+    // New Site Provisioning Flow
+    siteId = `site_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+    await queryD1(
+      `INSERT INTO sites (id, slug, name, plan, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'active', ?, ?)`,
+      [siteId, order.desired_slug, `${order.buyer_name}'s Portfolio`, order.plan, now, now]
     );
+    createdRows.push({ kind: 'site', id: siteId });
 
-    let targetSiteId: string | null = null;
-    if (existingClients.length > 0) {
-      const siteIds = existingClients.map((c) => c.site_id);
-      const placeholders = siteIds.map(() => '?').join(',');
-      const matchingSites = await queryD1<{ id: string; slug: string }>(
-        `SELECT id, slug FROM sites WHERE id IN (${placeholders}) AND LOWER(slug) = ?`,
-        [...siteIds, order.desired_slug.toLowerCase()]
-      );
-      if (matchingSites.length > 0) {
-        targetSiteId = matchingSites[0].id;
-      }
-    }
-
-    if (targetSiteId) {
-      // Existing Buyer Upgrade Flow for matching site
-      isExistingBuyer = true;
-      siteId = targetSiteId;
-
-      // Capture previous state so activation failure can be rolled back
-      const prevSiteRows = await queryD1<{ plan: string; active_template_key: string | null }>(
-        'SELECT plan, active_template_key FROM sites WHERE id = ?',
-        [siteId]
-      );
-      const prevSubRows = await queryD1<{ plan: string; status: string }>(
-        'SELECT plan, status FROM site_subscriptions WHERE site_id = ?',
-        [siteId]
-      );
-      upgradePrevious = {
-        siteId,
-        plan: prevSiteRows[0]?.plan ?? order.plan,
-        activeTemplateKey: prevSiteRows[0]?.active_template_key ?? null,
-        subPlan: prevSubRows[0]?.plan ?? order.plan,
-        subStatus: prevSubRows[0]?.status ?? 'active',
-      };
-
-      // Downgrade guard: activation via order must NOT silently downgrade a Pro
-      // site to Lite (quota guard downgrade hanya ada di flow Master). Same-plan
-      // renewal (=) atau upgrade (lite -> pro) tetap diperbolehkan.
-      if (upgradePrevious.plan === 'pro' && order.plan === 'lite') {
-        await queryD1(
-          `UPDATE orders SET status = 'waiting_verification', updated_at = ? WHERE id = ? AND status = 'activating'`,
-          [now, orderId]
-        );
-        return {
-          success: false,
-          message:
-            'Aktivasi ditolak: Site ini sudah berlangganan paket Pro dan tidak dapat diturunkan melalui aktivasi order Lite. Untuk downgrade, gunakan flow Master (dengan mempertimbangkan utilisasi quota).',
-        };
-      }
-
-      await queryD1('UPDATE sites SET plan = ?, updated_at = ? WHERE id = ?', [order.plan, now, siteId]);
-      await queryD1('UPDATE site_subscriptions SET plan = ?, status = "active", updated_at = ? WHERE site_id = ?', [
-        order.plan,
-        now,
-        siteId
-      ]);
-
-      // Fix desired_slug skip: read actual site slug for correct URL
-      const siteRows = await queryD1<{ slug: string }>('SELECT slug FROM sites WHERE id = ?', [siteId]);
-      if (siteRows[0]) {
-        actualSlug = siteRows[0].slug;
-      }
-    } else {
-      // New Site Provisioning Flow (Creates new site for new buyer OR new site for existing buyer email with a new desired_slug)
-      siteId = `site_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      const accessId = `client_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      const defaultPasswordHash = 'DISABLED_REQUIRE_RESET';
-
-      await queryD1(
-        `INSERT INTO sites (id, slug, name, plan, status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 'active', ?, ?)`,
-        [siteId, order.desired_slug, `${order.buyer_name}'s Portfolio`, order.plan, now, now]
-      );
-      createdRows.push({ kind: 'site', id: siteId });
-
-      await queryD1(
-        `INSERT INTO client_access (id, site_id, email, password_hash, status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 'active', ?, ?)`,
-        [accessId, siteId, order.buyer_email.toLowerCase(), defaultPasswordHash, now, now]
-      );
-      createdRows.push({ kind: 'client_access', id: accessId });
-
-      await queryD1(
-        `INSERT INTO site_subscriptions (id, site_id, plan, status, created_at, updated_at)
-         VALUES (?, ?, ?, 'active', ?, ?)`,
-        [`sub_${siteId}`, siteId, order.plan, now, now]
-      );
-      createdRows.push({ kind: 'site_subscription', id: `sub_${siteId}` });
-    }
-
-    // Auto-grant template entitlement if specified in order
-    if (order.template_id) {
-      const granted = await templateEntitlementService.grantEntitlement(siteId, order.template_id, 'purchase');
-      if (!granted) {
-        throw new Error(`Gagal memberikan entitlement template ${order.template_id}`);
-      }
-      createdRows.push({ kind: 'entitlement', siteId, templateId: order.template_id });
-      await queryD1('UPDATE sites SET active_template_key = ?, updated_at = ? WHERE id = ?', [
-        order.template_id,
-        now,
-        siteId,
-      ]);
-    }
+    await queryD1(
+      `INSERT INTO site_subscriptions (id, site_id, plan, status, created_at, updated_at)
+       VALUES (?, ?, ?, 'active', ?, ?)`,
+      [`sub_${siteId}`, siteId, order.plan, now, now]
+    );
+    createdRows.push({ kind: 'site_subscription', id: `sub_${siteId}` });
 
     // Update Order status to activated
     await queryD1('UPDATE orders SET status = "activated", site_id = ?, updated_at = ? WHERE id = ?', [
@@ -1052,7 +900,7 @@ export async function activateOrder(
     await queryD1(
       `INSERT INTO audit_logs (id, site_id, action, entity_type, created_at)
        VALUES (?, ?, ?, 'order', ?)`,
-      [`audit_${crypto.randomUUID()}`, siteId, isExistingBuyer ? 'ORDER_UPGRADED' : 'ORDER_ACTIVATED', now]
+      [`audit_${crypto.randomUUID()}`, siteId, 'ORDER_ACTIVATED', now]
     );
   } catch (err) {
     // Rollback — undo partially created rows, then mark order as failed
@@ -1062,33 +910,11 @@ export async function activateOrder(
       try {
         if (row.kind === 'site') {
           await queryD1('DELETE FROM sites WHERE id = ?', [row.id]);
-        } else if (row.kind === 'client_access') {
-          await queryD1('DELETE FROM client_access WHERE id = ?', [row.id]);
         } else if (row.kind === 'site_subscription') {
           await queryD1('DELETE FROM site_subscriptions WHERE id = ?', [row.id]);
-        } else {
-          await queryD1('DELETE FROM site_template_entitlements WHERE site_id = ? AND template_id = ?', [
-            row.siteId,
-            row.templateId,
-          ]);
         }
       } catch (cleanupErr) {
         console.error(`[activateOrder] Cleanup failed for ${row.kind} ${JSON.stringify(row)}:`, cleanupErr);
-      }
-    }
-
-    if (upgradePrevious) {
-      try {
-        await queryD1(
-          'UPDATE sites SET plan = ?, active_template_key = ?, updated_at = ? WHERE id = ?',
-          [upgradePrevious.plan, upgradePrevious.activeTemplateKey, now, upgradePrevious.siteId]
-        );
-        await queryD1(
-          'UPDATE site_subscriptions SET plan = ?, status = ?, updated_at = ? WHERE site_id = ?',
-          [upgradePrevious.subPlan, upgradePrevious.subStatus, now, upgradePrevious.siteId]
-        );
-      } catch (restoreErr) {
-        console.error(`[activateOrder] Restore of previous site state failed for order ${orderId}:`, restoreErr);
       }
     }
 
@@ -1111,11 +937,8 @@ export async function activateOrder(
 
   const baseUrl = env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://makeitbetter.my.id';
   const siteUrl = `${baseUrl}/${actualSlug}`;
-  const loginUrl = `${baseUrl}/client/login?site=${actualSlug}`;
 
-  const message = isExistingBuyer
-    ? `Berhasil meng-upgrade pesanan ${order.id} ke paket ${order.plan.toUpperCase()}. Site URL: ${siteUrl}`
-    : `Berhasil mengaktifkan pesanan ${order.id}. Site URL: ${siteUrl} | Login Client: ${loginUrl}`;
+  const message = `Berhasil mengaktifkan pesanan ${order.id}. Site URL: ${siteUrl}`;
 
   return { success: true, message, siteId };
 }

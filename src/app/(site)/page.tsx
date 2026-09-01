@@ -1,8 +1,7 @@
-import PublicTemplatesPage from '@/app/templates/page';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
 export default async function Home() {
-  return <PublicTemplatesPage />;
+  redirect('/default-site');
 }
-

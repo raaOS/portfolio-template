@@ -104,16 +104,6 @@ describe('GET /api/admin/sites', () => {
       ])
       .mockResolvedValueOnce([
         {
-          id: 'access-1',
-          site_id: 'default-site',
-          email: 'client@example.com',
-          status: 'active',
-          updated_at: '2026-06-03T00:00:00Z',
-          last_login_at: null,
-        },
-      ])
-      .mockResolvedValueOnce([
-        {
           site_id: 'default-site',
           plan: 'lite',
           status: 'trialing',
@@ -162,10 +152,6 @@ describe('GET /api/admin/sites', () => {
           available: true,
         },
       },
-      clientAccess: {
-        email: 'client@example.com',
-        status: 'active',
-      },
       billing: {
         status: 'trialing',
       },
@@ -213,7 +199,6 @@ describe('GET /api/admin/sites', () => {
         },
       ])
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         {
           site_id: 'site-custom',
@@ -221,7 +206,8 @@ describe('GET /api/admin/sites', () => {
           storage_mb: 1000,
           media_per_project: 20,
         },
-      ]);
+      ])
+      .mockResolvedValueOnce([]);
 
     const response = await GET(buildRequest());
     const body = await response.json();
@@ -335,7 +321,6 @@ describe('GET /api/admin/sites', () => {
         },
       ])
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         {
           site_id: 'site-created',
@@ -412,7 +397,6 @@ describe('GET /api/admin/sites', () => {
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ id: 'default-site' }])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([])
@@ -428,7 +412,6 @@ describe('GET /api/admin/sites', () => {
           project_count: 2,
         },
       ])
-      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
@@ -500,7 +483,6 @@ describe('GET /api/admin/sites', () => {
         },
       ])
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         {
           site_id: 'site-custom',
@@ -509,6 +491,7 @@ describe('GET /api/admin/sites', () => {
           media_per_project: null,
         },
       ])
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
 
     const response = await PUT(
@@ -549,6 +532,10 @@ describe('GET /api/admin/sites', () => {
       'sites/site-delete/projects/covers/a.webp',
       'sites/site-delete/projects/gallery/b.webp',
     ]);
+    for (let i = 0; i < 8; i++) {
+      queryD1Mock.mockResolvedValueOnce([]);
+    }
+    queryD1Mock.mockResolvedValueOnce([]);
 
     const response = await DELETE(
       buildRequest('DELETE', {
@@ -566,7 +553,16 @@ describe('GET /api/admin/sites', () => {
       mediaObjects: 2,
     });
     expect(deleteFromR2Mock).toHaveBeenCalledTimes(2);
-    expect(queryD1Mock).toHaveBeenCalledWith('DELETE FROM client_password_resets WHERE site_id = ?', [
+    expect(queryD1Mock).toHaveBeenCalledWith('DELETE FROM site_subscriptions WHERE site_id = ?', [
+      'site-delete',
+    ]);
+    expect(queryD1Mock).toHaveBeenCalledWith('DELETE FROM site_quota_overrides WHERE site_id = ?', [
+      'site-delete',
+    ]);
+    expect(queryD1Mock).toHaveBeenCalledWith('DELETE FROM media_assets WHERE site_id = ?', [
+      'site-delete',
+    ]);
+    expect(queryD1Mock).toHaveBeenCalledWith('DELETE FROM projects WHERE site_id = ?', [
       'site-delete',
     ]);
     expect(queryD1Mock).toHaveBeenCalledWith('DELETE FROM sites WHERE id = ?', ['site-delete']);

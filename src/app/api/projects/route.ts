@@ -14,7 +14,6 @@ import {
 import { validateSiteMutationRequest } from '@/lib/admin/siteMutationAuth';
 import { resolveProjectMediaUrls } from '@/lib/urlResolver';
 import { validateAdminRequest } from '@/lib/auth';
-import { validateClientRequest } from '@/lib/clientAuth';
 import { revalidateSiteProjectPaths } from '@/lib/admin/siteRequestContext';
 import { buildCommentPath } from '@/lib/projectEngagement';
 
@@ -29,10 +28,8 @@ export async function GET(request: NextRequest) {
     const siteId = resolveProjectSiteId(request);
 
     // SECURITY FIX: Unauthenticated callers can only see published projects.
-    // Admin and client-authenticated callers retain full status filtering.
-    const isAdmin = await validateAdminRequest(request, { checkCsrf: false });
-    const isClient = !isAdmin ? await validateClientRequest(request, { checkCsrf: false, siteId }) : null;
-    const isAuthenticated = Boolean(isAdmin || isClient);
+    // Admin callers retain full status filtering.
+    const isAuthenticated = await validateAdminRequest(request, { checkCsrf: false });
     const status = isAuthenticated
       ? (searchParams.get('status') || undefined)
       : 'published';

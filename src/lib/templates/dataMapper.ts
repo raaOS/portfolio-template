@@ -8,7 +8,6 @@ import type { SiteInfo } from '@/lib/adapters/siteDataAdapter';
 import type {
   PortfolioTemplateData,
   SiteProfileHeader,
-  SiteTemplateSettings,
 } from '@/types/template';
 
 export interface SiteRecordWithTemplate extends SiteInfo {
@@ -19,7 +18,6 @@ export interface SiteRecordWithTemplate extends SiteInfo {
 export interface DataMapperOptions {
   site: SiteRecordWithTemplate;
   homepageData: HomepageData;
-  settings?: SiteTemplateSettings;
 }
 
 /**
@@ -27,7 +25,7 @@ export interface DataMapperOptions {
  * yang siap dikonsumsi oleh seluruh template renderer.
  */
 export function mapD1ToTemplateData(options: DataMapperOptions): PortfolioTemplateData {
-  const { site, homepageData, settings } = options;
+  const { site, homepageData } = options;
 
   const siteHeader: SiteProfileHeader = {
     id: site.id,
@@ -52,7 +50,6 @@ export function mapD1ToTemplateData(options: DataMapperOptions): PortfolioTempla
     hardSkills: homepageData.hardSkillsData.skills || [],
     contact: homepageData.contactData,
     testimonials: homepageData.testimonialsData.testimonials || [],
-    settings,
     lastUpdated: new Date().toISOString(),
   };
 }

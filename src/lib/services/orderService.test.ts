@@ -10,7 +10,6 @@ import {
 } from './orderService';
 import * as cloudflareD1 from '@/lib/cloudflareD1';
 import * as slugService from './slugService';
-import { templateRegistryService } from './templateRegistryService';
 
 vi.mock('@/lib/cloudflareD1', () => ({
   queryD1: vi.fn()
@@ -18,12 +17,6 @@ vi.mock('@/lib/cloudflareD1', () => ({
 
 vi.mock('./slugService', () => ({
   isSlugAvailable: vi.fn()
-}));
-
-vi.mock('./templateRegistryService', () => ({
-  templateRegistryService: {
-    getTemplateMetadata: vi.fn(),
-  },
 }));
 
 const activePaymentConfigRows = [
@@ -179,109 +172,8 @@ describe('orderService', () => {
       expect(res.error).toContain('Pembayaran sedang tidak aktif');
     });
 
-    it('rejects a Pro-only template on a Lite order', async () => {
-      vi.mocked(slugService.isSlugAvailable).mockResolvedValueOnce(true);
-      vi.mocked(templateRegistryService.getTemplateMetadata).mockResolvedValueOnce({
-        id: 'custom-editorial',
-        name: 'Custom Editorial',
-        description: 'Custom template',
-        category: 'landing',
-        tierRequired: 'pro',
-        priceIdr: 0,
-        isActive: true,
-      });
-      vi.mocked(cloudflareD1.queryD1)
-        .mockResolvedValueOnce([]) // expire stale: activating-recovery sweep
-        .mockResolvedValueOnce([]) // expire stale: 7-day auto-cancel sweep
-        .mockResolvedValueOnce([]) // expire stale pending orders
-        .mockResolvedValueOnce(activePaymentConfigRows)
-        .mockResolvedValueOnce([]); // M5: duplicate order check
-
-      const res = await createOrder({
-        buyerName: 'Nanda',
-        buyerEmail: 'nanda@test.com',
-        buyerWhatsapp: '628123456789',
-        plan: 'lite',
-        desiredSlug: 'nanda-design',
-        templateId: 'custom-editorial',
-      });
-
-      expect(res.success).toBe(false);
-      expect(res.error).toContain('membutuhkan paket Pro');
-    });
-
-    it('adds paid template price to the order amount', async () => {
-      vi.mocked(slugService.isSlugAvailable).mockResolvedValueOnce(true);
-      vi.mocked(templateRegistryService.getTemplateMetadata).mockResolvedValueOnce({
-        id: 'custom-paid-landing',
-        name: 'Paid Custom Landing',
-        description: 'Paid template',
-        category: 'landing',
-        tierRequired: 'pro',
-        priceIdr: 50000,
-        isActive: true,
-      });
-      vi.mocked(cloudflareD1.queryD1)
-        .mockResolvedValueOnce([]) // expire stale: activating-recovery sweep
-        .mockResolvedValueOnce([]) // expire stale: 7-day auto-cancel sweep
-        .mockResolvedValueOnce([]) // expire stale pending orders
-        .mockResolvedValueOnce([
-          {
-            value: JSON.stringify({
-              isActive: true,
-              qrisUniqueAmountEnabled: false,
-              qrisUniqueAmountMaxOffset: 999,
-            }),
-          },
-        ])
-        .mockResolvedValueOnce([]) // M5: duplicate order check
-        .mockResolvedValueOnce([]); // insert order
-
-      const res = await createOrder({
-        buyerName: 'Nanda',
-        buyerEmail: 'nanda@test.com',
-        buyerWhatsapp: '628123456789',
-        plan: 'pro',
-        desiredSlug: 'nanda-design',
-        templateId: 'custom-paid-landing',
-      });
-
-      expect(res.success).toBe(true);
-      expect(res.order?.template_id).toBe('custom-paid-landing');
-      expect(res.order?.amount).toBe(349000);
-    });
-
-    it('allows order creation when the slug belongs to the same buyer email (renewal/upgrade)', async () => {
+    it('still rejects a slug that is not available', async () => {
       vi.mocked(slugService.isSlugAvailable).mockResolvedValueOnce(false);
-      vi.mocked(cloudflareD1.queryD1)
-        .mockResolvedValueOnce([]) // expire stale: activating-recovery sweep
-        .mockResolvedValueOnce([]) // expire stale: 7-day auto-cancel sweep
-        .mockResolvedValueOnce([]) // expire stale pending orders
-        .mockResolvedValueOnce([{ id: 'site_owned' }]) // owner check: slug owned by same email
-        .mockResolvedValueOnce(activePaymentConfigRows)
-        .mockResolvedValueOnce([]) // M5: duplicate order check
-        .mockResolvedValueOnce([]) // used unique offsets
-        .mockResolvedValueOnce([]); // insert order
-
-      const res = await createOrder({
-        buyerName: 'Nanda',
-        buyerEmail: 'nanda@test.com',
-        buyerWhatsapp: '628123456789',
-        plan: 'pro',
-        desiredSlug: 'nanda-design'
-      });
-
-      expect(res.success).toBe(true);
-      expect(res.order?.desired_slug).toBe('nanda-design');
-    });
-
-    it('still rejects a slug that belongs to another buyer email', async () => {
-      vi.mocked(slugService.isSlugAvailable).mockResolvedValueOnce(false);
-      vi.mocked(cloudflareD1.queryD1)
-        .mockResolvedValueOnce([]) // expire stale: activating-recovery sweep
-        .mockResolvedValueOnce([]) // expire stale: 7-day auto-cancel sweep
-        .mockResolvedValueOnce([]) // expire stale pending orders
-        .mockResolvedValueOnce([]); // owner check: not owned by this email
 
       const res = await createOrder({
         buyerName: 'Orang Lain',
@@ -440,42 +332,12 @@ describe('orderService', () => {
 
       vi.mocked(cloudflareD1.queryD1)
         .mockResolvedValueOnce([order]) // lock order with UPDATE RETURNING
-        .mockResolvedValueOnce([]) // existingClients check (empty)
         .mockResolvedValueOnce([]) // insert sites
-        .mockResolvedValueOnce([]) // insert client_access
         .mockResolvedValueOnce([]) // insert site_subscriptions
         .mockResolvedValueOnce([]) // update order activated
         .mockResolvedValueOnce([]); // insert audit_log
 
       const res = await activateOrder('ORD-123');
-      expect(res.success).toBe(true);
-      expect(res.message).toContain('Berhasil mengaktifkan pesanan');
-      expect(res.siteId).toBeDefined();
-    });
-
-    it('provisions new site when existing buyer orders a different desired slug', async () => {
-      const order = {
-        id: 'ORD-456',
-        desired_slug: 'second-studio',
-        buyer_name: 'Nanda Existing',
-        buyer_email: 'existingbuyer@test.com',
-        buyer_whatsapp: '628123456789',
-        plan: 'pro',
-        payment_proof_url: 'https://proof.png',
-        status: 'waiting_verification'
-      };
-
-      vi.mocked(cloudflareD1.queryD1)
-        .mockResolvedValueOnce([order]) // lock order with UPDATE RETURNING
-        .mockResolvedValueOnce([{ site_id: 'site_first' }]) // existingClients check
-        .mockResolvedValueOnce([]) // matchingSites check for 'second-studio' (empty -> new site)
-        .mockResolvedValueOnce([]) // insert sites
-        .mockResolvedValueOnce([]) // insert client_access
-        .mockResolvedValueOnce([]) // insert site_subscriptions
-        .mockResolvedValueOnce([]) // update order activated
-        .mockResolvedValueOnce([]); // insert audit_log
-
-      const res = await activateOrder('ORD-456');
       expect(res.success).toBe(true);
       expect(res.message).toContain('Berhasil mengaktifkan pesanan');
       expect(res.siteId).toBeDefined();
@@ -489,33 +351,6 @@ describe('orderService', () => {
       const res = await activateOrder('ORD-789');
       expect(res.success).toBe(false);
       expect(res.message).toContain('bukti bayar');
-    });
-
-    it('rejects downgrade activation (Pro site via Lite order) and resets order to waiting_verification', async () => {
-      const order = {
-        id: 'ORD-DG',
-        desired_slug: 'pro-site',
-        buyer_name: 'Nanda',
-        buyer_email: 'nanda@test.com',
-        buyer_whatsapp: '628123456789',
-        plan: 'lite',
-        payment_proof_url: 'https://proof.png',
-        status: 'waiting_verification'
-      };
-
-      vi.mocked(cloudflareD1.queryD1)
-        .mockResolvedValueOnce([order]) // lock order
-        .mockResolvedValueOnce([{ site_id: 'site_pro' }]) // existingClients check
-        .mockResolvedValueOnce([{ id: 'site_pro', slug: 'pro-site' }]) // matchingSites
-        .mockResolvedValueOnce([{ plan: 'pro', active_template_key: 'os-desktop' }]) // prev site = Pro
-        .mockResolvedValueOnce([{ plan: 'pro', status: 'active' }]) // prev subscription = Pro
-        .mockResolvedValueOnce([]); // order set back to waiting_verification
-
-      const res = await activateOrder('ORD-DOWN');
-      expect(res.success).toBe(false);
-      expect(res.message).toContain('tidak dapat diturunkan');
-      const updateSql = vi.mocked(cloudflareD1.queryD1).mock.calls.map(([sql]) => String(sql)).filter((sql) => /UPDATE orders/.test(sql));
-      expect(updateSql.some((sql) => sql.includes("status = 'waiting_verification'"))).toBe(true);
     });
 
     it('cleans up partially created rows when provisioning fails mid-way', async () => {
@@ -532,9 +367,7 @@ describe('orderService', () => {
 
       vi.mocked(cloudflareD1.queryD1)
         .mockResolvedValueOnce([order]) // lock order
-        .mockResolvedValueOnce([]) // existingClients check (empty)
         .mockResolvedValueOnce([]) // insert sites
-        .mockResolvedValueOnce([]) // insert client_access
         .mockResolvedValueOnce([]) // insert site_subscriptions
         .mockRejectedValueOnce(new Error('UPDATE orders activated failed')); // fail after inserts
 
@@ -547,43 +380,7 @@ describe('orderService', () => {
       );
       const deleteSql = deleteCalls.map(([sql]) => String(sql));
       expect(deleteSql.some((sql) => sql.includes('DELETE FROM sites WHERE id = ?'))).toBe(true);
-      expect(deleteSql.some((sql) => sql.includes('DELETE FROM client_access WHERE id = ?'))).toBe(true);
       expect(deleteSql.some((sql) => sql.includes('DELETE FROM site_subscriptions WHERE id = ?'))).toBe(true);
-    });
-
-    it('restores previous site plan when upgrade provisioning fails', async () => {
-      const order = {
-        id: 'ORD-888',
-        desired_slug: 'existing-site',
-        buyer_name: 'Existing',
-        buyer_email: 'existing@test.com',
-        buyer_whatsapp: '628123',
-        plan: 'pro',
-        payment_proof_url: 'https://proof.png',
-        status: 'waiting_verification'
-      };
-
-      vi.mocked(cloudflareD1.queryD1)
-        .mockResolvedValueOnce([order]) // lock order
-        .mockResolvedValueOnce([{ site_id: 'site_x' }]) // existingClients check
-        .mockResolvedValueOnce([{ id: 'site_x', slug: 'existing-site' }]) // matchingSites
-        .mockResolvedValueOnce([{ plan: 'lite', active_template_key: null }]) // prev site
-        .mockResolvedValueOnce([{ plan: 'lite', status: 'active' }]) // prev subscription
-        .mockResolvedValueOnce([]) // update sites plan -> pro
-        .mockResolvedValueOnce([]) // update subscriptions plan -> pro
-        .mockResolvedValueOnce([{ slug: 'existing-site' }]) // read slug
-        .mockRejectedValueOnce(new Error('POST upgrade update failed')); // fail after provisioning
-
-      const res = await activateOrder('ORD-888');
-
-      expect(res.success).toBe(false);
-      const updateSql = vi.mocked(cloudflareD1.queryD1).mock.calls.map(([sql]) => String(sql)).filter((sql) => /UPDATE/.test(sql));
-      expect(
-        updateSql.some((sql) => sql.includes('UPDATE sites SET plan = ?, active_template_key = ?'))
-      ).toBe(true);
-      expect(
-        updateSql.some((sql) => sql.includes('UPDATE site_subscriptions SET plan = ?, status = ?'))
-      ).toBe(true);
     });
   });
 

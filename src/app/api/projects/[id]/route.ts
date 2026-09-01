@@ -12,7 +12,6 @@ import {
 } from '@/lib/admin/projectSiteContext';
 import { validateSiteMutationRequest } from '@/lib/admin/siteMutationAuth';
 import { validateAdminRequest } from '@/lib/auth';
-import { validateClientRequest } from '@/lib/clientAuth';
 import { revalidateSiteProjectPaths } from '@/lib/admin/siteRequestContext';
 import { buildCommentPath } from '@/lib/projectEngagement';
 
@@ -61,9 +60,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
 
     // SECURITY FIX: Unauthenticated callers cannot view draft projects.
     if (project.status !== 'published') {
-      const isAdmin = await validateAdminRequest(request, { checkCsrf: false });
-      const isClient = !isAdmin ? await validateClientRequest(request, { checkCsrf: false, siteId }) : null;
-      if (!isAdmin && !isClient) {
+      if (!(await validateAdminRequest(request, { checkCsrf: false }))) {
         return NextResponse.json({ error: 'Project not found' }, { status: 404 });
       }
     }

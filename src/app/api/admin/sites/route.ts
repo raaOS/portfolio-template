@@ -36,15 +36,6 @@ type SiteSummaryRow = {
   project_count: number;
 };
 
-type ClientAccessSummaryRow = {
-  id: string;
-  site_id: string;
-  email: string;
-  status: string;
-  updated_at: string;
-  last_login_at: string | null;
-};
-
 type SiteSubscriptionSummaryRow = {
   site_id: string;
   plan: string;
@@ -152,14 +143,6 @@ function placeholders(values: unknown[]) {
   return values.map(() => '?').join(', ');
 }
 
-function mapClientAccessRows(rows: ClientAccessSummaryRow[]) {
-  const bySiteId = new Map<string, ClientAccessSummaryRow>();
-  rows.forEach((row) => {
-    if (!bySiteId.has(row.site_id)) bySiteId.set(row.site_id, row);
-  });
-  return bySiteId;
-}
-
 function mapSubscriptionRows(rows: SiteSubscriptionSummaryRow[]) {
   const bySiteId = new Map<string, SiteSubscriptionSummaryRow>();
   rows.forEach((row) => {
@@ -235,16 +218,9 @@ async function loadSiteSummaries(
   const siteIds = rows.map((row) => row.id);
   const storageUsages = await Promise.all(siteIds.map((siteId) => getSiteStorageUsageSafe(siteId)));
   const relationParams = placeholders(siteIds);
-  const [clientAccessRows, subscriptionRows, quotaOverrides, customDomainStatuses] =
+  const [subscriptionRows, quotaOverrides, customDomainStatuses] =
     siteIds.length > 0
       ? await Promise.all([
-          queryD1<ClientAccessSummaryRow>(
-            `SELECT id, site_id, email, status, updated_at, last_login_at
-             FROM client_access
-             WHERE site_id IN (${relationParams})
-             ORDER BY updated_at DESC`,
-            siteIds
-          ),
           queryD1<SiteSubscriptionSummaryRow>(
             `SELECT site_id, plan, status, current_period_end, external_customer_id, external_subscription_id, updated_at
              FROM site_subscriptions
@@ -256,19 +232,16 @@ async function loadSiteSummaries(
         ])
       : [
           [],
-          [],
           new Map<string, SiteQuotaOverride>(),
           new Map<string, Awaited<ReturnType<typeof customDomainService.getStatus>>>(),
         ];
 
-  const accessBySiteId = mapClientAccessRows(clientAccessRows);
   const subscriptionBySiteId = mapSubscriptionRows(subscriptionRows);
 
   return rows.map((row, index) => {
     const plan = normalizeProductPlan(row.plan);
     const quotaOverride = quotaOverrides.get(row.id) ?? normalizeSiteQuotaOverride(null);
     const quotaDefault = getPlanQuota(plan);
-    const access = accessBySiteId.get(row.id);
     const subscription = subscriptionBySiteId.get(row.id);
     const domainRecord = customDomainStatuses.get(row.id);
 
@@ -287,15 +260,6 @@ async function loadSiteSummaries(
         projects: Number(row.project_count || 0),
         storage: storageUsages[index],
       },
-      clientAccess: access
-        ? {
-            id: access.id,
-            email: access.email,
-            status: access.status,
-            updatedAt: access.updated_at,
-            lastLoginAt: access.last_login_at,
-          }
-        : null,
       billing: subscription
         ? {
             plan: normalizeProductPlan(subscription.plan),
@@ -712,8 +676,6 @@ export async function DELETE(request: NextRequest) {
     }
 
     const deleteTables = [
-      'client_access',
-      'client_password_resets',
       'site_subscriptions',
       'site_quota_overrides',
       'media_assets',
