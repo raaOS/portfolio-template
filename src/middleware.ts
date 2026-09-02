@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { isStaticAsset, addSecurityHeaders, shouldRedirectToHttps } from './middleware/utils';
-import { checkAdminAuth } from './middleware/auth';
+import { checkCustomerAuth } from './middleware/customer-auth';
 import { checkCSRF } from './middleware/csrf';
 import { customDomainService, isCustomDomainEnabled } from './lib/services/customDomainService';
 
@@ -89,7 +89,7 @@ export async function middleware(request: NextRequest) {
     return addSecurityHeaders(csrfResult.response);
   }
 
-  const authResult = await checkAdminAuth(request);
+  const authResult = await checkCustomerAuth(request);
   if (!authResult.authenticated && authResult.response) {
     return addSecurityHeaders(authResult.response);
   }

@@ -4,6 +4,7 @@
  *
  * @module
  */
+export * from './config';
 export * from './auth/password';
 export * from './auth/csrf';
 export * from './auth/session';

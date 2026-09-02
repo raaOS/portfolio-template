@@ -38,6 +38,9 @@ export const publicRoutes = [
   '/api/admin/logout',
   '/api/admin/upload/direct',
   '/api/admin/pin/verify',
+  '/api/auth/login',
+  '/api/auth/logout',
+  '/api/auth/check-auth',
 ];
 
 // Note: RATE_LIMIT_* previously defined here was removed. Rate limiting is

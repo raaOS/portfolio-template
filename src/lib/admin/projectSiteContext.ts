@@ -7,6 +7,7 @@ import {
   type PlanQuota,
 } from '@/lib/product/sitePlan';
 import { getEffectiveSiteQuotaById } from '@/lib/product/siteQuota';
+import { SITE_ID } from '@/crud/shared/config';
 
 type SiteRow = {
   id: string;
@@ -49,10 +50,10 @@ export function resolveProjectSiteId(request: NextRequest, body?: Record<string,
     (typeof body?.siteId === 'string' && body.siteId) ||
     request.headers.get('x-site-id') ||
     searchParams.get('siteId') ||
-    'default-site';
+    SITE_ID;
 
   const siteId = rawSiteId.trim();
-  return siteId || 'default-site';
+  return siteId || SITE_ID;
 }
 
 export async function getAdminSiteContext(siteId: string): Promise<AdminSiteContext> {

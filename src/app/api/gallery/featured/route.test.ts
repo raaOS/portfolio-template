@@ -1,19 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
-  validateAdminRequestMock,
+  validateSiteMutationRequestMock,
   updateFeaturedDataMock,
   enforceRequestRateLimitMock,
   revalidatePathMock,
 } = vi.hoisted(() => ({
-  validateAdminRequestMock: vi.fn(),
+  validateSiteMutationRequestMock: vi.fn(),
   updateFeaturedDataMock: vi.fn(),
   enforceRequestRateLimitMock: vi.fn(),
   revalidatePathMock: vi.fn(),
 }));
 
-vi.mock('@/lib/auth', () => ({
-  validateAdminRequest: validateAdminRequestMock,
+vi.mock('@/lib/admin/siteMutationAuth', () => ({
+  validateSiteMutationRequest: validateSiteMutationRequestMock,
 }));
 
 vi.mock('@/lib/services/galleryFeaturedService', () => ({
@@ -44,7 +44,7 @@ function buildPost(body: unknown): Request {
 describe('POST /api/gallery/featured', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    validateAdminRequestMock.mockResolvedValue(true);
+    validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
     enforceRequestRateLimitMock.mockResolvedValue({ allowed: true, retryAfter: 0 });
     updateFeaturedDataMock.mockResolvedValue({
       featuredProjectIds: ['a', 'b'],
@@ -53,7 +53,7 @@ describe('POST /api/gallery/featured', () => {
   });
 
   it('rejects unauthenticated', async () => {
-    validateAdminRequestMock.mockResolvedValue(false);
+    validateSiteMutationRequestMock.mockResolvedValue(null);
     const response = await POST(buildPost({ featuredProjectIds: ['a'] }) as never);
     expect(response.status).toBe(401);
   });

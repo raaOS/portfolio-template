@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const { validateAdminRequestMock, conceptServiceMock } = vi.hoisted(() => ({
+const { validateAdminRequestMock, validateSiteMutationRequestMock, conceptServiceMock } = vi.hoisted(() => ({
   validateAdminRequestMock: vi.fn(),
+  validateSiteMutationRequestMock: vi.fn(),
   conceptServiceMock: {
     updateConcept: vi.fn(),
     deleteConcept: vi.fn(),
@@ -11,6 +12,10 @@ const { validateAdminRequestMock, conceptServiceMock } = vi.hoisted(() => ({
 
 vi.mock('@/lib/auth', () => ({
   validateAdminRequest: validateAdminRequestMock,
+}));
+
+vi.mock('@/lib/admin/siteMutationAuth', () => ({
+  validateSiteMutationRequest: validateSiteMutationRequestMock,
 }));
 
 vi.mock('@/lib/services/hardSkillConceptService', () => ({
@@ -34,7 +39,7 @@ describe('/api/hard-skills/concepts/[id]', () => {
 
   describe('PUT', () => {
     it('blocks unauthenticated requests', async () => {
-      validateAdminRequestMock.mockResolvedValue(false);
+      validateSiteMutationRequestMock.mockResolvedValue(null);
 
       const request = new NextRequest('http://localhost/api/hard-skills/concepts/abc', {
         method: 'PUT',
@@ -49,7 +54,7 @@ describe('/api/hard-skills/concepts/[id]', () => {
     });
 
     it('updates a concept successfully', async () => {
-      validateAdminRequestMock.mockResolvedValue(true);
+      validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
       conceptServiceMock.updateConcept.mockResolvedValue({
         id: 'abc',
         title: 'Updated Concept',
@@ -71,7 +76,7 @@ describe('/api/hard-skills/concepts/[id]', () => {
     });
 
     it('returns 404 when concept is not found', async () => {
-      validateAdminRequestMock.mockResolvedValue(true);
+      validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
       conceptServiceMock.updateConcept.mockResolvedValue(null);
 
       const request = new NextRequest('http://localhost/api/hard-skills/concepts/missing', {
@@ -88,7 +93,7 @@ describe('/api/hard-skills/concepts/[id]', () => {
     });
 
     it('returns 500 on service failure', async () => {
-      validateAdminRequestMock.mockResolvedValue(true);
+      validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
       conceptServiceMock.updateConcept.mockRejectedValue(new Error('Database error'));
 
       const request = new NextRequest('http://localhost/api/hard-skills/concepts/abc', {
@@ -106,7 +111,7 @@ describe('/api/hard-skills/concepts/[id]', () => {
 
   describe('DELETE', () => {
     it('blocks unauthenticated requests', async () => {
-      validateAdminRequestMock.mockResolvedValue(false);
+      validateSiteMutationRequestMock.mockResolvedValue(null);
 
       const request = new NextRequest('http://localhost/api/hard-skills/concepts/abc', {
         method: 'DELETE',
@@ -119,7 +124,7 @@ describe('/api/hard-skills/concepts/[id]', () => {
     });
 
     it('deletes a concept successfully', async () => {
-      validateAdminRequestMock.mockResolvedValue(true);
+      validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
       conceptServiceMock.deleteConcept.mockResolvedValue(true);
 
       const request = new NextRequest('http://localhost/api/hard-skills/concepts/abc', {
@@ -134,7 +139,7 @@ describe('/api/hard-skills/concepts/[id]', () => {
     });
 
     it('returns 404 when concept not found', async () => {
-      validateAdminRequestMock.mockResolvedValue(true);
+      validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
       conceptServiceMock.deleteConcept.mockResolvedValue(false);
 
       const request = new NextRequest('http://localhost/api/hard-skills/concepts/missing', {
@@ -148,7 +153,7 @@ describe('/api/hard-skills/concepts/[id]', () => {
     });
 
     it('returns 500 on service failure', async () => {
-      validateAdminRequestMock.mockResolvedValue(true);
+      validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
       conceptServiceMock.deleteConcept.mockRejectedValue(new Error('Internal error'));
 
       const request = new NextRequest('http://localhost/api/hard-skills/concepts/abc', {

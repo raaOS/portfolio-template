@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { validateAdminRequestMock, updateHardSkillMock, deleteHardSkillMock, revalidatePathMock } =
+const { validateAdminRequestMock, validateSiteMutationRequestMock, updateHardSkillMock, deleteHardSkillMock, revalidatePathMock } =
   vi.hoisted(() => ({
     validateAdminRequestMock: vi.fn(),
+    validateSiteMutationRequestMock: vi.fn(),
     updateHardSkillMock: vi.fn(),
     deleteHardSkillMock: vi.fn(),
     revalidatePathMock: vi.fn(),
@@ -10,6 +11,10 @@ const { validateAdminRequestMock, updateHardSkillMock, deleteHardSkillMock, reva
 
 vi.mock('@/lib/auth', () => ({
   validateAdminRequest: validateAdminRequestMock,
+}));
+
+vi.mock('@/lib/admin/siteMutationAuth', () => ({
+  validateSiteMutationRequest: validateSiteMutationRequestMock,
 }));
 
 vi.mock('@/lib/services/hardSkillService', () => ({
@@ -42,7 +47,7 @@ const paramsOf = (id: string) => ({ params: Promise.resolve({ id }) });
 describe('PUT /api/hard-skills/[id]', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    validateAdminRequestMock.mockResolvedValue(true);
+    validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
     updateHardSkillMock.mockResolvedValue({
       id: 'skill-1',
       name: 'Updated',
@@ -55,7 +60,7 @@ describe('PUT /api/hard-skills/[id]', () => {
   });
 
   it('rejects unauthenticated', async () => {
-    validateAdminRequestMock.mockResolvedValue(false);
+    validateSiteMutationRequestMock.mockResolvedValue(null);
     const response = await PUT(buildPut('skill-1', { name: 'New' }) as never, paramsOf('skill-1'));
     expect(response.status).toBe(401);
   });
@@ -97,12 +102,12 @@ describe('PUT /api/hard-skills/[id]', () => {
 describe('DELETE /api/hard-skills/[id]', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    validateAdminRequestMock.mockResolvedValue(true);
+    validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
     deleteHardSkillMock.mockResolvedValue(true);
   });
 
   it('rejects unauthenticated', async () => {
-    validateAdminRequestMock.mockResolvedValue(false);
+    validateSiteMutationRequestMock.mockResolvedValue(null);
     const response = await DELETE(buildDelete('x') as never, paramsOf('x'));
     expect(response.status).toBe(401);
   });

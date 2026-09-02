@@ -117,4 +117,17 @@ export const SHARED_SCHEMA_QUERIES = [
     count INTEGER NOT NULL DEFAULT 1,
     window_start TEXT NOT NULL DEFAULT (datetime('now'))
   ) STRICT`,
+
+  // ──────────────────────────────────────────────
+  // 8. App KV — key-value store untuk konten legacy
+  // (about, experience, skills, contact, testimonials, dll)
+  // ──────────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS app_kv (
+    id TEXT PRIMARY KEY,
+    key TEXT NOT NULL,
+    value TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  ) STRICT`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_app_kv_key ON app_kv(key)`,
 ] as const;

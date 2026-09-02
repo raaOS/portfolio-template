@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import AdminLoginClient from './_components/AdminLoginClient';
-import { verifyAdminToken } from '@/lib/auth';
+import { verifySiteUserJWT } from '@/crud/shared/auth/session';
 
 export const metadata: Metadata = {
   title: 'Admin Login | Portfolio OS',
@@ -38,11 +38,14 @@ function getSafeRedirectTarget(value?: string | string[]) {
 
 export default async function AdminLoginPage({ searchParams }: AdminLoginPageProps) {
   const cookieStore = await cookies();
-  const token = cookieStore.get('admin_token')?.value || cookieStore.get('admin-token')?.value;
+  const token = cookieStore.get('site_user_token')?.value;
 
-  if (token && verifyAdminToken(token)) {
-    const params = await searchParams;
-    redirect(getSafeRedirectTarget(params?.redirect));
+  if (token) {
+    const session = await verifySiteUserJWT(token);
+    if (session) {
+      const params = await searchParams;
+      redirect(getSafeRedirectTarget(params?.redirect));
+    }
   }
 
   return <AdminLoginClient />;

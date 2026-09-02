@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const { validateAdminRequestMock, conceptServiceMock } = vi.hoisted(() => ({
+const { validateAdminRequestMock, validateSiteMutationRequestMock, conceptServiceMock } = vi.hoisted(() => ({
   validateAdminRequestMock: vi.fn(),
+  validateSiteMutationRequestMock: vi.fn(),
   conceptServiceMock: {
     getConcepts: vi.fn(),
     createConcept: vi.fn(),
@@ -11,6 +12,10 @@ const { validateAdminRequestMock, conceptServiceMock } = vi.hoisted(() => ({
 
 vi.mock('@/lib/auth', () => ({
   validateAdminRequest: validateAdminRequestMock,
+}));
+
+vi.mock('@/lib/admin/siteMutationAuth', () => ({
+  validateSiteMutationRequest: validateSiteMutationRequestMock,
 }));
 
 vi.mock('@/lib/services/hardSkillConceptService', () => ({
@@ -63,7 +68,7 @@ describe('/api/hard-skills/concepts', () => {
 
   describe('POST', () => {
     it('blocks unauthenticated requests', async () => {
-      validateAdminRequestMock.mockResolvedValue(false);
+      validateSiteMutationRequestMock.mockResolvedValue(null);
 
       const request = new NextRequest('http://localhost/api/hard-skills/concepts', {
         method: 'POST',
@@ -78,7 +83,7 @@ describe('/api/hard-skills/concepts', () => {
     });
 
     it('returns 400 when title or description is missing', async () => {
-      validateAdminRequestMock.mockResolvedValue(true);
+      validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
 
       const request = new NextRequest('http://localhost/api/hard-skills/concepts', {
         method: 'POST',
@@ -94,7 +99,7 @@ describe('/api/hard-skills/concepts', () => {
     });
 
     it('creates a concept with defaults', async () => {
-      validateAdminRequestMock.mockResolvedValue(true);
+      validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
       conceptServiceMock.createConcept.mockResolvedValue({
         id: 'new-concept',
         title: 'New Concept',
@@ -119,7 +124,7 @@ describe('/api/hard-skills/concepts', () => {
     });
 
     it('creates a concept with explicit isActive=false', async () => {
-      validateAdminRequestMock.mockResolvedValue(true);
+      validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
       conceptServiceMock.createConcept.mockResolvedValue({
         id: 'inactive',
         title: 'Hidden',

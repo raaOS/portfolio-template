@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   validateAdminRequestMock,
+  validateSiteMutationRequestMock,
   saveHardSkillsMock,
   enforceRequestRateLimitMock,
   revalidatePathMock,
 } = vi.hoisted(() => ({
   validateAdminRequestMock: vi.fn(),
+  validateSiteMutationRequestMock: vi.fn(),
   saveHardSkillsMock: vi.fn(),
   enforceRequestRateLimitMock: vi.fn(),
   revalidatePathMock: vi.fn(),
@@ -14,6 +16,10 @@ const {
 
 vi.mock('@/lib/auth', () => ({
   validateAdminRequest: validateAdminRequestMock,
+}));
+
+vi.mock('@/lib/admin/siteMutationAuth', () => ({
+  validateSiteMutationRequest: validateSiteMutationRequestMock,
 }));
 
 vi.mock('@/lib/services/hardSkillService', () => ({
@@ -54,13 +60,13 @@ function buildPost(body: unknown): Request {
 describe('POST /api/hard-skills (bulk)', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    validateAdminRequestMock.mockResolvedValue(true);
+    validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
     enforceRequestRateLimitMock.mockResolvedValue({ allowed: true, retryAfter: 0 });
     saveHardSkillsMock.mockResolvedValue(true);
   });
 
   it('rejects unauthenticated BEFORE checking rate limit', async () => {
-    validateAdminRequestMock.mockResolvedValue(false);
+    validateSiteMutationRequestMock.mockResolvedValue(null);
 
     const response = await POST(buildPost([validSkill]) as never);
     expect(response.status).toBe(401);

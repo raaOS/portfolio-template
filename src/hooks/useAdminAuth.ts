@@ -69,7 +69,7 @@ async function checkAuth(force = false) {
 
   inFlightAuthCheck = (async () => {
     try {
-      const response = await fetch(`/api/admin/check-auth?t=${Date.now()}`, {
+      const response = await fetch(`/api/auth/check-auth?t=${Date.now()}`, {
         credentials: 'include',
       });
       const data = await response.json();
@@ -152,7 +152,7 @@ async function logoutWithSharedState() {
   const timeoutId = window.setTimeout(() => controller.abort(), 10_000);
 
   try {
-    await fetch('/api/admin/logout', {
+    await fetch('/api/auth/logout', {
       method: 'POST',
       headers: {
         'x-csrf-token': authSnapshot.csrfToken,

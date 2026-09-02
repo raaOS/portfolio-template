@@ -1,0 +1,18 @@
+name = "customer-deployment"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# Customer-specific environment variables
+[vars]
+CUSTOMER_SITE_ID = "default-site"
+
+# D1 Database binding (uncomment and configure per customer)
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "customer-database"
+# database_id = "your-d1-database-id"
+
+# R2 Bucket binding (uncomment and configure per customer)
+# [[r2_buckets]]
+# binding = "R2"
+# bucket_name = "customer-media"

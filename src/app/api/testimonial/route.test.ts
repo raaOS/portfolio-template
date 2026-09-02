@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   validateAdminRequestMock,
+  validateSiteMutationRequestMock,
   getTestimonialsMock,
   getSiteTestimonialsMock,
   createTestimonialMock,
@@ -10,6 +11,7 @@ const {
   revalidatePathMock,
 } = vi.hoisted(() => ({
   validateAdminRequestMock: vi.fn(),
+  validateSiteMutationRequestMock: vi.fn(),
   getTestimonialsMock: vi.fn(),
   getSiteTestimonialsMock: vi.fn(),
   createTestimonialMock: vi.fn(),
@@ -20,6 +22,10 @@ const {
 
 vi.mock('@/lib/auth', () => ({
   validateAdminRequest: validateAdminRequestMock,
+}));
+
+vi.mock('@/lib/admin/siteMutationAuth', () => ({
+  validateSiteMutationRequest: validateSiteMutationRequestMock,
 }));
 
 vi.mock('@/lib/services/testimonialService', () => ({
@@ -120,12 +126,12 @@ describe('GET /api/testimonial', () => {
 describe('POST /api/testimonial', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    validateAdminRequestMock.mockResolvedValue(true);
+    validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
     createTestimonialMock.mockResolvedValue({ ...validCreatePayload, id: 'test-new' });
   });
 
   it('rejects unauthenticated creation', async () => {
-    validateAdminRequestMock.mockResolvedValue(false);
+    validateSiteMutationRequestMock.mockResolvedValue(null);
     const response = await POST(buildPost(validCreatePayload) as never);
     const body = await response.json();
 
@@ -167,12 +173,12 @@ describe('POST /api/testimonial', () => {
 describe('PUT /api/testimonial', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    validateAdminRequestMock.mockResolvedValue(true);
+    validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
     updateTestimonialMock.mockResolvedValue({ ...mockTestimonial, name: 'Updated Name' });
   });
 
   it('rejects unauthenticated updates', async () => {
-    validateAdminRequestMock.mockResolvedValue(false);
+    validateSiteMutationRequestMock.mockResolvedValue(null);
     const response = await PUT(buildPut(validUpdatePayload) as never);
     const body = await response.json();
 
@@ -224,12 +230,12 @@ describe('PUT /api/testimonial', () => {
 describe('DELETE /api/testimonial', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    validateAdminRequestMock.mockResolvedValue(true);
+    validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
     deleteTestimonialMock.mockResolvedValue(true);
   });
 
   it('rejects unauthenticated deletes', async () => {
-    validateAdminRequestMock.mockResolvedValue(false);
+    validateSiteMutationRequestMock.mockResolvedValue(null);
     const response = await DELETE(buildDelete(validDeletePayload) as never);
     const body = await response.json();
 

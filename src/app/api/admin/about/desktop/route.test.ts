@@ -2,19 +2,34 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const {
-  validateAdminRequestMock,
+  validateSiteMutationRequestMock,
   aboutServiceUpdateMock,
   invalidateAboutCacheMock,
-  revalidatePathMock,
+  resolveRequestSiteIdMock,
+  revalidateSiteContentPathsMock,
 } = vi.hoisted(() => ({
-  validateAdminRequestMock: vi.fn(),
+  validateSiteMutationRequestMock: vi.fn(),
   aboutServiceUpdateMock: vi.fn(),
   invalidateAboutCacheMock: vi.fn(),
-  revalidatePathMock: vi.fn(),
+  resolveRequestSiteIdMock: vi.fn(),
+  revalidateSiteContentPathsMock: vi.fn(),
 }));
 
-vi.mock('@/lib/auth', () => ({
-  validateAdminRequest: validateAdminRequestMock,
+vi.mock('@/lib/admin/siteMutationAuth', () => ({
+  validateSiteMutationRequest: validateSiteMutationRequestMock,
+}));
+
+vi.mock('@/lib/admin/siteRequestContext', () => ({
+  resolveRequestSiteId: resolveRequestSiteIdMock,
+  assertKnownSite: vi.fn().mockResolvedValue({ id: 'default-site', slug: null }),
+  revalidateSiteContentPaths: revalidateSiteContentPathsMock,
+  SiteContextError: class SiteContextError extends Error {
+    status: number;
+    constructor(message: string, status = 400) {
+      super(message);
+      this.status = status;
+    }
+  },
 }));
 
 vi.mock('@/lib/services/aboutService', () => ({
@@ -23,10 +38,6 @@ vi.mock('@/lib/services/aboutService', () => ({
 
 vi.mock('@/lib/about', () => ({
   invalidateAboutCache: invalidateAboutCacheMock,
-}));
-
-vi.mock('next/cache', () => ({
-  revalidatePath: revalidatePathMock,
 }));
 
 import { POST } from './route';
@@ -42,12 +53,13 @@ function buildPostRequest(body: unknown): NextRequest {
 describe('POST /api/admin/about/desktop', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    validateAdminRequestMock.mockResolvedValue(true);
+    resolveRequestSiteIdMock.mockResolvedValue('default-site');
+    validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
     aboutServiceUpdateMock.mockResolvedValue(undefined);
   });
 
   it('rejects unauthenticated requests', async () => {
-    validateAdminRequestMock.mockResolvedValue(false);
+    validateSiteMutationRequestMock.mockResolvedValue(null);
     const res = await POST(
       buildPostRequest({
         desktopPreferences: { iconSize: 64 },
@@ -77,8 +89,7 @@ describe('POST /api/admin/about/desktop', () => {
       'default-site'
     );
     expect(invalidateAboutCacheMock).toHaveBeenCalled();
-    expect(revalidatePathMock).toHaveBeenCalledWith('/', 'layout');
-    expect(revalidatePathMock).toHaveBeenCalledWith('/about');
+    expect(revalidateSiteContentPathsMock).toHaveBeenCalledWith('default-site', ['/', '/about']);
   });
 
   it('handles aboutService failure with 500', async () => {

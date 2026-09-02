@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   validateAdminRequestMock,
+  validateSiteMutationRequestMock,
   refMock,
   onceMock,
   valMock,
@@ -12,6 +13,7 @@ const {
   revalidatePathMock,
 } = vi.hoisted(() => ({
   validateAdminRequestMock: vi.fn(),
+  validateSiteMutationRequestMock: vi.fn(),
   refMock: vi.fn(),
   onceMock: vi.fn(),
   valMock: vi.fn(),
@@ -23,6 +25,10 @@ const {
 
 vi.mock('@/lib/auth', () => ({
   validateAdminRequest: validateAdminRequestMock,
+}));
+
+vi.mock('@/lib/admin/siteMutationAuth', () => ({
+  validateSiteMutationRequest: validateSiteMutationRequestMock,
 }));
 
 vi.mock('@/lib/database', () => ({
@@ -103,7 +109,7 @@ describe('GET /api/contact', () => {
 describe('PUT /api/contact', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    validateAdminRequestMock.mockResolvedValue(true);
+    validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
     onceMock.mockResolvedValue({ val: valMock });
     refMock.mockReturnValue({ once: onceMock, set: setMock });
     valMock.mockReturnValue(null);
@@ -117,7 +123,7 @@ describe('PUT /api/contact', () => {
   });
 
   it('rejects unauthenticated updates', async () => {
-    validateAdminRequestMock.mockResolvedValue(false);
+    validateSiteMutationRequestMock.mockResolvedValue(null);
     const response = await PUT(buildPut(validUpdatePayload) as never);
     const body = await response.json();
 

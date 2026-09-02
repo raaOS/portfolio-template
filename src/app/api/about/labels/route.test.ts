@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const { validateAdminRequestMock, revalidatePathMock, serviceGetDataMock, serviceSaveDataMock } =
+const { validateAdminRequestMock, validateSiteMutationRequestMock, revalidatePathMock, serviceGetDataMock, serviceSaveDataMock } =
   vi.hoisted(() => ({
     validateAdminRequestMock: vi.fn(),
+    validateSiteMutationRequestMock: vi.fn(),
     revalidatePathMock: vi.fn(),
     serviceGetDataMock: vi.fn(),
     serviceSaveDataMock: vi.fn(),
@@ -11,6 +12,10 @@ const { validateAdminRequestMock, revalidatePathMock, serviceGetDataMock, servic
 
 vi.mock('@/lib/auth', () => ({
   validateAdminRequest: validateAdminRequestMock,
+}));
+
+vi.mock('@/lib/admin/siteMutationAuth', () => ({
+  validateSiteMutationRequest: validateSiteMutationRequestMock,
 }));
 
 vi.mock('next/cache', () => ({
@@ -66,13 +71,13 @@ describe('GET /api/about/labels', () => {
 describe('PUT /api/about/labels', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    validateAdminRequestMock.mockResolvedValue(true);
+    validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
     serviceSaveDataMock.mockResolvedValue(undefined);
     revalidatePathMock.mockResolvedValue(undefined);
   });
 
   it('rejects unauthenticated requests', async () => {
-    validateAdminRequestMock.mockResolvedValue(false);
+    validateSiteMutationRequestMock.mockResolvedValue(null);
     const res = await PUT(buildPutRequest(mockLabels));
     expect(res.status).toBe(401);
     const body = await res.json();

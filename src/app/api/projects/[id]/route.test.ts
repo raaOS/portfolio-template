@@ -14,6 +14,7 @@ const {
   removeMock,
   revalidatePathMock,
   generateGenZCommentsMock,
+  validateSiteMutationRequestMock,
 } = vi.hoisted(() => ({
   validateAdminRequestMock: vi.fn(),
   getProjectByIdSqlMock: vi.fn(),
@@ -28,10 +29,15 @@ const {
   removeMock: vi.fn(),
   revalidatePathMock: vi.fn(),
   generateGenZCommentsMock: vi.fn(),
+  validateSiteMutationRequestMock: vi.fn(),
 }));
 
 vi.mock('@/lib/auth', () => ({
   validateAdminRequest: validateAdminRequestMock,
+}));
+
+vi.mock('@/lib/admin/siteMutationAuth', () => ({
+  validateSiteMutationRequest: validateSiteMutationRequestMock,
 }));
 
 vi.mock('@/lib/services/project/projectSqlService', () => ({
@@ -162,7 +168,7 @@ describe('GET /api/projects/[id]', () => {
 describe('PUT /api/projects/[id]', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    validateAdminRequestMock.mockResolvedValue(true);
+    validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
     resolveProjectSiteIdMock.mockReturnValue('default-site');
     enforceProjectUpdateQuotaMock.mockResolvedValue(undefined);
     getProjectByIdSqlMock.mockResolvedValue(mockProject);
@@ -175,7 +181,7 @@ describe('PUT /api/projects/[id]', () => {
   });
 
   it('rejects unauthenticated updates', async () => {
-    validateAdminRequestMock.mockResolvedValue(false);
+    validateSiteMutationRequestMock.mockResolvedValue(null);
     const response = await PUT(
       buildPut({ id: 'proj-1', title: 'Test' }) as never,
       params('proj-1')
@@ -313,13 +319,13 @@ describe('PUT /api/projects/[id]', () => {
 describe('DELETE /api/projects/[id]', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    validateAdminRequestMock.mockResolvedValue(true);
+    validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
     resolveProjectSiteIdMock.mockReturnValue('default-site');
     deleteProjectSqlMock.mockResolvedValue(true);
   });
 
   it('rejects unauthenticated deletes', async () => {
-    validateAdminRequestMock.mockResolvedValue(false);
+    validateSiteMutationRequestMock.mockResolvedValue(null);
     const response = await DELETE(buildDelete() as never, params('proj-1'));
     const body = await response.json();
 

@@ -5,9 +5,10 @@ import { useSearchParams } from 'next/navigation';
 
 import type { LocationData } from './useGeolocation';
 
-export function useAdminLogin(location: LocationData | null) {
+export function useAdminLogin(_location: LocationData | null) {
   const searchParams = useSearchParams();
 
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -17,13 +18,12 @@ export function useAdminLogin(location: LocationData | null) {
   // Fetch CSRF token on load
   const fetchCSRF = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/login', {
+      const res = await fetch('/api/auth/check-auth', {
         credentials: 'include',
       });
       if (res.ok) {
         const data = await res.json();
         setCsrfToken(data.csrfToken);
-        console.log('CSRF token fetched successfully');
       }
     } catch (e) {
       console.error('CSRF fetch error:', e);
@@ -39,18 +39,17 @@ export function useAdminLogin(location: LocationData | null) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!location) {
-      setError('⚠️ Lokasi wajib diaktifkan untuk login.');
+    if (!email || !password) {
+      setError('Email dan password wajib diisi.');
       return;
     }
 
     setLoading(true);
     setError('');
 
-    // Refresh CSRF token before login
     let currentToken = csrfToken;
     try {
-      const res = await fetch('/api/admin/login', {
+      const res = await fetch('/api/auth/check-auth', {
         credentials: 'include',
       });
       if (res.ok) {
@@ -63,25 +62,20 @@ export function useAdminLogin(location: LocationData | null) {
     }
 
     if (!currentToken) {
-      setError('⚠️ CSRF token tidak tersedia. Silakan refresh halaman.');
+      setError('CSRF token tidak tersedia. Silakan refresh halaman.');
       setLoading(false);
       return;
     }
 
     try {
-      const response = await fetch('/api/admin/login', {
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           'X-CSRF-Token': currentToken,
         },
-        body: JSON.stringify({
-          password,
-          lat: location.lat,
-          lng: location.lng,
-          accuracy: location.accuracy,
-        }),
+        body: JSON.stringify({ email, password }),
       });
 
       if (response.ok) {
@@ -135,6 +129,8 @@ export function useAdminLogin(location: LocationData | null) {
   };
 
   return {
+    email,
+    setEmail,
     password,
     setPassword,
     showPassword,

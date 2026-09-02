@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   validateAdminRequestMock,
+  validateSiteMutationRequestMock,
   updateTestimonialMock,
   deleteTestimonialMock,
   revalidatePathMock,
 } = vi.hoisted(() => ({
   validateAdminRequestMock: vi.fn(),
+  validateSiteMutationRequestMock: vi.fn(),
   updateTestimonialMock: vi.fn(),
   deleteTestimonialMock: vi.fn(),
   revalidatePathMock: vi.fn(),
@@ -14,6 +16,10 @@ const {
 
 vi.mock('@/lib/auth', () => ({
   validateAdminRequest: validateAdminRequestMock,
+}));
+
+vi.mock('@/lib/admin/siteMutationAuth', () => ({
+  validateSiteMutationRequest: validateSiteMutationRequestMock,
 }));
 
 vi.mock('@/lib/services/testimonialService', () => ({
@@ -64,7 +70,7 @@ function buildDelete(): Request {
 describe('PUT /api/testimonial/[id]', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    validateAdminRequestMock.mockResolvedValue(true);
+    validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
     updateTestimonialMock.mockResolvedValue({
       ...mockTestimonial,
       ...validUpdateBody,
@@ -72,7 +78,7 @@ describe('PUT /api/testimonial/[id]', () => {
   });
 
   it('rejects unauthenticated requests', async () => {
-    validateAdminRequestMock.mockResolvedValue(false);
+    validateSiteMutationRequestMock.mockResolvedValue(null);
     const response = await PUT(buildPut(validUpdateBody) as never, params('test-1'));
     const body = await response.json();
 
@@ -144,12 +150,12 @@ describe('PUT /api/testimonial/[id]', () => {
 describe('DELETE /api/testimonial/[id]', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    validateAdminRequestMock.mockResolvedValue(true);
+    validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
     deleteTestimonialMock.mockResolvedValue(true);
   });
 
   it('rejects unauthenticated requests', async () => {
-    validateAdminRequestMock.mockResolvedValue(false);
+    validateSiteMutationRequestMock.mockResolvedValue(null);
     const response = await DELETE(buildDelete() as never, params('test-1'));
     const body = await response.json();
 

@@ -83,7 +83,7 @@ export default function AdminLoginClient() {
     refreshPage,
   } = useGeolocation();
 
-  const { password, setPassword, showPassword, setShowPassword, loading, error, handleSubmit } =
+  const { email, setEmail, password, setPassword, showPassword, setShowPassword, loading, error, handleSubmit } =
     useAdminLogin(location);
 
   return (
@@ -113,11 +113,13 @@ export default function AdminLoginClient() {
 
         {/* Login Form */}
         <LoginForm
+          email={email}
           password={password}
           showPassword={showPassword}
           loading={loading}
           error={error}
           isEnabled={isEnabled}
+          onEmailChange={setEmail}
           onPasswordChange={setPassword}
           onTogglePassword={() => setShowPassword(!showPassword)}
           onSubmit={handleSubmit}

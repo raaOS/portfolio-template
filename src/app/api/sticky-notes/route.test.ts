@@ -1,15 +1,34 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { validateAdminRequestMock, saveNotesMock, enforceRequestRateLimitMock, revalidatePathMock } =
-  vi.hoisted(() => ({
-    validateAdminRequestMock: vi.fn(),
-    saveNotesMock: vi.fn(),
-    enforceRequestRateLimitMock: vi.fn(),
-    revalidatePathMock: vi.fn(),
-  }));
+const {
+  validateSiteMutationRequestMock,
+  saveNotesMock,
+  enforceRequestRateLimitMock,
+  resolveRequestSiteIdMock,
+  revalidateSiteContentPathsMock,
+} = vi.hoisted(() => ({
+  validateSiteMutationRequestMock: vi.fn(),
+  saveNotesMock: vi.fn(),
+  enforceRequestRateLimitMock: vi.fn(),
+  resolveRequestSiteIdMock: vi.fn(),
+  revalidateSiteContentPathsMock: vi.fn(),
+}));
 
-vi.mock('@/lib/auth', () => ({
-  validateAdminRequest: validateAdminRequestMock,
+vi.mock('@/lib/admin/siteMutationAuth', () => ({
+  validateSiteMutationRequest: validateSiteMutationRequestMock,
+}));
+
+vi.mock('@/lib/admin/siteRequestContext', () => ({
+  resolveRequestSiteId: resolveRequestSiteIdMock,
+  assertKnownSite: vi.fn().mockResolvedValue({ id: 'default-site', slug: null }),
+  revalidateSiteContentPaths: revalidateSiteContentPathsMock,
+  SiteContextError: class SiteContextError extends Error {
+    status: number;
+    constructor(message: string, status = 400) {
+      super(message);
+      this.status = status;
+    }
+  },
 }));
 
 vi.mock('@/lib/services/stickyNotesService', () => ({
@@ -21,10 +40,6 @@ vi.mock('@/lib/services/stickyNotesService', () => ({
 
 vi.mock('@/lib/security/request', () => ({
   enforceRequestRateLimit: enforceRequestRateLimitMock,
-}));
-
-vi.mock('next/cache', () => ({
-  revalidatePath: revalidatePathMock,
 }));
 
 import { PUT } from './route';
@@ -49,13 +64,14 @@ const validNote = {
 describe('PUT /api/sticky-notes', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    validateAdminRequestMock.mockResolvedValue(true);
+    resolveRequestSiteIdMock.mockResolvedValue('default-site');
+    validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
     enforceRequestRateLimitMock.mockResolvedValue({ allowed: true, retryAfter: 0 });
     saveNotesMock.mockResolvedValue([validNote]);
   });
 
   it('rejects unauthenticated requests', async () => {
-    validateAdminRequestMock.mockResolvedValue(false);
+    validateSiteMutationRequestMock.mockResolvedValue(null);
 
     const response = await PUT(buildPut([validNote]) as never);
     expect(response.status).toBe(401);
@@ -100,6 +116,6 @@ describe('PUT /api/sticky-notes', () => {
     expect(response.status).toBe(200);
 
     expect(saveNotesMock).toHaveBeenCalledWith([validNote], 'default-site');
-    expect(revalidatePathMock).toHaveBeenCalled();
+    expect(revalidateSiteContentPathsMock).toHaveBeenCalledWith('default-site', ['/']);
   });
 });

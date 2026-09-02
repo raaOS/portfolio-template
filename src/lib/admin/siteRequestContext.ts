@@ -1,8 +1,9 @@
 import type { NextRequest } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { queryD1 } from '@/lib/cloudflareD1';
+import { SITE_ID } from '@/crud/shared/config';
 
-const DEFAULT_SITE_ID = 'default-site';
+const DEFAULT_SITE_ID = SITE_ID;
 
 type SiteLookupRow = {
   id: string;

@@ -10,6 +10,7 @@ const {
   setMock,
   revalidatePathMock,
   generateGenZCommentsMock,
+  validateSiteMutationRequestMock,
 } = vi.hoisted(() => ({
   validateAdminRequestMock: vi.fn(),
   getProjectsSqlMock: vi.fn(),
@@ -20,10 +21,15 @@ const {
   setMock: vi.fn(),
   revalidatePathMock: vi.fn(),
   generateGenZCommentsMock: vi.fn(),
+  validateSiteMutationRequestMock: vi.fn(),
 }));
 
 vi.mock('@/lib/auth', () => ({
   validateAdminRequest: validateAdminRequestMock,
+}));
+
+vi.mock('@/lib/admin/siteMutationAuth', () => ({
+  validateSiteMutationRequest: validateSiteMutationRequestMock,
 }));
 
 vi.mock('@/lib/services/project/projectSqlService', () => ({
@@ -153,7 +159,7 @@ describe('GET /api/projects', () => {
 describe('POST /api/projects', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    validateAdminRequestMock.mockResolvedValue(true);
+    validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
     createProjectSqlMock.mockResolvedValue(mockProject);
     enforceProjectCreateQuotaMock.mockResolvedValue(undefined);
     resolveProjectSiteIdMock.mockReturnValue('default-site');
@@ -163,7 +169,7 @@ describe('POST /api/projects', () => {
   });
 
   it('rejects unauthenticated requests', async () => {
-    validateAdminRequestMock.mockResolvedValue(false);
+    validateSiteMutationRequestMock.mockResolvedValue(null);
     const response = await POST(buildPost(validProjectPayload) as never);
     const body = await response.json();
 

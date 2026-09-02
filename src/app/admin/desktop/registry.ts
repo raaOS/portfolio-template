@@ -15,52 +15,10 @@ import {
   Users,
   MessageSquareText,
   Image as ImageIcon,
-  Building2,
-  PanelTop,
-  CreditCard,
-  ReceiptText,
 } from 'lucide-react';
 import type { AdminZone } from './types';
 
 export const ADMIN_ZONES: AdminZone[] = [
-  {
-    id: 'clients',
-    label: 'Manajemen Sistem & Klien',
-    description: 'Pengaturan akun klien, limit kuota, dan metode pembayaran',
-    icon: Building2,
-    iconColor: 'text-zinc-700',
-    iconBg: 'bg-zinc-700',
-    gradient: 'bg-zinc-700',
-    apps: [
-      {
-        id: 'clientDashboard',
-        label: 'Dashboard Client',
-        icon: PanelTop,
-        iconColor: 'text-emerald-600',
-        iconBg: 'bg-emerald-100',
-        defaultWidth: 1180,
-        defaultHeight: 720,
-      },
-      {
-        id: 'paymentConfig',
-        label: 'Pengaturan QRIS',
-        icon: CreditCard,
-        iconColor: 'text-blue-600',
-        iconBg: 'bg-blue-100',
-        defaultWidth: 900,
-        defaultHeight: 700,
-      },
-      {
-        id: 'orders',
-        label: 'Daftar Transaksi',
-        icon: ReceiptText,
-        iconColor: 'text-amber-600',
-        iconBg: 'bg-amber-100',
-        defaultWidth: 1100,
-        defaultHeight: 720,
-      },
-    ],
-  },
   {
     id: 'content',
     label: 'Konten & Berkas',
@@ -245,7 +203,6 @@ export const ADMIN_ZONES: AdminZone[] = [
  * inside the admin desktop window.
  */
 export const APP_ROUTE_MAP: Record<string, string> = {
-  clientDashboard: '/admin/client-dashboard',
   projects: '/admin/projects',
   profile: '/admin/content/profile',
   experience: '/admin/content/experience',

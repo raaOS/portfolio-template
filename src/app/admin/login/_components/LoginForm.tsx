@@ -1,30 +1,56 @@
 'use client';
 
-import { Eye, EyeOff, Lock } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail } from 'lucide-react';
 
 interface LoginFormProps {
+  email: string;
   password: string;
   showPassword: boolean;
   loading: boolean;
   error: string;
   isEnabled: boolean;
+  onEmailChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
   onTogglePassword: () => void;
   onSubmit: (e: React.FormEvent) => void;
 }
 
 export function LoginForm({
+  email,
   password,
   showPassword,
   loading,
   error,
   isEnabled,
+  onEmailChange,
   onPasswordChange,
   onTogglePassword,
   onSubmit,
 }: LoginFormProps) {
   return (
     <form className="space-y-6" onSubmit={onSubmit}>
+      <div>
+        <label htmlFor="email" className="sr-only">
+          Email
+        </label>
+        <div className="flex gap-2">
+          <input
+            id="email"
+            name="email"
+            type="email"
+            required
+            disabled={!isEnabled}
+            className="relative block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-blue-500 focus:outline-none focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100 sm:text-sm"
+            placeholder="Enter admin email"
+            value={email}
+            onChange={(e) => onEmailChange(e.target.value)}
+          />
+          <div className="flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 text-gray-500">
+            <Mail className="h-4 w-4" />
+          </div>
+        </div>
+      </div>
+
       <div>
         <label htmlFor="password" className="sr-only">
           Password

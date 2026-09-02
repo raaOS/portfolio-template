@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server';
 
 const {
   validateAdminRequestMock,
+  validateSiteMutationRequestMock,
   getAdminSiteContextMock,
   ProjectQuotaErrorMock,
   isConfiguredMock,
@@ -28,6 +29,7 @@ const {
 
   return {
     validateAdminRequestMock: vi.fn(),
+    validateSiteMutationRequestMock: vi.fn(),
     getAdminSiteContextMock: vi.fn(),
     ProjectQuotaErrorMock: MockProjectQuotaError,
     isConfiguredMock: vi.fn(),
@@ -39,6 +41,10 @@ const {
 
 vi.mock('@/lib/auth', () => ({
   validateAdminRequest: validateAdminRequestMock,
+}));
+
+vi.mock('@/lib/admin/siteMutationAuth', () => ({
+  validateSiteMutationRequest: validateSiteMutationRequestMock,
 }));
 
 vi.mock('@/lib/admin/projectSiteContext', () => ({
@@ -85,7 +91,7 @@ function params(siteId = 'default-site') {
 describe('POST /api/admin/sites/[siteId]/project-media', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    validateAdminRequestMock.mockResolvedValue(true);
+    validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
     isConfiguredMock.mockReturnValue(true);
     missingKeysMock.mockReturnValue([]);
     getAdminSiteContextMock.mockResolvedValue({
@@ -113,7 +119,7 @@ describe('POST /api/admin/sites/[siteId]/project-media', () => {
   });
 
   it('blocks unauthenticated requests', async () => {
-    validateAdminRequestMock.mockResolvedValue(false);
+    validateSiteMutationRequestMock.mockResolvedValue(null);
 
     const response = await POST(
       buildRequest({ name: 'gallery.png', type: 'image/png', data: new Uint8Array(10) }) as never,

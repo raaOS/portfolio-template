@@ -3,11 +3,13 @@ import { NextRequest } from 'next/server';
 
 const {
   validateAdminRequestMock,
+  validateSiteMutationRequestMock,
   aboutServiceGetMock,
   aboutServiceUpdateMock,
   revalidatePathMock,
 } = vi.hoisted(() => ({
   validateAdminRequestMock: vi.fn(),
+  validateSiteMutationRequestMock: vi.fn(),
   aboutServiceGetMock: vi.fn(),
   aboutServiceUpdateMock: vi.fn(),
   revalidatePathMock: vi.fn(),
@@ -15,6 +17,10 @@ const {
 
 vi.mock('@/lib/auth', () => ({
   validateAdminRequest: validateAdminRequestMock,
+}));
+
+vi.mock('@/lib/admin/siteMutationAuth', () => ({
+  validateSiteMutationRequest: validateSiteMutationRequestMock,
 }));
 
 vi.mock('@/lib/services/aboutService', () => ({
@@ -107,13 +113,13 @@ describe('GET /api/about/philosophy', () => {
 describe('POST /api/about/philosophy', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    validateAdminRequestMock.mockResolvedValue(true);
+    validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
     aboutServiceUpdateMock.mockResolvedValue(undefined);
     revalidatePathMock.mockResolvedValue(undefined);
   });
 
   it('rejects unauthenticated requests', async () => {
-    validateAdminRequestMock.mockResolvedValue(false);
+    validateSiteMutationRequestMock.mockResolvedValue(null);
     const res = await POST(buildPostRequest(validPayload));
     expect(res.status).toBe(401);
   });

@@ -20,6 +20,10 @@ vi.mock('@/lib/auth', () => ({
   validateAdminRequest: vi.fn().mockResolvedValue(true),
 }));
 
+vi.mock('@/lib/admin/siteMutationAuth', () => ({
+  validateSiteMutationRequest: vi.fn().mockResolvedValue({ role: 'admin' }),
+}));
+
 vi.mock('next/cache', () => ({
   revalidatePath: vi.fn(),
 }));
@@ -42,6 +46,7 @@ vi.mock('@/lib/services/aboutService', () => ({
 // modules.
 import { POST } from '../route';
 import { validateAdminRequest } from '@/lib/auth';
+import { validateSiteMutationRequest } from '@/lib/admin/siteMutationAuth';
 
 function buildPostRequest(body: unknown): NextRequest {
   return new NextRequest('http://localhost/api/about/wallpaper-collection', {
@@ -65,11 +70,11 @@ function makeAboutData(overrides: Partial<AboutData['wallpaperConfig']> = {}): A
 describe('POST /api/about/wallpaper-collection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (validateAdminRequest as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+    (validateSiteMutationRequest as ReturnType<typeof vi.fn>).mockResolvedValue({ role: 'admin' });
   });
 
   it('rejects requests when admin validation fails', async () => {
-    (validateAdminRequest as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+    (validateSiteMutationRequest as ReturnType<typeof vi.fn>).mockResolvedValue(null);
 
     const res = await POST(
       buildPostRequest({
