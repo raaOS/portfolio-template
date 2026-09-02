@@ -20,15 +20,47 @@ Sistem dokumentasi pelacakan pekerjaan (Tracker) telah diaktifkan untuk menghema
 
 ## 1. Ringkasan Proyek & Arsitektur
 
-**portfolio-shared** sedang ditransisikan dari portofolio pribadi tunggal menjadi **Portfolio OS Template** multi-site/multi-tenant yang akan dijual dalam paket Lite dan Pro. Pengalaman utama tetap berupa desktop simulator bergaya macOS: pengunjung langsung masuk ke desktop interaktif dengan window system, dock aplikasi, wallpaper dinamis, efek audio, notifikasi Dynamic Island, dan antarmuka obrolan/testimoni bergaya aplikasi pesan.
+**portfolio-shared** adalah **Portfolio OS Template** dengan model **Managed Service**: owner deploy template + CRUD ke akun Cloudflare customer. Pengalaman utama berupa desktop simulator bergaya macOS: pengunjung langsung masuk ke desktop interaktif dengan window system, dock aplikasi, wallpaper dinamis, efek audio, notifikasi Dynamic Island, dan antarmuka obrolan/testimoni bergaya aplikasi pesan.
+
+### Arsitektur Managed Service (Current — Sprint 75+)
+
+```
+┌─────────────────────────────────────────────────┐
+│  OWNER (kita)                                   │
+│  - Deploy template ke akun Cloudflare customer  │
+│  - Setup awal: /setup wizard                    │
+│  - Maintenance: Wrangler CLI                    │
+└─────────────────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────┐
+│  CUSTOMER (1 Cloudflare account)                │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐      │
+│  │ D1 DB    │  │ R2 Bucket│  │ Pages    │      │
+│  │ (8 tabel)│  │ (media)  │  │ (deploy) │      │
+│  └──────────┘  └──────────┘  └──────────┘      │
+│                                                  │
+│  Admin Panel: /admin (macOS desktop style)       │
+│  Setup Wizard: /setup (first-time only)          │
+└─────────────────────────────────────────────────┘
+```
+
+**Konsep Kunci:**
+- 1 customer = 1 Cloudflare account → 1 D1 + 1 R2 + 1 deployment
+- **SITE_ID** hardcoded per deployment (`CUSTOMER_SITE_ID` env var)
+- Tidak ada multi-site resolution — setiap D1 hanya berisi data 1 customer
+- Auth pakai `jose` (Edge-compatible), cookie `site_user_token`
+- Konten legacy (about, skills, dll) disimpan di tabel `app_kv` (key-value JSON)
+- Customer login: `/admin/login` → email + password
+- Setup wizard: `/setup` → seed admin user + content data
 
 ### Keputusan Produk Terkunci (Wajib Diikuti)
 
 - Target arsitektur adalah **full Cloudflare**, bukan Vercel: Cloudflare Pages/Workers untuk aplikasi/API, Cloudflare D1 untuk data relasional, dan Cloudflare R2 untuk media.
 - Jangan merancang fitur baru dengan asumsi Vercel project, Vercel Functions, atau quota Vercel. Referensi Vercel yang masih ada di repo adalah legacy/migration debt sampai dibersihkan.
-- Model produk adalah **multi-site / multi-tenant single platform**, bukan 1 pembeli = 1 deployment project.
-- Lite dan Pro sama-sama **self-service** untuk client. Lite dibatasi quota/fitur; Pro membuka quota dan fitur lanjutan.
-- CRUD Master tetap diperlukan sebagai panel pusat untuk membuat site, mengatur plan/quota/feature flags, reset akses, audit, suspend/activate, dan override data bila client butuh bantuan. CRUD Master bukan tempat admin mengisi semua project client secara manual.
+- Model produk adalah **managed service**: 1 customer = 1 Cloudflare account, bukan multi-tenant single platform.
+- Customer self-service admin panel untuk kelola konten (projects, profile, experience, skills, contact, testimonials).
+- Owner deploy + maintain via Wrangler CLI, bukan via dashboard web.
 
 ### Karakteristik Utama
 
@@ -347,7 +379,115 @@ npx tsx scripts/cloudflare/backfill-wallpaper-poster-urls.ts --apply
 
 ---
 
-## 12. Troubleshooting & Resolusi Masalah Umum
+## 12. Customer CRUD Architecture (Managed Service)
+
+> **Wajib dibaca AI yang mengerjakan fitur customer-facing, admin panel, atau deploy pipeline.**
+
+### Auth System
+
+| Komponen | Detail |
+|---|---|
+| **Library** | `jose` (Edge-compatible, bukan `jsonwebtoken`) |
+| **Cookie** | `site_user_token` (HTTP-only, secure, 2h TTL) |
+| **CSRF** | Double-submit cookie pattern (`csrf_token` + `x-csrf-token` header) |
+| **Endpoints** | `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/check-auth` |
+| **Middleware** | `src/middleware/customer-auth.ts` — JWT verify + sliding refresh |
+| **Guard** | `requireAuth()`, `requireAdmin()` di `src/crud/shared/auth/guard.ts` |
+
+### SITE_ID Configuration
+
+```typescript
+// src/crud/shared/config.ts
+export const SITE_ID = process.env.CUSTOMER_SITE_ID || 'default-site';
+```
+
+- Hardcoded per deployment, tidak ada multi-site resolution
+- Digunakan di: `siteRequestContext.ts`, `projectSiteContext.ts`, `siteMutationAuth.ts`
+- Setiap D1 hanya berisi data 1 customer
+
+### D1 Schema (8 Tabel)
+
+| Tabel | Fungsi |
+|---|---|
+| `sites` | Informasi site (id, slug, name, plan, status) |
+| `site_users` | Login credentials (email, password_hash, role) |
+| `projects` | Data project portfolio |
+| `media_assets` | Referensi file di R2 |
+| `site_settings` | Pengaturan site (key-value) |
+| `audit_logs` | Jejak aktivitas |
+| `rate_limits` | Proteksi brute force |
+| `app_kv` | Key-value store untuk konten legacy |
+
+### Content Storage (app_kv)
+
+Konten legacy disimpan sebagai JSON string di tabel `app_kv`:
+- `about` — headline, description, bio
+- `experience` — array experience items
+- `skills` — array skill categories
+- `contact` — email, phone, location
+- `testimonials` — array testimonials
+- `interests` — array interests
+- `philosophy` — quote, principles
+
+**Penting:** Jangan campur penggunaan `db.ref(path)` (content service) dengan `getD1Value(key)` (raw helper) pada path yang sama.
+
+### Setup Flow
+
+```
+1. Owner deploy ke akun customer (Wrangler CLI)
+2. Customer buka /setup
+3. Form: site name, admin email, admin password
+4. POST /api/setup → seedDeployment()
+   → Create site row di D1
+   → Create admin user (scrypt password)
+   → Seed content keys di app_kv
+5. Redirect ke /admin/login
+6. Customer login dengan email + password
+```
+
+### Deploy Pipeline
+
+```bash
+# Build
+./scripts/deploy/build-customer.sh <slug> <api-token> <account-id>
+
+# Deploy
+./scripts/deploy/deploy-customer.sh <slug> <api-token> <account-id>
+
+# Customer akses: https://<slug>.pages.dev
+# Customer buka: https://<slug>.pages.dev/setup
+```
+
+### Admin UI Zones (3 Zones)
+
+| Zone | Apps |
+|---|---|
+| **Content & Berkas** | Projects, Profile, Experience, Skills, Archive, Labels, Explorer, Event Pages |
+| **Sistem & Tampilan** | Appearance, Dock, Widgets, Sounds |
+| **Komunikasi** | Notifications, Messages, Feedback, Contacts |
+
+> Zone "Manajemen Sistem & Klien" (clientDashboard, paymentConfig, orders) sudah dihapus.
+
+### Test Mock Pattern
+
+Saat menulis test untuk routes yang pakai auth:
+
+```typescript
+// Mock shared core auth
+vi.mock('@/lib/admin/siteMutationAuth', () => ({
+  validateSiteMutationRequest: validateSiteMutationRequestMock,
+}));
+
+// In beforeEach
+validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
+
+// For unauthenticated test
+validateSiteMutationRequestMock.mockResolvedValue(null);
+```
+
+---
+
+## 13. Troubleshooting & Resolusi Masalah Umum
 
 ### Kegagalan Cache Webpack / Next Build
 
@@ -385,5 +525,5 @@ Guna mengunci dependency yang rentan, pastikan kolom `overrides` di file `packag
 
 ---
 
-_Terakhir Diperbarui: 2026-06-27_
+_Terakhir Diperbarui: 2026-09-01_
 _Tingkat Kepercayaan Informasi: Terverifikasi Penuh oleh Pengujian Unit & Sistem_

@@ -4,8 +4,17 @@
 > Jangan membaca seluruh codebase atau PRD secara sembarangan. Jika Anda baru memulai sesi, baca file ini untuk mengetahui status proyek, lalu BUKA HANYA file log yang relevan di folder `logs/`. Setelah selesai bekerja, perbarui file log yang relevan.
 
 ## 📌 Status Global Proyek
-- **Fase Saat Ini:** Portfolio OS Template V6 full Cloudflare sudah berhasil production deploy ke Cloudflare Workers dan manual acceptance RC1 production sudah lulus.
-- **Tugas Aktif:** Seluruh 4 Sprint Program Fitur Platform OS & Multi-Template Marketplace (Sprint 61 – 64) COMPLETED 🟢.
+
+**Arsitektur Saat Ini: Managed Service (1-customer-1-account)**
+- 1 customer = 1 Cloudflare account → 1 D1 + 1 R2 + 1 deployment
+- Owner deploy template + CRUD ke akun customer via Wrangler CLI
+- Customer dapat admin panel (macOS desktop style) untuk kelola konten
+- SITE_ID hardcoded per deployment, tidak ada multi-site resolution
+
+**Fase Saat Ini:** Fondasi managed service sudah selesai (Sprint 75). Admin panel customer sudah fungsional.
+**Tugas Aktif:** Backlog managed service — owner dashboard, customer dashboard, password reset, content migration.
+
+> **ARCHIVED (Sprint 0-74):** Sprint lama mencatat evolusi dari portofolio pribadi → multi-tenant SaaS → managed service. Log sprint lama masih relevan untuk memahami *why* keputusan desain, tapi kode dan arsitektur yang dijelaskan sudah **tidak merepresentasikan kondisi terkini**. AI wajib merujuk Sprint 75+ untuk arsitektur current.
 
 ## 📂 Daftar Modul / Log Pekerjaan (Logs)
 Berikut adalah daftar aktivitas yang telah atau sedang dikerjakan. Pilih log yang sesuai dengan permintaan user:
@@ -319,4 +328,12 @@ Kustomisasi per-section template `landing-bento` (Pro-only): kontrak settings zo
 93. **[Sprint 74 - UI/UX Bento Tokens + Demo Cinematic](file:///C:/Users/USER/Documents/portfolio-template/docs/tracker/logs/sprint_74_uiux_bento_tokens_cinematic_demo.md)**
    - *Status:* 🟢 Completed
    - *Isi:* Konsistensi UI template bento via token bersama `src/components/templates/landing-bento/ui.ts` (button/card/title/badge/tag + warna aksen `--bento-accent`, hapus hardcode emerald/teal; canvas 3D `BentoImageSequence` kini baca aksen via `getComputedStyle`). Rombak total demo `/templates/landing-bento/demo` → halaman cinematic scroll "Mostar city" (vanilla statis di `public/cinematic-mostar/`, demo page render iframe fullscreen; terisolasi dari Tailwind). Verifikasi: 120 files / 873 tests PASS, tsc 0 error, lint bersih, runtime engine animasi + slider 15 kartu aktif.
+
+## 🏗️ Managed Service — Current Architecture (Sprint 75+)
+
+> **PENTING:** Mulai Sprint 75, arsitektur berubah dari multi-tenant SaaS menjadi **Managed Service**. AI wajib merujuk bagian ini dan Sprint 75+ untuk pemahaman current.
+
+94. **[Sprint 75 - Customer CRUD Foundation](file:///C:/Users/USER/Documents/portfolio-template/docs/tracker/logs/sprint_75_customer_crud_foundation.md)**
+   - *Status:* 🟢 Completed
+   - *Isi:* Fondasi managed service lengkap: (1) Customer auth — email+password login via `/api/auth/*`, JWT jose Edge-compatible, SITE_ID hardcoded, cookie `site_user_token`; (2) API routes — hardcode SITE_ID di `siteRequestContext`, `projectSiteContext`, `siteMutationAuth`; (3) Admin UI — hapus owner zones (clientDashboard, paymentConfig, orders), sisa 3 zones: content/system/communications; (4) Schema — tambah tabel `app_kv` untuk konten legacy (about/experience/skills/contact/testimonials); (5) Setup — wizard `/setup` + API `/api/setup` + `seedDeployment()`; (6) Deploy — build/deploy scripts untuk Wrangler CLI. Verifikasi: tsc 0 error, eslint 0 warning, 104 files / 791 tests PASS, 43 files changed (+1002/-167).
 
