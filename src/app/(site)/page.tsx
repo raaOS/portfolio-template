@@ -14,7 +14,6 @@ export default async function Home() {
       slug: SITE_ID,
       title: 'Portfolio',
       name: 'Portfolio',
-      plan: 'pro',
       status: 'active',
       active_template_key: 'os-desktop',
     },

@@ -8,7 +8,6 @@ describe('dataMapper', () => {
     slug: 'johndoe',
     name: 'John Doe Portfolio',
     title: 'John Doe - Creative Developer',
-    plan: 'pro',
     status: 'active',
   };
 
@@ -125,7 +124,6 @@ describe('dataMapper', () => {
 
     expect(result.site.id).toBe('site-123');
     expect(result.site.slug).toBe('johndoe');
-    expect(result.site.tier).toBe('pro');
     expect(result.site.activeTemplateKey).toBe('os-desktop');
     expect(result.site.avatarUrl).toBe('https://example.com/avatar.jpg');
 

@@ -37,7 +37,6 @@ export function mapD1ToTemplateData(options: DataMapperOptions): PortfolioTempla
         ? homepageData.aboutData.hero.backgroundTrail[0]
         : homepageData.aboutData.hero.backgroundTrail[0].src
       : undefined,
-    tier: (site.plan as 'lite' | 'pro') || 'lite',
     activeTemplateKey: site.active_template_key || 'os-desktop',
   };
 

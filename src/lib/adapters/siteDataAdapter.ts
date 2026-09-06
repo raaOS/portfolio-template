@@ -13,7 +13,7 @@ export interface SiteInfo {
   id: string;
   slug: string;
   name: string;
-  plan: string;
+  plan?: string;
   status: string;
 }
 

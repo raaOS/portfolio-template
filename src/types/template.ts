@@ -12,21 +12,18 @@ import type { HardSkill } from './hardSkill';
 import type { Project } from './projects';
 import type { Testimonial } from './testimonial';
 
-export type TemplateTier = 'lite' | 'pro';
-
 export interface SiteProfileHeader {
   id: string;
   slug: string;
   title: string;
   description?: string;
   avatarUrl?: string;
-  tier: TemplateTier;
   activeTemplateKey: string;
 }
 
 /**
  * Single Source of Truth Universal Data Contract untuk seluruh Template Renderer.
- * Seluruh renderer template (OS Desktop) wajib mengonsumsi data ini.
+ * Seluruh renderer template wajib mengonsumsi data ini.
  */
 export interface PortfolioTemplateData {
   site: SiteProfileHeader;
