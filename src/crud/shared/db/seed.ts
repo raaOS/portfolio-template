@@ -49,6 +49,40 @@ export async function seedDeployment(options: {
     siteCreated = true;
   }
 
+  // Seed default templates if not exists
+  const defaultTemplates = [
+    { id: 'os-desktop', name: 'OS Desktop', description: 'Portfolio interaktif bergaya desktop macOS dengan window system, dock, dan efek visual.', price: 0 },
+    { id: 'infinite-canvas', name: 'Infinite Canvas', description: 'Infinite canvas dengan drag-to-explore dan zoom untuk melihat project.', price: 0 },
+  ];
+
+  for (const tmpl of defaultTemplates) {
+    const existing = await queryD1<{ id: string }>(
+      `SELECT id FROM portfolio_templates WHERE id = ? LIMIT 1`,
+      [tmpl.id]
+    );
+    if (existing.length === 0) {
+      await queryD1(
+        `INSERT INTO portfolio_templates (id, name, description, price, is_active, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 1, datetime('now'), datetime('now'))`,
+        [tmpl.id, tmpl.name, tmpl.description, tmpl.price]
+      );
+    }
+  }
+
+  // Grant default entitlement (os-desktop) for the site
+  const existingEntitlement = await queryD1<{ id: string }>(
+    `SELECT id FROM site_template_entitlements WHERE site_id = ? AND template_id = 'os-desktop' LIMIT 1`,
+    [SITE_ID]
+  );
+  if (existingEntitlement.length === 0) {
+    const entitlementId = `ent-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    await queryD1(
+      `INSERT INTO site_template_entitlements (id, site_id, template_id, purchased_at, price, granted_by, created_at)
+       VALUES (?, ?, ?, datetime('now'), 0, 'system', datetime('now'))`,
+      [entitlementId, SITE_ID, 'os-desktop']
+    );
+  }
+
   // Create admin user
   let adminCreated = false;
   const existingUsers = await queryD1<{ id: string }>(

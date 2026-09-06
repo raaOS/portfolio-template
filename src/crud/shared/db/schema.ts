@@ -130,4 +130,33 @@ export const SHARED_SCHEMA_QUERIES = [
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   ) STRICT`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_app_kv_key ON app_kv(key)`,
+
+  // ──────────────────────────────────────────────
+  // 9. Portfolio Templates — katalog template yang tersedia
+  // ──────────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS portfolio_templates (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    price INTEGER NOT NULL DEFAULT 0,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  ) STRICT`,
+
+  // ──────────────────────────────────────────────
+  // 10. Site Template Entitlements — template yang dibeli per site
+  // ──────────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS site_template_entitlements (
+    id TEXT PRIMARY KEY,
+    site_id TEXT NOT NULL,
+    template_id TEXT NOT NULL,
+    purchased_at TEXT NOT NULL DEFAULT (datetime('now')),
+    price INTEGER NOT NULL DEFAULT 0,
+    granted_by TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (site_id) REFERENCES sites(id),
+    FOREIGN KEY (template_id) REFERENCES portfolio_templates(id)
+  ) STRICT`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_entitlements_site_template ON site_template_entitlements(site_id, template_id)`,
 ] as const;
