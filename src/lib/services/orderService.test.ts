@@ -84,7 +84,7 @@ describe('orderService', () => {
         .mockResolvedValueOnce([]) // expire stale pending orders
         .mockResolvedValueOnce(activePaymentConfigRows)
         .mockResolvedValueOnce([]) // M5: duplicate order check
-        .mockResolvedValueOnce([{ amount: 299001 }]) // active amount already used
+        .mockResolvedValueOnce([{ amount: 199001 }]) // active amount already used
         .mockResolvedValueOnce([]); // insert order
 
       const res = await createOrder({
@@ -96,12 +96,12 @@ describe('orderService', () => {
       });
 
       expect(res.success).toBe(true);
-      // Probe acak: offset dipastikan BEBAS (bukan 299001 yang sudah terpakai),
+      // Probe acak: offset dipastikan BEBAS (bukan 199001 yang sudah terpakai),
       // dalam rentang kode unik valid 1..999, bukan nilai deterministik tertentu.
       const amount = res.order?.amount;
-      expect(amount).toBeGreaterThan(299001);
-      expect(amount).toBeLessThanOrEqual(299999);
-      expect(Number(amount) - 299000).toBeGreaterThanOrEqual(1);
+      expect(amount).toBeGreaterThan(199001);
+      expect(amount).toBeLessThanOrEqual(199999);
+      expect(Number(amount) - 199000).toBeGreaterThanOrEqual(1);
       expect(cloudflareD1.queryD1).toHaveBeenNthCalledWith(
         3,
         expect.stringContaining("WHERE status = 'pending_payment'"),
@@ -140,8 +140,8 @@ describe('orderService', () => {
       });
 
       expect(res.success).toBe(true);
-      expect(res.order?.amount).toBeGreaterThanOrEqual(299001);
-      expect(res.order?.amount).toBeLessThanOrEqual(299999);
+      expect(res.order?.amount).toBeGreaterThanOrEqual(199001);
+      expect(res.order?.amount).toBeLessThanOrEqual(199999);
     });
 
     it('fails cleanly when payment config is inactive', async () => {

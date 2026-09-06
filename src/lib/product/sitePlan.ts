@@ -1,16 +1,12 @@
 import type { CreateProjectData, UpdateProjectData, GalleryItem } from '@/types/projects';
 
+/** @deprecated Plan concept removed. All sites use default quota. */
 export type ProductPlan = 'lite' | 'pro';
 
 export type PlanQuota = {
   projectLimit: number;
   storageMb: number;
   mediaPerProject: number;
-};
-
-export type PlanFeatures = {
-  whatsappTestimonials: boolean;
-  testimonialLimit: number;
 };
 
 export type SiteQuotaOverride = {
@@ -24,46 +20,26 @@ function parsePositiveInt(value: string | undefined, fallback: number) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-export function normalizeProductPlan(plan: string | null | undefined): ProductPlan {
-  return plan === 'pro' ? 'pro' : 'lite';
-}
-
-export function getPlanQuota(planInput: string | null | undefined): PlanQuota {
-  const plan = normalizeProductPlan(planInput);
-
-  if (plan === 'pro') {
-    return {
-      projectLimit: parsePositiveInt(process.env.PLAN_PRO_PROJECT_LIMIT, 50),
-      storageMb: parsePositiveInt(process.env.PLAN_PRO_STORAGE_MB, 5000),
-      mediaPerProject: parsePositiveInt(process.env.PLAN_PRO_MEDIA_PER_PROJECT, 50),
-    };
-  }
-
+/**
+ * Default quota — tidak ada lagi perbedaan plan.
+ * Semua site mendapatkan quota yang sama.
+ */
+export function getDefaultQuota(): PlanQuota {
   return {
-    projectLimit: parsePositiveInt(process.env.PLAN_LITE_PROJECT_LIMIT, 5),
-    storageMb: parsePositiveInt(process.env.PLAN_LITE_STORAGE_MB, 250),
-    mediaPerProject: parsePositiveInt(process.env.PLAN_LITE_MEDIA_PER_PROJECT, 8),
+    projectLimit: parsePositiveInt(process.env.PROJECT_LIMIT, 50),
+    storageMb: parsePositiveInt(process.env.STORAGE_MB, 5000),
+    mediaPerProject: parsePositiveInt(process.env.MEDIA_PER_PROJECT, 50),
   };
 }
 
-export function getPlanFeatures(planInput: string | null | undefined): PlanFeatures {
-  const plan = normalizeProductPlan(planInput);
-
-  if (plan === 'pro') {
-    return {
-      whatsappTestimonials: true,
-      testimonialLimit: 20,
-    };
-  }
-
-  return {
-    whatsappTestimonials: false,
-    testimonialLimit: 0,
-  };
+/** @deprecated Use getDefaultQuota() instead */
+export function getPlanQuota(_planInput?: string | null | undefined): PlanQuota {
+  return getDefaultQuota();
 }
 
-export function canUseWhatsappTestimonials(planInput: string | null | undefined) {
-  return getPlanFeatures(planInput).whatsappTestimonials;
+/** @deprecated All features are enabled by default */
+export function canUseWhatsappTestimonials(_planInput?: string | null | undefined) {
+  return true;
 }
 
 function normalizeOverrideValue(value: unknown) {
@@ -90,34 +66,11 @@ export function hasSiteQuotaOverride(input: Partial<SiteQuotaOverride> | null | 
   );
 }
 
-export function sanitizeSiteQuotaOverrideForPlan(
-  planInput: string | null | undefined,
-  input: Partial<SiteQuotaOverride> | null | undefined
-): SiteQuotaOverride {
-  const defaults = getPlanQuota(planInput);
-  const override = normalizeSiteQuotaOverride(input);
-
-  return {
-    projectLimit:
-      override.projectLimit !== null && override.projectLimit > defaults.projectLimit
-        ? override.projectLimit
-        : null,
-    storageMb:
-      override.storageMb !== null && override.storageMb > defaults.storageMb
-        ? override.storageMb
-        : null,
-    mediaPerProject:
-      override.mediaPerProject !== null && override.mediaPerProject > defaults.mediaPerProject
-        ? override.mediaPerProject
-        : null,
-  };
-}
-
 export function getEffectiveSiteQuota(
-  planInput: string | null | undefined,
-  input: Partial<SiteQuotaOverride> | null | undefined
+  _planInput?: string | null | undefined,
+  input?: Partial<SiteQuotaOverride> | null | undefined
 ): PlanQuota {
-  const defaults = getPlanQuota(planInput);
+  const defaults = getDefaultQuota();
   const override = normalizeSiteQuotaOverride(input);
 
   return {
@@ -128,6 +81,28 @@ export function getEffectiveSiteQuota(
       override.mediaPerProject ?? defaults.mediaPerProject
     ),
   };
+}
+
+/** @deprecated Use getEffectiveSiteQuota instead */
+export function getEffectiveSiteQuotaById(_args: {
+  siteId?: string;
+  plan?: string;
+  quotaOverride?: Partial<SiteQuotaOverride> | null;
+}): PlanQuota {
+  return getDefaultQuota();
+}
+
+/** @deprecated Plan concept removed. Always returns 'lite'. */
+export function normalizeProductPlan(_plan?: string | null | undefined): ProductPlan {
+  return 'lite';
+}
+
+/** @deprecated Plan concept removed. Use getEffectiveSiteQuota instead. */
+export function sanitizeSiteQuotaOverrideForPlan(
+  _planInput?: string | null | undefined,
+  input?: Partial<SiteQuotaOverride> | null | undefined
+): SiteQuotaOverride {
+  return normalizeSiteQuotaOverride(input);
 }
 
 function addMediaRef(refs: Set<string>, value: unknown) {

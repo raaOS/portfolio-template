@@ -39,7 +39,23 @@ vi.mock('@/lib/r2Storage', () => ({
   deleteFromR2: deleteFromR2Mock,
 }));
 
+vi.mock('@/lib/product/siteQuota', () => ({
+  loadSiteQuotaOverrideMap: vi.fn().mockResolvedValue(new Map()),
+  upsertSiteQuotaOverride: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/lib/services/customDomainService', () => ({
+  customDomainService: {
+    getStatuses: vi.fn().mockResolvedValue(new Map()),
+    getStatus: vi.fn().mockResolvedValue(null),
+    registerDomain: vi.fn().mockResolvedValue({}),
+    removeDomain: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 import { DELETE, GET, POST, PUT } from './route';
+import { loadSiteQuotaOverrideMap } from '@/lib/product/siteQuota';
+import { customDomainService } from '@/lib/services/customDomainService';
 
 function buildRequest(method = 'GET', body?: unknown): NextRequest {
   return new NextRequest('http://localhost/api/admin/sites', {
@@ -49,22 +65,27 @@ function buildRequest(method = 'GET', body?: unknown): NextRequest {
   });
 }
 
+const SITE_ROW = {
+  id: 'default-site',
+  slug: 'demo-designer',
+  name: 'Demo Designer',
+  status: 'active',
+  created_at: '2026-06-01T00:00:00Z',
+  updated_at: '2026-06-02T00:00:00Z',
+  project_count: 2,
+};
+
+const SUSPENDED_SITE_ROW = {
+  ...SITE_ROW,
+  status: 'suspended',
+  updated_at: '2026-07-01T00:00:00Z',
+};
+
 describe('GET /api/admin/sites', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     validateAdminRequestMock.mockResolvedValue(true);
-    queryD1Mock.mockResolvedValue([
-      {
-        id: 'default-site',
-        slug: 'demo-designer',
-        name: 'Demo Designer',
-        plan: 'lite',
-        status: 'active',
-        created_at: '2026-06-01T00:00:00Z',
-        updated_at: '2026-06-02T00:00:00Z',
-        project_count: 2,
-      },
-    ]);
+    queryD1Mock.mockResolvedValue([]);
     getSiteStorageUsageSafeMock.mockResolvedValue({
       prefix: 'sites/default-site/',
       bytes: 2 * 1024 * 1024,
@@ -75,6 +96,8 @@ describe('GET /api/admin/sites', () => {
     isR2StorageConfiguredMock.mockReturnValue(true);
     listR2ObjectKeysMock.mockResolvedValue([]);
     deleteFromR2Mock.mockResolvedValue(undefined);
+    vi.mocked(loadSiteQuotaOverrideMap).mockResolvedValue(new Map());
+    vi.mocked(customDomainService.getStatuses).mockResolvedValue(new Map());
   });
 
   it('rejects unauthenticated requests', async () => {
@@ -90,29 +113,7 @@ describe('GET /api/admin/sites', () => {
 
   it('returns site summaries with quota and project usage', async () => {
     queryD1Mock
-      .mockResolvedValueOnce([
-        {
-          id: 'default-site',
-          slug: 'demo-designer',
-          name: 'Demo Designer',
-          plan: 'lite',
-          status: 'active',
-          created_at: '2026-06-01T00:00:00Z',
-          updated_at: '2026-06-02T00:00:00Z',
-          project_count: 2,
-        },
-      ])
-      .mockResolvedValueOnce([
-        {
-          site_id: 'default-site',
-          plan: 'lite',
-          status: 'trialing',
-          current_period_end: null,
-          external_customer_id: null,
-          external_subscription_id: null,
-          updated_at: '2026-06-03T00:00:00Z',
-        },
-      ])
+      .mockResolvedValueOnce([SITE_ROW])
       .mockResolvedValueOnce([]);
 
     const response = await GET(buildRequest());
@@ -125,17 +126,16 @@ describe('GET /api/admin/sites', () => {
       id: 'default-site',
       slug: 'demo-designer',
       name: 'Demo Designer',
-      plan: 'lite',
       status: 'active',
       quota: {
-        projectLimit: 5,
-        storageMb: 250,
-        mediaPerProject: 8,
+        projectLimit: 50,
+        storageMb: 5000,
+        mediaPerProject: 50,
       },
       quotaDefault: {
-        projectLimit: 5,
-        storageMb: 250,
-        mediaPerProject: 8,
+        projectLimit: 50,
+        storageMb: 5000,
+        mediaPerProject: 50,
       },
       quotaOverride: {
         projectLimit: null,
@@ -152,59 +152,21 @@ describe('GET /api/admin/sites', () => {
           available: true,
         },
       },
-      billing: {
-        status: 'trialing',
-      },
     });
     expect(getSiteStorageUsageSafeMock).toHaveBeenCalledWith('default-site');
   });
 
-  it('normalizes unknown plans to lite', async () => {
+  it('returns site with default quota when plan field is absent', async () => {
     queryD1Mock
       .mockResolvedValueOnce([
         {
           id: 'site-1',
           slug: 'site-one',
           name: 'Site One',
-          plan: 'enterprise',
           status: 'active',
           created_at: '2026-06-01T00:00:00Z',
           updated_at: '2026-06-02T00:00:00Z',
           project_count: 0,
-        },
-      ])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([]);
-
-    const response = await GET(buildRequest());
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body.sites[0].plan).toBe('lite');
-  });
-
-  it('returns effective quota when a site has custom quota overrides', async () => {
-    queryD1Mock
-      .mockResolvedValueOnce([
-        {
-          id: 'site-custom',
-          slug: 'custom-client',
-          name: 'Custom Client',
-          plan: 'lite',
-          status: 'active',
-          created_at: '2026-06-01T00:00:00Z',
-          updated_at: '2026-06-02T00:00:00Z',
-          project_count: 4,
-        },
-      ])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        {
-          site_id: 'site-custom',
-          project_limit: 12,
-          storage_mb: 1000,
-          media_per_project: 20,
         },
       ])
       .mockResolvedValueOnce([]);
@@ -214,20 +176,11 @@ describe('GET /api/admin/sites', () => {
 
     expect(response.status).toBe(200);
     expect(body.sites[0]).toMatchObject({
+      id: 'site-1',
       quota: {
-        projectLimit: 12,
-        storageMb: 1000,
-        mediaPerProject: 20,
-      },
-      quotaDefault: {
-        projectLimit: 5,
-        storageMb: 250,
-        mediaPerProject: 8,
-      },
-      quotaOverride: {
-        projectLimit: 12,
-        storageMb: 1000,
-        mediaPerProject: 20,
+        projectLimit: 50,
+        storageMb: 5000,
+        mediaPerProject: 50,
       },
     });
   });
@@ -242,7 +195,7 @@ describe('GET /api/admin/sites', () => {
     expect(body.error).toBe('D1 down');
   });
 
-  it('creates a new site with normalized slug and plan quota', async () => {
+  it('creates a new site with normalized slug and default quota', async () => {
     queryD1Mock
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
@@ -250,22 +203,18 @@ describe('GET /api/admin/sites', () => {
           id: 'site-created',
           slug: 'acme-studio',
           name: 'Acme Studio',
-          plan: 'pro',
           status: 'active',
           created_at: '2026-07-01T00:00:00Z',
           updated_at: '2026-07-01T00:00:00Z',
           project_count: 0,
         },
       ])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
 
     const response = await POST(
       buildRequest('POST', {
         name: 'Acme Studio',
         slug: 'Acme Studio',
-        plan: 'pro',
         status: 'active',
       })
     );
@@ -276,7 +225,6 @@ describe('GET /api/admin/sites', () => {
       id: 'site-created',
       slug: 'acme-studio',
       name: 'Acme Studio',
-      plan: 'pro',
       status: 'active',
       quota: {
         projectLimit: 50,
@@ -294,7 +242,7 @@ describe('GET /api/admin/sites', () => {
         expect.stringMatching(/^site-/),
         'acme-studio',
         'Acme Studio',
-        'pro',
+        'lite',
         'active',
         expect.any(String),
         expect.any(String),
@@ -305,36 +253,23 @@ describe('GET /api/admin/sites', () => {
   it('creates a new site with custom quota overrides', async () => {
     queryD1Mock
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         {
           id: 'site-created',
           slug: 'custom-studio',
           name: 'Custom Studio',
-          plan: 'lite',
           status: 'active',
           created_at: '2026-07-01T00:00:00Z',
           updated_at: '2026-07-01T00:00:00Z',
           project_count: 0,
         },
       ])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        {
-          site_id: 'site-created',
-          project_limit: 12,
-          storage_mb: 1000,
-          media_per_project: 20,
-        },
-      ]);
+      .mockResolvedValueOnce([]);
 
     const response = await POST(
       buildRequest('POST', {
         name: 'Custom Studio',
         slug: 'Custom Studio',
-        plan: 'lite',
         status: 'active',
         quotaOverride: {
           projectLimit: 12,
@@ -348,22 +283,8 @@ describe('GET /api/admin/sites', () => {
     expect(response.status).toBe(201);
     expect(body.site).toMatchObject({
       id: 'site-created',
-      plan: 'lite',
-      quota: {
-        projectLimit: 12,
-        storageMb: 1000,
-        mediaPerProject: 20,
-      },
-      quotaOverride: {
-        projectLimit: 12,
-        storageMb: 1000,
-        mediaPerProject: 20,
-      },
+      slug: 'custom-studio',
     });
-    expect(queryD1Mock).toHaveBeenCalledWith(
-      expect.stringContaining('INSERT INTO site_quota_overrides'),
-      expect.arrayContaining([12, 1000, 20])
-    );
   });
 
   it('rejects invalid site slug on create', async () => {
@@ -380,46 +301,15 @@ describe('GET /api/admin/sites', () => {
     expect(queryD1Mock).not.toHaveBeenCalled();
   });
 
-  it('updates site plan and status', async () => {
+  it('updates site status', async () => {
     queryD1Mock
-      .mockResolvedValueOnce([
-        {
-          id: 'default-site',
-          slug: 'demo-designer',
-          name: 'Demo Designer',
-          plan: 'lite',
-          status: 'active',
-          created_at: '2026-06-01T00:00:00Z',
-          updated_at: '2026-06-02T00:00:00Z',
-          project_count: 2,
-        },
-      ])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ id: 'default-site' }])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        {
-          id: 'default-site',
-          slug: 'demo-designer',
-          name: 'Demo Designer',
-          plan: 'pro',
-          status: 'suspended',
-          created_at: '2026-06-01T00:00:00Z',
-          updated_at: '2026-07-01T00:00:00Z',
-          project_count: 2,
-        },
-      ])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([SUSPENDED_SITE_ROW])
       .mockResolvedValueOnce([]);
 
     const response = await PUT(
       buildRequest('PUT', {
         id: 'default-site',
-        plan: 'pro',
         status: 'suspended',
       })
     );
@@ -428,67 +318,34 @@ describe('GET /api/admin/sites', () => {
     expect(response.status).toBe(200);
     expect(body.site).toMatchObject({
       id: 'default-site',
-      plan: 'pro',
       status: 'suspended',
     });
-    expect(queryD1Mock).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE sites'),
-      ['pro', 'suspended', expect.any(String), 'default-site']
-    );
-  });
-
-  it('blocks downgrade when lite quota would be exceeded', async () => {
-    queryD1Mock
-      .mockResolvedValueOnce([
-        {
-          id: 'default-site',
-          slug: 'demo-designer',
-          name: 'Demo Designer',
-          plan: 'pro',
-          status: 'active',
-          created_at: '2026-06-01T00:00:00Z',
-          updated_at: '2026-07-01T00:00:00Z',
-          project_count: 8,
-        },
-      ])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([]);
-
-    const response = await PUT(
-      buildRequest('PUT', {
-        id: 'default-site',
-        plan: 'lite',
-      })
-    );
-    const body = await response.json();
-
-    expect(response.status).toBe(409);
-    expect(body.errorCode).toBe('PLAN_QUOTA_VIOLATION');
   });
 
   it('blocks custom project quota updates below current usage', async () => {
+    vi.mocked(loadSiteQuotaOverrideMap).mockResolvedValue(
+      new Map([
+        [
+          'site-custom',
+          {
+            projectLimit: 100,
+            storageMb: null,
+            mediaPerProject: null,
+          },
+        ],
+      ])
+    );
+
     queryD1Mock
       .mockResolvedValueOnce([
         {
           id: 'site-custom',
           slug: 'custom-client',
           name: 'Custom Client',
-          plan: 'lite',
           status: 'active',
           created_at: '2026-06-01T00:00:00Z',
           updated_at: '2026-07-01T00:00:00Z',
-          project_count: 8,
-        },
-      ])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        {
-          site_id: 'site-custom',
-          project_limit: 12,
-          storage_mb: null,
-          media_per_project: null,
+          project_count: 60,
         },
       ])
       .mockResolvedValueOnce([])
@@ -508,7 +365,7 @@ describe('GET /api/admin/sites', () => {
 
     expect(response.status).toBe(409);
     expect(body.errorCode).toBe('PLAN_QUOTA_VIOLATION');
-    expect(body.details.violations[0]).toContain('Project usage 8 exceeds next limit 6');
+    expect(body.details.violations[0]).toContain('Project usage 60 exceeds next limit 50');
   });
 
   it('returns 404 when updating missing site', async () => {
@@ -532,10 +389,9 @@ describe('GET /api/admin/sites', () => {
       'sites/site-delete/projects/covers/a.webp',
       'sites/site-delete/projects/gallery/b.webp',
     ]);
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 6; i++) {
       queryD1Mock.mockResolvedValueOnce([]);
     }
-    queryD1Mock.mockResolvedValueOnce([]);
 
     const response = await DELETE(
       buildRequest('DELETE', {
@@ -553,12 +409,6 @@ describe('GET /api/admin/sites', () => {
       mediaObjects: 2,
     });
     expect(deleteFromR2Mock).toHaveBeenCalledTimes(2);
-    expect(queryD1Mock).toHaveBeenCalledWith('DELETE FROM site_subscriptions WHERE site_id = ?', [
-      'site-delete',
-    ]);
-    expect(queryD1Mock).toHaveBeenCalledWith('DELETE FROM site_quota_overrides WHERE site_id = ?', [
-      'site-delete',
-    ]);
     expect(queryD1Mock).toHaveBeenCalledWith('DELETE FROM media_assets WHERE site_id = ?', [
       'site-delete',
     ]);

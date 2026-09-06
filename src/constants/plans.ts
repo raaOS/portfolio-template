@@ -1,12 +1,16 @@
 /**
- * Harga dasar paket — sumber tunggal agar UI checkout dan billing service
- * selalu sinkron. Jangan hardcode 149000/299000 di tempat lain.
+ * Harga dasar — sumber tunggal agar UI checkout dan billing service
+ * selalu sinkron.
  */
+export const BASE_PRICE = 199000;
+
+/** @deprecated Use BASE_PRICE instead */
 export const PLAN_BASE_PRICES = {
-  lite: 149000,
-  pro: 299000,
+  lite: BASE_PRICE,
+  pro: BASE_PRICE,
 } as const;
 
+/** @deprecated */
 export type PlanKey = keyof typeof PLAN_BASE_PRICES;
 
 export function formatIdr(amount: number): string {
