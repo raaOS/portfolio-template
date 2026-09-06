@@ -2,6 +2,10 @@
  * Shared Core — Seed
  * Seeds initial data for a new customer deployment.
  *
+ * Content data (about, experience, skills, etc.) is NOT seeded here.
+ * The frontend uses fallback JSON files from src/data/ as defaults.
+ * Customers customize content via the admin panel.
+ *
  * @module
  */
 import { queryD1, bootstrapD1Schema, createSite } from './connection';
@@ -11,11 +15,11 @@ import { createScryptPasswordRecord } from '../auth/password';
 export interface SeedResult {
   siteCreated: boolean;
   adminCreated: boolean;
-  contentSeeded: boolean;
 }
 
 /**
- * Seed the database with initial site, admin user, and content data.
+ * Seed the database with initial site and admin user.
+ * Content data comes from fallback JSON files (src/data/).
  */
 export async function seedDeployment(options: {
   siteName?: string;
@@ -71,35 +75,7 @@ export async function seedDeployment(options: {
     adminCreated = true;
   }
 
-  // Seed content data
-  let contentSeeded = false;
-  const contentKeys = [
-    { key: 'about', value: JSON.stringify({ headline: '', description: '', bio: '' }) },
-    { key: 'experience', value: '[]' },
-    { key: 'skills', value: '[]' },
-    { key: 'contact', value: JSON.stringify({ email: '', phone: '', location: '' }) },
-    { key: 'testimonials', value: '[]' },
-    { key: 'interests', value: '[]' },
-    { key: 'philosophy', value: JSON.stringify({ quote: '', principles: [] }) },
-  ];
-
-  for (const item of contentKeys) {
-    const existing = await queryD1<{ id: string }>(
-      `SELECT id FROM app_kv WHERE key = ? LIMIT 1`,
-      [item.key]
-    );
-
-    if (existing.length === 0) {
-      await queryD1(
-        `INSERT INTO app_kv (id, key, value, created_at, updated_at)
-         VALUES (?, ?, ?, datetime('now'), datetime('now'))`,
-        [`${SITE_ID}-${item.key}`, item.key, item.value]
-      );
-      contentSeeded = true;
-    }
-  }
-
-  return { siteCreated, adminCreated, contentSeeded };
+  return { siteCreated, adminCreated };
 }
 
 /**
@@ -108,8 +84,6 @@ export async function seedDeployment(options: {
 export async function verifyDeployment(): Promise<{
   hasSite: boolean;
   hasAdmin: boolean;
-  hasContent: boolean;
-  contentKeys: string[];
 }> {
   await bootstrapD1Schema();
 
@@ -123,15 +97,8 @@ export async function verifyDeployment(): Promise<{
     [SITE_ID]
   );
 
-  const contentRows = await queryD1<{ key: string }>(
-    `SELECT key FROM app_kv`,
-    []
-  );
-
   return {
     hasSite: sites.length > 0,
     hasAdmin: admins.length > 0,
-    hasContent: contentRows.length > 0,
-    contentKeys: contentRows.map((r: { key: string }) => r.key),
   };
 }
