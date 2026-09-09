@@ -16,6 +16,9 @@ Sistem dokumentasi pelacakan pekerjaan (Tracker) telah diaktifkan untuk menghema
 2. **MANDATORY WRITE (Saat Pekerjaan Selesai / Handoff):**
    Setiap AI yang menyelesaikan task, memperbaiki bug, atau meninggalkan pekerjaan yang belum selesai (handoff) **wajib** memperbarui file log yang relevan di `docs/tracker/logs/`. Tambahkan daftar file yang dimodifikasi dan bug yang diperbaiki.
 
+3. **MANDATORY CHANGELOG (Saat Ada Fitur Baru / Bugfix Template):**
+   Setiap AI yang menambah fitur baru, mengoptimasi performa, atau memperbaiki bug pada template **wajib** menambahkan catatan versi baru di baris paling atas [CHANGELOG.md](file:///c:/Users/USER/Documents/portfolio-template/CHANGELOG.md). Catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di browser untuk ditampilkan kepada owner dan dirangkum menjadi pesan WhatsApp serah terima update ke klien.
+
 ---
 
 ## 1. Ringkasan Proyek & Arsitektur

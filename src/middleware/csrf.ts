@@ -20,6 +20,9 @@ export function checkCSRF(request: NextRequest) {
     const allowlistPaths = [
       '/api/admin/login',
       '/api/admin/logout',
+      '/api/auth/login',
+      '/api/auth/logout',
+      '/api/setup',
       '/api/chat/send',
       '/api/chat/voice',
       '/api/translate',

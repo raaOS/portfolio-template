@@ -6,6 +6,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify, SignJWT } from 'jose';
+import { deriveSiteSecret } from '@/crud/shared/auth/session';
 import { protectedRoutes, publicRoutes } from './constants';
 
 const SITE_USER_COOKIE = 'site_user_token';
@@ -16,11 +17,6 @@ function getJwtSecret(): Uint8Array | null {
   const secret = process.env.JWT_SECRET;
   if (!secret) return null;
   return new TextEncoder().encode(secret);
-}
-
-async function deriveSiteSecret(baseSecret: Uint8Array, siteId: string): Promise<CryptoKey> {
-  const siteKey = new TextEncoder().encode(siteId);
-  return crypto.subtle.importKey('raw', siteKey.buffer as ArrayBuffer, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
 }
 
 async function maybeRefreshToken(
@@ -35,10 +31,7 @@ async function maybeRefreshToken(
   if (remaining > REFRESH_THRESHOLD_SECONDS) return;
 
   try {
-    const siteKey = await deriveSiteSecret(baseSecret, payload.siteId);
-    const signature = await crypto.subtle.sign('HMAC', siteKey, new TextEncoder().encode(payload.siteId));
-    const derivedSecret = new Uint8Array(64);
-    new Uint8Array(signature).forEach((byte, i) => { derivedSecret[i] = byte; });
+    const derivedSecret = await deriveSiteSecret(payload.siteId, baseSecret);
 
     const fresh = await new SignJWT({
       siteId: payload.siteId,
@@ -85,10 +78,7 @@ export async function checkCustomerAuth(request: NextRequest) {
           ) as { siteId?: string };
 
           if (payload.siteId) {
-            const siteKey = await deriveSiteSecret(baseSecret, payload.siteId);
-            const signature = await crypto.subtle.sign('HMAC', siteKey, new TextEncoder().encode(payload.siteId));
-            const derivedSecret = new Uint8Array(64);
-            new Uint8Array(signature).forEach((byte, i) => { derivedSecret[i] = byte; });
+            const derivedSecret = await deriveSiteSecret(payload.siteId, baseSecret);
 
             const { payload: verified } = await jwtVerify(token, derivedSecret, {
               issuer: 'portfolio-site-user',
@@ -111,13 +101,6 @@ export async function checkCustomerAuth(request: NextRequest) {
         return {
           authenticated: false,
           response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
-        };
-      }
-
-      if (pathname.startsWith('/admin')) {
-        return {
-          authenticated: false,
-          response: NextResponse.rewrite(new URL('/404', request.url)),
         };
       }
 

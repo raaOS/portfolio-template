@@ -17,7 +17,7 @@ export const osDesktopCrudConfig: TemplateCrudConfig = {
       label: 'Profil & About',
       description: 'Kelola info profil, bio, headline, dan avatar.',
       apiPath: '/api/templates/os-desktop/about',
-      adminPath: '/admin/templates/os-desktop/about',
+      adminPath: '/admin/content/profile',
       fields: [
         { key: 'hero.name', label: 'Nama', type: 'text', required: true },
         { key: 'hero.title', label: 'Title / Jabatan', type: 'text' },
@@ -31,7 +31,7 @@ export const osDesktopCrudConfig: TemplateCrudConfig = {
       label: 'Projects',
       description: 'Kelola daftar project portfolio.',
       apiPath: '/api/templates/os-desktop/projects',
-      adminPath: '/admin/templates/os-desktop/projects',
+      adminPath: '/admin/projects',
       fields: [
         { key: 'title', label: 'Judul', type: 'text', required: true },
         { key: 'description', label: 'Deskripsi', type: 'textarea' },
@@ -50,7 +50,7 @@ export const osDesktopCrudConfig: TemplateCrudConfig = {
       label: 'Pengalaman Kerja',
       description: 'Kelola riwayat pengalaman kerja.',
       apiPath: '/api/templates/os-desktop/experience',
-      adminPath: '/admin/templates/os-desktop/experience',
+      adminPath: '/admin/content/experience',
       fields: [
         { key: 'company', label: 'Perusahaan', type: 'text', required: true },
         { key: 'position', label: 'Posisi', type: 'text', required: true },
@@ -63,7 +63,7 @@ export const osDesktopCrudConfig: TemplateCrudConfig = {
       label: 'Hard Skills',
       description: 'Kelola keahlian teknis.',
       apiPath: '/api/templates/os-desktop/skills',
-      adminPath: '/admin/templates/os-desktop/skills',
+      adminPath: '/admin/content/skills',
       fields: [
         { key: 'name', label: 'Nama Skill', type: 'text', required: true },
         { key: 'level', label: 'Level (0-100)', type: 'number' },
@@ -76,7 +76,7 @@ export const osDesktopCrudConfig: TemplateCrudConfig = {
       label: 'Testimoni',
       description: 'Kelola testimoni klien.',
       apiPath: '/api/templates/os-desktop/testimonial',
-      adminPath: '/admin/templates/os-desktop/testimonial',
+      adminPath: '/admin/communications/feedback',
       fields: [
         { key: 'name', label: 'Nama Klien', type: 'text', required: true },
         { key: 'company', label: 'Perusahaan', type: 'text' },
@@ -89,7 +89,7 @@ export const osDesktopCrudConfig: TemplateCrudConfig = {
       label: 'Kontak',
       description: 'Kelola info kontak.',
       apiPath: '/api/templates/os-desktop/contact',
-      adminPath: '/admin/templates/os-desktop/contact',
+      adminPath: '/admin/communications/contacts',
       fields: [
         { key: 'email', label: 'Email', type: 'text' },
         { key: 'phone', label: 'Telepon', type: 'text' },
@@ -111,7 +111,7 @@ export const infiniteCanvasCrudConfig: TemplateCrudConfig = {
       label: 'Profil & About',
       description: 'Kelola info profil, bio, headline, dan avatar.',
       apiPath: '/api/templates/infinite-canvas/about',
-      adminPath: '/admin/templates/infinite-canvas/about',
+      adminPath: '/admin/content/profile',
       fields: [
         { key: 'hero.name', label: 'Nama', type: 'text', required: true },
         { key: 'hero.title', label: 'Title / Jabatan', type: 'text' },
@@ -125,7 +125,7 @@ export const infiniteCanvasCrudConfig: TemplateCrudConfig = {
       label: 'Projects',
       description: 'Kelola daftar project portfolio.',
       apiPath: '/api/templates/infinite-canvas/projects',
-      adminPath: '/admin/templates/infinite-canvas/projects',
+      adminPath: '/admin/projects',
       fields: [
         { key: 'title', label: 'Judul', type: 'text', required: true },
         { key: 'description', label: 'Deskripsi', type: 'textarea' },

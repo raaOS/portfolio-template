@@ -54,6 +54,9 @@ describe('checkCSRF middleware', () => {
       '/api/translate',
       '/api/admin/login',
       '/api/admin/logout',
+      '/api/auth/login',
+      '/api/auth/logout',
+      '/api/setup',
     ])('allows %s POST without csrf_token cookie (visitor fresh)', (pathname) => {
       const result = checkCSRF(buildRequest(pathname, 'POST'));
       expect(result.isValid).toBe(true);

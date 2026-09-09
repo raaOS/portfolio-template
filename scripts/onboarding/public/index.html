@@ -1,0 +1,1524 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Asisten Klien Portofolio — Master Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f9fafb;
+      --card-bg: #ffffff;
+      --border: #e5e7eb;
+      --border-focus: #111827;
+      --text: #111827;
+      --text-muted: #6b7280;
+      --text-subtle: #9ca3af;
+      --primary: #111827;
+      --primary-hover: #1f2937;
+      --surface-subtle: #f3f4f6;
+      --success: #059669;
+      --success-bg: #ecfdf5;
+      --success-border: #a7f3d0;
+      --error: #b91c1c;
+      --error-bg: #fef2f2;
+      --error-border: #fecaca;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 2.5rem 1rem;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 640px;
+    }
+
+    /* Top Navigation Tabs */
+    .tabs-nav {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.75rem;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      padding: 0.5rem 0.875rem;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .tab-btn:hover {
+      color: var(--text);
+      background: var(--surface-subtle);
+    }
+
+    .tab-btn.active {
+      color: var(--text);
+      font-weight: 600;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    }
+
+    .header {
+      margin-bottom: 1.75rem;
+    }
+
+    .badge-master {
+      display: inline-block;
+      background: var(--surface-subtle);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      margin-bottom: 0.75rem;
+    }
+
+    .title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      margin-bottom: 0.35rem;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 2rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+    }
+
+    .section-title {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 0.375rem;
+    }
+
+    input, select {
+      width: 100%;
+      background: #ffffff;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: 0.625rem 0.875rem;
+      color: var(--text);
+      font-size: 0.875rem;
+      font-family: inherit;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    input::placeholder {
+      color: var(--text-subtle);
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 1px var(--border-focus);
+    }
+
+    .input-hint {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.375rem;
+      line-height: 1.4;
+    }
+
+    .input-hint code, .inline-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      background: var(--surface-subtle);
+      padding: 0.1rem 0.35rem;
+      border-radius: 4px;
+      color: var(--text);
+    }
+
+    /* Template Radio Cards */
+    .template-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .template-card {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.875rem 1rem;
+      cursor: pointer;
+      transition: border-color 0.15s ease, background 0.15s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .template-card:hover {
+      border-color: #9ca3af;
+    }
+
+    .template-card.active {
+      border-color: var(--border-focus);
+      background: #fafafa;
+      box-shadow: 0 0 0 1px var(--border-focus);
+    }
+
+    .template-name {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .template-desc {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .template-badge {
+      align-self: flex-start;
+      font-size: 0.6875rem;
+      font-weight: 500;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      background: var(--surface-subtle);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    .template-card.active .template-badge {
+      background: #111827;
+      border-color: #111827;
+      color: #ffffff;
+    }
+
+    /* Help Box */
+    .help-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 0.875rem 1rem;
+      margin-bottom: 1.25rem;
+      font-size: 0.78125rem;
+      line-height: 1.55;
+      color: #475569;
+    }
+
+    .help-box strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    /* Button */
+    .btn-submit {
+      width: 100%;
+      background: var(--primary);
+      color: #ffffff;
+      border: 1px solid var(--primary);
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s ease, border-color 0.15s ease;
+      margin-top: 0.5rem;
+    }
+
+    .btn-submit:hover:not(:disabled) {
+      background: var(--primary-hover);
+      border-color: var(--primary-hover);
+    }
+
+    .btn-submit:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Progress Overlay */
+    .progress-container {
+      display: none;
+      margin-top: 1.5rem;
+      padding: 1.25rem;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    .progress-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .step-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+    }
+
+    .step-item.active {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .step-item.done {
+      color: var(--success);
+      font-weight: 500;
+    }
+
+    .step-icon {
+      width: 1.25rem;
+      height: 1.25rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      background: #ffffff;
+      border: 1px solid #d1d5db;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .step-item.active .step-icon {
+      border-color: var(--border-focus);
+      background: var(--border-focus);
+      color: #ffffff;
+    }
+
+    .step-item.done .step-icon {
+      border-color: var(--success);
+      background: var(--success-bg);
+      color: var(--success);
+    }
+
+    /* Success Result Screen */
+    .result-container {
+      display: none;
+      animation: fadeIn 0.2s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .success-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .success-icon-badge {
+      width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      background: var(--success-bg);
+      border: 1px solid var(--success-border);
+      color: var(--success);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.875rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .result-links {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8125rem;
+    }
+
+    .result-row {
+      margin-bottom: 0.75rem;
+    }
+
+    .result-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .result-label {
+      color: var(--text-muted);
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: block;
+      margin-bottom: 0.2rem;
+    }
+
+    .result-val {
+      color: var(--text);
+      word-break: break-all;
+    }
+
+    .btn-wa {
+      width: 100%;
+      background: var(--primary);
+      color: #ffffff;
+      border: 1px solid var(--primary);
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s ease;
+      margin-bottom: 0.625rem;
+    }
+
+    .btn-wa:hover {
+      background: var(--primary-hover);
+    }
+
+    .btn-reset {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.625rem 1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 0.8125rem;
+      width: 100%;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .btn-reset:hover {
+      background: var(--surface-subtle);
+      border-color: #d1d5db;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #111827;
+      color: #ffffff;
+      padding: 0.625rem 1.25rem;
+      border-radius: 6px;
+      font-weight: 500;
+      font-size: 0.8125rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      transition: transform 0.2s ease;
+      z-index: 100;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .error-box {
+      display: none;
+      background: var(--error-bg);
+      border: 1px solid var(--error-border);
+      color: var(--error);
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      font-size: 0.8125rem;
+      margin-bottom: 1.25rem;
+      line-height: 1.45;
+    }
+
+    /* Client summary info card */
+    .info-summary-card {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1.25rem;
+      font-size: 0.8125rem;
+    }
+
+    .info-summary-card .row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+    }
+
+    .info-summary-card .row:last-child {
+      margin-bottom: 0;
+    }
+
+    .info-summary-card .key {
+      color: var(--text-muted);
+    }
+
+    .info-summary-card .val {
+      font-weight: 500;
+      color: var(--text);
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Navigation Tabs -->
+  <div class="tabs-nav">
+    <button type="button" class="tab-btn active" id="tab-btn-onboard">Pendaftaran Klien Baru</button>
+    <button type="button" class="tab-btn" id="tab-btn-domain">Kelola Custom Domain</button>
+    <button type="button" class="tab-btn" id="tab-btn-update">Update Versi Template</button>
+  </div>
+
+  <!-- TAB 1: ONBOARDING VIEW -->
+  <div id="view-onboard">
+    <div class="header">
+      <span class="badge-master">Master Onboarding</span>
+      <h1 class="title">Pendaftaran Klien Baru</h1>
+      <p class="subtitle">Otomasi pembuatan database D1, storage media R2, dan penyiapan akun portofolio klien.</p>
+    </div>
+
+    <!-- Form Card -->
+    <div class="card" id="form-card">
+      <form id="onboard-form">
+        <div id="error-message" class="error-box"></div>
+
+        <!-- Section 1: Informasi Klien -->
+        <div class="section-title">1. Identitas Klien</div>
+        
+        <div class="form-group">
+          <label for="clientName">Nama Lengkap Klien</label>
+          <input type="text" id="clientName" placeholder="Contoh: Budi Pratama" required>
+        </div>
+
+        <div class="form-group">
+          <label for="clientSlug">Slug URL Website (Otomatis)</label>
+          <input type="text" id="clientSlug" placeholder="budi-pratama" required>
+          <div class="input-hint">Target URL: <code id="slug-preview">https://budi-pratama.pages.dev</code></div>
+        </div>
+
+        <div class="form-group">
+          <label>Pilihan Gaya Template Portofolio</label>
+          <div class="template-grid">
+            <div class="template-card active" data-template="os-desktop" id="card-os">
+              <span class="template-name">macOS Desktop OS</span>
+              <span class="template-desc">Desktop simulator dengan menu bar, dock, wallpaper, dan jendela modular.</span>
+              <span class="template-badge">Desktop Simulator</span>
+            </div>
+            <div class="template-card" data-template="infinite-canvas" id="card-canvas">
+              <span class="template-name">Infinite Canvas</span>
+              <span class="template-desc">Kanvas spasial bebas dengan kluster profil, proyek, keahlian, dan riwayat.</span>
+              <span class="template-badge">Spasial Kanvas</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="adminEmail">Email Login Klien</label>
+          <input type="email" id="adminEmail" placeholder="budi@domain.com" required>
+          <div class="input-hint">Digunakan klien untuk login ke dashboard admin di <code>/admin</code>.</div>
+        </div>
+
+        <!-- Section 2: Kredensial Cloudflare Klien -->
+        <div class="section-title" style="margin-top: 1.5rem;">2. Kredensial Cloudflare Klien</div>
+
+        <div class="help-box">
+          <strong>Panduan Pengambilan Kredensial:</strong>
+          <br>1. Buka <strong>dash.cloudflare.com</strong> di akun Cloudflare klien.
+          <br>2. <strong>Account ID:</strong> Buka Workers &amp; Pages atau menu apa saja, salin Account ID di panel samping kanan.
+          <br>3. <strong>API Token:</strong> Buka My Profile &gt; API Tokens &gt; Create Token (pilih template Edit Cloudflare Workers).
+        </div>
+
+        <div class="form-group">
+          <label for="accountId">Cloudflare Account ID</label>
+          <input type="text" id="accountId" placeholder="Contoh: 9f8a7b6c5d4e3f21a0b9c8d7e6f5a4b3" required>
+        </div>
+
+        <div class="form-group">
+          <label for="apiToken">Cloudflare API Token</label>
+          <input type="password" id="apiToken" placeholder="Contoh: vX8z9P0a1b2c3d4e5f6g7h8i9j0k1l2m" required>
+        </div>
+
+        <!-- Action Button -->
+        <button type="submit" class="btn-submit" id="btn-submit">
+          Proses dan Siapkan Website Klien
+        </button>
+      </form>
+
+      <!-- Progress Checklist -->
+      <div class="progress-container" id="progress-box">
+        <div class="section-title">Status Pemrosesan</div>
+        <div class="progress-steps">
+          <div class="step-item" id="step-1">
+            <div class="step-icon">1</div>
+            <span>Verifikasi kredensial akun Cloudflare</span>
+          </div>
+          <div class="step-item" id="step-2">
+            <div class="step-icon">2</div>
+            <span>Membuat database D1 terisolasi (<code id="progress-db">db-...</code>)</span>
+          </div>
+          <div class="step-item" id="step-3">
+            <div class="step-icon">3</div>
+            <span>Menyiapkan storage media R2 (<code id="progress-r2">media-...</code>)</span>
+          </div>
+          <div class="step-item" id="step-4">
+            <div class="step-icon">4</div>
+            <span>Migrasi skema tabel database dan konfigurasi template</span>
+          </div>
+          <div class="step-item" id="step-5">
+            <div class="step-icon">5</div>
+            <span>Pengarsipan lokal dan pembuatan surat serah terima</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Success Card -->
+    <div class="card result-container" id="result-card">
+      <div class="success-header">
+        <div class="success-icon-badge">✓</div>
+        <div>
+          <h2 class="title" style="font-size: 1.25rem; margin-bottom: 0.15rem;">Website Klien Berhasil Disiapkan</h2>
+          <p class="subtitle" style="font-size: 0.8125rem;">Database, storage, dan konfigurasi telah aktif secara terisolasi.</p>
+        </div>
+      </div>
+
+      <div class="result-links">
+        <div class="result-row">
+          <span class="result-label">Nama Klien</span>
+          <span class="result-val" id="res-client-name" style="font-weight: 600;">-</span>
+        </div>
+        <div class="result-row">
+          <span class="result-label">Alamat Website</span>
+          <a id="res-web-link" href="#" target="_blank" class="result-val" style="color: #111827; text-decoration: underline;">-</a>
+        </div>
+        <div class="result-row">
+          <span class="result-label">Ruang Kerja Admin</span>
+          <a id="res-admin-link" href="#" target="_blank" class="result-val" style="color: #111827; text-decoration: underline;">-</a>
+        </div>
+        <div class="result-row">
+          <span class="result-label">Email Login</span>
+          <span class="result-val" id="res-email">-</span>
+        </div>
+        <div class="result-row">
+          <span class="result-label">Password Login</span>
+          <span class="result-val" id="res-pass" style="font-weight: 600;">-</span>
+        </div>
+        <div class="result-row">
+          <span class="result-label">Lokasi Arsip Lokal</span>
+          <span class="result-val" id="res-folder" style="color: var(--text-muted);">-</span>
+        </div>
+      </div>
+
+      <button class="btn-wa" id="btn-copy-wa">
+        Salin Format Pesan Serah Terima (WhatsApp)
+      </button>
+      
+      <button class="btn-reset" id="btn-create-another">
+        Daftarkan Klien Berikutnya
+      </button>
+    </div>
+  </div>
+
+  <!-- TAB 2: CUSTOM DOMAIN MANAGEMENT VIEW -->
+  <div id="view-domain" style="display: none;">
+    <div class="header">
+      <span class="badge-master">Domain Manager</span>
+      <h1 class="title">Hubungkan Custom Domain Klien</h1>
+      <p class="subtitle">Pasang domain yang baru dibeli klien (misal: budipratama.com) langsung ke Cloudflare tanpa mengetik kredensial ulang.</p>
+    </div>
+
+    <div class="card" id="domain-card">
+      <form id="domain-form">
+        <div id="domain-error-message" class="error-box"></div>
+
+        <div class="form-group">
+          <label for="select-client">Pilih Klien Terdaftar (Dari Arsip Laptop)</label>
+          <select id="select-client" required>
+            <option value="">-- Memuat daftar klien dari laptop... --</option>
+          </select>
+          <div class="input-hint">Kredensial Cloudflare diambil otomatis dari folder <code>arsip-klien/</code>.</div>
+        </div>
+
+        <!-- Selected Client Info -->
+        <div id="client-info-box" class="info-summary-card" style="display: none;">
+          <div class="row">
+            <span class="key">Nama Klien:</span>
+            <span class="val" id="info-client-name">-</span>
+          </div>
+          <div class="row">
+            <span class="key">Website Bawaan:</span>
+            <span class="val" id="info-client-url">-</span>
+          </div>
+          <div class="row">
+            <span class="key">Domain Saat Ini:</span>
+            <span class="val" id="info-client-domain">-</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="customDomainInput">Nama Domain Baru Klien</label>
+          <input type="text" id="customDomainInput" placeholder="Contoh: budipratama.com atau portofolio.budi.com" required>
+          <div class="input-hint">Cukup ketik nama domainnya saja (tanpa <code>https://</code>).</div>
+        </div>
+
+        <button type="submit" class="btn-submit" id="btn-submit-domain">
+          Hubungkan Domain ke Cloudflare
+        </button>
+      </form>
+
+      <!-- Domain Success Result -->
+      <div id="domain-result-box" style="display: none; margin-top: 1.5rem;">
+        <div class="success-header">
+          <div class="success-icon-badge">✓</div>
+          <div>
+            <h2 class="title" style="font-size: 1.15rem; margin-bottom: 0.15rem;">Domain Berhasil Didaftarkan</h2>
+            <p class="subtitle" style="font-size: 0.8125rem;">Cloudflare sudah menerima pendaftaran domain ini.</p>
+          </div>
+        </div>
+
+        <div class="help-box" style="margin-bottom: 1.25rem;">
+          <strong>Petunjuk DNS untuk Klien / Registrar:</strong>
+          <br>Buka tempat membeli domain (Niagahoster, GoDaddy, dll), lalu tambahkan 1 baris CNAME berikut:
+          <div style="margin-top: 0.5rem; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; background: #ffffff; padding: 0.5rem; border-radius: 4px; border: 1px solid var(--border);">
+            Type: <strong>CNAME</strong> &nbsp;|&nbsp; Host: <strong id="res-cname-host">@</strong> &nbsp;|&nbsp; Target: <strong id="res-cname-target">-</strong>
+          </div>
+        </div>
+
+        <button class="btn-wa" id="btn-copy-domain-wa">
+          Salin Pesan WhatsApp Serah Terima Domain
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 3: TEMPLATE UPDATE VIEW -->
+  <div id="view-update" style="display: none;">
+    <div class="header">
+      <span class="badge-master">Template Manager</span>
+      <h1 class="title">Update Versi Template ke Klien</h1>
+      <p class="subtitle">Kirim pembaruan fitur baru dan perbaikan bug ke website klien tanpa menghapus data portofolio, media R2, atau akun login klien.</p>
+    </div>
+
+    <div class="card" id="update-card">
+      <div id="update-error-message" class="error-box"></div>
+
+      <!-- Build Status Card -->
+      <div class="info-summary-card" style="margin-bottom: 1.25rem;">
+        <div class="row">
+          <span class="key">Status Build Template (.open-next):</span>
+          <span class="val" id="build-status-text">Memeriksa status build...</span>
+        </div>
+        <div class="row">
+          <span class="key">Waktu Build Terakhir:</span>
+          <span class="val" id="build-last-time">-</span>
+        </div>
+      </div>
+
+      <!-- Changelog Release Notes Card -->
+      <div id="changelog-card" class="info-summary-card" style="margin-bottom: 1.25rem; background: #ffffff; border: 1px solid var(--border); transition: all 0.2s ease;">
+        <div id="changelog-header" style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 0.5rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <button type="button" id="btn-toggle-changelog" style="background: transparent; border: none; font-family: inherit; font-size: 0.875rem; font-weight: 700; color: var(--text); cursor: pointer; display: flex; align-items: center; gap: 0.35rem; padding: 0;">
+              <span id="toggle-changelog-icon" style="font-size: 0.6875rem; color: var(--text-muted); transition: transform 0.2s ease;">▼</span>
+              <span>Catatan Pembaruan Rilis</span>
+            </button>
+            <span id="changelog-version-badge" class="badge-master" style="margin: 0; background: #111827; color: #ffffff; border: none; font-size: 0.6875rem; padding: 0.15rem 0.45rem;">v1.2.0</span>
+            <span id="changelog-date" style="font-size: 0.75rem; color: var(--text-muted);">-</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <button type="button" id="btn-refresh-changelog" class="btn-reset" title="Muat ulang catatan pembaruan dari CHANGELOG.md" style="width: auto; padding: 0.3rem 0.6rem; font-size: 0.75rem; display: flex; align-items: center; gap: 0.3rem;">
+              <span id="refresh-icon-spin">🔄</span>
+              <span>Cek Versi Baru</span>
+            </button>
+            <button type="button" id="btn-copy-update-wa" class="btn-reset" style="width: auto; padding: 0.3rem 0.65rem; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 0.3rem;">
+              📋 Salin Pesan WA
+            </button>
+          </div>
+        </div>
+        <div id="changelog-body" style="transition: max-height 0.25s ease; margin-top: 0.625rem;">
+          <div id="changelog-content" style="font-size: 0.8125rem; color: var(--text); line-height: 1.5; max-height: 320px; overflow-y: auto; padding-right: 0.25rem;">
+            Memuat catatan pembaruan dari CHANGELOG.md...
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1.25rem;">
+        <label style="display: flex; align-items: flex-start; gap: 0.625rem; font-weight: normal; cursor: pointer;">
+          <input type="checkbox" id="forceBuildCheck" style="width: auto; margin-top: 0.2rem;" checked>
+          <span>
+            <strong style="color: var(--text);">Kompilasi build baru terlebih dahulu (npm run cf:build)</strong>
+            <br>
+            <span style="font-size: 0.75rem; color: var(--text-muted); display: inline-block; margin-top: 0.15rem;">
+              Centang jika kamu baru saja mengedit kode, memperbaiki bug, atau menambah fitur baru ke template.
+            </span>
+          </span>
+        </label>
+      </div>
+
+      <!-- Action Row: Update All Button -->
+      <div style="display: flex; gap: 0.75rem; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border);">
+        <div>
+          <span class="section-title" style="border: none; margin: 0; padding: 0;">Daftar Klien Terdaftar</span>
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;" id="client-count-text">0 klien</div>
+        </div>
+        <button type="button" class="btn-submit" id="btn-update-all" style="width: auto; padding: 0.5rem 1rem; font-size: 0.8125rem; margin-top: 0;">
+          🚀 Update Semua Klien Sekaligus
+        </button>
+      </div>
+
+      <!-- Client Cards List -->
+      <div id="update-client-list" style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.25rem;">
+        <div style="color: var(--text-muted); font-size: 0.8125rem;">Memuat daftar klien dari laptop...</div>
+      </div>
+
+      <!-- Terminal / Progress Log Box -->
+      <div id="update-progress-container" style="display: none; margin-top: 1.5rem;">
+        <div class="section-title" style="margin-bottom: 0.5rem;" id="update-progress-title">Proses Pembaruan Sedang Berjalan...</div>
+        <div style="font-size: 0.8125rem; color: var(--text-muted); margin-bottom: 0.75rem;" id="update-progress-status">Menyiapkan...</div>
+        <div id="update-console-log" style="background: #0f172a; color: #38bdf8; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; padding: 1rem; border-radius: 8px; max-height: 280px; overflow-y: auto; white-space: pre-wrap; line-height: 1.5; border: 1px solid #1e293b;"></div>
+      </div>
+
+      <!-- Success Summary Box -->
+      <div id="update-success-box" style="display: none; margin-top: 1.5rem;">
+        <div class="success-header">
+          <div class="success-icon-badge">✓</div>
+          <div>
+            <h2 class="title" style="font-size: 1.15rem; margin-bottom: 0.15rem;">Pembaruan Berhasil Dikirim!</h2>
+            <p class="subtitle" style="font-size: 0.8125rem;">Website klien sekarang sudah menggunakan versi template terbaru.</p>
+          </div>
+        </div>
+        <div id="update-summary-results" class="result-links" style="margin-top: 0.75rem;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">Pesan berhasil disalin ke clipboard.</div>
+
+<script>
+  let selectedTemplate = 'os-desktop';
+  let lastWhatsappText = '';
+  let lastDomainWhatsappText = '';
+  let archivedClients = [];
+
+  // Navigation Tabs Switching
+  const tabBtnOnboard = document.getElementById('tab-btn-onboard');
+  const tabBtnDomain = document.getElementById('tab-btn-domain');
+  const tabBtnUpdate = document.getElementById('tab-btn-update');
+  const viewOnboard = document.getElementById('view-onboard');
+  const viewDomain = document.getElementById('view-domain');
+  const viewUpdate = document.getElementById('view-update');
+
+  tabBtnOnboard.addEventListener('click', () => {
+    tabBtnOnboard.classList.add('active');
+    tabBtnDomain.classList.remove('active');
+    tabBtnUpdate.classList.remove('active');
+    viewOnboard.style.display = 'block';
+    viewDomain.style.display = 'none';
+    viewUpdate.style.display = 'none';
+  });
+
+  tabBtnDomain.addEventListener('click', () => {
+    tabBtnDomain.classList.add('active');
+    tabBtnOnboard.classList.remove('active');
+    tabBtnUpdate.classList.remove('active');
+    viewOnboard.style.display = 'none';
+    viewDomain.style.display = 'block';
+    viewUpdate.style.display = 'none';
+    loadArchivedClients();
+  });
+
+  tabBtnUpdate.addEventListener('click', () => {
+    tabBtnUpdate.classList.add('active');
+    tabBtnOnboard.classList.remove('active');
+    tabBtnDomain.classList.remove('active');
+    viewOnboard.style.display = 'none';
+    viewDomain.style.display = 'none';
+    viewUpdate.style.display = 'block';
+    loadUpdateView();
+  });
+
+  // Template card click
+  const cardOs = document.getElementById('card-os');
+  const cardCanvas = document.getElementById('card-canvas');
+
+  cardOs.addEventListener('click', () => {
+    selectedTemplate = 'os-desktop';
+    cardOs.classList.add('active');
+    cardCanvas.classList.remove('active');
+  });
+
+  cardCanvas.addEventListener('click', () => {
+    selectedTemplate = 'infinite-canvas';
+    cardCanvas.classList.add('active');
+    cardOs.classList.remove('active');
+  });
+
+  // Auto slugify name
+  const nameInput = document.getElementById('clientName');
+  const slugInput = document.getElementById('clientSlug');
+  const slugPreview = document.getElementById('slug-preview');
+
+  nameInput.addEventListener('input', (e) => {
+    const slug = e.target.value
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    slugInput.value = slug;
+    slugPreview.textContent = `https://${slug || 'nama-klien'}.pages.dev`;
+  });
+
+  slugInput.addEventListener('input', (e) => {
+    slugPreview.textContent = `https://${e.target.value || 'nama-klien'}.pages.dev`;
+  });
+
+  // Form Submit: Onboard
+  const form = document.getElementById('onboard-form');
+  const submitBtn = document.getElementById('btn-submit');
+  const errorBox = document.getElementById('error-message');
+  const progressBox = document.getElementById('progress-box');
+  const formCard = document.getElementById('form-card');
+  const resultCard = document.getElementById('result-card');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errorBox.style.display = 'none';
+
+    const clientName = nameInput.value.trim();
+    const clientSlug = slugInput.value.trim();
+    const adminEmail = document.getElementById('adminEmail').value.trim();
+    const accountId = document.getElementById('accountId').value.trim();
+    const apiToken = document.getElementById('apiToken').value.trim();
+
+    if (!clientSlug) {
+      showError('Slug website tidak boleh kosong');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Memproses ke Cloudflare...';
+    progressBox.style.display = 'block';
+
+    document.getElementById('progress-db').textContent = `db-${clientSlug}`;
+    document.getElementById('progress-r2').textContent = `media-${clientSlug}`;
+
+    for (let i = 1; i <= 5; i++) {
+      const step = document.getElementById(`step-${i}`);
+      step.className = 'step-item';
+    }
+
+    try {
+      const response = await fetch('/api/provision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientName,
+          clientSlug,
+          templateKey: selectedTemplate,
+          accountId,
+          apiToken,
+          adminEmail,
+        }),
+      });
+
+      if (!response.body) {
+        throw new Error('Gagal membaca respons streaming dari server');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const block of lines) {
+          if (!block.trim()) continue;
+          const matchEvent = block.match(/^event: (.*)$/m);
+          const matchData = block.match(/^data: (.*)$/m);
+
+          const eventType = matchEvent ? matchEvent[1].trim() : 'message';
+          const eventData = matchData ? JSON.parse(matchData[1]) : {};
+
+          if (eventType === 'progress') {
+            updateStep(eventData.step, eventData.message);
+          } else if (eventType === 'complete') {
+            showSuccess(eventData);
+            return;
+          } else if (eventType === 'error') {
+            throw new Error(eventData.message || 'Terjadi kesalahan sistem');
+          }
+        }
+      }
+    } catch (err) {
+      showError(err.message || 'Terjadi kegagalan koneksi. Periksa kembali Account ID dan API Token.');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Proses dan Siapkan Website Klien';
+    }
+  });
+
+  function updateStep(stepNum, message) {
+    for (let i = 1; i < stepNum; i++) {
+      const prev = document.getElementById(`step-${i}`);
+      if (prev) prev.className = 'step-item done';
+    }
+    const current = document.getElementById(`step-${stepNum}`);
+    if (current) current.className = 'step-item active';
+  }
+
+  function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.style.display = 'block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function showSuccess(data) {
+    formCard.style.display = 'none';
+    resultCard.style.display = 'block';
+
+    document.getElementById('res-client-name').textContent = data.clientName;
+    
+    const webLink = document.getElementById('res-web-link');
+    webLink.href = data.websiteUrl;
+    webLink.textContent = data.websiteUrl;
+
+    const adminLink = document.getElementById('res-admin-link');
+    adminLink.href = data.adminUrl;
+    adminLink.textContent = data.adminUrl;
+
+    document.getElementById('res-email').textContent = data.adminEmail;
+    document.getElementById('res-pass').textContent = data.adminPassword;
+    document.getElementById('res-folder').textContent = data.archiveFolder;
+
+    lastWhatsappText = 
+`Halo ${data.clientName},
+
+Website portofolio Anda telah selesai disiapkan dan sudah dapat diakses:
+
+Alamat Website:
+${data.websiteUrl}
+
+Ruang Kerja Admin:
+${data.adminUrl}
+Email: ${data.adminEmail}
+Password: ${data.adminPassword}
+
+Anda dapat mengelola karya proyek, profil, kontak, dan keahlian secara langsung melalui ruang kerja admin di atas. Panduan penggunaan juga terlampir.`;
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // Copy WhatsApp message (Onboard)
+  const copyBtn = document.getElementById('btn-copy-wa');
+  const toast = document.getElementById('toast');
+
+  copyBtn.addEventListener('click', async () => {
+    if (!lastWhatsappText) return;
+    try {
+      await navigator.clipboard.writeText(lastWhatsappText);
+      showToast('Format pesan serah terima berhasil disalin ke clipboard.');
+    } catch {
+      alert('Pesan:\n\n' + lastWhatsappText);
+    }
+  });
+
+  // Create another client
+  document.getElementById('btn-create-another').addEventListener('click', () => {
+    form.reset();
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Proses dan Siapkan Website Klien';
+    progressBox.style.display = 'none';
+    resultCard.style.display = 'none';
+    formCard.style.display = 'block';
+  });
+
+  // --- CUSTOM DOMAIN SECTION LOGIC ---
+  const selectClient = document.getElementById('select-client');
+  const clientInfoBox = document.getElementById('client-info-box');
+  const infoClientName = document.getElementById('info-client-name');
+  const infoClientUrl = document.getElementById('info-client-url');
+  const infoClientDomain = document.getElementById('info-client-domain');
+  const customDomainInput = document.getElementById('customDomainInput');
+  const domainForm = document.getElementById('domain-form');
+  const btnSubmitDomain = document.getElementById('btn-submit-domain');
+  const domainErrorBox = document.getElementById('domain-error-message');
+  const domainResultBox = document.getElementById('domain-result-box');
+  const resCnameHost = document.getElementById('res-cname-host');
+  const resCnameTarget = document.getElementById('res-cname-target');
+  const btnCopyDomainWa = document.getElementById('btn-copy-domain-wa');
+
+  async function loadArchivedClients() {
+    try {
+      selectClient.innerHTML = '<option value="">-- Memuat klien dari arsip laptop... --</option>';
+      const res = await fetch('/api/clients');
+      const data = await res.json();
+      archivedClients = data.clients || [];
+
+      if (archivedClients.length === 0) {
+        selectClient.innerHTML = '<option value="">(Belum ada arsip klien. Silakan daftarkan klien baru terlebih dahulu)</option>';
+        return;
+      }
+
+      let optionsHtml = '<option value="">-- Pilih Klien --</option>';
+      for (const client of archivedClients) {
+        optionsHtml += `<option value="${client.id}">${client.clientName} (${client.clientSlug})</option>`;
+      }
+      selectClient.innerHTML = optionsHtml;
+    } catch (err) {
+      selectClient.innerHTML = '<option value="">Gagal memuat arsip klien</option>';
+    }
+  }
+
+  selectClient.addEventListener('change', () => {
+    domainErrorBox.style.display = 'none';
+    domainResultBox.style.display = 'none';
+    const folderId = selectClient.value;
+    const client = archivedClients.find((c) => c.id === folderId);
+
+    if (client) {
+      clientInfoBox.style.display = 'block';
+      infoClientName.textContent = client.clientName;
+      infoClientUrl.textContent = client.websiteUrl;
+      infoClientDomain.textContent = client.customDomain ? client.customDomain : '(Belum ada custom domain)';
+      customDomainInput.value = client.customDomain || '';
+    } else {
+      clientInfoBox.style.display = 'none';
+      customDomainInput.value = '';
+    }
+  });
+
+  domainForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    domainErrorBox.style.display = 'none';
+    domainResultBox.style.display = 'none';
+
+    const folderName = selectClient.value;
+    const customDomain = customDomainInput.value.trim();
+
+    if (!folderName) {
+      domainErrorBox.textContent = 'Pilih salah satu klien terlebih dahulu.';
+      domainErrorBox.style.display = 'block';
+      return;
+    }
+
+    btnSubmitDomain.disabled = true;
+    btnSubmitDomain.textContent = 'Menghubungkan ke Cloudflare...';
+
+    try {
+      const res = await fetch('/api/custom-domain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folderName, customDomain }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Gagal menghubungkan domain');
+      }
+
+      domainResultBox.style.display = 'block';
+      resCnameHost.textContent = data.cnameHost || '@';
+      resCnameTarget.textContent = data.cnameTarget || `${data.clientSlug}.pages.dev`;
+
+      lastDomainWhatsappText = 
+`Halo ${data.clientName},
+
+Domain ${data.domain} telah berhasil dihubungkan ke akun website portofolio Anda.
+
+Untuk mengaktifkannya, silakan tambahkan 1 baris record DNS pada registrar tempat Anda membeli domain:
+• Tipe Record : CNAME
+• Nama / Host : ${data.cnameHost || '@'}
+• Nilai / Target: ${data.cnameTarget}
+
+Setelah DNS diperbarui, website portofolio Anda akan langsung aktif di https://${data.domain}`;
+
+      showToast('Domain berhasil didaftarkan ke Cloudflare!');
+      await loadArchivedClients();
+      selectClient.value = folderName;
+    } catch (err) {
+      domainErrorBox.textContent = err.message;
+      domainErrorBox.style.display = 'block';
+    } finally {
+      btnSubmitDomain.disabled = false;
+      btnSubmitDomain.textContent = 'Hubungkan Domain ke Cloudflare';
+    }
+  });
+
+  btnCopyDomainWa.addEventListener('click', async () => {
+    if (!lastDomainWhatsappText) return;
+    try {
+      await navigator.clipboard.writeText(lastDomainWhatsappText);
+      showToast('Pesan serah terima domain disalin ke clipboard.');
+    } catch {
+      alert('Pesan:\n\n' + lastDomainWhatsappText);
+    }
+  });
+
+  function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+  }
+
+  // --- TAB 3: UPDATE TEMPLATE LOGIC ---
+  const buildStatusText = document.getElementById('build-status-text');
+  const buildLastTime = document.getElementById('build-last-time');
+  const forceBuildCheck = document.getElementById('forceBuildCheck');
+  const clientCountText = document.getElementById('client-count-text');
+  const updateClientList = document.getElementById('update-client-list');
+  const updateErrorMessage = document.getElementById('update-error-message');
+  const updateProgressContainer = document.getElementById('update-progress-container');
+  const updateProgressStatus = document.getElementById('update-progress-status');
+  const updateConsoleLog = document.getElementById('update-console-log');
+  const updateSuccessBox = document.getElementById('update-success-box');
+  const updateSummaryResults = document.getElementById('update-summary-results');
+  const btnUpdateAll = document.getElementById('btn-update-all');
+  const changelogVersionBadge = document.getElementById('changelog-version-badge');
+  const changelogDate = document.getElementById('changelog-date');
+  const changelogContent = document.getElementById('changelog-content');
+  const changelogBody = document.getElementById('changelog-body');
+  const changelogHeader = document.getElementById('changelog-header');
+  const btnToggleChangelog = document.getElementById('btn-toggle-changelog');
+  const toggleChangelogIcon = document.getElementById('toggle-changelog-icon');
+  const btnRefreshChangelog = document.getElementById('btn-refresh-changelog');
+  const refreshIconSpin = document.getElementById('refresh-icon-spin');
+  const btnCopyUpdateWa = document.getElementById('btn-copy-update-wa');
+
+  let isUpdating = false;
+  let isChangelogCollapsed = false;
+  let lastUpdateWhatsappText = '';
+
+  // Toggle Collapse / Expand
+  btnToggleChangelog.addEventListener('click', () => {
+    isChangelogCollapsed = !isChangelogCollapsed;
+    if (isChangelogCollapsed) {
+      changelogBody.style.display = 'none';
+      changelogHeader.style.borderBottom = 'none';
+      changelogHeader.style.paddingBottom = '0';
+      toggleChangelogIcon.textContent = '▶';
+    } else {
+      changelogBody.style.display = 'block';
+      changelogHeader.style.borderBottom = '1px solid var(--border)';
+      changelogHeader.style.paddingBottom = '0.5rem';
+      toggleChangelogIcon.textContent = '▼';
+    }
+  });
+
+  // Manual Refresh Changelog
+  btnRefreshChangelog.addEventListener('click', async () => {
+    btnRefreshChangelog.disabled = true;
+    refreshIconSpin.textContent = '⏳';
+    await fetchChangelog(true);
+    refreshIconSpin.textContent = '🔄';
+    btnRefreshChangelog.disabled = false;
+  });
+
+  async function fetchChangelog(showFeedback = false) {
+    try {
+      const resChangelog = await fetch('/api/changelog?t=' + Date.now());
+      const changelogData = await resChangelog.json();
+      if (changelogData.success) {
+        changelogVersionBadge.textContent = `v${changelogData.version || '1.0.0'}`;
+        changelogDate.textContent = changelogData.date ? `(${changelogData.date})` : '';
+        lastUpdateWhatsappText = changelogData.whatsappMessage || '';
+
+        if (changelogData.sections && changelogData.sections.length > 0) {
+          let cHtml = '';
+          for (const sec of changelogData.sections) {
+            cHtml += `<div style="font-weight: 600; margin-top: 0.4rem; margin-bottom: 0.2rem; color: var(--text);">${escapeHtml(sec.title)}</div>`;
+            cHtml += `<ul style="margin-left: 1.25rem; margin-bottom: 0.4rem; list-style-type: disc;">`;
+            for (const item of sec.items) {
+              cHtml += `<li style="margin-bottom: 0.15rem; color: var(--text-muted);">${escapeHtml(item)}</li>`;
+            }
+            cHtml += `</ul>`;
+          }
+          changelogContent.innerHTML = cHtml;
+        } else {
+          changelogContent.textContent = 'Belum ada catatan pembaruan di CHANGELOG.md.';
+        }
+        if (showFeedback) {
+          showToast(`Catatan rilis v${changelogData.version} berhasil dimuat ulang!`);
+        }
+      }
+    } catch (e) {
+      changelogContent.textContent = 'Gagal memuat catatan rilis dari server.';
+    }
+  }
+
+  btnCopyUpdateWa.addEventListener('click', async () => {
+    if (!lastUpdateWhatsappText) {
+      showToast('Belum ada catatan pembaruan untuk disalin.');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(lastUpdateWhatsappText);
+      showToast('Pesan pengumuman update berhasil disalin ke clipboard!');
+    } catch {
+      alert('Pesan Pengumuman:\n\n' + lastUpdateWhatsappText);
+    }
+  });
+
+  async function loadUpdateView() {
+    updateErrorMessage.style.display = 'none';
+    updateProgressContainer.style.display = 'none';
+    updateSuccessBox.style.display = 'none';
+
+    // Fetch Changelog
+    await fetchChangelog(false);
+    
+    // Check build status
+    try {
+      const res = await fetch('/api/build-status');
+      const data = await res.json();
+      if (data.hasBuild) {
+        buildStatusText.innerHTML = '<span style="color: var(--success); font-weight: 600;">✓ Bundle Siap Dideploy</span>';
+        buildLastTime.textContent = data.lastBuilt || '-';
+      } else {
+        buildStatusText.innerHTML = '<span style="color: #d97706; font-weight: 600;">⚠ Belum Ada Build (Akan dikompilasi otomatis)</span>';
+        buildLastTime.textContent = 'Belum pernah dibuild';
+        forceBuildCheck.checked = true;
+      }
+    } catch (e) {
+      buildStatusText.textContent = 'Gagal memeriksa status build';
+    }
+
+    // Load clients
+    try {
+      const res = await fetch('/api/clients');
+      const data = await res.json();
+      const clients = data.clients || [];
+      archivedClients = clients;
+      clientCountText.textContent = `${clients.length} klien terdaftar di arsip-klien/`;
+
+      if (clients.length === 0) {
+        updateClientList.innerHTML = '<div style="color: var(--text-muted); font-size: 0.8125rem; padding: 0.75rem; background: var(--surface-subtle); border-radius: 6px;">Belum ada arsip klien di folder <code>arsip-klien/</code>. Silakan daftarkan klien baru di Tab 1 terlebih dahulu.</div>';
+        btnUpdateAll.disabled = true;
+        btnUpdateAll.style.opacity = '0.5';
+        return;
+      }
+
+      btnUpdateAll.disabled = false;
+      btnUpdateAll.style.opacity = '1';
+
+      let html = '';
+      for (const client of clients) {
+        html += `
+          <div class="client-card" style="border: 1px solid var(--border); border-radius: 8px; padding: 0.875rem 1rem; display: flex; justify-content: space-between; align-items: center; background: #ffffff;">
+            <div style="flex: 1; padding-right: 1rem;">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="font-weight: 600; font-size: 0.875rem; color: var(--text);">${escapeHtml(client.clientName)}</span>
+                <span style="font-size: 0.6875rem; color: var(--text-muted); background: var(--surface-subtle); padding: 0.1rem 0.4rem; border-radius: 4px;">${client.templateKey === 'os-desktop' ? 'macOS Desktop' : '3D Canvas'}</span>
+              </div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+                <a href="${client.websiteUrl}" target="_blank" style="color: var(--text-muted); text-decoration: underline;">${client.websiteUrl}</a>
+                ${client.customDomain ? ` • <strong style="color: var(--success);">${escapeHtml(client.customDomain)}</strong>` : ''}
+              </div>
+            </div>
+            <button type="button" class="btn-reset btn-update-single" data-folder="${client.id}" style="width: auto; padding: 0.45rem 0.85rem; font-size: 0.75rem; font-weight: 600; white-space: nowrap;">
+              Update Klien Ini
+            </button>
+          </div>
+        `;
+      }
+      updateClientList.innerHTML = html;
+
+      // Attach single click events
+      document.querySelectorAll('.btn-update-single').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const folderName = btn.getAttribute('data-folder');
+          const client = archivedClients.find((c) => c.id === folderName);
+          const name = client ? client.clientName : folderName;
+          if (confirm(`Yakin ingin mengupdate website ${name} ke versi template terbaru?`)) {
+            triggerDeploy({ folderName });
+          }
+        });
+      });
+    } catch (e) {
+      updateClientList.innerHTML = '<div style="color: var(--error); font-size: 0.8125rem;">Gagal memuat daftar klien.</div>';
+    }
+  }
+
+  btnUpdateAll.addEventListener('click', () => {
+    if (archivedClients.length === 0) return;
+    if (confirm(`PENTING: Yakin ingin mengupdate SEMUA (${archivedClients.length}) klien sekaligus ke versi template terbaru?`)) {
+      triggerDeploy({ all: true });
+    }
+  });
+
+  async function triggerDeploy(payload) {
+    if (isUpdating) return;
+    isUpdating = true;
+    updateErrorMessage.style.display = 'none';
+    updateSuccessBox.style.display = 'none';
+    updateProgressContainer.style.display = 'block';
+    updateConsoleLog.textContent = '';
+    updateProgressStatus.textContent = 'Memulai proses pembaruan...';
+    btnUpdateAll.disabled = true;
+    document.querySelectorAll('.btn-update-single').forEach((b) => (b.disabled = true));
+
+    const forceBuild = forceBuildCheck.checked;
+    const requestBody = { ...payload, forceBuild };
+
+    try {
+      const response = await fetch('/api/deploy-client', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.body) {
+        throw new Error('Gagal membuka streaming log dari server.');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const block of lines) {
+          if (!block.trim()) continue;
+          const matchEvent = block.match(/^event: (.*)$/m);
+          const matchData = block.match(/^data: (.*)$/m);
+
+          const eventType = matchEvent ? matchEvent[1].trim() : 'message';
+          const eventData = matchData ? JSON.parse(matchData[1]) : {};
+
+          if (eventType === 'log') {
+            appendLog(eventData.text);
+          } else if (eventType === 'progress') {
+            updateProgressStatus.textContent = eventData.message || 'Memproses...';
+          } else if (eventType === 'complete') {
+            handleDeployComplete(eventData);
+            return;
+          } else if (eventType === 'error') {
+            throw new Error(eventData.message || 'Terjadi kesalahan saat deploy');
+          }
+        }
+      }
+    } catch (err) {
+      updateErrorMessage.textContent = err.message || 'Terjadi kegagalan jaringan saat deploy.';
+      updateErrorMessage.style.display = 'block';
+      appendLog(`[ERROR FATAL] ${err.message}`);
+    } finally {
+      isUpdating = false;
+      btnUpdateAll.disabled = false;
+      document.querySelectorAll('.btn-update-single').forEach((b) => (b.disabled = false));
+      // Refresh build status
+      loadUpdateView();
+    }
+  }
+
+  function appendLog(line) {
+    updateConsoleLog.textContent += line + '\n';
+    updateConsoleLog.scrollTop = updateConsoleLog.scrollHeight;
+  }
+
+  function handleDeployComplete(data) {
+    updateSuccessBox.style.display = 'block';
+    let resultsHtml = '';
+    for (const r of data.results || []) {
+      resultsHtml += `
+        <div class="result-row" style="margin-bottom: 0.5rem;">
+          <span class="result-label" style="display: flex; align-items: center; gap: 0.35rem;">
+            ${r.success ? '<span style="color: var(--success); font-weight: bold;">✓ SUKSES</span>' : '<span style="color: var(--error); font-weight: bold;">✗ GAGAL</span>'}
+            ${escapeHtml(r.clientName)} (${escapeHtml(r.clientSlug)})
+          </span>
+          <span class="result-val">
+            ${r.success ? `<a href="${r.url}" target="_blank" style="color: var(--text); text-decoration: underline;">${r.url}</a>` : `<span style="color: var(--error);">${escapeHtml(r.error || 'Gagal')}</span>`}
+          </span>
+        </div>
+      `;
+    }
+    updateSummaryResults.innerHTML = resultsHtml || 'Tidak ada target pembaruan.';
+    showToast('Proses pembaruan versi template telah selesai!');
+  }
+
+  function escapeHtml(str) {
+    return (str || '').replace(/[&<>"']/g, (m) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[m]));
+  }
+</script>
+
+</body>
+</html>

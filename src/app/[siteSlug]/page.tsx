@@ -5,6 +5,7 @@ import { loadHomepageData } from '@/lib/loaders';
 import { canUseWhatsappTestimonials } from '@/lib/product/sitePlan';
 import { mapD1ToTemplateData } from '@/lib/templates/dataMapper';
 import OSDesktopRenderer from '@/components/templates/os-desktop/OSDesktopRenderer';
+import InfiniteCanvasRenderer from '@/components/templates/infinite-canvas/InfiniteCanvasRenderer';
 
 export const revalidate = 60;
 
@@ -49,13 +50,19 @@ export default async function TenantPage({ params }: TenantPageProps) {
     testimonialsData: effectiveTestimonialsData,
   };
 
+  const activeTemplateKey = site.active_template_key || 'os-desktop';
+
   const templateData = mapD1ToTemplateData({
     site: {
       ...site,
-      active_template_key: 'os-desktop',
+      active_template_key: activeTemplateKey,
     },
     homepageData: effectiveHomepageData,
   });
+
+  if (activeTemplateKey === 'infinite-canvas') {
+    return <InfiniteCanvasRenderer data={templateData} />;
+  }
 
   return <OSDesktopRenderer data={templateData} />;
 }

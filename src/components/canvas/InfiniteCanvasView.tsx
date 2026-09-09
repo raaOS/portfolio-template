@@ -28,6 +28,7 @@ import { clearCameraState, clearTargetSlug, getCameraState } from '@/lib/canvasC
 
 type Props = {
   projects: Project[];
+  onSelectProject?: (project: Project) => void;
 };
 
 type TransitionTarget = {
@@ -35,7 +36,7 @@ type TransitionTarget = {
   slug: string;
 };
 
-export default function InfiniteCanvasView({ projects }: Props) {
+export default function InfiniteCanvasView({ projects, onSelectProject }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = useReducedMotion();
 
@@ -108,12 +109,8 @@ export default function InfiniteCanvasView({ projects }: Props) {
 
   const [renderedItems, setRenderedItems] = useState<CanvasItem[]>(initialItems);
   const renderedItemsRef = useRef<CanvasItem[]>(initialItems);
-  const [hoveredProject, setHoveredProject] = useState<Project | null>(null);
-  const [isTooltipSuppressed, setIsTooltipSuppressed] = useState(false);
   const hoveredProjectRef = useRef<Project | null>(null);
-  const isTooltipSuppressedRef = useRef(false);
   const pointerClientRef = useRef({ x: 0, y: 0, inside: false });
-  const tooltipRef = useRef<HTMLDivElement>(null);
 
   // Clear target slug after a short delay (allows transition to complete)
   useEffect(() => {
@@ -128,10 +125,7 @@ export default function InfiniteCanvasView({ projects }: Props) {
   }, [transitionTarget]);
 
   const handleHoverChange = useCallback((project: Project | null) => {
-    if (hoveredProjectRef.current === project) return;
-
     hoveredProjectRef.current = project;
-    setHoveredProject(project);
   }, []);
 
   const reconcileHoveredProject = useCallback(() => {
@@ -189,7 +183,7 @@ export default function InfiniteCanvasView({ projects }: Props) {
     Map<string, { opacity: number; grayscale: number; hidden: boolean }>
   >(new Map());
 
-  // — Mouse tracker for magnetic effect & tooltip position —
+  // — Mouse tracker for magnetic effect —
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     const container = containerRef.current;
     if (!container) return;
@@ -199,37 +193,6 @@ export default function InfiniteCanvasView({ projects }: Props) {
       x: ((e.clientX - rect.left) / rect.width) * 2 - 1,
       y: ((e.clientY - rect.top) / rect.height) * 2 - 1,
     };
-
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const tooltipBounds = tooltipRef.current?.getBoundingClientRect();
-    const tooltipWidth = tooltipBounds?.width ?? 260;
-    const tooltipHeight = tooltipBounds?.height ?? 120;
-    const edgePadding = 12;
-    const pointerGap = 20;
-    const preferredX = x + pointerGap;
-    const preferredY = y + pointerGap;
-    const flippedX = x - tooltipWidth - pointerGap;
-    const flippedY = y - tooltipHeight - pointerGap;
-    const maxX = Math.max(edgePadding, rect.width - tooltipWidth - edgePadding);
-    const maxY = Math.max(edgePadding, rect.height - tooltipHeight - edgePadding);
-    const tooltipX = Math.min(
-      Math.max(
-        edgePadding,
-        preferredX + tooltipWidth <= rect.width - edgePadding ? preferredX : flippedX
-      ),
-      maxX
-    );
-    const tooltipY = Math.min(
-      Math.max(
-        edgePadding,
-        preferredY + tooltipHeight <= rect.height - edgePadding ? preferredY : flippedY
-      ),
-      maxY
-    );
-
-    container.style.setProperty('--tooltip-x', `${tooltipX}px`);
-    container.style.setProperty('--tooltip-y', `${tooltipY}px`);
   }, []);
 
   // Stable ref callbacks — prevents CanvasCard memo() from re-rendering on parent state change
@@ -539,12 +502,13 @@ export default function InfiniteCanvasView({ projects }: Props) {
 
       const videoNode = videoNodesRef.current.get(item.key);
       if (videoNode) {
-        // Only load and play video for cards within focus distance (< 1800) to optimize bandwidth, memory, and CPU
-        const isNearFocus = item.dist < 1800;
+        // Optimization: play video only when user hovers this project card to save GPU/video decoders
+        const isHovered = hoveredProjectRef.current?.id === item.project.id;
         if (
-          visualStyle.opacity > CANVAS_CONSTANTS.videoVisibilityOpacity &&
+          isHovered &&
           activeKeys.has(item.key) &&
-          isNearFocus
+          !visualStyle.hidden &&
+          visualStyle.opacity > 0.1
         ) {
           if (videoNode.paused) {
             if (!videoNode.getAttribute('src')) {
@@ -555,10 +519,6 @@ export default function InfiniteCanvasView({ projects }: Props) {
         } else {
           if (!videoNode.paused) {
             videoNode.pause();
-          }
-          if (videoNode.getAttribute('src') && item.dist >= 1800) {
-            videoNode.removeAttribute('src');
-            videoNode.load();
           }
         }
       }
@@ -636,15 +596,7 @@ export default function InfiniteCanvasView({ projects }: Props) {
 
       updateDomNodes();
 
-      const shouldSuppressTooltip = isDraggingRef.current;
-      const wasTooltipSuppressed = isTooltipSuppressedRef.current;
-
-      if (shouldSuppressTooltip !== wasTooltipSuppressed) {
-        isTooltipSuppressedRef.current = shouldSuppressTooltip;
-        setIsTooltipSuppressed(shouldSuppressTooltip);
-      }
-
-      if (!shouldSuppressTooltip && (isCameraMoving || wasTooltipSuppressed)) {
+      if (!isDraggingRef.current && isCameraMoving) {
         reconcileHoveredProject();
       }
 
@@ -726,7 +678,6 @@ export default function InfiniteCanvasView({ projects }: Props) {
           const dz = item.z - initialCamera.z;
 
           let targetOpacity = 1;
-          let blur = 0;
           let targetGrayscale = 0;
 
           // Forward (Close-up) Fading
@@ -736,10 +687,6 @@ export default function InfiniteCanvasView({ projects }: Props) {
               Math.max(0, (dz - CANVAS_CONSTANTS.fadeCloseStart) / CANVAS_CONSTANTS.fadeCloseRange)
             );
             targetOpacity = 1 - (1 - Math.pow(1 - t, 5)); // easeOutQuint
-            blur = Math.min(
-              12,
-              Math.max(0, (dz - CANVAS_CONSTANTS.fadeCloseStart) / CANVAS_CONSTANTS.blurCloseRange)
-            );
           }
 
           // Backward (Far) Fading & Grayscale
@@ -759,13 +706,6 @@ export default function InfiniteCanvasView({ projects }: Props) {
               Math.max(0, (dz - CANVAS_CONSTANTS.fadeFarStart) / CANVAS_CONSTANTS.fadeFarRange)
             );
             targetOpacity = 1 - (1 - Math.pow(1 - t, 5)); // easeOutQuint
-            blur = Math.max(
-              blur,
-              Math.min(
-                15,
-                Math.max(0, (dz - CANVAS_CONSTANTS.fadeFarStart) / CANVAS_CONSTANTS.blurFarRange)
-              )
-            );
           }
 
           // Radial (Edge) Fading
@@ -791,9 +731,6 @@ export default function InfiniteCanvasView({ projects }: Props) {
           const isHidden = targetOpacity <= CANVAS_CONSTANTS.minVisibleOpacity;
           const filterParts: string[] = [];
 
-          if (blur > 0.5 && targetOpacity > 0.1) {
-            filterParts.push(`blur(${Math.min(10, blur).toFixed(1)}px)`);
-          }
           if (targetGrayscale > 1) {
             filterParts.push(`grayscale(${targetGrayscale.toFixed(0)}%)`);
           }
@@ -820,6 +757,7 @@ export default function InfiniteCanvasView({ projects }: Props) {
               onHoverChange={handleHoverChange}
               isTransitionTarget={isTransitionTarget}
               getCamera={getCameraRef.current}
+              onSelectProject={onSelectProject}
             />
           );
         })}
@@ -833,43 +771,6 @@ export default function InfiniteCanvasView({ projects }: Props) {
             'radial-gradient(ellipse 70% 60% at 50% 50%, transparent 70%, rgba(220,228,236,0) 100%)',
         }}
       />
-
-      {hoveredProject && (
-        <div
-          ref={tooltipRef}
-          data-canvas-tooltip
-          className={`pointer-events-none absolute left-0 top-0 z-50 transition-opacity duration-150 ${
-            isTooltipSuppressed ? 'opacity-0' : 'opacity-100'
-          }`}
-          style={{
-            transform: 'translate3d(var(--tooltip-x, 12px), var(--tooltip-y, 12px), 0)',
-            willChange: 'transform',
-          }}
-        >
-          <div
-            className="flex w-[260px] max-w-[calc(100vw-24px)] flex-col gap-0.5 rounded-lg border border-white/20 bg-white/70 p-3 shadow-none backdrop-blur-xl dark:border-white/10 dark:bg-black/75"
-            style={{
-              animation: 'tooltip-appear 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-            }}
-          >
-            {/* Title */}
-            <h3 className="text-[15px] font-semibold leading-snug text-slate-900 dark:text-white">
-              {hoveredProject.title}
-            </h3>
-
-            {/* Client & Year */}
-            <div className="flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-black/60 dark:text-zinc-400">
-              {hoveredProject.client && (
-                <>
-                  <span>{hoveredProject.client}</span>
-                  <span className="text-black/30 dark:text-white/30">•</span>
-                </>
-              )}
-              <span>{hoveredProject.year}</span>
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="pointer-events-none absolute bottom-10 left-10 flex flex-col gap-2">
         <div className="text-[10px] uppercase tracking-[0.32em] text-black/20">

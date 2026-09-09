@@ -15,6 +15,7 @@ export interface SiteInfo {
   name: string;
   plan?: string;
   status: string;
+  active_template_key?: string;
 }
 
 export async function getSiteBySlug(slug: string): Promise<SiteInfo | null> {

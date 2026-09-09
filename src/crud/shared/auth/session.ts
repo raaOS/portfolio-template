@@ -33,16 +33,37 @@ function getJwtSecret(): ArrayBuffer {
 }
 
 /**
+ * Derive per-site secret using HMAC-SHA256 from the base JWT_SECRET.
+ */
+export async function deriveSiteSecret(
+  siteId: string,
+  baseSecret?: ArrayBuffer | Uint8Array
+): Promise<Uint8Array> {
+  const secretBuffer = baseSecret
+    ? (baseSecret instanceof Uint8Array ? baseSecret.buffer : baseSecret)
+    : getJwtSecret();
+  const siteKey = new TextEncoder().encode(siteId);
+  const hmac = await crypto.subtle.importKey(
+    'raw',
+    secretBuffer as ArrayBuffer,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signature = await crypto.subtle.sign('HMAC', hmac, siteKey);
+  const derivedSecret = new Uint8Array(64);
+  new Uint8Array(signature).forEach((byte, i) => {
+    derivedSecret[i] = byte;
+  });
+  return derivedSecret;
+}
+
+/**
  * Sign a JWT for a site user.
  * The secret is derived per-site using HMAC to prevent cross-site token reuse.
  */
 export async function signSiteUserJWT(session: SiteUserSession): Promise<string> {
-  const baseSecret = getJwtSecret();
-  const siteKey = new TextEncoder().encode(session.siteId);
-  const hmac = await crypto.subtle.importKey('raw', baseSecret, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const signature = await crypto.subtle.sign('HMAC', hmac, siteKey);
-  const derivedSecret = new Uint8Array(64);
-  new Uint8Array(signature).forEach((byte, i) => { derivedSecret[i] = byte; });
+  const derivedSecret = await deriveSiteSecret(session.siteId);
 
   const token = await new SignJWT({
     siteId: session.siteId,
@@ -65,8 +86,6 @@ export async function signSiteUserJWT(session: SiteUserSession): Promise<string>
  */
 export async function verifySiteUserJWT(token: string): Promise<SiteUserSession | null> {
   try {
-    const baseSecret = getJwtSecret();
-
     // We need to decode the token first to get siteId for key derivation
     const payload = JSON.parse(
       Buffer.from(token.split('.')[1], 'base64url').toString()
@@ -74,11 +93,7 @@ export async function verifySiteUserJWT(token: string): Promise<SiteUserSession 
 
     if (!payload.siteId) return null;
 
-    const siteKey = new TextEncoder().encode(payload.siteId);
-    const hmac = await crypto.subtle.importKey('raw', baseSecret, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-    const signature = await crypto.subtle.sign('HMAC', hmac, siteKey);
-    const derivedSecret = new Uint8Array(64);
-    new Uint8Array(signature).forEach((byte, i) => { derivedSecret[i] = byte; });
+    const derivedSecret = await deriveSiteSecret(payload.siteId);
 
     const { payload: verified } = await jwtVerify(token, derivedSecret, {
       issuer: ISSUER,

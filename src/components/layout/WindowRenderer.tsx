@@ -14,25 +14,27 @@ export default function WindowRenderer() {
   }
 
   return (
-    <AnimatePresence>
-      {openWindows.map((window) => (
-        <OSWindow
-          key={window.id}
-          id={window.id}
-          title={window.title}
-          isOpen={window.isOpen}
-          isMinimized={window.isMinimized}
-          isMaximized={window.isMaximized}
-          zIndex={window.zIndex}
-          noPadding={window.noPadding}
-          initialPosition={window.initialPosition}
-          width={window.width}
-          height={window.height}
-          onClose={() => closeWindow(window.id)}
-        >
-          {window.content}
-        </OSWindow>
-      ))}
-    </AnimatePresence>
+    <div className="fixed inset-0 pointer-events-none z-[500] overflow-hidden">
+      <AnimatePresence>
+        {openWindows.map((window) => (
+          <OSWindow
+            key={window.id}
+            id={window.id}
+            title={window.title}
+            isOpen={window.isOpen}
+            isMinimized={window.isMinimized}
+            isMaximized={window.isMaximized}
+            zIndex={window.zIndex}
+            noPadding={window.noPadding}
+            initialPosition={window.initialPosition}
+            width={window.width}
+            height={window.height}
+            onClose={() => closeWindow(window.id)}
+          >
+            {window.content}
+          </OSWindow>
+        ))}
+      </AnimatePresence>
+    </div>
   );
 }

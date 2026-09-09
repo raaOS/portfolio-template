@@ -48,6 +48,7 @@ export default function LayoutClient({
     pathname?.startsWith('/about-test') ||
     pathname?.startsWith('/about') ||
     pathname?.includes('/demo') ||
+    pathname?.startsWith('/preview/os-desktop') ||
     isTenantRequest;
 
   // Slot dock yang persistent: dirender di level non-lazy supaya element

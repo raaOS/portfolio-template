@@ -116,6 +116,9 @@ const nextConfig = {
       // Redirect /works to /projects - permanent redirect
       { source: '/works/:slug*', destination: '/projects/:slug*', permanent: true },
       { source: '/project/:slug*', destination: '/projects/:slug*', permanent: true },
+      // Redirect legacy admin templates routes to main admin desktop
+      { source: '/admin/templates', destination: '/admin', permanent: false },
+      { source: '/admin/templates/:path*', destination: '/admin', permanent: false },
       // Note: trailing slash removal is handled by trailingSlash: false
     ];
   },
@@ -206,6 +209,20 @@ const nextConfig = {
             value: '0',
           },
         ],
+      },
+    ];
+  },
+  async redirects() {
+    return [
+      {
+        source: '/admin/templates',
+        destination: '/admin',
+        permanent: false,
+      },
+      {
+        source: '/admin/templates/:path*',
+        destination: '/admin',
+        permanent: false,
       },
     ];
   },

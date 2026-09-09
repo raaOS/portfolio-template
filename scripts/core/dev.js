@@ -46,15 +46,52 @@ function resolveNextCli() {
   }
 }
 
-function isPortAvailable(port) {
+function testBind(port, host) {
   return new Promise((resolve) => {
     const server = net.createServer();
-    server.once('error', () => resolve(false));
+    server.once('error', (err) => {
+      if (err && (err.code === 'EADDRNOTAVAIL' || err.code === 'ENOTFOUND')) {
+        return resolve(true);
+      }
+      resolve(false);
+    });
     server.once('listening', () => {
       server.close(() => resolve(true));
     });
-    server.listen(port, '0.0.0.0');
+    server.listen(port, host);
   });
+}
+
+function testConnect(port, host) {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    const finalize = (occupied) => {
+      socket.removeAllListeners();
+      socket.destroy();
+      resolve(occupied);
+    };
+    socket.setTimeout(400);
+    socket.once('connect', () => finalize(true));
+    socket.once('timeout', () => finalize(false));
+    socket.once('error', () => finalize(false));
+    socket.connect(port, host);
+  });
+}
+
+async function isPortAvailable(port) {
+  const [activeIpv4, activeIpv6] = await Promise.all([
+    testConnect(port, '127.0.0.1'),
+    testConnect(port, '::1'),
+  ]);
+  if (activeIpv4 || activeIpv6) {
+    return false;
+  }
+
+  const [bindIpv4, bindIpv6] = await Promise.all([
+    testBind(port, '0.0.0.0'),
+    testBind(port, '::'),
+  ]);
+  return bindIpv4 && bindIpv6;
 }
 
 async function findPort() {
@@ -92,7 +129,7 @@ async function main() {
   pipeFilteredOutput(child.stdout, process.stdout);
   pipeFilteredOutput(child.stderr, process.stderr);
 
-  child.on('exit', (code) => {
+  child.on('close', (code) => {
     process.exit(code ?? 0);
   });
 }

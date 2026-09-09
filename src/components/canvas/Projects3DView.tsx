@@ -7,9 +7,10 @@ import InfiniteCanvasView from './InfiniteCanvasView';
 
 type Props = {
   projects: Project[];
+  onSelectProject?: (project: Project) => void;
 };
 
-function Projects3DViewComponent({ projects }: Props) {
+function Projects3DViewComponent({ projects, onSelectProject }: Props) {
   return (
     <SectionErrorBoundary
       sectionName="Projects 3D View"
@@ -24,7 +25,7 @@ function Projects3DViewComponent({ projects }: Props) {
         </div>
       }
     >
-      <InfiniteCanvasView projects={projects} />
+      <InfiniteCanvasView projects={projects} onSelectProject={onSelectProject} />
     </SectionErrorBoundary>
   );
 }

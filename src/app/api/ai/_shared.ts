@@ -2,9 +2,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import { validateAdminRequest } from '@/lib/auth';
 import { enforceRequestRateLimit } from '@/lib/security/request';
 
+import { getResolvedAiConfig, type SiteAiConfig } from '@/lib/services/aiGatewayService';
+import { resolveRequestSiteId } from '@/lib/admin/siteRequestContext';
+
 const MAX_AI_REQUESTS = 10;
 const RATE_LIMIT_WINDOW = 60 * 1000;
 const BLOCK_DURATION = 5 * 60 * 1000;
+
+export async function getResolvedAiConfigForRequest(req?: NextRequest): Promise<SiteAiConfig | null> {
+  let siteId: string | undefined;
+  if (req) {
+    try {
+      siteId = await resolveRequestSiteId(req);
+    } catch {
+      // fallback
+    }
+  }
+  return getResolvedAiConfig(siteId);
+}
 
 export function getGoogleAiApiKey() {
   const provider = (process.env.AI_PROVIDER || '').toLowerCase();

@@ -3,6 +3,10 @@ import { createOrder } from '@/lib/services/orderService';
 import { isSlugAvailable, validateSlugFormat } from '@/lib/services/slugService';
 import { enforceRequestRateLimit } from '@/lib/security/request';
 
+/**
+ * GET /api/billing/checkout?slug=xxx
+ * Cek ketersediaan slug (masih diperlukan untuk admin/setup flow).
+ */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -30,6 +34,10 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * POST /api/billing/checkout
+ * Buat order baru. Plan dan slug sekarang opsional — default 'pro' dan auto-generate.
+ */
 export async function POST(request: NextRequest) {
   try {
     const rateLimit = await enforceRequestRateLimit(request, 'billing_checkout', 10, 60_000, 300_000);
@@ -43,9 +51,19 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { buyerName, buyerEmail, buyerWhatsapp, plan, desiredSlug, templateId } = body;
 
-    if (!buyerName || !buyerEmail || !buyerWhatsapp || !desiredSlug) {
+    if (!buyerName || !buyerEmail || !buyerWhatsapp) {
       return NextResponse.json({ error: 'Data form checkout tidak lengkap' }, { status: 400 });
     }
+
+    // Auto-generate slug dari nama buyer jika tidak disediakan
+    const slug = desiredSlug
+      ? desiredSlug.trim().toLowerCase()
+      : buyerName
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '')
+          .slice(0, 30) || 'portfolio';
 
     const selectedPlan = plan === 'lite' ? 'lite' : 'pro';
 
@@ -55,7 +73,7 @@ export async function POST(request: NextRequest) {
         buyerEmail,
         buyerWhatsapp,
         plan: selectedPlan,
-        desiredSlug,
+        desiredSlug: slug,
         templateId: typeof templateId === 'string' && templateId.trim() ? templateId.trim() : undefined,
       },
       {

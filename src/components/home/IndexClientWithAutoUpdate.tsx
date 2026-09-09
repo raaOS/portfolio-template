@@ -128,6 +128,7 @@ export default function IndexClientWithAutoUpdate({
         searchQuery={searchQuery}
         windowWidth={windowWidth}
         isLoading={isLoading}
+        siteId={siteId}
         view={view}
       />
     </div>

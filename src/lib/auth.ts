@@ -118,8 +118,17 @@ export const validateAdminRequest = async (
   request: NextRequest,
   options: { checkCsrf?: boolean } = {}
 ): Promise<boolean> => {
-  // 1. Check Admin Auth
-  if (!checkAdminAuth(request)) {
+  // 1. Check Admin Auth (legacy admin_token or customer site_user_token)
+  let isAuthenticated = checkAdminAuth(request);
+  if (!isAuthenticated) {
+    const { getSiteUserSession } = await import('@/crud/shared/auth/guard');
+    const session = await getSiteUserSession(request);
+    if (session && session.role === 'admin') {
+      isAuthenticated = true;
+    }
+  }
+
+  if (!isAuthenticated) {
     return false;
   }
 

@@ -16,7 +16,7 @@ interface ProjectsFinderHeaderProps {
 }
 
 export default function ProjectsFinderHeader({
-  itemCount,
+  itemCount: _itemCount,
   labels = [],
 }: ProjectsFinderHeaderProps) {
   const t = useDictionary();

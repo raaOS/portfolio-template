@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import { Check, ChevronDown, Search, Wifi, LogOut, Users, ShoppingCart } from 'lucide-react';
+import { Check, ChevronDown, Search, Wifi, LogOut, Users } from 'lucide-react';
 import { useOSOverlays } from '../context/OSSystemContext';
 import { Z_LAYERS } from '../utils/zIndexLayers';
 import { useReducedMotion } from 'motion/react';
@@ -264,14 +264,6 @@ export default function MenuBar({
         )}
 
         <MusicPlayerWidget />
-        <Link
-          href="/checkout"
-          className="group flex items-center gap-1.5 px-2 py-1 text-xs font-semibold text-gray-700 transition-colors hover:text-blue-600 active:text-blue-700 active:scale-95"
-          title="Pesan Portfolio OS"
-        >
-          <ShoppingCart size={13} className="text-gray-500 transition-colors group-hover:text-blue-600 group-active:text-blue-700" aria-hidden="true" />
-          <span className="hidden sm:inline">Pesan OS</span>
-        </Link>
         <LanguageSwitch className="hidden md:inline-grid" />
 
         {/* Icons */}

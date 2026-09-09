@@ -84,13 +84,13 @@ export function mapSqlToProject(
   // Map narrative from DB narrativeRow (with fallback to metadata narrative)
   if (narrativeRow) {
     project.narrative = {
-      challenge: narrativeRow.challenge || undefined,
-      solution: narrativeRow.solution || undefined,
-      impact: narrativeRow.impact || undefined,
       ...metadata.narrative,
+      challenge: narrativeRow.challenge || metadata.narrative?.challenge || undefined,
+      solution: narrativeRow.solution || metadata.narrative?.solution || undefined,
+      impact: narrativeRow.impact || metadata.narrative?.impact || undefined,
     };
-    // Also use impact/challenge as fallback description
-    project.description = narrativeRow.challenge || narrativeRow.impact || '';
+    // Prioritize metadata.description and only fallback to narrative challenge/impact
+    project.description = metadata.description || narrativeRow.challenge || narrativeRow.impact || '';
   } else if (metadata.narrative) {
     project.narrative = metadata.narrative;
   }

@@ -15,6 +15,7 @@ import {
   Users,
   MessageSquareText,
   Image as ImageIcon,
+  Sparkles,
 } from 'lucide-react';
 import type { AdminZone } from './types';
 
@@ -147,6 +148,15 @@ export const ADMIN_ZONES: AdminZone[] = [
         defaultWidth: 800,
         defaultHeight: 550,
       },
+      {
+        id: 'ai',
+        label: 'Asisten AI',
+        icon: Sparkles,
+        iconColor: 'text-violet-600',
+        iconBg: 'bg-violet-100',
+        defaultWidth: 900,
+        defaultHeight: 650,
+      },
     ],
   },
   {
@@ -215,6 +225,7 @@ export const APP_ROUTE_MAP: Record<string, string> = {
   dock: '/admin/system/dock',
   widgets: '/admin/system/widgets',
   sounds: '/admin/system/sounds',
+  ai: '/admin/system/ai',
   notifications: '/admin/communications/notifications',
   messages: '/admin/communications/messages',
   feedback: '/admin/communications/feedback',

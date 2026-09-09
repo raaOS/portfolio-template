@@ -24,6 +24,7 @@ type CanvasCardProps = {
   onHoverChange?: (project: Project | null) => void;
   isTransitionTarget?: boolean;
   getCamera?: () => { x: number; y: number; z: number };
+  onSelectProject?: (project: Project) => void;
 };
 
 export function CanvasCardInner({
@@ -35,6 +36,7 @@ export function CanvasCardInner({
   onHoverChange,
   isTransitionTarget,
   getCamera,
+  onSelectProject,
 }: CanvasCardProps) {
   const router = useTransitionRouter();
   const pathname = usePathname();
@@ -85,6 +87,11 @@ export function CanvasCardInner({
         // Ignore clicks if the user dragged the canvas more than 10 pixels
         if (dragDistance.current > 10) {
           e.preventDefault();
+          return;
+        }
+
+        if (onSelectProject) {
+          onSelectProject(item.project);
           return;
         }
 

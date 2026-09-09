@@ -1,0 +1,282 @@
+/* ==========================================================================
+   Landing Page — Minimalist Showcase
+   Monochrome, no gradients, no shadows, solid colors.
+   ========================================================================== */
+
+.landing {
+  --lp-bg: #0a0a0a;
+  --lp-fg: #e5e5e5;
+  --lp-muted: #888;
+  --lp-border: #222;
+  --lp-surface: #111;
+  --lp-accent: #fff;
+
+  background: var(--lp-bg);
+  color: var(--lp-fg);
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ---------- Nav ---------- */
+.landing-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 32px;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.landing-logo {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--lp-accent);
+  text-decoration: none;
+}
+
+.landing-nav-link {
+  font-size: 14px;
+  color: var(--lp-muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.landing-nav-link:hover {
+  color: var(--lp-accent);
+}
+
+/* ---------- Hero ---------- */
+.landing-hero {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 80px 32px 48px;
+  text-align: center;
+}
+
+.landing-hero h1 {
+  font-size: clamp(32px, 5vw, 56px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: var(--lp-accent);
+  margin: 0 0 16px;
+}
+
+.landing-hero p {
+  font-size: 17px;
+  color: var(--lp-muted);
+  margin: 0 auto 40px;
+  max-width: 520px;
+  line-height: 1.6;
+}
+
+/* ---------- Templates Grid ---------- */
+.landing-templates {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 32px 80px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 720px) {
+  .landing-templates {
+    grid-template-columns: 1fr;
+  }
+}
+
+.landing-card {
+  border: 1px solid var(--lp-border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--lp-surface);
+  transition: border-color 0.2s;
+}
+
+.landing-card:hover {
+  border-color: #444;
+}
+
+.landing-card-preview {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #0a0a0a;
+}
+
+.landing-card-iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1440px;
+  height: 900px;
+  border: none;
+  transform-origin: top left;
+  /* Scale: card is ~548px wide in 2-col grid (1120 - 24 gap) / 2 ≈ 548 */
+  /* 548 / 1440 ≈ 0.38 */
+  transform: scale(0.38);
+  pointer-events: none;
+}
+
+@media (max-width: 720px) {
+  .landing-card-iframe {
+    /* Mobile: card is full width ~100vw - 64px padding ≈ ~356px min */
+    /* Use slightly smaller scale and let overflow hidden crop */
+    transform: scale(0.25);
+  }
+}
+
+.landing-card-body {
+  padding: 24px;
+}
+
+.landing-card-body h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--lp-accent);
+  margin: 0 0 6px;
+}
+
+.landing-card-body p {
+  font-size: 14px;
+  color: var(--lp-muted);
+  margin: 0 0 20px;
+  line-height: 1.5;
+}
+
+.landing-card-link {
+  display: inline-block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--lp-accent);
+  text-decoration: none;
+  border-bottom: 1px solid var(--lp-border);
+  padding-bottom: 2px;
+  transition: border-color 0.15s;
+}
+
+.landing-card-link:hover {
+  border-color: var(--lp-accent);
+}
+
+/* ---------- Features ---------- */
+.landing-features {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 32px 80px;
+}
+
+.landing-features-heading {
+  font-size: 14px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--lp-muted);
+  margin: 0 0 32px;
+}
+
+.landing-features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+@media (max-width: 720px) {
+  .landing-features-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.landing-feature {
+  padding: 24px;
+  border: 1px solid var(--lp-border);
+  border-radius: 8px;
+}
+
+.landing-feature h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--lp-fg);
+  margin: 0 0 8px;
+}
+
+.landing-feature p {
+  font-size: 13px;
+  color: var(--lp-muted);
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* ---------- CTA / Pricing ---------- */
+.landing-cta {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 32px 80px;
+  text-align: center;
+}
+
+.landing-cta-divider {
+  width: 100%;
+  height: 1px;
+  background: var(--lp-border);
+  margin: 0 0 64px;
+  border: none;
+}
+
+.landing-price-label {
+  font-size: 14px;
+  color: var(--lp-muted);
+  margin: 0 0 8px;
+}
+
+.landing-price {
+  font-size: clamp(36px, 5vw, 52px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--lp-accent);
+  margin: 0 0 8px;
+}
+
+.landing-price-note {
+  font-size: 14px;
+  color: var(--lp-muted);
+  margin: 0 0 32px;
+}
+
+.landing-btn {
+  display: inline-block;
+  padding: 14px 40px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #0a0a0a;
+  background: var(--lp-accent);
+  border: none;
+  border-radius: 8px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.landing-btn:hover {
+  opacity: 0.85;
+}
+
+/* ---------- Footer ---------- */
+.landing-footer {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 32px;
+  text-align: center;
+  border-top: 1px solid var(--lp-border);
+}
+
+.landing-footer p {
+  font-size: 13px;
+  color: var(--lp-muted);
+  margin: 0;
+}

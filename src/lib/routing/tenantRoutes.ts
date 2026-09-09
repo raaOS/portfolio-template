@@ -7,6 +7,7 @@ const RESERVED_TOP_LEVEL_SEGMENTS = new Set([
   'cv',
   'lab',
   'orders',
+  'preview',
   'projects',
   'r2',
   'robots.txt',
@@ -48,7 +49,7 @@ export function buildTenantProjectDetailHref(pathname: string | null | undefined
 }
 
 export function buildTenantHomeHref(pathname: string | null | undefined, queryString?: string) {
-  const basePath = getTenantBasePath(pathname) || '/';
+  const basePath = getTenantBasePath(pathname) || '/preview/os-desktop';
   const query = queryString ? (queryString.startsWith('?') ? queryString : `?${queryString}`) : '';
   return `${basePath}${query}`;
 }

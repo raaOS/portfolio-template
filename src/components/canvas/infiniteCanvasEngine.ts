@@ -5,10 +5,10 @@ import type { Project } from '@/types/projects';
 export const CANVAS_CONSTANTS = {
   perspective: 1000,
   cellSize: 2200,
-  renderRadius: 2,
+  renderRadius: 1,
   maxDeltaTime: 32,
   targetFrameTime: 16.66,
-  maxActiveItems: 100,
+  maxActiveItems: 40,
   cameraSyncDistanceThreshold: 500,
   maxCacheMultiplier: 2,
   cacheTrimRatio: 0.1,
@@ -79,7 +79,7 @@ export const CANVAS_CONSTANTS = {
   trailMaxSpeed: 25, // velocity at which trail reaches full intensity
   trailAttack: 0.12, // how quickly trail ramps up (0-1 lerp factor)
   trailDecay: 0.04, // how slowly trail fades out (lower = longer lingering)
-  trailLayers: 3, // number of ghost shadow layers
+  trailLayers: 1, // number of ghost shadow layers (optimized for 60fps)
   trailMaxOffset: 40, // max pixel offset for the outermost ghost layer
   trailMaxOpacity: 0.18, // max opacity of the closest ghost layer
   trailBlurBase: 6, // base blur for trail shadows (px)
@@ -347,7 +347,6 @@ export function computeVisualStyle(args: {
   const dz = item.z - camera.z;
 
   let targetOpacity = 1;
-  let blur = 0;
   let targetGrayscale = 0;
 
   // Forward (Close-up) Fading
@@ -357,10 +356,6 @@ export function computeVisualStyle(args: {
       Math.max(0, (dz - CANVAS_CONSTANTS.fadeCloseStart) / CANVAS_CONSTANTS.fadeCloseRange)
     );
     targetOpacity = 1 - easeOutQuint(t);
-    blur = Math.min(
-      12,
-      Math.max(0, (dz - CANVAS_CONSTANTS.fadeCloseStart) / CANVAS_CONSTANTS.blurCloseRange)
-    );
   }
 
   // Backward (Far) Fading & Grayscale
@@ -377,13 +372,6 @@ export function computeVisualStyle(args: {
       Math.max(0, (CANVAS_CONSTANTS.fadeFarStart - dz) / CANVAS_CONSTANTS.fadeFarRange)
     );
     targetOpacity = 1 - easeOutQuint(t);
-    blur = Math.max(
-      blur,
-      Math.min(
-        15,
-        Math.max(0, (CANVAS_CONSTANTS.fadeFarStart - dz) / CANVAS_CONSTANTS.blurFarRange)
-      )
-    );
   }
 
   // Radial (Edge) Fading
@@ -414,9 +402,6 @@ export function computeVisualStyle(args: {
   const isHidden = lerpOpacity <= CANVAS_CONSTANTS.minVisibleOpacity;
   const filterParts: string[] = [];
 
-  if (blur > 0.5 && lerpOpacity > 0.1) {
-    filterParts.push(`blur(${Math.min(10, blur).toFixed(1)}px)`);
-  }
   if (lerpGrayscale > 1) {
     filterParts.push(`grayscale(${lerpGrayscale.toFixed(0)}%)`);
   }

@@ -46,6 +46,7 @@ const PLATFORM_PATH_PREFIXES = [
   '/checkout',
   '/orders',
   '/templates',
+  '/preview',
   '/client',
   '/admin',
   '/r2',

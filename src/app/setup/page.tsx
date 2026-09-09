@@ -11,7 +11,7 @@ interface SetupStatus {
 
 export default function SetupPage() {
   const router = useRouter();
-  const [status, setStatus] = useState<SetupStatus | null>(null);
+  const [_status, setStatus] = useState<SetupStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');

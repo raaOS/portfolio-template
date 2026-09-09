@@ -68,7 +68,6 @@ raw_errors.txt
 ts_errors.txt
 ts_errors_2.log
 tmp_live_projects.json
-
 service-account.json
 
 # Temporary artifacts & debug screenshots
@@ -79,7 +78,6 @@ playwright-report/
 debug-*.md
 projects-page.md
 test_output.log
-_a")sxsx214be5b4520cdd.md
 
 # Local temporary files
 tmp/
@@ -88,3 +86,6 @@ ts-error.txt
 # Internal product assets (do not publish)
 qris MIB.jpg
 PRD_ContextPack_*.docx
+
+# Client Archives (contains private client tokens)
+arsip-klien/

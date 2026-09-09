@@ -9,20 +9,17 @@ import { generateCSRFToken, CSRF_COOKIE_NAME } from '@/crud/shared/auth/csrf';
 
 export async function GET(request: Request) {
   const session = await getSiteUserSession(request);
-
-  if (!session) {
-    return NextResponse.json({ authenticated: false, csrfToken: '' });
-  }
-
   const csrfToken = generateCSRFToken();
 
   const response = NextResponse.json({
-    authenticated: true,
+    authenticated: !!session,
     csrfToken,
-    user: {
-      email: session.email,
-      role: session.role,
-    },
+    user: session
+      ? {
+          email: session.email,
+          role: session.role,
+        }
+      : undefined,
   });
 
   response.cookies.set(CSRF_COOKIE_NAME, csrfToken, {
@@ -32,6 +29,10 @@ export async function GET(request: Request) {
     path: '/',
     maxAge: 2 * 60 * 60,
   });
+
+  response.headers.set('Cache-Control', 'no-store, max-age=0, must-revalidate');
+  response.headers.set('Pragma', 'no-cache');
+  response.headers.set('Expires', '0');
 
   return response;
 }

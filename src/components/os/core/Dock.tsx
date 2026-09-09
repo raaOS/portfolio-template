@@ -25,17 +25,20 @@ import { Link } from 'next-view-transitions';
 import { useLinkStatus } from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTransitionRouter } from 'next-view-transitions';
-import { Grid, User, Mail, FileText, Trash2, Layers, Sparkles } from 'lucide-react';
+import { Grid, User, Mail, FileText } from 'lucide-react';
 import AppIcon from '../ui/AppIcon';
 import WhatsAppIcon from '../ui/WhatsAppIcon';
 import DockProjectModes from '../ui/DockProjectModes';
 import { useWindowContext } from '@/contexts/WindowContext';
 import { getDockItemConfig } from '../utils/dockUtils';
 import { markBack } from '@/lib/navigationDirection';
-import { buildTenantProjectsHref, getTenantBasePath } from '@/lib/routing/tenantRoutes';
+import {
+  buildTenantHomeHref,
+  buildTenantProjectsHref,
+  getTenantBasePath,
+} from '@/lib/routing/tenantRoutes';
 import { Z_LAYERS } from '../utils/zIndexLayers';
 import { DockPortal } from '@/components/layout/GlobalDockSlot';
-import { useOSOverlays } from '../context/OSSystemContext';
 import {
   DndContext,
   closestCenter,
@@ -614,12 +617,7 @@ export default function Dock({
     return () => cancelAnimationFrame(frame);
   }, []);
 
-  const filteredItems = useMemo(() => {
-    if (isMobile) {
-      return sortedItems.filter((item) => item.id !== 'trash');
-    }
-    return sortedItems;
-  }, [sortedItems, isMobile]);
+  const filteredItems = sortedItems;
 
   const dockBaseWidth =
     filteredItems.length > 0 ? filteredItems.length * 64 + (filteredItems.length - 1) * 8 + 24 : 0;
@@ -851,44 +849,36 @@ export function GlobalDock({ dockConfig }: { dockConfig?: DockPreferences }) {
         popoverContent: <DockProjectModes projectsBasePath={projectsBasePath} />,
       },
       {
-        id: 'mission-control',
-        label: 'Mission Control',
-        icon: <AppIcon icon={Layers} color="from-indigo-500 to-purple-600" />,
-        onClick: markNav,
-        href: '/?app=mission-control',
-      },
-
-      {
         id: 'about',
         label: 'About Me',
         icon: <AppIcon icon={User} color="from-gray-300 to-gray-400" />,
         onClick: markNav,
-        href: '/?app=about',
+        href: buildTenantHomeHref(pathname, '?app=about'),
       },
       {
         id: 'whatsapp',
         label: 'WhatsApp',
         icon: <WhatsAppIcon />,
         onClick: markNav,
-        href: '/?app=whatsapp',
+        href: buildTenantHomeHref(pathname, '?app=whatsapp'),
       },
       {
         id: 'contact',
         label: 'Contact',
         icon: <AppIcon icon={Mail} color="from-blue-400 to-indigo-500" />,
         onClick: markNav,
-        href: '/?app=contact',
+        href: buildTenantHomeHref(pathname, '?app=contact'),
       },
       {
         id: 'notes',
         label: 'Notes',
         icon: <AppIcon icon={FileText} color="from-yellow-300 to-orange-400" />,
         onClick: markNav,
-        href: '/?app=notes',
+        href: buildTenantHomeHref(pathname, '?app=notes'),
       },
     ];
     return getDockItemConfig(items, dockConfig);
-  }, [markNav, dockConfig, isMobile, router, projectsBasePath, projectsHref]);
+  }, [markNav, dockConfig, isMobile, router, projectsBasePath, projectsHref, pathname]);
 
   // Status `isOpen` di-merge tanpa membuat ulang icon/popoverContent —
   // mencegah re-create React elements setiap mutasi window state.
@@ -909,7 +899,12 @@ export function GlobalDock({ dockConfig }: { dockConfig?: DockPreferences }) {
 
   // SSR-safe: pathname null saat server. Sembunyikan di route OS desktop
   // dan admin. (`/about` dropped — route tidak ada lagi.)
-  if (!pathname || pathname === '/' || pathname.startsWith('/admin')) {
+  if (
+    !pathname ||
+    pathname === '/' ||
+    pathname.startsWith('/admin') ||
+    pathname.startsWith('/preview/os-desktop')
+  ) {
     return null;
   }
 
@@ -946,7 +941,7 @@ export interface OSDockProps {
   onOpenWhatsApp: () => void;
   onOpenContact: () => void;
   onOpenNotes: () => void;
-  onOpenTrash: () => void;
+  onOpenTrash?: () => void;
   isWindowOpen: (windowId: string) => boolean;
   notesVisible: boolean;
   bouncingId?: string | null;
@@ -961,7 +956,6 @@ export function OSDock({
   onOpenWhatsApp,
   onOpenContact,
   onOpenNotes,
-  onOpenTrash,
   isWindowOpen,
   notesVisible,
   bouncingId,
@@ -970,7 +964,6 @@ export function OSDock({
 }: OSDockProps) {
   const router = useTransitionRouter();
   const pathname = usePathname();
-  const { showMissionControl, toggleMissionControl } = useOSOverlays();
   const projectsHref = buildTenantProjectsHref(pathname);
   const projectsBasePath = getTenantBasePath(pathname);
 
@@ -1003,13 +996,6 @@ export function OSDock({
         popoverContent: <DockProjectModes projectsBasePath={projectsBasePath} />,
       },
       {
-        id: 'mission-control',
-        label: 'Mission Control',
-        icon: <AppIcon icon={Layers} color="from-indigo-500 to-purple-600" />,
-        onClick: toggleMissionControl,
-      },
-
-      {
         id: 'about',
         label: 'About Me',
         icon: <AppIcon icon={User} color="from-gray-300 to-gray-400" />,
@@ -1033,12 +1019,6 @@ export function OSDock({
         icon: <AppIcon icon={FileText} color="from-yellow-300 to-orange-400" />,
         onClick: onOpenNotes,
       },
-      {
-        id: 'trash',
-        label: 'Trash',
-        icon: <AppIcon icon={Trash2} color="from-zinc-500 to-zinc-700" />,
-        onClick: onOpenTrash,
-      },
     ];
     return getDockItemConfig(items, aboutData?.dockConfig);
   }, [
@@ -1048,9 +1028,7 @@ export function OSDock({
     onOpenWhatsApp,
     onOpenContact,
     onOpenNotes,
-    onOpenTrash,
     isMobile,
-    toggleMissionControl,
     projectsBasePath,
     projectsHref,
   ]);
@@ -1058,8 +1036,6 @@ export function OSDock({
   const dockItems = useMemo<DockItemData[]>(() => {
     return baseItems.map((item) => {
       switch (item.id) {
-        case 'mission-control':
-          return { ...item, isOpen: showMissionControl };
         case 'about':
           return { ...item, isOpen: isWindowOpen('about') };
         case 'whatsapp':
@@ -1068,13 +1044,11 @@ export function OSDock({
           return { ...item, isOpen: isWindowOpen('contact') };
         case 'notes':
           return { ...item, isOpen: notesVisible };
-        case 'trash':
-          return { ...item, isOpen: isWindowOpen('trash-bin') };
         default:
           return item;
       }
     });
-  }, [baseItems, isWindowOpen, notesVisible, showMissionControl]);
+  }, [baseItems, isWindowOpen, notesVisible]);
 
   return (
     <div className={className}>

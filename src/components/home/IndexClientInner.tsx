@@ -1,7 +1,7 @@
 'use client';
 
 import type { Project } from '@/types/projects';
-import { useMemo, useEffect, useRef, memo, useDeferredValue, useState } from 'react';
+import { useMemo, useEffect, useRef, memo, useDeferredValue, useState, useCallback } from 'react';
 import { LazyMotion, domAnimation, m, AnimatePresence, type Transition } from 'motion/react';
 import ProjectCardPinterest from '@/components/projects/ProjectCardPinterest';
 import MasonryGrid from '@/components/layout/MasonryGrid';
@@ -11,10 +11,15 @@ import { useQuickLook } from '@/components/os/hooks/useQuickLook';
 import QuickLookModal from '@/components/ui/QuickLookModal';
 import { resolveCover } from '@/lib/images';
 import { useDictionary } from '@/contexts/LanguageContext';
-import { usePathname } from 'next/navigation';
-import { buildTenantProjectDetailHref } from '@/lib/routing/tenantRoutes';
 
+import dynamic from 'next/dynamic';
+import { useWindowContext } from '@/contexts/WindowContext';
 import Projects3DView from '@/components/canvas/Projects3DView';
+
+const ProjectDetailWrapper = dynamic(
+  () => import('@/components/os/ui/ProjectDetailWrapper'),
+  { ssr: false }
+);
 
 type Props = {
   projects: Project[];
@@ -23,6 +28,7 @@ type Props = {
   windowWidth?: number;
   isLoading?: boolean;
   view?: 'grid' | '3d';
+  siteId?: string;
 };
 
 const MemoizedProjectCardPinterest = memo(ProjectCardPinterest);
@@ -57,15 +63,53 @@ export default function IndexClientInner({
   windowWidth,
   isLoading: isParentLoading,
   view = 'grid',
+  siteId = 'default-site',
 }: Props) {
   const t = useDictionary();
-  const pathname = usePathname();
   const { filteredProjects } = useProjectFiltering(projects, tag, searchQuery);
   const { visibleCount, isLoadingMore, hasMore, resetCount, initialCount } = useInfiniteScroll(
     filteredProjects.length
   );
   const activeView = useDeferredValue(view);
   const isViewTransitioning = activeView !== view;
+
+  const { openWindow, closeWindow, windows } = useWindowContext();
+
+  const handleOpenProject = useCallback(
+    (project: Project) => {
+      // Close other open project windows to prevent multiple windows overlapping
+      windows.forEach((w) => {
+        if (w.id.startsWith('project-') && w.id !== `project-${project.id}`) {
+          closeWindow(w.id);
+        }
+      });
+
+      const initialPos =
+        typeof window !== 'undefined'
+          ? {
+              x: Math.max(20, Math.round((window.innerWidth - 900) / 2)),
+              y: Math.max(40, Math.round((window.innerHeight - 620) / 2)),
+            }
+          : { x: 100, y: 100 };
+
+      openWindow(`project-${project.id}`, {
+        title: `Portfolio: ${project.title}`,
+        content: (
+          <ProjectDetailWrapper
+            project={project}
+            projects={projects}
+            siteId={siteId}
+          />
+        ),
+        initialPosition: initialPos,
+        width: 900,
+        height: 620,
+        noPadding: true,
+        zIndex: 500,
+      });
+    },
+    [openWindow, closeWindow, windows, projects, siteId]
+  );
 
   // Quick Look
   const [hoveredProjectId, setHoveredProjectId] = useState<string | null>(null);
@@ -136,13 +180,14 @@ export default function IndexClientInner({
                 videoEnabled={true}
                 highlightedTag={tag}
                 transitionOrigin="grid"
+                onClick={() => handleOpenProject(item.project)}
               />
             </m.div>
           );
         })}
       </MasonryGrid>
     ),
-    [displayedItems, windowWidth, tag, gridPriorityCount, gridEagerCount]
+    [displayedItems, windowWidth, tag, gridPriorityCount, gridEagerCount, handleOpenProject]
   );
 
   const showLoading = isParentLoading || isViewTransitioning;
@@ -163,7 +208,14 @@ export default function IndexClientInner({
             <ViewLoadingIndicator />
           ) : displayedItems.length > 0 ? (
             <>
-              {activeView === '3d' ? <Projects3DView projects={filteredProjects} /> : gridView}
+              {activeView === '3d' ? (
+                <Projects3DView
+                  projects={filteredProjects}
+                  onSelectProject={handleOpenProject}
+                />
+              ) : (
+                gridView
+              )}
               {activeView === 'grid' && (
                 <>
                   {/* Sentinel spacer for scroll detection */}
@@ -214,12 +266,10 @@ export default function IndexClientInner({
               type={cover.kind}
               url={cover.src}
               metadata={quickLookProject.tags?.join(', ')}
-              onGoToDetail={() =>
-                (window.location.href = buildTenantProjectDetailHref(
-                  pathname,
-                  quickLookProject.slug
-                ))
-              }
+              onGoToDetail={() => {
+                setQuickLookProject(null);
+                handleOpenProject(quickLookProject);
+              }}
             />
           );
         })()}

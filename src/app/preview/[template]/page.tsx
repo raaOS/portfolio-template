@@ -1,7 +1,7 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { loadHomepageData } from '@/lib/loaders';
 import { mapD1ToTemplateData } from '@/lib/templates/dataMapper';
-import { getTemplate, SYSTEM_DEFAULT_TEMPLATE_ID } from '@/lib/templates/registry';
+import { getTemplate } from '@/lib/templates/registry';
 import { SITE_ID } from '@/crud/shared/config';
 import InfiniteCanvasRenderer from '@/components/templates/infinite-canvas/InfiniteCanvasRenderer';
 
@@ -17,10 +17,23 @@ export const dynamic = 'force-dynamic';
  */
 export default async function PreviewPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ template: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { template: templateSlug } = await params;
+
+  if (templateSlug === 'projects') {
+    const sp = searchParams ? await searchParams : {};
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(sp)) {
+      if (typeof v === 'string') qs.set(k, v);
+      else if (Array.isArray(v)) v.forEach((item) => qs.append(k, item));
+    }
+    const query = qs.toString() ? `?${qs.toString()}` : '';
+    redirect(`/projects${query}`);
+  }
 
   // Cek apakah template ada di registry
   const templateMeta = getTemplate(templateSlug);

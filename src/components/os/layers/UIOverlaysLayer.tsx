@@ -198,7 +198,6 @@ export default function UIOverlaysLayer({
                   onOpenWhatsApp={openWhatsAppList}
                   onOpenContact={() => openWindow('contact')}
                   onOpenNotes={toggleNotesVisibility}
-                  onOpenTrash={() => openWindow('trash-bin')}
                   isWindowOpen={isWindowOpen}
                   notesVisible={notesVisible}
                   bouncingId={bouncingDocId}
