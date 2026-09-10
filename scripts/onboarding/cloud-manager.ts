@@ -677,13 +677,14 @@ async function main() {
         break;
       default:
         console.error(`Aksi tidak dikenali: "${action}". Gunakan "onboard_client", "update_template", atau "custom_domain".`);
-        process.exit(1);
+        process.exitCode = 1;
+        return;
     }
   } catch (err) {
     const errMsg = (err as Error).message;
     console.error('\n❌ [ERROR]:', errMsg);
     appendToGitHubSummary(`\n### ❌ Gagal Menjalankan Aksi: ${action}\n> **Error:** ${errMsg}\n`);
-    process.exit(1);
+    process.exitCode = 1;
   }
 }
 
