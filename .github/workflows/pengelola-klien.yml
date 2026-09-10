@@ -1,0 +1,116 @@
+name: Pengelola Klien (Cloud Master)
+
+on:
+  workflow_dispatch:
+    inputs:
+      action_type:
+        description: 'Pilih Tindakan / Aksi'
+        required: true
+        type: choice
+        default: 'onboard_client'
+        options:
+          - 'onboard_client'
+          - 'update_template'
+          - 'custom_domain'
+
+      client_name:
+        description: 'Nama Lengkap Klien (misal: Budi Pratama)'
+        required: false
+        type: string
+        default: ''
+
+      client_slug:
+        description: 'Slug Website (misal: budi-pratama - kosongkan untuk otomatis)'
+        required: false
+        type: string
+        default: ''
+
+      template_key:
+        description: 'Pilihan Gaya Template'
+        required: false
+        type: choice
+        default: 'os-desktop'
+        options:
+          - 'os-desktop'
+          - 'infinite-canvas'
+
+      admin_email:
+        description: 'Email Login Admin Klien'
+        required: false
+        type: string
+        default: ''
+
+      admin_password:
+        description: 'Password Admin Klien (kosongkan untuk generate otomatis aman)'
+        required: false
+        type: string
+        default: ''
+
+      cloudflare_account_id:
+        description: 'Cloudflare Account ID Klien'
+        required: false
+        type: string
+        default: ''
+
+      cloudflare_api_token:
+        description: 'Cloudflare API Token Klien'
+        required: false
+        type: string
+        default: ''
+
+      custom_domain:
+        description: 'Nama Custom Domain (khusus aksi Pasang Custom Domain, misal: budipratama.com)'
+        required: false
+        type: string
+        default: ''
+
+      update_target:
+        description: 'Target Pembaruan (khusus aksi Update Versi Template)'
+        required: false
+        type: choice
+        default: 'selected_client'
+        options:
+          - 'selected_client'
+          - 'all'
+
+jobs:
+  manage_client:
+    name: Eksekusi Operasional Cloud Master
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node.js (v20)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: 📦 Install Dependencies
+        run: npm ci --prefer-offline
+
+      - name: 🚀 Jalankan Cloud Manager Engine
+        run: npx tsx scripts/onboarding/cloud-manager.ts
+        env:
+          ACTION_TYPE: ${{ inputs.action_type }}
+          CLIENT_NAME: ${{ inputs.client_name }}
+          CLIENT_SLUG: ${{ inputs.client_slug }}
+          TEMPLATE_KEY: ${{ inputs.template_key }}
+          ADMIN_EMAIL: ${{ inputs.admin_email }}
+          ADMIN_PASSWORD: ${{ inputs.admin_password }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ inputs.cloudflare_account_id || secrets.DEFAULT_CF_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare_api_token || secrets.DEFAULT_CF_API_TOKEN }}
+          CUSTOM_DOMAIN: ${{ inputs.custom_domain }}
+          UPDATE_TARGET: ${{ inputs.update_target }}
+          FORCE_BUILD: 'true'
+
+      - name: 💾 Simpan Arsip Klien (GitHub Artifact 90 Hari)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arsip-klien-run-${{ github.run_number }}
+          path: arsip-klien/
+          retention-days: 90

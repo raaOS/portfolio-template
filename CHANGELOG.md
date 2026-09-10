@@ -3,6 +3,16 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.2.7] - 2026-09-10
+
+### 📱 Cloud Master Mobile Onboarding (Kelola Klien & Deploy Tanpa PC)
+- **Otomasi Cloud Master via GitHub Actions (`.github/workflows/pengelola-klien.yml`):** Memungkinkan owner portofolio mendaftarkan klien baru, melakukan deployment update versi template, atau memasang custom domain langsung dari smartphone (Android/iPhone) via aplikasi GitHub Mobile atau browser HP tanpa perlu menyalakan komputer/laptop.
+- **Engine Otomasi CLI Mandiri (`scripts/onboarding/cloud-manager.ts`):** Menyatukan alur verifikasi kredensial Cloudflare API, pembuatan database D1 & bucket R2 terisolasi, migrasi skema tabel, seed akun admin, kompilasi OpenNext, deploy ke Cloudflare Pages, serta rendering Job Summary dan pesan WhatsApp siap kirim.
+- **Penyimpanan Arsip Kredensial Aman:** Berkas konfigurasi dan surat serah terima otomatis dibungkus sebagai GitHub Actions Artifacts terenkripsi dengan masa simpan 90 hari.
+- **Panduan Penggunaan Lengkap:** Ditambahkan dokumen panduan ringkas 3-langkah di `panduan/PANDUAN_KELOLA_DARI_HP.md`.
+
+---
+
 ## [1.2.6] - 2026-09-10
 
 ### 🚀 Optimasi Puncak Menuju 100% (Instant Boot Bypass & Header No-Transform Robots)
