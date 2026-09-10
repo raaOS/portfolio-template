@@ -5,6 +5,16 @@ Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **U
 
 ---
 
+## [1.2.3] - 2026-09-10
+
+### 🧹 Pembersihan Dead Code & Penataan Berkas (Zero Regression)
+- **Eradikasi File & Komponen Mati (*Dead Code Removal*):** Menghapus 11 berkas yang tidak terpakai atau yatim (*unreferenced*) termasuk `DynamicIsland.tsx` (sisa Sprint 83), loader `HomeOSBootstrap.tsx`, utilitas `ReadMoreDescription.tsx`, `ProjectMediaUpload.tsx` monolitik lama, `ProjectStepIndicator.tsx`, hook `useAdminAbout.ts`, `AdminSidebar.tsx` lama, `useAdminSidebar.ts`, middleware `auth.ts` legacy, serta berkas sisa audit/Lighthouse (`parse-lh.js`, `lighthouse-report.json`).
+- **Pembersihan Aset Grafis Usang:** Menghapus berkas aset 3D sisa template Spatial yang telah ditiadakan (`public/adamsbridge.hdr` 1.6 MB dan `public/cap.glb`), serta membersihkan direktori kosong `src/crud/templates/`.
+- **Penataan Struktur Berkas Proyek:** Merapikan file-file yang tercecer di root dan root scripts ke direktori peruntukannya masing-masing (`docs/agent-context/`, `docs/reports/`, `backups/`, `scripts/test/`, dan `scripts/maintenance/`).
+- **Resolusi Compiler & Linting (0 Error, 0 Warning):** Memperbaiki peringatan React Compiler `react-hooks/set-state-in-effect` pada transisi wallpaper background di `DesktopBackground.tsx` serta membersihkan variabel mati di seluruh panel admin. Seluruh 821 unit test terverifikasi tetap lolos 100%.
+
+---
+
 ## [1.2.2] - 2026-09-10
 
 ### 🎬 Live Video Wallpaper & UI Clean-up

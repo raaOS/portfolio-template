@@ -7,7 +7,6 @@ import {
   KeyRound,
   Loader2,
   Save,
-  Settings,
   ShieldAlert,
   Trash2,
   X,

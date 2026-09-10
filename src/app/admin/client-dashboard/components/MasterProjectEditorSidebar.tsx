@@ -44,7 +44,7 @@ export function MasterProjectEditorSidebar({
   canUploadCover,
   canUploadGallery,
   maxGalleryItems,
-  remainingGallerySlots,
+  remainingGallerySlots: _remainingGallerySlots,
   savePending,
   PROJECT_COVER_ACCEPT,
   PROJECT_GALLERY_ACCEPT,

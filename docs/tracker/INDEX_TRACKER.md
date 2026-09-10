@@ -369,6 +369,11 @@ Kustomisasi per-section template `landing-bento` (Pro-only): kontrak settings zo
      - *Status:* 🟢 Completed
      - *Isi:* Mengaktifkan live video wallpaper 4K di Cloudflare R2/D1 (`Hunt Showdown Veil of Thorns`, `Zen Kois`, `Pink Bloom`, dan `Sachiro Dark Nights`) dengan pemutaran otomatis (`autoplay`, `preload="auto"`, `loop`, `muted`) serta fail-safe fallback otomatis agar layar tidak pernah blank/hitam. Menghapus komponen Dynamic Island dan floating bubble notifikasi di bagian atas desktop macOS agar tampilan lebih bersih, minimalis, dan berfokus penuh pada konten. Versi template dinaikkan ke v1.2.2 di `CHANGELOG.md` dan terintegrasi otomatis ke portal `PENGELOLA_KLIEN.bat`. Verifikasi: 109 test files / 821 tests PASS, live deployment version `f473ee2f-1b1c-44f0-9e7e-08761492118d`.
 
+103. **[Sprint 84 - Codebase Clean-up & Architecture Streamlining (v1.2.3)](file:///C:/Users/USER/Documents/portfolio-template/docs/tracker/logs/sprint_84_codebase_cleanup_and_dead_code_removal.md)**
+     - *Status:* 🟢 Completed
+     - *Isi:* Pembersihan menyeluruh dead code dan berkas tanpa fungsi (penghapusan 11 file mati termasuk `DynamicIsland.tsx`, `HomeOSBootstrap.tsx`, `ReadMoreDescription.tsx`, `ProjectMediaUpload.tsx`, `AdminSidebar.tsx`, `useAdminAbout.ts`, `middleware/auth.ts`, serta 3D assets sisa), penataan berkas berantakan di root & scripts ke subfolder spesifik (`docs/agent-context/`, `docs/reports/`, `backups/`, `scripts/test/`, `scripts/maintenance/`), dan perbaikan error React Compiler / ESLint `react-hooks/set-state-in-effect` pada background wallpaper serta eliminasi unused variables. Verifikasi: 109 test files / 821 tests PASS (100%), tsc 0 error, eslint 0 error 0 warning, pre-deploy pass.
+
+
 
 
 

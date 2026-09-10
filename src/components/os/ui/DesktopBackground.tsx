@@ -100,11 +100,13 @@ export default function DesktopBackground({
 
   const [videoReady, setVideoReady] = useState(false);
   const [hasLoadError, setHasLoadError] = useState(false);
+  const [prevWallpaper, setPrevWallpaper] = useState(activeWallpaper);
 
-  useEffect(() => {
+  if (activeWallpaper !== prevWallpaper) {
+    setPrevWallpaper(activeWallpaper);
     setHasLoadError(false);
     setVideoReady(false);
-  }, [activeWallpaper]);
+  }
 
   const handleVideoCanPlay = useCallback(() => {
     setVideoReady(true);

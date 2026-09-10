@@ -3,11 +3,8 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  AlertCircle,
   Building2,
-  CheckCircle2,
   FilePlus2,
-  Loader2,
   Pencil,
   RefreshCw,
   Search,
@@ -585,22 +582,6 @@ function formatDate(value?: string) {
   }).format(date);
 }
 
-function formatStorageMb(value: number) {
-  if (!Number.isFinite(value) || value <= 0) return '0 MB';
-  if (value >= 1024) {
-    const gb = value / 1024;
-    return `${gb >= 10 ? gb.toFixed(0) : gb.toFixed(1)} GB`;
-  }
-  if (value >= 10) return `${value.toFixed(0)} MB`;
-  return `${value.toFixed(2)} MB`;
-}
-
-function statusTone(status: string) {
-  if (status === 'active') return 'bg-emerald-50 text-emerald-700 ring-emerald-200';
-  if (status === 'suspended') return 'bg-red-50 text-red-700 ring-red-200';
-  return 'bg-zinc-100 text-zinc-700 ring-zinc-200';
-}
-
 function isSeedDemoSite(site: AdminSiteSummary) {
   return site.id === 'default-site' || site.slug === 'demo-designer';
 }
@@ -654,7 +635,6 @@ export default function ClientDashboardPanel() {
         setSiteDraft(siteDraftFromSummary(selectedSite));
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- sengaja bergantung pada identitas site saja
   }, [selectedSite?.id, isCreatingSite, selectedSite]);
 
   const activeSiteDraft =
@@ -673,11 +653,6 @@ export default function ClientDashboardPanel() {
   const isProjectLimitReached = selectedSite
     ? selectedSite.usage.projects >= selectedSite.quota.projectLimit
     : false;
-  const selectedStorage = selectedSite?.usage.storage;
-  const storageUsagePercent =
-    selectedSite && selectedStorage?.available
-      ? Math.min(100, (selectedStorage.mb / selectedSite.quota.storageMb) * 100)
-      : 0;
 
   const projectsQuery = useQuery({
     queryKey: ['client-dashboard', 'projects', effectiveSiteId],
@@ -1025,8 +1000,6 @@ export default function ClientDashboardPanel() {
   const canUploadCover = canMutate && !coverUploadMutation.isPending;
   const maxGalleryItems = selectedSite ? Math.max(0, selectedSite.quota.mediaPerProject - 1) : 0;
   const remainingGallerySlots = Math.max(0, maxGalleryItems - draft.gallery.length);
-  const hasProjects = projects.length > 0;
-  const hasPublishedProjects = projects.some((project) => project.status === 'published');
   const clientLoginPath = activePublicSlug ? `/${activePublicSlug}/login` : '';
   const canUploadGallery =
     canMutate &&

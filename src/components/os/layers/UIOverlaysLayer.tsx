@@ -88,7 +88,6 @@ export default function UIOverlaysLayer({
     setShowControlCenter,
     showCalendar,
     setShowCalendar,
-    showMissionControl,
   } = useOSOverlays();
   const { isRevealed } = useOSBoot();
   // Saat hollow-O mulai membesar (`isRevealed = true`), dock & menubar sudah

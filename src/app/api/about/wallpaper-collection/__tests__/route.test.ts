@@ -45,7 +45,6 @@ vi.mock('@/lib/services/aboutService', () => ({
 // Imported AFTER mocks are defined so the route picks up the mocked
 // modules.
 import { POST } from '../route';
-import { validateAdminRequest } from '@/lib/auth';
 import { validateSiteMutationRequest } from '@/lib/admin/siteMutationAuth';
 
 function buildPostRequest(body: unknown): NextRequest {

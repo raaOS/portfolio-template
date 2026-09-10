@@ -39,7 +39,7 @@ Cukup tanyakan 2 hal ini ke klien:
 
 1. Buatkan akun Cloudflare gratis untuk klien (cukup daftar di `dash.cloudflare.com`).
 2. Di folder proyek ini (atau Desktop laptop kamu), cukup **Double-Click (Klik Dua Kali)** file:
-   👉 **`PENGELOLA_KLIEN.bat`** *(atau `BUAT_KLIEN_BARU.bat`)*
+   👉 **`PENGELOLA_KLIEN.bat`**
 3. Browser Google Chrome akan otomatis terbuka menampilkan portal kontrol visual yang ramah:
    - Masukkan **Nama Klien** (misal: *Budi Pratama*).
    - Pilih gaya template: **macOS Desktop OS** atau **Infinite Canvas**.
@@ -163,7 +163,7 @@ Konsumen sekarang **bisa mengatur mesin AI dan memasukkan kunci API mereka sendi
 
 Jika suatu saat klien baru membeli nama domain sendiri (contoh: `budipratama.com`), kamu **tidak perlu membuka dashboard Cloudflare atau mengetik token lagi**:
 
-1. **Buka Asisten:** Cukup klik dua kali `PENGELOLA_KLIEN.bat` (atau `BUAT_KLIEN_BARU.bat`).
+1. **Buka Asisten:** Cukup klik dua kali `PENGELOLA_KLIEN.bat`.
 2. **Pilih Tab:** Klik tab **"Kelola Custom Domain"** di bagian atas.
 3. **Pilih Klien:** Pilih nama klien dari daftar dropdown (sistem otomatis membaca data klien dari folder `arsip-klien/` di laptop kamu).
 4. **Ketik Domain:** Masukkan nama domain yang dibeli klien (misal: `budipratama.com`).
