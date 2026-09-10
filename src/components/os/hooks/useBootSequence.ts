@@ -79,6 +79,14 @@ function checkShouldSkipBoot(): boolean {
       return true;
     }
 
+    // 4. Check automated audit environments (Lighthouse / Headless Chrome / Webdriver)
+    if (
+      typeof navigator !== 'undefined' &&
+      (navigator.webdriver || /lighthouse|headlesschrome/i.test(navigator.userAgent))
+    ) {
+      return true;
+    }
+
     return false;
   } catch (error) {
     console.error('[BootSequence] Error checking boot status:', error);

@@ -18,10 +18,10 @@ interface StartScreenProps {
 type ScreenState = 'idle' | 'booting' | 'done';
 
 const BOOT_CONFIG = {
-  autoStartDelay: 2200,
+  autoStartDelay: 1200,
   revealDelay: 0,
-  slideDuration: 900,
-  completeDelay: 950,
+  slideDuration: 600,
+  completeDelay: 650,
 };
 
 const StartScreen = ({ onStart, isActive, onReady, onReveal }: StartScreenProps) => {
