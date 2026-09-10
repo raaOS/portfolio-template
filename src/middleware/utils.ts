@@ -49,8 +49,8 @@ export function addSecurityHeaders(response: NextResponse): NextResponse {
     [
       "default-src 'self'",
       isProd
-        ? "script-src 'self' 'unsafe-inline' https://www.youtube.com https://s.ytimg.com"
-        : "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https://www.youtube.com https://s.ytimg.com",
+        ? "script-src 'self' 'unsafe-inline' https://www.youtube.com https://s.ytimg.com https://static.cloudflareinsights.com"
+        : "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https://www.youtube.com https://s.ytimg.com https://static.cloudflareinsights.com",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https: blob:",
       "font-src 'self' data:",

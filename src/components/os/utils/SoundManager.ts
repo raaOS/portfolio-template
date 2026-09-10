@@ -148,12 +148,17 @@ class SoundManager {
       if (this.soundPaths[typeKey] !== undefined) {
         const oldPath = this.soundPaths[typeKey];
 
-        // UX Fix: Localization Remote URL -> Local path
+        // UX Fix: Localization Remote URL -> Local bundled static path
         let path = setting.path;
-        if (path.includes('/public/sounds/')) {
-          const filename = path.split('/').pop()?.split('?')[0];
+        if (
+          path.includes('/public/sounds/') ||
+          path.includes('/r2/assets/sounds/') ||
+          (path.startsWith('http') && path.includes('/sounds/'))
+        ) {
+          const rawFilename = path.split('/').pop()?.split('?')[0];
           const version = path.split('?v=')[1] || '1.3';
-          if (filename) {
+          if (rawFilename) {
+            const filename = rawFilename === 'sent.mp3' ? 'notification.mp3' : rawFilename;
             path = `/sounds/${filename}?v=${version}`;
             console.log(`[SoundManager] Localized path for ${typeKey}: ${path}`);
           }

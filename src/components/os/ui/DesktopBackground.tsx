@@ -343,7 +343,7 @@ export default function DesktopBackground({
                 muted
                 loop
                 playsInline
-                preload="auto"
+                preload="metadata"
                 onCanPlay={handleVideoCanPlay}
                 onError={handleMediaError}
                 className={`h-full w-full object-cover transition-opacity duration-700 ${videoReady ? 'opacity-100' : 'opacity-0'}`}

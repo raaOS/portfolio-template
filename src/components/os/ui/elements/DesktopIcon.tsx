@@ -282,9 +282,9 @@ export default function DesktopIcon({
                 sizes="(max-width: 768px) 96px, 128px"
                 draggable={false}
                 onError={() => setFailedImageUrl(imageUrl ?? '__missing__')}
-                priority={priority} // Important for LCP
-                loading="eager"
-                fetchPriority={priority ? 'high' : 'auto'}
+                priority={priority} // Only priority icons block LCP
+                loading={priority ? 'eager' : 'lazy'}
+                fetchPriority={priority ? 'high' : 'low'}
                 quality={60} // Thumbnails don't need 100% quality
               />
             )}

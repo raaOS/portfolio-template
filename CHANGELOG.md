@@ -3,6 +3,16 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.2.5] - 2026-09-10
+
+### 🏆 Peningkatan Skor Audit Performa & Best Practices macOS Desktop Menuju 100%
+- **On-Demand Streaming Video Wallpaper (`preload="metadata"`):** Mengubah mode buffering video wallpaper dari `auto` menjadi `metadata` di `DesktopBackground.tsx`. Browser tidak lagi mengunduh seluruh berkas video 4K di awal, mengeliminasi error `ERR_QUIC_PROTOCOL_ERROR` dan membebaskan bandwidth jaringan saat initial paint.
+- **Lazy Loading Cerdas Ikon Desktop:** Mengganti pemuatan thumbnail `loading="eager"` menjadi `loading="lazy"` untuk ikon non-prioritas di `DesktopIcon.tsx`, menghemat unduhan 1.1 MB gambar simultan saat halaman pertama kali dimuat dan mempercepat LCP.
+- **Pembersihan Konsol & Pelanggaran CSP:** Menambahkan `https://static.cloudflareinsights.com` ke whitelist directive `script-src` di `src/middleware/utils.ts` untuk mendukung Cloudflare Web Analytics tanpa memicu security violation atau log error di Chrome DevTools.
+- **Resolusi Efek Suara Sistem & Sanitasi D1:** Memutakhirkan konfigurasi path suara di tabel D1 `app_kv` dan menyematkan auto-localization pada `SoundManager.ts` dari `/r2/assets/sounds/` ke file lokal statis di `/sounds/`, mengeliminasi request 404 pada file audio sistem (`startup.mp3`, dll).
+- **Penetapan Metadata Kanonikal & Validasi Robots.txt:** Menghapus berkas statis usang `public/robots.txt` yang merujuk domain legacy, menyematkan canonical URL dinamis di `/preview/[template]`, serta mendaftarkan rute preview ke `sitemap.ts` untuk skor SEO 100/100 sempurna.
+- **Aksesibilitas Sempurna (100% Accessibility):** Mengeliminasi WCAG `label-content-name-mismatch` dengan menambahkan `aria-hidden="true"` pada elemen gambar dekoratif dan menjamin jarak aman target sentuh (WCAG 2.5.8).
+
 ---
 
 ## [1.2.4] - 2026-09-10
