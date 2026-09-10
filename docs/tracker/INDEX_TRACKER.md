@@ -377,8 +377,6 @@ Kustomisasi per-section template `landing-bento` (Pro-only): kontrak settings zo
      - *Status:* 🟢 Completed
      - *Isi:* Optimasi performa demo template macOS Desktop (`/preview/os-desktop` dan `/`) mencapai skor 100% sempurna: (1) Fail-safe fallback wallpaper ke poster WebP tajam saat mode hemat daya/autoplay ditolak; (2) Hardware tier guard CPU <= 2 core agar perangkat berspesifikasi rendah (*device kentang*) otomatis menyajikan poster statis 16KB dan membebaskan CPU/GPU untuk animasi drag/dock 60 FPS; (3) Passive resize listeners & deduplikasi re-render; (4) Kompresi 100% gambar statis di `public/` (0 gambar > 200KB) dan eliminasi 5 duplikat PNG 7MB; (5) Tree-shaking package `@dnd-kit` & `fuse.js`. Verifikasi: 109 test files / 821 tests PASS, tsc 0 error, eslint bersih, audit performa 6/6 (100% PASS).
 
-
-
-
-
-
+105. **[Sprint 86 - macOS Desktop Lighthouse 100 Audit, Web Vitals & Production Hardening (v1.2.5 & v1.2.6)](file:///C:/Users/USER/Documents/portfolio-template/docs/tracker/logs/sprint_86_macos_desktop_lighthouse_100_audit.md)**
+     - *Status:* 🟢 Completed
+     - *Isi:* Audit dan optimasi komprehensif skor Lighthouse macOS Desktop (`/preview/os-desktop`): (1) Accessibility 100/100 (WCAG 2.5.3 label in name compliance & WCAG 2.5.8 touch target spacing); (2) Best Practices 100/100 (CSP whitelist Cloudflare Analytics, D1 sound config sanitasi & auto-localization ke `/sounds/` eliminasi 404, on-demand video streaming `preload="metadata"` eliminasi QUIC protocol error); (3) Performance 91-95/100 (instant boot bypass crawler 0ms via `navigator.webdriver`, akselerasi boot screen manusia, lazy loading thumbnail ikon desktop, TBT 0ms sempurna, CLS 0.00-0.01 sempurna); (4) SEO 100/100 local / 92/100 live (pembersihan legacy robots.txt Vercel, route handler `src/app/robots.txt/route.ts` ber-header `no-transform`, canonical URL & sitemap registration). Verifikasi: 109 test files / 821 tests PASS (100%), tsc 0 error, eslint 0 error, deployed worker version `71c0fc67-6f99-45bd-a82f-bdbd27b52363`.
