@@ -1291,20 +1291,47 @@ Setelah DNS diperbarui, website portofolio Anda akan langsung aktif di https://$
         changelogDate.textContent = changelogData.date ? `(${changelogData.date})` : '';
         lastUpdateWhatsappText = changelogData.whatsappMessage || '';
 
-        if (changelogData.sections && changelogData.sections.length > 0) {
+        const releases = changelogData.releases || [];
+        if (releases.length > 0) {
           let cHtml = '';
-          for (const sec of changelogData.sections) {
-            cHtml += `<div style="font-weight: 600; margin-top: 0.4rem; margin-bottom: 0.2rem; color: var(--text);">${escapeHtml(sec.title)}</div>`;
-            cHtml += `<ul style="margin-left: 1.25rem; margin-bottom: 0.4rem; list-style-type: disc;">`;
-            for (const item of sec.items) {
-              cHtml += `<li style="margin-bottom: 0.15rem; color: var(--text-muted);">${escapeHtml(item)}</li>`;
+          releases.forEach((rel, rIdx) => {
+            const isLatest = rIdx === 0;
+            if (rIdx > 0) {
+              cHtml += `<div style="border-top: 1px dashed var(--border); margin: 0.85rem 0 0.75rem 0;"></div>`;
             }
-            cHtml += `</ul>`;
-          }
+            cHtml += `<div style="display: flex; align-items: center; gap: 0.45rem; margin-bottom: 0.4rem; flex-wrap: wrap;">`;
+            cHtml += `<span style="font-weight: 700; font-size: 0.875rem; color: var(--text);">Versi ${escapeHtml(rel.version)}</span>`;
+            if (rel.date) {
+              cHtml += `<span style="font-size: 0.75rem; color: var(--text-muted);">(${escapeHtml(rel.date)})</span>`;
+            }
+            if (isLatest) {
+              cHtml += `<span style="background: #059669; color: #ffffff; font-size: 0.625rem; font-weight: 600; padding: 0.1rem 0.45rem; border-radius: 9999px;">Terbaru</span>`;
+            }
+            cHtml += `</div>`;
+
+            if (rel.sections && rel.sections.length > 0) {
+              for (const sec of rel.sections) {
+                cHtml += `<div style="font-weight: 600; font-size: 0.8125rem; margin-top: 0.35rem; margin-bottom: 0.15rem; color: var(--text);">${escapeHtml(sec.title)}</div>`;
+                cHtml += `<ul style="margin-left: 1.25rem; margin-bottom: 0.35rem; list-style-type: disc;">`;
+                for (const item of sec.items) {
+                  cHtml += `<li style="margin-bottom: 0.15rem; color: var(--text-muted); font-size: 0.78125rem; line-height: 1.45;">${escapeHtml(item)}</li>`;
+                }
+                cHtml += `</ul>`;
+              }
+            }
+          });
           changelogContent.innerHTML = cHtml;
         } else {
           changelogContent.textContent = 'Belum ada catatan pembaruan di CHANGELOG.md.';
         }
+        
+        // Pastikan container terbuka saat di-refresh agar log langsung terbaca
+        isChangelogCollapsed = false;
+        changelogBody.style.display = 'block';
+        changelogHeader.style.borderBottom = '1px solid var(--border)';
+        changelogHeader.style.paddingBottom = '0.5rem';
+        toggleChangelogIcon.textContent = '▼';
+
         if (showFeedback) {
           showToast(`Catatan rilis v${changelogData.version} berhasil dimuat ulang!`);
         }

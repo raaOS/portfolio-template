@@ -631,28 +631,49 @@ const server = http.createServer(async (req, res) => {
       }
 
       const content = fs.readFileSync(changelogPath, 'utf-8');
-      const versionMatch = content.match(/##\s*\[([^\]]+)\]\s*-\s*([^\r\n]+)/);
-      const version = versionMatch ? versionMatch[1].trim() : '1.0.0';
-      const date = versionMatch ? versionMatch[2].trim() : '';
+      
+      // Parse all releases (splitting by '## [version]')
+      const releaseBlocks = content.split(/\n(?=##\s*\[)/);
+      const releases: Array<{
+        version: string;
+        date: string;
+        sections: Array<{ title: string; items: string[] }>;
+      }> = [];
 
-      const afterFirstHeader = content.slice(versionMatch ? (versionMatch.index || 0) + versionMatch[0].length : 0);
-      const nextHeaderIdx = afterFirstHeader.search(/\n##\s*\[/);
-      const releaseBody = nextHeaderIdx !== -1 ? afterFirstHeader.slice(0, nextHeaderIdx) : afterFirstHeader;
+      for (const block of releaseBlocks) {
+        const headerMatch = block.match(/##\s*\[([^\]]+)\]\s*-\s*([^\r\n]+)/);
+        if (!headerMatch) continue;
 
-      const sections: Array<{ title: string; items: string[] }> = [];
-      const lines = releaseBody.split(/\r?\n/);
-      let currentSection: { title: string; items: string[] } | null = null;
+        const version = headerMatch[1].trim();
+        const date = headerMatch[2].trim();
 
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed.startsWith('### ')) {
-          currentSection = { title: trimmed.replace(/^###\s*/, ''), items: [] };
-          sections.push(currentSection);
-        } else if (trimmed.startsWith('- ') && currentSection) {
-          const itemText = trimmed.replace(/^-\s*/, '').replace(/\*\*([^*]+)\*\*:\s*/, '$1: ').replace(/\*\*([^*]+)\*\*/, '$1').trim();
-          currentSection.items.push(itemText);
+        const afterHeader = block.slice((headerMatch.index || 0) + headerMatch[0].length);
+        const sections: Array<{ title: string; items: string[] }> = [];
+        const lines = afterHeader.split(/\r?\n/);
+        let currentSection: { title: string; items: string[] } | null = null;
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('### ')) {
+            currentSection = { title: trimmed.replace(/^###\s*/, ''), items: [] };
+            sections.push(currentSection);
+          } else if (trimmed.startsWith('- ') && currentSection) {
+            const itemText = trimmed
+              .replace(/^-\s*/, '')
+              .replace(/\*\*([^*]+)\*\*:\s*/, '$1: ')
+              .replace(/\*\*([^*]+)\*\*/, '$1')
+              .trim();
+            currentSection.items.push(itemText);
+          }
         }
+
+        releases.push({ version, date, sections });
       }
+
+      const latestRelease = releases[0] || { version: '1.0.0', date: '', sections: [] };
+      const version = latestRelease.version;
+      const date = latestRelease.date;
+      const sections = latestRelease.sections;
 
       const waBulletPoints: string[] = [];
       for (const sec of sections) {
@@ -673,7 +694,7 @@ const server = http.createServer(async (req, res) => {
       ].join('\n');
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: true, version, date, sections, whatsappMessage }));
+      res.end(JSON.stringify({ success: true, version, date, sections, releases, whatsappMessage }));
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: false, message: (err as Error).message }));
