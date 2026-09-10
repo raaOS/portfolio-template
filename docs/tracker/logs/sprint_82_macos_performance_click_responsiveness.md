@@ -57,7 +57,9 @@
    - Solusi:
      - Mengunggah seluruh koleksi wallpaper video 4K dari lokal (`hunt-showdown-veil-of-thorns.3840x2160.mp4`, `Zen-Kois-wallpaper-50s-upload-safe.mp4`, `pink-bloom-field-clear-sky-live-wallpaper-wallsflow-com.mp4`, dan `sachiro-dark-nights.3840x2160.mp4`) beserta poster JPEG resolusi tinggi ke Cloudflare R2 bucket (`portfolio-template-media/assets/wallpapers/`).
      - Memperbarui database D1 (`content` & `content_default-site`) sehingga wallpaper aktif adalah `w-1780744973336-veil-thorns` bertipe `video`.
-     - Menyempurnakan `DesktopBackground.tsx`: menambahkan `autoPlay`, `preload="auto"`, dan menghapus `onError` pada poster image yang sebelumnya secara keliru membatalkan pemutaran video. Handler `onError` pada elemen `<video>` tetap aktif sebagai fail-safe agar bila terjadi kegagalan jaringan, sistem tetap menampilkan fallback default tanpa layar hitam.
+10. **`src/components/os/layers/UIOverlaysLayer.tsx` (Penghapusan Fitur Dynamic Island):**
+    - Sesuai permintaan pengguna, fitur Dynamic Island yang menampilkan floating pill notifikasi di bawah menubar atas dihapus dari tampilan template demo macOS desktop.
+    - Menghapus komponen `DynamicIsland`, import `ISLAND_ID`, serta callbacks notifikasi yang tidak terpakai sehingga tampilan layar desktop menjadi lebih bersih, minimalis, dan tidak terdistraksi bubble teks.
 
 ---
 
@@ -65,6 +67,8 @@
 
 - **TypeScript Typecheck:** `npx tsc --noEmit` ➔ 0 error (Exit code: 0).
 - **Unit Test Suite:** `npm test` ➔ 109 test files passed, 821 tests passed (100% PASS).
-- **Cloudflare Build & Deploy:** `npm run cf:build` & `npx opennextjs-cloudflare deploy` berhasil di-deploy ke `https://makeitbetter.my.id` (Version ID: `4274559f-5cc2-4833-9a63-3539668d843a`).
-- **Live Browser Verification:** `https://makeitbetter.my.id/preview/os-desktop` diverifikasi via automated browser: `<video>` element aktif, memutar video 4K (*Hunt Showdown Veil of Thorns*) secara mulus (`paused: false`, `readyState: 4`, `opacity: 1`, looping, muted) dengan resolusi asli 3840x2160.
-- **Integritas Visual:** Seluruh animasi spring, efek Web Audio retro SoundManager, looping wallpaper video, dan efek transisi tetap berjalan 100% utuh dan lancar.
+- **Cloudflare Build & Deploy:** `npm run cf:build` & `npx opennextjs-cloudflare deploy` berhasil di-deploy ke `https://makeitbetter.my.id` (Version ID: `f473ee2f-1b1c-44f0-9e7e-08761492118d`).
+- **Live Browser Verification:** `https://makeitbetter.my.id/preview/os-desktop` diverifikasi via automated browser subagent:
+  - `hasDynamicIslandId: false`, `islandElementsCount: 0`. Elemen Dynamic Island 100% hilang dari DOM.
+  - Area atas layar di bawah menubar bersih tanpa pil/bubble notifikasi.
+  - Background live video 4K, menubar, dock, desktop icons, dan window system tetap 100% utuh dan responsif.
