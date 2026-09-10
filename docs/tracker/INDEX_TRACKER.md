@@ -365,6 +365,10 @@ Kustomisasi per-section template `landing-bento` (Pro-only): kontrak settings zo
      - *Status:* 🟢 Completed
      - *Isi:* Mengatasi 2 isu performa pada template macOS desktop: (1) Menghilangkan kelambatan perpindahan antar halaman dengan mempercepat durasi view-transition dari 800ms menjadi 350ms/320ms ber-kurva fluid iOS/macOS, memangkas delay buatan dock bounce dari 280ms ke 90ms, dan memangkas timer transitionPhase; (2) Memperbaiki responsivitas klik aset gambar/video menjadi instan 1-klik dengan mengaktifkan single-click project window opener pada desktop icon, memasang threshold drag (> 5px) agar getaran mikroskopis mouse tidak membatalkan event klik, mengaktifkan single-click preview pada jendela Explorer/Finder, serta menerapkan pointer-events-none pada video tanpa kontrol agar klik diteruskan dengan mulus ke container. Verifikasi: 109 test files / 821 tests PASS, TypeScript compiler 0 error.
 
+102. **[Sprint 83 - 4K Live Video Wallpaper & Dynamic Island Clean-up (v1.2.2)](file:///C:/Users/USER/Documents/portfolio-template/docs/tracker/logs/sprint_83_live_video_wallpaper_and_dynamic_island_removal.md)**
+     - *Status:* 🟢 Completed
+     - *Isi:* Mengaktifkan live video wallpaper 4K di Cloudflare R2/D1 (`Hunt Showdown Veil of Thorns`, `Zen Kois`, `Pink Bloom`, dan `Sachiro Dark Nights`) dengan pemutaran otomatis (`autoplay`, `preload="auto"`, `loop`, `muted`) serta fail-safe fallback otomatis agar layar tidak pernah blank/hitam. Menghapus komponen Dynamic Island dan floating bubble notifikasi di bagian atas desktop macOS agar tampilan lebih bersih, minimalis, dan berfokus penuh pada konten. Versi template dinaikkan ke v1.2.2 di `CHANGELOG.md` dan terintegrasi otomatis ke portal `PENGELOLA_KLIEN.bat`. Verifikasi: 109 test files / 821 tests PASS, live deployment version `f473ee2f-1b1c-44f0-9e7e-08761492118d`.
+
 
 
 
