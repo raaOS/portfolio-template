@@ -52,7 +52,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { applyDockItemOrder } from '../utils/dockOrder';
 
-const LINK_BOUNCE_DELAY_MS = 280;
+const LINK_BOUNCE_DELAY_MS = 90;
 
 /**
  * Dock implementation — single source untuk semua varian.

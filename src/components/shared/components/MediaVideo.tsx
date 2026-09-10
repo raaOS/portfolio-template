@@ -228,11 +228,9 @@ const MediaVideo = forwardRef<HTMLVideoElement, MediaVideoProps>(
       <div ref={containerRef} className="relative h-full w-full bg-neutral-200 dark:bg-neutral-900">
         <video
           ref={setVideoRef}
-          // pointer-events-none HANYA dipasang saat overlay autoplay-blocked
-          // sedang aktif, supaya overlay button bisa menerima click. Untuk
-          // semua kondisi normal (controls on/off), video element tetap
-          // interaktif sehingga tap-to-pause / native controls bekerja.
-          className={`${className || 'h-full w-full object-cover'} ${autoplayBlocked && !canPlay ? 'pointer-events-none' : ''}`}
+          // When controls are disabled (e.g. background/card/preview video), disable pointer events
+          // so clicks propagate cleanly to parent cards, links, and triggers.
+          className={`${className || 'h-full w-full object-cover'} ${!controls || (autoplayBlocked && !canPlay) ? 'pointer-events-none' : ''}`}
           src={shouldLoad ? getProxiedUrl(src) : undefined}
           aria-label={controls ? alt || 'Video content' : undefined}
           title={controls ? alt || 'Video content' : undefined}
@@ -291,6 +289,7 @@ const MediaVideo = forwardRef<HTMLVideoElement, MediaVideoProps>(
             <Image
               src={getProxiedUrl(poster)}
               alt={alt}
+              unoptimized={true}
               width={width}
               height={height}
               priority={effectivePosterPriority}

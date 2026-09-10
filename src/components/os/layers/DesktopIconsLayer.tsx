@@ -247,33 +247,31 @@ function DesktopIconsLayer({
                   onSizeChange={isAdmin ? (size) => handleIconSizeRequest(icon, size) : undefined}
                   onClick={() => {
                     setSelectedIconId(icon.id);
-                    if (isMobile) {
-                      if (icon.data) {
-                        const el = iconRefs.current[icon.id];
-                        const rect = el?.getBoundingClientRect();
+                    if (icon.data) {
+                      const el = iconRefs.current[icon.id];
+                      const rect = el?.getBoundingClientRect();
 
-                        setOpeningIconId(icon.id);
+                      setOpeningIconId(icon.id);
 
-                        openProjectWindow(
-                          icon.data!,
-                          rect
-                            ? {
-                                x: rect.left,
-                                y: rect.top,
-                                width: rect.width,
-                                height: rect.height,
-                              }
-                            : undefined
-                        );
+                      openProjectWindow(
+                        icon.data!,
+                        rect
+                          ? {
+                              x: rect.left,
+                              y: rect.top,
+                              width: rect.width,
+                              height: rect.height,
+                            }
+                          : undefined
+                      );
 
-                        if (openTimeoutRef.current) clearTimeout(openTimeoutRef.current);
-                        openTimeoutRef.current = setTimeout(() => {
-                          openTimeoutRef.current = null;
-                          setOpeningIconId(null);
-                        }, 700);
-                      } else if (icon.action) {
-                        icon.action();
-                      }
+                      if (openTimeoutRef.current) clearTimeout(openTimeoutRef.current);
+                      openTimeoutRef.current = setTimeout(() => {
+                        openTimeoutRef.current = null;
+                        setOpeningIconId(null);
+                      }, 700);
+                    } else if (icon.action) {
+                      icon.action();
                     }
                   }}
                   activeScale={

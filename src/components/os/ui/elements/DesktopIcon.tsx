@@ -85,6 +85,8 @@ export default function DesktopIcon({
   const iconY = useMotionValue(y);
 
   const [isDragging, setIsDragging] = useState(false);
+  const hasMovedRef = useRef(false);
+  const dragSoundPlayedRef = useRef(false);
 
   const requestSizeStep = (direction: 1 | -1) => {
     if (!onSizeChange) return;
@@ -109,18 +111,40 @@ export default function DesktopIcon({
   }[size];
 
   const handleDragStart = () => {
-    setIsDragging(true);
-    soundManager.play('drag');
+    hasMovedRef.current = false;
+    dragSoundPlayedRef.current = false;
+  };
+
+  const handleDrag = (_e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    const dist = Math.hypot(info.offset.x, info.offset.y);
+    if (dist > 5) {
+      hasMovedRef.current = true;
+      if (!isDragging) setIsDragging(true);
+      if (!dragSoundPlayedRef.current) {
+        dragSoundPlayedRef.current = true;
+        soundManager.play('drag');
+      }
+    }
   };
 
   const handleDragEnd = (info: PanInfo) => {
-    setTimeout(() => setIsDragging(false), 50); // Small delay to prevent click firing immediately after drag
+    const dist = Math.hypot(info.offset.x, info.offset.y);
+    const wasRealDrag = hasMovedRef.current || dist > 5;
 
-    if (onPositionChange) {
+    setTimeout(() => {
+      setIsDragging(false);
+      hasMovedRef.current = false;
+      dragSoundPlayedRef.current = false;
+    }, 60);
+
+    if (wasRealDrag && onPositionChange) {
       onPositionChange(id, info.offset.x, info.offset.y);
 
       // Instantly reset motion values to avoid double-jump jitter
       // The parent will re-render with new left/top immediately.
+      iconX.set(x);
+      iconY.set(y);
+    } else {
       iconX.set(x);
       iconY.set(y);
     }
@@ -161,18 +185,19 @@ export default function DesktopIcon({
       dragMomentum={false}
       dragElastic={0.05}
       onDragStart={handleDragStart}
+      onDrag={handleDrag}
       onDragEnd={(_e, info) => {
         handleDragEnd(info);
       }}
       data-lenis-prevent
       onClick={(_e) => {
-        if (!isDragging) {
+        if (!hasMovedRef.current) {
           soundManager.play('click');
           onClick();
         }
       }}
       onDoubleClick={(e) => {
-        if (!isDragging && onDoubleClick) {
+        if (!hasMovedRef.current && onDoubleClick) {
           onDoubleClick(e);
         }
       }}
@@ -251,6 +276,7 @@ export default function DesktopIcon({
                 src={imageUrl}
                 alt={label}
                 fill
+                unoptimized={true}
                 className={`pointer-events-none object-cover transition-opacity duration-300 ${shouldRenderVideo ? 'opacity-0' : 'opacity-100'}`}
                 sizes="(max-width: 768px) 96px, 128px"
                 draggable={false}

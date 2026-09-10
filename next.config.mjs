@@ -28,8 +28,9 @@ const nextConfig = {
       { protocol: 'https', hostname: 'i.postimg.cc' },
       { protocol: 'https', hostname: 'images2.imgbox.com' },
     ],
-    // Enable optimization in production only
-    unoptimized: process.env.NODE_ENV === 'development',
+    // Cloudflare Workers target: no native Node image optimization server (_next/image),
+    // so images are served directly by Cloudflare CDN/R2 without 404 errors.
+    unoptimized: true,
     // Optimize device sizes for better performance
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384, 512],

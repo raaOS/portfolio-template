@@ -99,9 +99,19 @@ export default function DesktopBackground({
     probedOverride && probedOverride.forSeed === seedPoster ? probedOverride.url : seedPoster;
 
   const [videoReady, setVideoReady] = useState(false);
+  const [hasLoadError, setHasLoadError] = useState(false);
+
+  useEffect(() => {
+    setHasLoadError(false);
+    setVideoReady(false);
+  }, [activeWallpaper]);
 
   const handleVideoCanPlay = useCallback(() => {
     setVideoReady(true);
+  }, []);
+
+  const handleMediaError = useCallback(() => {
+    setHasLoadError(true);
   }, []);
 
   useEffect(() => {
@@ -286,21 +296,22 @@ export default function DesktopBackground({
         animate={animateTarget}
         transition={springTransition}
       >
-        {/* Primary wallpaper - Priority load for LCP */}
-        {isVideo ? (
+        {/* Primary wallpaper - Priority load for LCP with automatic default fallback */}
+        {hasLoadError ? (
+          <Image
+            src={DEFAULT_WALLPAPER_URL}
+            alt="Desktop wallpaper"
+            fill
+            priority
+            fetchPriority="high"
+            unoptimized={true}
+            quality={75}
+            sizes="100vw"
+            className="object-cover"
+            style={{ transform: 'translateZ(0)' }}
+          />
+        ) : isVideo ? (
           // Bandwidth-aware video wallpaper.
-          //
-          //   - `poster` shows the side-car JPG instantly (one HTTP
-          //     request, ~30-80 KB) so the screen is not black while
-          //     the MP4 buffers. This is the LCP for the desktop on
-          //     first paint when video is involved.
-          //   - The MP4 is mounted only after the desktop reveal begins, so
-          //     Lighthouse/cold visitors pay for the poster first, not the
-          //     full wallpaper video before any interaction.
-          //   - On `saveData` / 2g connections we don't render the
-          //     <video> at all — we fall back to the poster as a still
-          //     image. Visitor menghemat bandwidth, dan halaman tetap
-          //     punya wallpaper visual yang masuk akal.
           shouldMountVideo ? (
             <React.Fragment key={activeWallpaper}>
               {posterUrl && (
@@ -309,7 +320,7 @@ export default function DesktopBackground({
                   alt=""
                   fill
                   priority
-                  unoptimized={posterUrl.startsWith('/r2/')}
+                  unoptimized={true}
                   className={`pointer-events-none object-cover transition-opacity duration-700 ${videoReady ? 'opacity-0' : 'opacity-100'}`}
                   style={{ transform: 'translateZ(0)' }}
                 />
@@ -318,11 +329,13 @@ export default function DesktopBackground({
                 ref={videoRef}
                 src={videoSrc}
                 poster={posterUrl}
+                autoPlay
                 muted
                 loop
                 playsInline
-                preload="metadata"
+                preload="auto"
                 onCanPlay={handleVideoCanPlay}
+                onError={handleMediaError}
                 className={`h-full w-full object-cover transition-opacity duration-700 ${videoReady ? 'opacity-100' : 'opacity-0'}`}
                 style={{ transform: 'translateZ(0)' }}
               />
@@ -334,11 +347,12 @@ export default function DesktopBackground({
               fill
               priority
               fetchPriority="high"
-              unoptimized={posterUrl.startsWith('/r2/')}
+              unoptimized={true}
               quality={75}
               sizes="100vw"
               className="object-cover"
               style={{ transform: 'translateZ(0)' }}
+              onError={handleMediaError}
             />
           ) : (
             <Image
@@ -347,6 +361,7 @@ export default function DesktopBackground({
               fill
               priority
               fetchPriority="high"
+              unoptimized={true}
               quality={75}
               sizes="100vw"
               className="object-cover"
@@ -360,10 +375,12 @@ export default function DesktopBackground({
             fill
             priority
             fetchPriority="high"
+            unoptimized={true}
             quality={75}
             sizes="100vw"
             className="object-cover"
             style={{ transform: 'translateZ(0)' }}
+            onError={handleMediaError}
           />
         )}
       </m.div>

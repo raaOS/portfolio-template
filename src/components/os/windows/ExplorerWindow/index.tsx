@@ -320,6 +320,7 @@ export default function ExplorerWindow({
   const handleNodeClick = (node: AnyExplorerNode, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedNodeId(node.id);
+    void handleNodeDoubleClick(node, e);
   };
 
   const handleNodeDoubleClick = useCallback(

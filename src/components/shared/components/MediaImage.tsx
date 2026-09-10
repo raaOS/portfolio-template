@@ -41,6 +41,7 @@ export default function MediaImage({
       <Image
         src={getProxiedUrl(src)}
         alt={alt}
+        unoptimized={true}
         width={width}
         height={height}
         priority={priority}

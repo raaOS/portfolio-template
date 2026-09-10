@@ -102,8 +102,12 @@ function HomeOSWrapperInner(props: DesktopEnvironmentProps) {
           cachedDesktopOS = mod.default;
           if (!cancelled) {
             setDesktopOS(() => mod.default);
-            setTransitionPhase('fading');
-            setTimeout(() => setTransitionPhase('ready'), 500);
+            if (shouldLoadDesktopImmediately()) {
+              setTransitionPhase('ready');
+            } else {
+              setTransitionPhase('fading');
+              setTimeout(() => setTransitionPhase('ready'), 100);
+            }
           }
         })
         .catch((err) => {

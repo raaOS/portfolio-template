@@ -532,14 +532,14 @@ main[data-vt-container='true'][data-canvas-mode='true'] {
    deselerasi halus di akhir (mirip transisi native iOS/macOS). */
 ::view-transition-old(root) {
   animation:
-    800ms cubic-bezier(0.32, 0.72, 0, 1) both vt-slide-out-left,
-    540ms cubic-bezier(0.4, 0, 0.2, 1) 120ms both vt-fade-out;
+    350ms cubic-bezier(0.25, 1, 0.5, 1) both vt-slide-out-left,
+    220ms cubic-bezier(0.4, 0, 0.2, 1) 60ms both vt-fade-out;
 }
 
 ::view-transition-new(root) {
   animation:
-    800ms cubic-bezier(0.32, 0.72, 0, 1) both vt-slide-in-right,
-    580ms cubic-bezier(0.4, 0, 0.2, 1) both vt-fade-in;
+    350ms cubic-bezier(0.25, 1, 0.5, 1) both vt-slide-in-right,
+    240ms cubic-bezier(0.4, 0, 0.2, 1) both vt-fade-in;
 }
 
 /* Navigasi BACK — arah slide dibalik: halaman lama geser ke kanan,
@@ -547,32 +547,32 @@ main[data-vt-container='true'][data-canvas-mode='true'] {
    Attribute data-vt-direction="back" di-set oleh lib/navigationDirection.ts */
 html[data-vt-direction='back']::view-transition-old(root) {
   animation:
-    800ms cubic-bezier(0.32, 0.72, 0, 1) both vt-slide-out-right,
-    540ms cubic-bezier(0.4, 0, 0.2, 1) 120ms both vt-fade-out;
+    350ms cubic-bezier(0.25, 1, 0.5, 1) both vt-slide-out-right,
+    220ms cubic-bezier(0.4, 0, 0.2, 1) 60ms both vt-fade-out;
 }
 
 html[data-vt-direction='back']::view-transition-new(root) {
   animation:
-    800ms cubic-bezier(0.32, 0.72, 0, 1) both vt-slide-in-left,
-    580ms cubic-bezier(0.4, 0, 0.2, 1) both vt-fade-in;
+    350ms cubic-bezier(0.25, 1, 0.5, 1) both vt-slide-in-left,
+    240ms cubic-bezier(0.4, 0, 0.2, 1) both vt-fade-in;
 }
 
 /* Saat shared element morph aktif, root tetap slide.
    Fade besar dimatikan agar card shared-element tidak terasa ghost/jatuh. */
 html[data-vt-morph-active='true']::view-transition-old(root) {
-  animation: 760ms cubic-bezier(0.32, 0.72, 0, 1) both vt-slide-out-left;
+  animation: 320ms cubic-bezier(0.25, 1, 0.5, 1) both vt-slide-out-left;
 }
 
 html[data-vt-morph-active='true']::view-transition-new(root) {
-  animation: 760ms cubic-bezier(0.32, 0.72, 0, 1) both vt-slide-in-right;
+  animation: 320ms cubic-bezier(0.25, 1, 0.5, 1) both vt-slide-in-right;
 }
 
 html[data-vt-direction='back'][data-vt-morph-active='true']::view-transition-old(root) {
-  animation: 760ms cubic-bezier(0.32, 0.72, 0, 1) both vt-slide-out-right;
+  animation: 320ms cubic-bezier(0.25, 1, 0.5, 1) both vt-slide-out-right;
 }
 
 html[data-vt-direction='back'][data-vt-morph-active='true']::view-transition-new(root) {
-  animation: 760ms cubic-bezier(0.32, 0.72, 0, 1) both vt-slide-in-left;
+  animation: 320ms cubic-bezier(0.25, 1, 0.5, 1) both vt-slide-in-left;
 }
 
 /* Related card di halaman detail: cukup morph card antar project,
