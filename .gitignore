@@ -61,6 +61,7 @@ audit-log.txt
 data-audit*.json
 probe-results*.txt
 lint-output.txt
+performance-test-results.json
 .audit-reports/
 
 # Error logs & temp files

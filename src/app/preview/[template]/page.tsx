@@ -1,11 +1,42 @@
+import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { loadHomepageData } from '@/lib/loaders';
 import { mapD1ToTemplateData } from '@/lib/templates/dataMapper';
 import { getTemplate } from '@/lib/templates/registry';
 import { SITE_ID } from '@/crud/shared/config';
+import { DEFAULT_SITE_URL } from '@/lib/constants';
 import InfiniteCanvasRenderer from '@/components/templates/infinite-canvas/InfiniteCanvasRenderer';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60;
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ template: string }>;
+}): Promise<Metadata> {
+  const { template: templateSlug } = await params;
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || DEFAULT_SITE_URL;
+  const canonicalUrl = `${baseUrl}/preview/${templateSlug}`;
+
+  const title =
+    templateSlug === 'os-desktop'
+      ? 'macOS Desktop OS Template Demo'
+      : templateSlug === 'infinite-canvas'
+        ? '3D Infinite Canvas Template Demo'
+        : 'Portfolio Template Demo';
+
+  return {
+    title,
+    description: 'Interactive portfolio template demo built for creators and developers.',
+    alternates: {
+      canonical: canonicalUrl,
+    },
+    openGraph: {
+      title,
+      url: canonicalUrl,
+    },
+  };
+}
 
 /**
  * Preview route untuk template.

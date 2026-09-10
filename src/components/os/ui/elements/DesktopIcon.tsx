@@ -274,7 +274,8 @@ export default function DesktopIcon({
             {imageUrl && !imageError && (
               <Image
                 src={imageUrl}
-                alt={label}
+                alt=""
+                aria-hidden="true"
                 fill
                 unoptimized={true}
                 className={`pointer-events-none object-cover transition-opacity duration-300 ${shouldRenderVideo ? 'opacity-0' : 'opacity-100'}`}

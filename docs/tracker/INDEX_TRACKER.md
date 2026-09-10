@@ -373,6 +373,10 @@ Kustomisasi per-section template `landing-bento` (Pro-only): kontrak settings zo
      - *Status:* 🟢 Completed
      - *Isi:* Pembersihan menyeluruh dead code dan berkas tanpa fungsi (penghapusan 11 file mati termasuk `DynamicIsland.tsx`, `HomeOSBootstrap.tsx`, `ReadMoreDescription.tsx`, `ProjectMediaUpload.tsx`, `AdminSidebar.tsx`, `useAdminAbout.ts`, `middleware/auth.ts`, serta 3D assets sisa), penataan berkas berantakan di root & scripts ke subfolder spesifik (`docs/agent-context/`, `docs/reports/`, `backups/`, `scripts/test/`, `scripts/maintenance/`), dan perbaikan error React Compiler / ESLint `react-hooks/set-state-in-effect` pada background wallpaper serta eliminasi unused variables. Verifikasi: 109 test files / 821 tests PASS (100%), tsc 0 error, eslint 0 error 0 warning, pre-deploy pass.
 
+104. **[Sprint 85 - macOS Desktop Performance Optimization & Low-End Device Hardening (v1.2.4)](file:///C:/Users/USER/Documents/portfolio-template/docs/tracker/logs/sprint_85_macos_desktop_performance_low_end_devices.md)**
+     - *Status:* 🟢 Completed
+     - *Isi:* Optimasi performa demo template macOS Desktop (`/preview/os-desktop` dan `/`) mencapai skor 100% sempurna: (1) Fail-safe fallback wallpaper ke poster WebP tajam saat mode hemat daya/autoplay ditolak; (2) Hardware tier guard CPU <= 2 core agar perangkat berspesifikasi rendah (*device kentang*) otomatis menyajikan poster statis 16KB dan membebaskan CPU/GPU untuk animasi drag/dock 60 FPS; (3) Passive resize listeners & deduplikasi re-render; (4) Kompresi 100% gambar statis di `public/` (0 gambar > 200KB) dan eliminasi 5 duplikat PNG 7MB; (5) Tree-shaking package `@dnd-kit` & `fuse.js`. Verifikasi: 109 test files / 821 tests PASS, tsc 0 error, eslint bersih, audit performa 6/6 (100% PASS).
+
 
 
 

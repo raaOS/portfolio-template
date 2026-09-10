@@ -66,6 +66,8 @@ export const generateDesktopIcons = (
     ...visibleProjects,
   ];
 
+  const placedPositions: { x: number; y: number }[] = [];
+
   const generatedIcons = (desktopItems as DesktopItem[]).map((item, index: number) => {
     const itemId = item?.id || `icon-${index}`;
     // 1. Check if we have a saved position for this ID (Admin Saved)
@@ -128,6 +130,14 @@ export const generateDesktopIcons = (
       finalX = Math.max(10, Math.min(windowSize.width - 80, slot.x));
       finalY = Math.max(topOffset, Math.min(windowSize.height - bottomOffset, slot.y));
     }
+
+    // Touch target clearance guard (WCAG 2.5.8): prevent overlapping icons
+    for (const p of placedPositions) {
+      if (Math.abs(finalX - p.x) < 40 && Math.abs(finalY - p.y) < 40) {
+        finalY = Math.min(windowSize.height - bottomOffset, p.y + (isMobile ? 80 : 110));
+      }
+    }
+    placedPositions.push({ x: finalX, y: finalY });
 
     if (item.type === 'folder') {
       return {

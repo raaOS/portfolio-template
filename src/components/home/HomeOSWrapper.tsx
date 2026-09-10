@@ -80,9 +80,14 @@ function HomeOSWrapperInner(props: DesktopEnvironmentProps) {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 768);
+    const handler = () => {
+      setIsMobile((prev) => {
+        const next = window.innerWidth < 768;
+        return prev === next ? prev : next;
+      });
+    };
     handler();
-    window.addEventListener('resize', handler);
+    window.addEventListener('resize', handler, { passive: true });
     return () => window.removeEventListener('resize', handler);
   }, []);
 

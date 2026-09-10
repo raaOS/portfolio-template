@@ -30,7 +30,11 @@ export default function OSDesktopRenderer({ data }: TemplateRendererProps) {
   };
 
   return (
-    <div className="relative h-screen w-full overflow-hidden bg-[#050505]">
+    <main
+      role="main"
+      aria-label="macOS Desktop Simulator"
+      className="relative h-screen w-full overflow-hidden bg-[#050505]"
+    >
       <HomeOSWrapper
         siteId={site.id}
         siteSlug={site.slug}
@@ -41,6 +45,6 @@ export default function OSDesktopRenderer({ data }: TemplateRendererProps) {
         testimonialsData={testimonialsData}
         contactData={contact}
       />
-    </div>
+    </main>
   );
 }

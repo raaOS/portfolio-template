@@ -194,9 +194,13 @@ export default function DesktopBackground({
         connection?: { saveData?: boolean; effectiveType?: string };
       }
     ).connection;
-    if (!conn) return true;
-    const slow = conn.effectiveType === '2g' || conn.effectiveType === 'slow-2g';
-    return !conn.saveData && !slow;
+    const slow = conn?.effectiveType === '2g' || conn?.effectiveType === 'slow-2g';
+    const isSaveData = Boolean(conn?.saveData);
+    // Low-end hardware guard: devices with <= 2 CPU cores fallback to static poster
+    // to preserve 60fps frame budget for window dragging and dock scaling
+    const isLowEndDevice =
+      typeof navigator.hardwareConcurrency === 'number' && navigator.hardwareConcurrency <= 2;
+    return !isSaveData && !slow && !isLowEndDevice;
   });
   const shouldMountVideo = isVideo && shouldPlayVideo && !prefersReducedMotion && isDesktopRevealed;
 
@@ -219,12 +223,14 @@ export default function DesktopBackground({
     // Effect ini hanya untuk subscribe perubahan connection runtime
     // (mis. wifi → cellular), bukan first evaluation.
     const decide = () => {
+      const isLowEnd =
+        typeof navigator.hardwareConcurrency === 'number' && navigator.hardwareConcurrency <= 2;
       if (!conn) {
-        setShouldPlayVideo(true);
+        setShouldPlayVideo(!isLowEnd);
         return;
       }
       const slow = conn.effectiveType === '2g' || conn.effectiveType === 'slow-2g';
-      setShouldPlayVideo(!conn.saveData && !slow);
+      setShouldPlayVideo(!conn.saveData && !slow && !isLowEnd);
     };
 
     conn?.addEventListener?.('change', decide);
@@ -239,7 +245,9 @@ export default function DesktopBackground({
     if (!video || !shouldMountVideo) return;
 
     video.play().catch((err) => {
-      console.warn('[DesktopBackground] Playback execution aborted:', err);
+      console.warn('[DesktopBackground] Playback execution aborted (power saver or policy):', err);
+      // Immediately revert to crisp poster image on autoplay rejection
+      setVideoReady(false);
     });
   }, [shouldMountVideo, videoSrc]);
 

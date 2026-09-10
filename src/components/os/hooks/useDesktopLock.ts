@@ -43,13 +43,21 @@ export const useDesktopLock = () => {
 
     const handleResize = () => {
       const width = window.innerWidth;
-      setIsMobile(width < 768);
+      setIsMobile((prev) => {
+        const next = width < 768;
+        return prev === next ? prev : next;
+      });
     };
 
     // Initial mobile check
-    requestAnimationFrame(() => setIsMobile(window.innerWidth < 768));
+    requestAnimationFrame(() => {
+      setIsMobile((prev) => {
+        const next = window.innerWidth < 768;
+        return prev === next ? prev : next;
+      });
+    });
 
-    window.addEventListener('resize', handleResize);
+    window.addEventListener('resize', handleResize, { passive: true });
 
     return () => {
       window.removeEventListener('resize', handleResize);

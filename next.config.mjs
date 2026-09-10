@@ -62,7 +62,15 @@ const nextConfig = {
     optimizeCss: true,
     // Tree-shake barrel imports untuk paket icon/animation/utility yang dipakai
     // banyak di OS desktop. Mengurangi ukuran bundle client pada cold start.
-    optimizePackageImports: ['lucide-react', '@tabler/icons-react', 'date-fns', 'motion'],
+    optimizePackageImports: [
+      'lucide-react',
+      '@tabler/icons-react',
+      'date-fns',
+      'motion',
+      'fuse.js',
+      '@dnd-kit/core',
+      '@dnd-kit/sortable',
+    ],
   },
 
   // Turbopack configuration (Next.js 16 Stable Bundler).
