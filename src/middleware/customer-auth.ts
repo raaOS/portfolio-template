@@ -24,7 +24,9 @@ async function maybeRefreshToken(
   response: NextResponse
 ): Promise<void> {
   const baseSecret = getJwtSecret();
-  if (!baseSecret || !payload.exp || !payload.siteId) return;
+  // A token without a role claim must not be refreshed into an admin
+  // token — refuse to refresh instead of defaulting the role.
+  if (!baseSecret || !payload.exp || !payload.siteId || !payload.role) return;
 
   const nowSec = Math.floor(Date.now() / 1000);
   const remaining = payload.exp - nowSec;
@@ -36,7 +38,7 @@ async function maybeRefreshToken(
     const fresh = await new SignJWT({
       siteId: payload.siteId,
       email: payload.email || '',
-      role: payload.role || 'admin',
+      role: payload.role,
     })
       .setProtectedHeader({ alg: 'HS256' })
       .setSubject(payload.sub || '')

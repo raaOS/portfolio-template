@@ -4,7 +4,6 @@
  *
  * @module
  */
-export { checkRateLimit } from './rateLimit';
 export {
   validateEmail,
   validatePassword,

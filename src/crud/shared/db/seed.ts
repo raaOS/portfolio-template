@@ -83,20 +83,31 @@ export async function seedDeployment(options: {
     );
   }
 
-  // Create admin user
+  // Create admin user.
+  // Guard: INSERT ... SELECT only when no admin exists yet (atomic check).
+  // A plain check-then-insert is racy: two concurrent /api/setup calls
+  // would both pass `existingUsers.length === 0` and create two admins.
   let adminCreated = false;
-  const existingUsers = await queryD1<{ id: string }>(
-    `SELECT id FROM site_users WHERE site_id = ? AND email = ? LIMIT 1`,
-    [SITE_ID, options.adminEmail.toLowerCase().trim()]
+  const existingAdmins = await queryD1<{ id: string }>(
+    `SELECT id FROM site_users WHERE site_id = ? AND role = 'admin' LIMIT 1`,
+    [SITE_ID]
   );
 
-  if (existingUsers.length === 0) {
+  if (existingAdmins.length === 0) {
     const passwordRecord = createScryptPasswordRecord(options.adminPassword);
     const userId = `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-    await queryD1(
+    // Atomic: only inserts if no admin row exists for this site.
+    // Concurrent setups with different emails both try to insert, but
+    // only the first wins the NOT EXISTS guard; the loser returns
+    // adminCreated=false and the route layer rejects it below.
+    const inserted = await queryD1<{ id: string }>(
       `INSERT INTO site_users (id, site_id, email, password_hash, password_salt, password_algorithm, role, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'admin', datetime('now'))`,
+       SELECT ?, ?, ?, ?, ?, ?, 'admin', datetime('now')
+       WHERE NOT EXISTS (
+         SELECT 1 FROM site_users WHERE site_id = ? AND role = 'admin'
+       )
+       RETURNING id`,
       [
         userId,
         SITE_ID,
@@ -104,9 +115,11 @@ export async function seedDeployment(options: {
         passwordRecord.passwordHash,
         passwordRecord.passwordSalt || '',
         passwordRecord.passwordAlgorithm || 'scrypt',
+        SITE_ID,
       ]
     );
-    adminCreated = true;
+
+    adminCreated = inserted.length > 0;
   }
 
   return { siteCreated, adminCreated };

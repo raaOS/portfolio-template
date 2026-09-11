@@ -121,9 +121,16 @@ export const validateAdminRequest = async (
   // 1. Check Admin Auth (legacy admin_token or customer site_user_token)
   let isAuthenticated = checkAdminAuth(request);
   if (!isAuthenticated) {
-    const { getSiteUserSession } = await import('@/crud/shared/auth/guard');
+    const [{ getSiteUserSession }, { SITE_ID }] = await Promise.all([
+      import('@/crud/shared/auth/guard'),
+      import('@/crud/shared/config'),
+    ]);
     const session = await getSiteUserSession(request);
-    if (session && session.role === 'admin') {
+    // Mirror siteMutationAuth: a customer token is only valid for its
+    // own deployment. Without the siteId check, a token signed with the
+    // same base JWT_SECRET (e.g. re-used across template deployments)
+    // would be accepted on every other deployment.
+    if (session && session.siteId === SITE_ID && session.role === 'admin') {
       isAuthenticated = true;
     }
   }

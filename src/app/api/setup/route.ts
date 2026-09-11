@@ -57,6 +57,15 @@ export async function POST(request: Request) {
       adminPassword,
     });
 
+    // Lost the insert race against a concurrent setup call — the admin
+    // slot for this deployment was taken by another request.
+    if (!result.adminCreated) {
+      return NextResponse.json(
+        { error: 'Setup sudah selesai. Admin user sudah ada.' },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Setup berhasil!',

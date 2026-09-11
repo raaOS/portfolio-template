@@ -34,6 +34,38 @@ function cleanupExpiredEntries() {
   }
 }
 
+// Prune limit for the D1-backed store: when the persisted `rateLimits`
+// object grows beyond this number of keys, drop expired entries during
+// the next check. Without this, keys derived from `ip|userAgent` grow
+// the app_kv row unboundedly and slow down every rate-limit check.
+const MAX_PERSISTED_KEYS = 500;
+
+function prunePersistedEntries(
+  records: Record<string, RateLimitRecord>,
+  now: number,
+  keepKey?: string
+) {
+  const entries = Object.entries(records);
+  if (entries.length <= MAX_PERSISTED_KEYS) return records;
+
+  const kept = entries.filter(
+    ([key, record]) =>
+      key === keepKey ||
+      !(
+        now > record.resetAt &&
+        (!record.blockedUntil || now >= record.blockedUntil)
+      )
+  );
+
+  // Never drop the key currently being rate-limited.
+  if (keepKey && !kept.some(([key]) => key === keepKey)) {
+    const current = entries.find(([key]) => key === keepKey);
+    if (current) kept.push(current);
+  }
+
+  return Object.fromEntries(kept);
+}
+
 function checkLocalRateLimit(
   key: string,
   maxAttempts: number,
@@ -44,16 +76,23 @@ function checkLocalRateLimit(
   const now = Date.now();
   const record = localLimits.get(key);
 
-  if (!record || now > record.resetAt || (record.blockedUntil && now >= record.blockedUntil)) {
+  if (!record) {
     localLimits.set(key, { attempts: 1, resetAt: now + windowMs });
     return { allowed: true };
   }
 
+  // An active block must be honored even if the counting window has
+  // already expired — otherwise blockMs is effectively capped at windowMs.
   if (record.blockedUntil && now < record.blockedUntil) {
     return {
       allowed: false,
       retryAfter: Math.ceil((record.blockedUntil - now) / 1000),
     };
+  }
+
+  if (now > record.resetAt || (record.blockedUntil && now >= record.blockedUntil)) {
+    localLimits.set(key, { attempts: 1, resetAt: now + windowMs });
+    return { allowed: true };
   }
 
   if (record.attempts >= maxAttempts) {
@@ -82,44 +121,59 @@ export async function checkDataRateLimit(
     return checkLocalRateLimit(safePath, maxAttempts, windowMs, blockMs);
   }
 
-  const ref = db.ref(`rateLimits/${safePath}`);
-
   try {
     // Capture the decision inside the transaction callback to avoid
     // a TOCTOU race between the transaction commit and a separate read.
     let decision: { allowed: boolean; retryAfter?: number } = { allowed: false };
 
-    await ref.transaction((record: RateLimitRecord | null) => {
+    // Operate on the parent map so pruning expired sibling keys happens
+    // inside the same CAS write that records this attempt.
+    const result = await db.ref('rateLimits').transaction((store: unknown) => {
+      const records =
+        store && typeof store === 'object' && !Array.isArray(store)
+          ? (store as Record<string, RateLimitRecord>)
+          : {};
+
+      // Prune expired sibling keys so the persisted row cannot grow
+      // unboundedly (see prunePersistedEntries).
+      const base = prunePersistedEntries(records, now, safePath);
+      const record = base[safePath];
+
+      const nextStore: Record<string, RateLimitRecord> = { ...base };
+
       if (!record) {
         decision = { allowed: true };
-        return { attempts: 1, resetAt: now + windowMs };
-      }
-
-      if (record.blockedUntil && now < record.blockedUntil) {
+        nextStore[safePath] = { attempts: 1, resetAt: now + windowMs };
+      } else if (record.blockedUntil && now < record.blockedUntil) {
         decision = {
           allowed: false,
           retryAfter: Math.ceil((record.blockedUntil - now) / 1000),
         };
-        return record;
-      }
-
-      if (now > record.resetAt || (record.blockedUntil && now >= record.blockedUntil)) {
+        return base; // blocked: keep the store as-is (still pruned)
+      } else if (now > record.resetAt || (record.blockedUntil && now >= record.blockedUntil)) {
         decision = { allowed: true };
-        return { attempts: 1, resetAt: now + windowMs };
-      }
-
-      if (record.attempts >= maxAttempts) {
+        nextStore[safePath] = { attempts: 1, resetAt: now + windowMs };
+      } else if (record.attempts >= maxAttempts) {
         const blockedUntil = now + blockMs;
         decision = {
           allowed: false,
           retryAfter: Math.ceil(blockMs / 1000),
         };
-        return { ...record, blockedUntil };
+        nextStore[safePath] = { ...record, blockedUntil };
+      } else {
+        decision = { allowed: true };
+        nextStore[safePath] = { ...record, attempts: record.attempts + 1 };
       }
 
-      decision = { allowed: true };
-      return { ...record, attempts: record.attempts + 1 };
+      return nextStore;
     });
+
+    // If CAS never committed (retries exhausted), fail closed instead of
+    // trusting the callback's optimistic decision — the attempt was never
+    // persisted, so allowing it would under-count concurrent attempts.
+    if (!result.committed) {
+      return { allowed: false, retryAfter: 60 };
+    }
 
     return decision;
   } catch (error) {

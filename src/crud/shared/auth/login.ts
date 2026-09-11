@@ -7,7 +7,7 @@
 import { queryD1, bootstrapD1Schema } from '@/crud/shared/db/connection';
 import { verifyStoredPassword, type StoredPasswordConfig } from './password';
 import { signSiteUserJWT, AUTH_COOKIE_NAME, AUTH_COOKIE_OPTIONS } from './session';
-import { generateCSRFToken, CSRF_COOKIE_NAME, CSRF_HEADER_NAME, validateCSRFToken } from './csrf';
+import { generateCSRFToken, CSRF_COOKIE_NAME } from './csrf';
 import { NextResponse } from 'next/server';
 
 export interface LoginRequest {
@@ -127,27 +127,4 @@ export function createLogoutResponse(): NextResponse {
   response.cookies.delete(CSRF_COOKIE_NAME);
 
   return response;
-}
-
-/**
- * Validate a request with CSRF check.
- * Returns the user session or null if invalid.
- */
-export async function validateRequestWithCSRF(
-  request: Request,
-  _siteId: string
-): Promise<{ userId: string; siteId: string; email: string; role: string } | null> {
-  // Only check CSRF on mutations
-  if (request.method === 'GET' || request.method === 'HEAD') {
-    return null; // No CSRF check needed for safe methods
-  }
-
-  const csrfToken = request.headers.get(CSRF_HEADER_NAME);
-  const csrfCookie = request.headers.get('cookie')?.match(new RegExp(`${CSRF_COOKIE_NAME}=([^;]+)`))?.[1];
-
-  if (!csrfToken || !csrfCookie || !validateCSRFToken(csrfToken, csrfCookie)) {
-    return null;
-  }
-
-  return null; // Caller should use guard() for full validation
 }
