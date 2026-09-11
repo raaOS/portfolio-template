@@ -5,14 +5,9 @@ import {
   applyVisitorWindowSnapshot,
   loadVisitorDesktopSession,
 } from '@/components/os/utils/visitorSessionState';
+import { getViewport } from '@/components/os/utils/viewport';
 
 const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
-
-/** SSR-safe viewport dimensions helper */
-function getViewport() {
-  if (typeof window === 'undefined') return { width: 1440, height: 900 };
-  return { width: window.innerWidth, height: window.innerHeight };
-}
 
 interface UseWindowInitializationProps {
   initialWindows: WindowState[];

@@ -3,6 +3,7 @@
 
 import type { DesktopIconSize, WindowPreference } from '@/types/about';
 import { clearVisitorDesktopSession } from './visitorSessionState';
+import { getViewport } from './viewport';
 
 const STORAGE_KEY = 'portfolio-os-positions-v1';
 
@@ -31,10 +32,8 @@ function isFiniteNumber(value: unknown): value is number {
 }
 
 /** SSR-safe viewport dimensions helper */
-function getCurrentViewport() {
-  if (typeof window === 'undefined') return { width: 1440, height: 900 };
-  return { width: window.innerWidth, height: window.innerHeight };
-}
+// getViewport dipindah ke ./viewport — dipakai bersama window manager & notes.
+
 
 // Load dari localStorage (ADMIN only)
 export function loadPositions(): Partial<PositionData> {
@@ -94,7 +93,7 @@ export function getWindowPosition(
     if (local) return local;
   }
 
-  const vp = getCurrentViewport();
+  const vp = getViewport();
 
   // 2. Cek percentage-based position (NEW - responsive)
   if (isFiniteNumber(CLOUDFLARE_D1Data?.xPct) && isFiniteNumber(CLOUDFLARE_D1Data?.yPct)) {
@@ -159,7 +158,7 @@ export function getIconPosition(
   defaults: { x: number; y: number },
   isAdmin: boolean = false
 ): { x: number; y: number } {
-  const vp = getCurrentViewport();
+  const vp = getViewport();
   // Icon minimum visibility: keep at least this many pixels dari tiap edge supaya
   // icon nggak pernah ketutup menu bar atas atau dock bawah, dan tetap clickable.
   const ICON_BOX = 80; // asumsi ukuran icon (matches DesktopIcon baseHeight large)
@@ -221,7 +220,7 @@ export function saveIconPosition(
   if (!isAdmin) return; // Visitor: no persistence to follow "refresh = reset" rule
 
   const current = loadPositions();
-  const vp = getCurrentViewport();
+  const vp = getViewport();
   const xPct = vp.width > 0 ? (pos.x / vp.width) * 100 : 0;
   const yPct = vp.height > 0 ? (pos.y / vp.height) * 100 : 0;
 

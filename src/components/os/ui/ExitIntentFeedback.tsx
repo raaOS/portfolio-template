@@ -2,16 +2,19 @@
 
 import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
-import dynamic from 'next/dynamic';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { X, Send } from 'lucide-react';
-import type { LottieRefCurrentProps } from 'lottie-react';
 import { useExitIntent } from '@/hooks/useExitIntent';
 import { useToast } from '@/contexts/ToastContext';
-import { POPULAR_EMOJIS } from '@/components/chat/data/EmojiData';
 import { Z_LAYERS } from '../utils/zIndexLayers';
-
-const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
+import {
+  readEnabledFromSession,
+  markFeedbackShown,
+  markFeedbackSent,
+  getOrCreateClientId,
+  detectDevice,
+} from './exitIntentSession';
+import { FEEDBACK_EMOJIS, FeedbackEyeIcon } from './FeedbackEyeIcon';
 
 /**
  * Exit-Intent Feedback Modal
@@ -19,139 +22,11 @@ const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
  * Muncul sekali per session saat kursor visitor bergerak keluar viewport ke atas
  * (sinyal "mau nutup tab"). Ngajakin visitor ninggalin rating + pesan singkat.
  *
- * Throttling (mode sopan):
- * - Session flag `portfolio_os_exit_feedback_shown` → modal tidak muncul 2x di session
- *   yang sama (satu tab, sampai ditutup).
- * - Session flag `portfolio_os_exit_feedback_sent`  → setelah sukses submit, modal
- *   langsung disable sampai user buka tab baru.
- * - Engagement minimum 15 detik → modal nggak nongol pas visitor baru nyampe.
- *
- * Layer pertahanan lapis kedua tetap di server: rate-limit per IP + dedup per
- * clientId (1 jam window).
+ * Throttling & session helpers → exitIntentSession.ts.
+ * Ikon mata Lottie → FeedbackEyeIcon.tsx.
  */
-
-const SESSION_SHOWN_KEY = 'portfolio_os_exit_feedback_shown';
-const SESSION_SENT_KEY = 'portfolio_os_exit_feedback_sent';
-// localStorage — stable client identifier supaya server bisa dedup lintas
-// session (berbeda dari sessionStorage flag yang reset tiap tab baru).
-const CLIENT_ID_KEY = 'portfolio_os_client_id';
 
 type SubmitState = 'idle' | 'submitting' | 'success' | 'error';
-
-function getEmojiByName(name: string, fallback: string) {
-  return POPULAR_EMOJIS.find((emoji) => emoji.name === name)?.char ?? fallback;
-}
-
-const FEEDBACK_EMOJIS = {
-  heart: getEmojiByName('heart', '\u2764\uFE0F'),
-  success: getEmojiByName('smiling heart', '\u{1F970}'),
-} as const;
-
-function FeedbackEyeIcon() {
-  const [animationData, setAnimationData] = useState<unknown>(null);
-  const prefersReducedMotion = useReducedMotion();
-  const lottieRef = useRef<LottieRefCurrentProps | null>(null);
-
-  useEffect(() => {
-    const instance = lottieRef.current;
-    return () => {
-      instance?.destroy?.();
-    };
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    const loadAnimation = async () => {
-      try {
-        const response = await fetch('/lottie/mata.json', {
-          signal: controller.signal,
-        });
-        if (!response.ok) return;
-
-        const data = await response.json();
-        setAnimationData(data);
-      } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') return;
-      }
-    };
-
-    loadAnimation();
-
-    return () => controller.abort();
-  }, []);
-
-  if (!animationData) {
-    return (
-      <div className="flex items-center justify-center" style={{ width: 280, height: 120 }}>
-        <span className="text-[88px] leading-none" aria-hidden="true">
-          {FEEDBACK_EMOJIS.heart}
-        </span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative flex h-[120px] w-[280px] items-center justify-center overflow-hidden">
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-        <Lottie
-          lottieRef={lottieRef}
-          animationData={animationData}
-          loop={!prefersReducedMotion}
-          autoplay={!prefersReducedMotion}
-          rendererSettings={{ preserveAspectRatio: 'xMidYMid meet' }}
-          style={{ width: 280, height: 280 }}
-          aria-hidden="true"
-        />
-      </div>
-    </div>
-  );
-}
-
-/**
- * Baca session flags sekali di client. Server selalu return true (enabled)
- * supaya hydration konsisten; hook `useExitIntent` no-op di server jadi
- * perbedaan nilai awal aman.
- */
-function readEnabledFromSession(): boolean {
-  if (typeof window === 'undefined') return true;
-  try {
-    const shown = sessionStorage.getItem(SESSION_SHOWN_KEY) === '1';
-    const sent = sessionStorage.getItem(SESSION_SENT_KEY) === '1';
-    return !shown && !sent;
-  } catch {
-    return true;
-  }
-}
-
-/**
- * Generate or load stable clientId dari localStorage. Dipakai server untuk
- * dedup per-client tanpa perlu auth. Bukan fingerprint — cukup random UUID.
- */
-function getOrCreateClientId(): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const existing = localStorage.getItem(CLIENT_ID_KEY);
-    if (existing && existing.length >= 8) return existing;
-    // crypto.randomUUID tersedia di semua browser target (Chrome 92+, FF 95+, Safari 15.4+)
-    const fresh =
-      typeof crypto !== 'undefined' && 'randomUUID' in crypto
-        ? crypto.randomUUID()
-        : `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-    localStorage.setItem(CLIENT_ID_KEY, fresh);
-    return fresh;
-  } catch {
-    return null;
-  }
-}
-
-function detectDevice(): 'desktop' | 'tablet' | 'mobile' | null {
-  if (typeof window === 'undefined') return null;
-  const width = window.innerWidth;
-  if (width < 768) return 'mobile';
-  if (width < 1024) return 'tablet';
-  return 'desktop';
-}
 
 export default function ExitIntentFeedback() {
   const prefersReducedMotion = useReducedMotion();
@@ -170,11 +45,7 @@ export default function ExitIntentFeedback() {
     if (!triggered || hasOpenedForTriggerRef.current) return;
     hasOpenedForTriggerRef.current = true;
     setIsOpen(true);
-    try {
-      sessionStorage.setItem(SESSION_SHOWN_KEY, '1');
-    } catch {
-      /* ignore */
-    }
+    markFeedbackShown();
   }, [triggered]);
 
   const [rating, setRating] = useState(0);
@@ -258,11 +129,7 @@ export default function ExitIntentFeedback() {
         return;
       }
 
-      try {
-        sessionStorage.setItem(SESSION_SENT_KEY, '1');
-      } catch {
-        /* ignore */
-      }
+      markFeedbackSent();
 
       setSubmitState('success');
       toast.showSuccess('Terima kasih atas feedbacknya! 🙏', 3500);

@@ -3,6 +3,41 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.0] - 2026-09-12
+
+### 🧩 Phase 2 Safe Refactor — Decoupling Komponen Besar (Ekstraksi Tanpa Perubahan Perilaku)
+
+- **Dock macOS Kini Modular (Dock.tsx 1064 → ~420 baris):** Komponen ikon dock `DockItem` (fisika magnifikasi hover, bounce animation, popover, navigasi view-transition) kini berada di file sendiri dan sepenuhnya props-driven. Wrapper `GlobalDock` (untuk halaman non-OS seperti /projects) dan `OSDock` (untuk desktop OS utama) juga dipisah ke file masing-masing. File `Dock.tsx` kini fokus pada inti: tracking kursor magnifikasi, state popover terpusat, drag-and-drop reorder ikon, dan penyimpanan urutan dock. Semua import path lama tetap valid lewat re-export — tidak ada file konsumen yang perlu diubah.
+- **Admin Explorer Upload Queue Terpisah (AdminExplorerClient.tsx 890 → 598 baris):** Seluruh logika antrean upload file (kompresi video FFmpeg di browser, progress bar per-file via XHR, rollback otomatis bila pendaftaran gagal, optimistic UI) diekstrak ke custom hook `useExplorerUploadQueue`. Serialisasi kompresi FFmpeg single-thread (`compressChainRef`) tetap hidup dalam satu closure di hook — dua video yang di-upload bersamaan tetap diproses berurutan seperti sebelumnya, mencegah crash WASM.
+- **Verifikasi Penuh:** TypeScript 0 error, ESLint 0 error/0 warning, 109 file test / 821 unit test PASS (100%). Fisika animasi dock (magnifikasi, bounce, drag) tidak berubah — direkomendasikan QA visual singkat di browser sebagai pemeriksaan tambahan.
+
+---
+
+## [1.2.9] - 2026-09-12
+
+### 🧹 Phase 1 Safe Refactor — Zero-Risk Quick Wins (Ekstraksi Murni Tanpa Perubahan Perilaku)
+
+- **Deduplikasi Helper Viewport (`src/components/os/utils/viewport.ts`):** Fungsi `getViewport()` yang sebelumnya terduplikasi identik di 4 file (`positionSync`, `useWindowActions`, `useWindowInitialization`, `useStickyNotes`) kini menjadi satu modul bersama SSR-safe. Path module `positionSync` dan seluruh nama export-nya tetap utuh sehingga 3 titik dynamic import (async chunk) tidak berubah.
+- **DesignPhilosophyForm Lebih Ramping (765 → 497 baris):** Konstanta data statis `DEFAULT_WORKFLOW_STEPS`, `AVAILABLE_ICONS`, dan `COLORS` dipindah ke `src/constants/designPhilosophy.ts`. Tipe `WorkflowStep`/`SubStep`/`DesignPhilosophyData` yang selama ini didefinisikan ganda kini memakai tipe kanonik dari `@/types/about` — satu sumber kebenaran yang sama dengan komponen flowchart publik.
+- **ExitIntentFeedback Lebih Ramping (504 → 339 baris):** Ikon mata Lottie dipisah ke komponen `FeedbackEyeIcon.tsx` mandiri (dengan fallback emoji tetap bekerja), dan helper throttling session (`shown`/`sent` flags, clientId stabil, deteksi perangkat) dipisah ke `exitIntentSession.ts` agar mudah dites terpisah. Perilaku modal, throttling, dan submit tidak berubah.
+- **Route Upload API Lebih Bersih (791 → 585 baris):** Helper murni (sanitasi nama file, ekstraksi PNG dari ICNS, peta content-type → ekstensi, scoping direktori site, kelas error `WallpaperImageTooSmallError`) dipindah ke `src/lib/media/uploadHelpers.ts`. Handler POST/DELETE, pipeline sequential, dan pemetaan status error (413/415/401) tetap persis sama; hanya static import (tanpa dynamic import baru) demi cold-start Cloudflare Worker.
+- **Verifikasi Penuh:** TypeScript 0 error, ESLint bersih, 109 file test / 821 unit test PASS (100%) — tanpa satu pun perubahan perilaku runtime.
+
+---
+
+## [1.2.8] - 2026-09-11
+
+### 🔒 Security & Logic Defect Sweep (Audit Otentikasi, Rate Limit & Setup)
+
+- **Rate Limit Login Customer (`/api/auth/login`):** Endpoint login utama kini diproteksi brute-force guard 3 percobaan / 5 menit dengan blokir 30 menit berbasis IP (D1-backed), setara dengan proteksi di `/api/admin/login`. Sebelumnya endpoint ini sama sekali tidak memiliki rate limiting sehingga password admin customer bisa di-brute-force tanpa batas.
+- **Perbaikan Rate Limiter Persisten (`dataRateLimit.ts`):** (1) Entry kedaluwarsa di penyimpanan D1 `rateLimits` kini otomatis di-prune saat jumlah key melewati 500, mencegah baris `app_kv` membengkak tanpa batas karena key `ip|userAgent` yang terus bertambah dan memperlambat seluruh aplikasi; (2) jika transaction CAS gagal commit (retries habis), request kini gagal tertutup (blocked) alih-alih diizinkan — menutup celah under-count saat permintaan bersamaan; (3) fallback lokal kini menghormati durasi blokir penuh: blokir 30 menit tidak lagi ter-reset prematur saat window hitungan 5 menit kedaluwarsa.
+- **Eliminasi Race Setup Dua Admin (`/api/setup` + `seedDeployment`):** Pembuatan admin pertama kini memakai atomic `INSERT ... WHERE NOT EXISTS (admin)` sehingga dua request setup bersamaan tidak bisa lagi menghasilkan dua akun admin pada satu deployment. Request yang kalah race ditolak dengan error yang jelas.
+- **Isolasi Token Antar-Deployment (`validateAdminRequest`):** Token sesi customer kini divalidasi `session.siteId === SITE_ID` — konsisten dengan `siteMutationAuth`. Sebelumnya token admin customer A yang ditandatangani dengan `JWT_SECRET` identik tetap diterima di deployment customer B.
+- **Hentikan Eskalasi Role Saat Refresh Token (`customer-auth.ts`):** Token tanpa claim `role` tidak lagi di-refresh menjadi token `admin` — refresh ditolak, bukan di-default naik.
+- **Pembersihan Dead Code Berbahaya:** Menghapus `crud/shared/security/rateLimit.ts` (tidak pernah dipakai; logika `blockSeconds`-nya bohong) dan `validateRequestWithCSRF` (selalu return `null`).
+
+---
+
 ## [1.2.7] - 2026-09-10
 
 ### 📱 Cloud Master Mobile Onboarding (Kelola Klien & Deploy Tanpa PC)

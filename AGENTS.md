@@ -132,34 +132,41 @@ src/
 ## 3. Batasan Refaktorisasi (Refactoring Restrictions)
 
 > [!IMPORTANT]
-> Beberapa file di bawah ini memiliki tingkat kompleksitas visual, efek animasi, alur state, atau integrasi eksternal yang sangat tinggi. **Jangan memecah atau melakukan refaktor modularisasi** pada file-file ini kecuali diperintah langsung oleh pengguna atau untuk memperbaiki bug spesifik. Pemecahan file secara agresif berisiko merusak sinkronisasi frame, menurunkan frame rate, atau memutuskan rantai callback.
+> Daftar ini diperbarui 2026-09-12 setelah audit penuh 24 file terlarang (Sprint refactor v1.2.9–v1.3.0, konsensus dua AI, setiap baris dibaca dan diverifikasi). Klaim lama yang usang (stale) sudah dikoreksi: `AdminExplorerClient` sudah tidak memakai dnd-kit (tabel click-driven), `DesignPhilosophyForm` sudah tidak memakai React Hook Form/Zod (plain `useState`), `upload/route.ts` sudah tidak menjalankan Sharp (`optimizeImageBuffer` = passthrough stub sejak migrasi Cloudflare), dan `ExitIntentFeedback` mendeteksi kursor via hook `useExitIntent` eksternal.
 
-| #   | File Path                                                 | Peran & Kompleksitas                                                                                                      | Risiko jika Direfaktor                                                                                 |
-| --- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| 1   | `src/components/os/core/Dock.tsx`                         | Menu Dock bawah; hover scaling fisika ikon, bounce animation, context menus, SoundManager, drag-and-drop `@dnd-kit/core`. | Merusak tracking kursor real-time, mengganggu timing bounce, memicu _infinite re-renders_.             |
-| 2   | `src/components/os/windows/Window.tsx`                    | Bingkai jendela aplikasi macOS; dragging, resizing, minimize/maximize animations, z-index focus stacking.                 | Merusak referensi DOM (`useRef`), z-index terputus, animasi transisi minimize menjadi patah.           |
-| 3   | `src/components/os/context/OSSystemContext.tsx`           | State global OS virtual (Spotlight, Control Center, Mission Control, volume, kecerahan, sticky notes).                    | Desinkronisasi state rendering antara Dock, MenuBar, dan Window; overhead boilerplate berlebih.        |
-| 4   | `src/app/api/admin/login/route.ts`                        | Endpoint login admin dan logging keamanan; audit, IP geolocation, geocoding maps.                                         | Kegagalan dependency-import antara runtime Cloudflare Worker vs Node compatibility, memperlambat cold-start. |
-| 6   | `src/components/os/core/DesktopEnvironment.tsx`           | Entry point desktop; koordinasi posisi window, drag boundaries, grid shortcut ikon, wallpaper transitions.                | Merusak drag boundaries, bug penumpukan window, atau glitch animasi transisi wallpaper.                |
-| 7   | `src/app/admin/projects/explorer/AdminExplorerClient.tsx` | File explorer virtual admin; grid direktori, drag-and-drop `@dnd-kit/core`, antrean upload R2, action sheets.             | Mengacaukan sinkronisasi drop-zones, merusak progres upload real-time, mematahkan navigasi breadcrumb. |
-| 8   | `src/app/admin/system/components/WallpaperManager.tsx`    | Dashboard admin wallpaper; upload direct-to-R2, kompresi WASM FFmpeg di client, aspek rasio asinkron, backfill poster.    | Kebocoran memori (memory leak) WASM FFmpeg, antrean upload rusak, kegagalan pembuatan poster JPG.      |
-| 9   | `src/app/api/admin/upload/route.ts`                       | API upload media; multipart parsing di edge runtime, validation size, kompresi ffmpeg, sharp image resizing.              | Upload file besar timeout, kegagalan optimasi gambar (.webp/.avif) secara acak.                        |
-| 10  | `src/components/admin/about/DesignPhilosophyForm.tsx`     | Form filosofi desain; nested arrays dengan React Hook Form, skema validasi Zod bersarang, sinkronisasi D1.                | Kerusakan jalur validasi Zod (validation path), input kehilangan fokus saat mengetik.                  |
-| 11  | `src/contexts/BackgroundUploadContext.tsx`                | State upload wallpaper background; serialisasi antrean kompresi `compressChainRef`, progress tracking di menubar.         | Concurrency conflict (race condition) pada thread WASM FFmpeg, video korup sewaktu kompresi.           |
-| 13  | `src/components/os/windows/ExplorerWindow/index.tsx`      | Finder/Explorer simulator client; render pohon direktori virtual, double-click gestures, Quick Look modal (PDF/Markdown). | Traversal folder melambat, double-click gesture macet, rendering ikon berkas rusak.                    |
-| 14  | `src/lib/services/explorerService.ts`                     | Layanan tree virtual file system (D1 & R2); SQL parent-child, copy/delete atomik R2, TOCTOU guard.                        | Kehilangan referensi file virtual (dangling files) atau terhapusnya media asli R2 secara permanen.     |
-| 15  | `src/components/canvas/InfiniteCanvasView.tsx`            | Galeri 3D proyek interaktif; Three.js / React Three Fiber setup, custom shaders, orbital camera limits, render loop.      | WebGL context lost, lag parah karena alokasi ulang objek 3D di setiap render, camera jittering.        |
-| 16  | `src/components/os/hooks/useJellyDrag.ts`                 | Kalkulasi physics elastis untuk interaksi drag-and-drop window.                                                           | Referensi pointer frame-by-frame terputus, animasi drag menjadi patah atau error sinkronisasi.         |
-| 17  | `src/components/os/utils/positionSync.ts`                 | Kalkulasi sinkronisasi koordinat posisi window di layar desktop.                                                          | Mengacaukan kalkulasi posisi window, menyebabkan window melompat atau tidak sinkron antar komponen.    |
-| 18  | `src/components/os/context/UnifiedZIndexContext.tsx`      | Mengelola tumpukan lapisan/z-index seluruh window OS.                                                                     | Urutan z-index OS terganggu, window aktif bisa tenggelam di belakang background atau tidak fokus.      |
-| 19  | `src/components/canvas/infiniteCanvasEngine.ts`           | Kalkulasi matriks dan render loop utama 3D Engine.                                                                        | Terjadi kebocoran memori (memory leak), crash tab browser, atau WebGL buffer error.                    |
-| 20  | `src/components/os/utils/SoundManager.ts`                 | Mengelola koneksi buffer audio Web Audio API secara global.                                                               | Audio menumpuk (double-play), antrean buffer rusak saat komponen memicu re-render.                     |
-| 21  | `src/contexts/MusicPlayerContext.tsx`                     | State global pemutar musik dan antrean track.                                                                             | Terputusnya state musik atau pemutaran tidak terkendali (double audio layer).                          |
-| 22  | `src/components/os/ui/ExitIntentFeedback.tsx`             | Logika deteksi kursor dan exit intent feedback.                                                                           | Gestur kursor terganggu dan memicu modal secara salah.                                                 |
-| 23  | `src/components/os/hooks/useStickyNotes.ts`               | Manajemen state catatan tempel OS dan sinkronisasi local storage.                                                         | Kehilangan data notes sementara atau state tidak sinkron antar komponen.                               |
-| 24  | `src/lib/database.ts`                                     | Wrapper core untuk eksekusi ke Cloudflare D1.                                                                             | Kerusakan koneksi DB atau kebocoran koneksi query secara diam-diam.                                    |
-| 25  | `src/hooks/useProjectForm.ts`                             | State controller raksasa untuk form proyek admin.                                                                         | Form kehilangan sinkronisasi reaktivitas saat modifikasi data berukuran besar.                         |
-| 26  | `src/components/os/hooks/window-manager/useWindowActions.ts`| Logika manajemen aktif (minimize/maximize/close) untuk window.                                                            | Window gagal diminimize atau nyangkut dalam state animasi nanggung.                                    |
+### 3a. Protected Cores — HARAM dipecah/direfaktor (8 inti)
+
+| # | File Path | Inti yang Terproteksi |
+|---|---|---|
+| P1 | `src/components/os/hooks/useJellyDrag.ts` | Mesin fisika spring rAF 60 FPS dengan in-place mutation (anti-GC). Loop + idle detection + cleanup = satu unit. Ekstraksi constants/helpers murni (`jellyPhysics.ts`) diizinkan. |
+| P2 | `src/contexts/BackgroundUploadContext.tsx` | `enqueueWallpaperUpload` + `compressChainRef`/`finalizeChainRef`/`encodingTaskIdRef` — mesin race-condition atomik (serialisasi WASM FFmpeg + read-modify-write koleksi wallpaper). Ekstraksi types/constants/session-effects diizinkan. |
+| P3 | `src/components/canvas/InfiniteCanvasView.tsx` | rAF render loop + `updateDomNodes`/`syncVisibleItems`/`flushRemovals` membaca-tulis ~15 refs bersama per frame. Optimasi Sprint 85 sudah file-structure-independent. Dedup fade-math JSX vs `computeVisualStyle` diizinkan. |
+| P4 | `src/components/os/context/UnifiedZIndexContext.tsx` | Store `useSyncExternalStore` (`_subscribe*`/`_get*` = kontrak publik) + interplay `normalizeZIndexes`→`notifyId`/`notifyGlobal`/`updateTopId`. Ekstraksi types/constants + `hooks.ts` tipis diizinkan. |
+| P5 | `src/components/os/utils/SoundManager.ts` | Singleton: gating unlock/autoplay, suppression timers, `inFlight`, startup-once, pending queue. Ekstraksi constants/types + `AudioElementPool` diizinkan. |
+| P6 | `src/contexts/MusicPlayerContext.tsx` | Dual-engine (HTMLAudio + YT iframe) — `ytPlayerRef` + 4 ref lain dianyam di 25+ lokasi (transport, polling 500ms, volume sync, onReady). Ekstraksi types + pure helpers (`mergeTrackQueue`, `isYt`) diizinkan; ekstraksi `useYouTubePlayer` DILARANG. |
+| P7 | `src/lib/services/explorerService.ts` | `explorerMutationChain` + CAS retry 8x + copy/verify/rollback R2. Ekstraksi pure path/name/tree helpers (`explorerKeys.ts`) diizinkan; rantai mutasi harus satu modul. |
+| P8 | `src/components/os/windows/Window.tsx` | Sisa 773 baris = frame binding rapat (`preSnapFrameRef`, onDrag→onDragEnd ordering, snap priority, originRect morph). Ekstraksi constants block + builder state animasi diizinkan; `useWindowSnap` hanya dengan persetujuan eksplisit. |
+
+### 3b. Core Dock & Upload Queue — sudah dimodularisasi (v1.3.0), jaga intinya
+
+| File | Status & Batasan |
+|---|---|
+| `src/components/os/core/Dock.tsx` | Core tetap satu unit: `mouseX` sharing, popover timing chain (suppress 1000ms, `data-dock-popover-closing`), dnd persist admin/visitor, `isClientHydrated`. Jangan pecah lagi. `DockItem`/`GlobalDock`/`OSDock` sudah file terpisah (props-driven). |
+| `src/app/admin/projects/explorer/hooks/useExplorerUploadQueue.ts` | Satu-satunya rumah `compressChainRef` (serialisasi WASM FFmpeg) + register/rollback — jangan pisahkan compress chain dari closure ini. |
+
+### 3c. File stabil lainnya — defer, jangan jadi target refactor
+
+| File | Catatan Terverifikasi |
+|---|---|
+| `src/components/os/context/OSSystemContext.tsx` (226 baris) | Sudah 3 slice internal independen; aman dipecah tapi YAGNI. |
+| `src/components/canvas/infiniteCanvasEngine.ts` (417 baris) | Murni matematika, zero runtime imports, unit-tested. BUKAN bagian render loop (loop ada di `InfiniteCanvasView`). Tidak perlu dipecah. |
+| `src/components/os/hooks/window-manager/useWindowActions.ts` | Sudah sub-hook dari folder `window-manager/` (pola dekomposisi established). |
+| `src/components/os/utils/positionSync.ts` | **Wajib tetap jadi barrel di path ini** — 3 dynamic import menarget path module (`useWindowPersistence.ts:148`, `useStickyNotes.ts:~400`, `useDesktopLayout.ts:137`). Jangan rename/move. |
+| `src/lib/database.ts` | Keep `D1Reference` + `D1Database` + Proxy `db` satu modul. Helpers/snapshot/interfaces boleh diekstrak. |
+| `src/components/os/core/DesktopEnvironment.tsx` | Defer: entrance-timing chain + visitor-session refs. Ekstraksi `useVisitorSession`/`useDesktopEntranceSequence` hanya dengan persetujuan eksplisit. |
+| `src/app/api/admin/login/route.ts` | Helper (`parseUserAgent`, `getGeoInfo`, `auditLogin`) boleh diekstrak; masalah Node-compat ada di import graph (`jsonwebtoken`/`crypto`), bukan struktur file — jangan digabur jadi migrasi jose. |
+| File sisa (Window/WallpaperManager/ExplorerWindow/useStickyNotes/useProjectForm/MusicPlayerContext/ExitIntentFeedback) | Lihat tabel 3a/3b dan tracker log refactor untuk batasan per-bagian. |
+
 ---
 
 ## 4. Technology Stack & Dependencies

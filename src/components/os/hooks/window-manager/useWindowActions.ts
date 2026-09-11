@@ -4,12 +4,7 @@ import { WindowState } from './types';
 import { AboutData } from '@/types/about';
 import { ElementType } from '@/components/os/context/UnifiedZIndexContext';
 import { saveWindowPosition } from '@/components/os/utils/positionSync';
-
-/** SSR-safe viewport dimensions helper */
-function getViewport() {
-  if (typeof window === 'undefined') return { width: 1440, height: 900 };
-  return { width: window.innerWidth, height: window.innerHeight };
-}
+import { getViewport } from '@/components/os/utils/viewport';
 
 interface UseWindowActionsProps {
   windows: WindowState[];

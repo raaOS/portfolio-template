@@ -1,12 +1,9 @@
 // ═══════════════════════════════════════════════════════════════════
-// SECTION MAP (upload/route.ts — 796 lines)
-// L1-11:    Imports, runtime config (nodejs, maxDuration: 60)
-// L12-109:  Constants: size limits, allowed types, validation helpers
-// L110-147: assertWallpaperImageDimensions — dimension validation
-// L148-268: optimizeImageBuffer — sharp image processing (webp/avif/jpg)
-// L269-757: POST handler — multipart parse, type detection, FFmpeg video
-//           compression, sharp image resize, R2 upload, D1 metadata write
-// L758-796: DELETE handler — R2 object deletion + D1 cleanup
+// SECTION MAP (upload/route.ts)
+// Helpers murni (sanitize, ICNS, ext map, scoping, error class) →
+//   src/lib/media/uploadHelpers.ts (static import, module graph tidak berubah)
+// Handler: POST (multipart → validate → transform → R2 → response),
+//          DELETE (R2 delete dengan path guard)
 // ═══════════════════════════════════════════════════════════════════
 import { NextRequest, NextResponse } from 'next/server';
 import { validateAdminRequest } from '@/lib/auth';
@@ -23,6 +20,14 @@ import {
   isR2StorageConfigured,
   uploadToR2,
 } from '@/lib/r2Storage';
+import {
+  assertWallpaperImageDimensions,
+  extractPngFromIcns,
+  extFromContentType,
+  sanitizeFilename,
+  scopeUploadDirectory,
+  WallpaperImageTooSmallError,
+} from '@/lib/media/uploadHelpers';
 
 // IMPORTANT: Keep this route timeout conservative. Large media should use
 // direct-to-R2 upload instead of passing through the application runtime.
@@ -30,10 +35,6 @@ import {
 // path direct-to-R2 (presign + PUT) yang bypass route ini sepenuhnya, jadi
 // 60 detik di sini cukup untuk image/audio + poster JPG.
 export const maxDuration = 60;
-
-// FIXED (BUG-010): Valid filename characters
-const VALID_FILENAME_REGEX = /^[a-zA-Z0-9_-]+$/;
-const MAX_FILENAME_LENGTH = 100;
 
 // Image compression contract:
 //   - JPEG, PNG, WebP  -> resize + transcode to WebP q82 (one pipeline, one upload).
@@ -51,24 +52,6 @@ const IMAGE_TRANSCODE_TYPES = new Set<string>();
 // hemat bandwidth, dengan slight upscale (+50%) di 4K monitor yang
 // hampir tidak terlihat untuk static image wallpaper.
 
-function sanitizeFilename(input: string | null): string | null {
-  if (!input) return null;
-
-  // Remove any path traversal attempts
-  const sanitized = input
-    .replace(/[/\\]/g, '') // Remove path separators
-    .replace(/\.{2,}/g, '') // Remove sequences of dots
-    .replace(/[<>"|?*]/g, ''); // Remove other dangerous chars
-
-  // Validate result
-  if (!VALID_FILENAME_REGEX.test(sanitized)) {
-    return null;
-  }
-
-  // Limit length
-  return sanitized.substring(0, MAX_FILENAME_LENGTH);
-}
-
 interface OptimizedImageResult {
   buffer: Buffer;
   contentType: string;
@@ -77,65 +60,6 @@ interface OptimizedImageResult {
   optimizedSize: number;
   width?: number;
   height?: number;
-}
-
-/**
- * Custom error thrown when wallpaper image fails server-side dimension
- * validation. Caller di POST handler tangkap ini dan return 413
- * supaya pesan error sampai ke admin UI dengan jelas.
- */
-class WallpaperImageTooSmallError extends Error {
-  constructor(
-    public readonly width: number,
-    public readonly height: number,
-    public readonly minWidth: number,
-    public readonly minHeight: number
-  ) {
-    super(
-      `Wallpaper image ${width}x${height} di bawah minimum ${minWidth}x${minHeight}. ` +
-        `Upload versi resolusi lebih tinggi.`
-    );
-    this.name = 'WallpaperImageTooSmallError';
-  }
-}
-
-/**
- * Validate dimensi image untuk wallpaper SEBELUM transcode. Sharp
- * `withoutEnlargement: true` artinya sub-1080p source tetap kecil di
- * output → wallpaper akan pecah saat fullscreen. Reject di sini dengan
- * pesan yang jelas.
- *
- * Dipanggil hanya untuk wallpaper folder + format yang sharp bisa decode.
- * Format animated/SVG tidak melewati pipeline transcode jadi tidak
- * butuh validation ini.
- */
-async function assertWallpaperImageDimensions(
-  inputBuffer: Buffer,
-  minWidth = 1920,
-  minHeight = 1080
-): Promise<void> {
-  const metadata = { orientation: 1, width: 0, height: 0 };
-
-  // EXIF rotation: kalau image punya orientation 5/6/7/8, sharp swap
-  // width/height saat .rotate() tapi metadata report dimensi pre-rotation.
-  // Hitung effective dimensions (post-rotate) supaya validation cocok
-  // dengan yang akan ditampilkan visitor.
-  const orientation = metadata.orientation ?? 1;
-  const isRotated = orientation >= 5 && orientation <= 8;
-  const effectiveWidth = isRotated ? (metadata.height ?? 0) : (metadata.width ?? 0);
-  const effectiveHeight = isRotated ? (metadata.width ?? 0) : (metadata.height ?? 0);
-
-  if (!effectiveWidth || !effectiveHeight) {
-    // Sharp tidak bisa baca dimensi → biarkan optimizeImageBuffer
-    // yang gagal nanti dengan pesan generic. Tidak throw di sini
-    // supaya tidak block format yang sharp metadata mungkin tidak
-    // dukung tapi pipeline-nya bisa.
-    return;
-  }
-
-  if (effectiveWidth < minWidth || effectiveHeight < minHeight) {
-    throw new WallpaperImageTooSmallError(effectiveWidth, effectiveHeight, minWidth, minHeight);
-  }
 }
 
 /**
@@ -158,93 +82,6 @@ async function optimizeImageBuffer(
     originalSize: inputBuffer.length,
     optimizedSize: inputBuffer.length,
   };
-}
-
-function extFromContentType(type: string): string | null {
-  switch (type) {
-    case 'image/jpeg':
-      return 'jpg';
-    case 'image/png':
-      return 'png';
-    case 'image/webp':
-      return 'webp';
-    case 'image/gif':
-      return 'gif';
-    case 'image/svg+xml':
-      return 'svg';
-    case 'image/heic':
-      return 'heic';
-    case 'image/heif':
-      return 'heif';
-    case 'image/avif':
-      return 'avif';
-    case 'video/mp4':
-      return 'mp4';
-    case 'video/webm':
-      return 'webm';
-    default:
-      return null;
-  }
-}
-
-function scopeUploadDirectory(siteId: string, targetDir: string) {
-  if (siteId === 'default-site') return targetDir;
-  if (targetDir === 'assets/wallpapers') return `sites/${siteId}/wallpapers`;
-  if (targetDir === 'assets/sounds') return `sites/${siteId}/sounds`;
-  if (targetDir.startsWith('assets/projects/comparisons')) {
-    return `sites/${siteId}/projects/comparisons`;
-  }
-  if (targetDir.startsWith('assets/projects')) return `sites/${siteId}/projects/legacy`;
-  if (targetDir.startsWith('assets/media')) return `sites/${siteId}/media`;
-  return targetDir;
-}
-
-function extractPngFromIcns(icnsBuffer: Buffer): Buffer | null {
-  if (icnsBuffer.length < 8) return null;
-  const magic = icnsBuffer.toString('ascii', 0, 4);
-  if (magic !== 'icns') return null;
-
-  let offset = 8;
-  let largestBuffer: Buffer | null = null;
-  let largestSize = 0;
-
-  const isPng = (buf: Buffer) => {
-    return (
-      buf.length >= 8 &&
-      buf[0] === 0x89 &&
-      buf[1] === 0x50 &&
-      buf[2] === 0x4e &&
-      buf[3] === 0x47 &&
-      buf[4] === 0x0d &&
-      buf[5] === 0x0a &&
-      buf[6] === 0x1a &&
-      buf[7] === 0x0a
-    );
-  };
-
-  const isJpeg = (buf: Buffer) => {
-    return buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
-  };
-
-  while (offset + 8 <= icnsBuffer.length) {
-    const size = icnsBuffer.readUInt32BE(offset + 4);
-
-    if (size < 8 || offset + size > icnsBuffer.length) {
-      break;
-    }
-
-    const blockData = icnsBuffer.subarray(offset + 8, offset + size);
-    if (isPng(blockData) || isJpeg(blockData)) {
-      if (blockData.length > largestSize) {
-        largestSize = blockData.length;
-        largestBuffer = Buffer.from(blockData);
-      }
-    }
-
-    offset += size;
-  }
-
-  return largestBuffer;
 }
 
 export async function POST(req: NextRequest) {

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react
 import type { NoteData } from '../ui/elements/StickyNoteItem';
 import { useLayoutPersistence } from '../contexts/LayoutPersistenceContext';
 import type { ElementType } from '../context/UnifiedZIndexContext';
+import { getViewport } from '../utils/viewport';
 
 // BUG FIX #5: Gunakan function untuk lazy initialization agar tidak SSR leak
 // HYDRATION FIX: Generate client-specific values only when function is called (client-side)
@@ -45,12 +46,6 @@ const _debounce = <T extends (...args: unknown[]) => ReturnType<T>>(func: T, wai
     clearTimeout(timeout);
     timeout = setTimeout(() => func(...args), wait);
   };
-};
-
-/** SSR-safe viewport helper */
-const getViewport = () => {
-  if (typeof window === 'undefined') return { width: 1440, height: 900 };
-  return { width: window.innerWidth, height: window.innerHeight };
 };
 
 /** Convert note pixel values to percentages for responsive positioning */
@@ -142,10 +137,7 @@ export const useStickyNotes = (
 
         if (Array.isArray(data) && data.length > 0) {
           // Responsive positioning: use percentage if available, fallback to pixels
-          const vp =
-            typeof window !== 'undefined'
-              ? { width: window.innerWidth, height: window.innerHeight }
-              : { width: 1440, height: 900 };
+          const vp = getViewport();
           const isMobile = vp.width < 768;
 
           const adjustedData = data.map((n, i) => {
