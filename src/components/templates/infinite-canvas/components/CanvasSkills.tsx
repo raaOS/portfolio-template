@@ -9,11 +9,11 @@ interface CanvasSkillsProps {
   style?: React.CSSProperties;
 }
 
-const levelColors: Record<string, string> = {
-  Beginner: 'text-amber-400 bg-amber-400/10 border-amber-400/20',
-  Intermediate: 'text-blue-400 bg-blue-400/10 border-blue-400/20',
-  Advanced: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20',
-  Expert: 'text-purple-400 bg-purple-400/10 border-purple-400/20',
+const levelBadges: Record<string, string> = {
+  Beginner: 'text-neutral-600 bg-neutral-100 border-neutral-200',
+  Intermediate: 'text-neutral-700 bg-neutral-100 border-neutral-200 font-medium',
+  Advanced: 'text-neutral-800 bg-neutral-100 border-neutral-300 font-semibold',
+  Expert: 'text-neutral-900 bg-neutral-200/80 border-neutral-300 font-bold',
 };
 
 export function CanvasSkills({ skills, style }: CanvasSkillsProps) {
@@ -21,17 +21,17 @@ export function CanvasSkills({ skills, style }: CanvasSkillsProps) {
 
   return (
     <div
-      className="absolute select-none bg-[#1c1c24]/90 border border-white/10 rounded-2xl p-6 shadow-2xl backdrop-blur-md w-80 md:w-96 space-y-4 transition-all duration-300 hover:border-indigo-500/40 hover:shadow-indigo-500/10"
+      className="absolute select-none -translate-x-1/2 -translate-y-1/2 bg-white border border-neutral-200 rounded-2xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.06)] w-80 md:w-96 space-y-4 transition-all duration-300 hover:border-neutral-400 hover:shadow-[0_12px_32px_rgba(0,0,0,0.1)]"
       style={style}
     >
       {/* Header */}
-      <div className="flex items-center gap-2.5 pb-3 border-b border-white/10">
-        <div className="p-2 rounded-lg bg-indigo-500/20 text-indigo-400">
+      <div className="flex items-center gap-2.5 pb-3 border-b border-neutral-100">
+        <div className="p-2 rounded-lg bg-neutral-100 text-neutral-900">
           <Cpu className="w-4 h-4" />
         </div>
         <div>
-          <h3 className="text-white text-sm font-semibold tracking-tight">Keahlian & Teknologi</h3>
-          <p className="text-white/40 text-[10px] font-mono">Hard Skills & Tools</p>
+          <h3 className="text-neutral-900 text-sm font-bold tracking-tight">Keahlian & Teknologi</h3>
+          <p className="text-neutral-400 text-[10px] font-mono uppercase tracking-wider">HARD SKILLS & TOOLS</p>
         </div>
       </div>
 
@@ -40,7 +40,7 @@ export function CanvasSkills({ skills, style }: CanvasSkillsProps) {
         {skills.map((skill) => (
           <div
             key={skill.id}
-            className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 transition-colors"
+            className="flex items-center gap-2.5 p-2.5 rounded-xl bg-neutral-50/80 border border-neutral-200/70 hover:bg-neutral-100 hover:border-neutral-300 transition-colors"
           >
             {skill.iconUrl ? (
               <img
@@ -52,17 +52,17 @@ export function CanvasSkills({ skills, style }: CanvasSkillsProps) {
                 }}
               />
             ) : (
-              <div className="w-6 h-6 rounded bg-indigo-600/30 flex items-center justify-center text-[10px] font-bold text-indigo-300 shrink-0">
+              <div className="w-6 h-6 rounded bg-neutral-200 flex items-center justify-center text-[10px] font-bold text-neutral-800 shrink-0">
                 {skill.name.charAt(0)}
               </div>
             )}
             <div className="min-w-0 flex-1">
-              <span className="text-white text-xs font-medium block truncate">
+              <span className="text-neutral-900 text-xs font-semibold block truncate">
                 {skill.name}
               </span>
               <span
-                className={`text-[9px] font-mono px-1.5 py-0.2 rounded border inline-block mt-0.5 ${
-                  levelColors[skill.level] || 'text-white/60 bg-white/5 border-white/10'
+                className={`text-[9px] font-mono px-1.5 py-0.5 rounded border inline-block mt-0.5 ${
+                  levelBadges[skill.level] || 'text-neutral-600 bg-neutral-100 border-neutral-200'
                 }`}
               >
                 {skill.level || 'Skill'}

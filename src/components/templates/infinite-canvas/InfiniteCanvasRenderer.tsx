@@ -18,34 +18,34 @@ import { CanvasNavigator, type CanvasClusterKey } from './components/CanvasNavig
  * Posisi project cards di canvas dalam orbit estetis mengitari Profile.
  * Dijaga agar tidak menabrak kluster Skills (Barat), Experience (Timur), dan Contact (Selatan).
  */
-const PROJECT_POSITIONS: Array<{
-  offsetX: number;
-  offsetY: number;
-  rotate: number;
-}> = [
-  { offsetX: 0, offsetY: -420, rotate: -2 },
-  { offsetX: -320, offsetY: -380, rotate: 3 },
-  { offsetX: 320, offsetY: -380, rotate: -3 },
-  { offsetX: -360, offsetY: -160, rotate: 2 },
-  { offsetX: 360, offsetY: -160, rotate: -2 },
-  { offsetX: -200, offsetY: -620, rotate: -1 },
-  { offsetX: 200, offsetY: -620, rotate: 4 },
-  { offsetX: 0, offsetY: -780, rotate: 1 },
-  { offsetX: -440, offsetY: 380, rotate: -2 },
-  { offsetX: 440, offsetY: 380, rotate: 3 },
-  { offsetX: -560, offsetY: -420, rotate: 2 },
-  { offsetX: 560, offsetY: -420, rotate: -2 },
-];
+const PROJECT_COLUMNS = [-480, -160, 160, 480];
+const PROJECT_ROTATIONS = [-1.5, 1, -1, 1.5];
+
+/**
+ * Mendapatkan posisi koordinat kartu proyek dengan garansi bebas tabrakan (zero collision).
+ * Ditata rapi dalam formasi sayap pameran arsitektural (North Exhibition Wing).
+ * Memiliki jarak aman vertikal dari Hub Profil sehingga tampilan awal pusat sangat bersih,
+ * dan seluruh kartu memiliki ruang sela lebar tanpa pernah saling menimpa.
+ */
+function getProjectPosition(index: number): { offsetX: number; offsetY: number; rotate: number } {
+  const col = index % 4;
+  const row = Math.floor(index / 4);
+  return {
+    offsetX: PROJECT_COLUMNS[col],
+    offsetY: -680 - row * 380,
+    rotate: PROJECT_ROTATIONS[col],
+  };
+}
 
 /**
  * InfiniteCanvasRenderer — Template portfolio dengan infinite canvas lengkap.
  *
  * Mengonsumsi seluruh data CRUD Admin:
  * - Pusat (0, 0): Profile & Bio Hub
- * - Orbit Sekitar: Projects (dapat diklik membuka CanvasProjectModal)
- * - Barat (-640px): Hard Skills Matrix
- * - Timur (+660px): Work Experience Timeline
- * - Selatan (+620px): Contact Info, Sosmed, & Testimonials
+ * - Utara (0, -960px): Sayap Galeri Karya (Projects Exhibition Wing)
+ * - Barat (-920px): Hard Skills & Tools Matrix
+ * - Timur (+920px): Work Experience Timeline
+ * - Selatan (+820px): Contact Info, Sosmed, & Testimonials
  * - HUD Bawah: Quick Section Navigator
  */
 export default function InfiniteCanvasRenderer({ data }: TemplateRendererProps) {
@@ -81,16 +81,16 @@ export default function InfiniteCanvasRenderer({ data }: TemplateRendererProps) 
         panTo(0, 0, 1);
         break;
       case 'projects':
-        panTo(0, -380, 0.85);
+        panTo(0, -960, 0.7);
         break;
       case 'skills':
-        panTo(-620, 0, 1);
+        panTo(-920, 0, 1);
         break;
       case 'experience':
-        panTo(640, 0, 1);
+        panTo(920, 0, 1);
         break;
       case 'contact':
-        panTo(0, 620, 1);
+        panTo(0, 820, 1);
         break;
     }
   };
@@ -116,8 +116,12 @@ export default function InfiniteCanvasRenderer({ data }: TemplateRendererProps) 
 
   return (
     <div
-      className="relative h-screen w-full overflow-hidden bg-[#141419] select-none"
-      style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+      className="relative h-screen w-full overflow-hidden bg-[#f8f9fa] text-neutral-900 select-none"
+      style={{
+        cursor: isDragging ? 'grabbing' : 'grab',
+        backgroundImage: 'radial-gradient(#d4d4d8 1.15px, transparent 1.15px)',
+        backgroundSize: '24px 24px',
+      }}
       onWheel={handleWheel}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -163,14 +167,9 @@ export default function InfiniteCanvasRenderer({ data }: TemplateRendererProps) 
           onContact={() => handleNavigate('contact')}
         />
 
-        {/* 2. Orbit Cluster: Projects */}
+        {/* 2. Orbit Cluster: Projects (Collision-Free Galaxy Formation) */}
         {projects?.map((project, index) => {
-          const basePos = PROJECT_POSITIONS[index % PROJECT_POSITIONS.length];
-          // If more projects than base array, expand orbit radius slightly
-          const lap = Math.floor(index / PROJECT_POSITIONS.length);
-          const mult = 1 + lap * 0.35;
-          const posX = basePos.offsetX * mult;
-          const posY = basePos.offsetY * mult;
+          const pos = getProjectPosition(index);
 
           return (
             <CanvasProject
@@ -179,9 +178,9 @@ export default function InfiniteCanvasRenderer({ data }: TemplateRendererProps) 
               hasDragged={hasDragged}
               onSelect={(p) => setSelectedProject(p)}
               style={{
-                left: `calc(50% + ${posX}px)`,
-                top: `calc(50% + ${posY}px)`,
-                transform: `rotate(${basePos.rotate}deg)`,
+                left: `calc(50% + ${pos.offsetX}px)`,
+                top: `calc(50% + ${pos.offsetY}px)`,
+                transform: `rotate(${pos.rotate}deg)`,
               }}
             />
           );
@@ -192,8 +191,8 @@ export default function InfiniteCanvasRenderer({ data }: TemplateRendererProps) 
           <CanvasSkills
             skills={hardSkills}
             style={{
-              left: 'calc(50% - 840px)',
-              top: 'calc(50% - 150px)',
+              left: 'calc(50% - 920px)',
+              top: '50%',
             }}
           />
         )}
@@ -203,8 +202,8 @@ export default function InfiniteCanvasRenderer({ data }: TemplateRendererProps) 
           <CanvasExperience
             experiences={experiences}
             style={{
-              left: 'calc(50% + 460px)',
-              top: 'calc(50% - 150px)',
+              left: 'calc(50% + 920px)',
+              top: '50%',
             }}
           />
         )}
@@ -214,18 +213,10 @@ export default function InfiniteCanvasRenderer({ data }: TemplateRendererProps) 
           contact={contact}
           testimonials={testimonials}
           style={{
-            left: 'calc(50% - 190px)',
-            top: 'calc(50% + 450px)',
+            left: '50%',
+            top: 'calc(50% + 820px)',
           }}
         />
-      </div>
-
-      {/* Edge Vignette Gradients */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-[#141419] to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#141419] to-transparent" />
-        <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-[#141419] to-transparent" />
-        <div className="absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-[#141419] to-transparent" />
       </div>
 
       {/* Interactive Project Detail Modal */}

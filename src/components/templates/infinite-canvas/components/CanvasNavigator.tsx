@@ -29,7 +29,7 @@ export function CanvasNavigator({
   return (
     <nav
       aria-label="Canvas Section Navigation"
-      className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 p-1.5 rounded-full bg-[#1c1c24]/85 backdrop-blur-xl border border-white/15 shadow-2xl select-none"
+      className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 p-1 rounded-full bg-white/95 backdrop-blur-md border border-neutral-200 shadow-[0_4px_20px_rgba(0,0,0,0.08)] select-none"
     >
       {items
         .filter((item) => item.show)
@@ -40,10 +40,10 @@ export function CanvasNavigator({
               key={item.key}
               type="button"
               onClick={() => onNavigate(item.key)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs transition-all duration-200 cursor-pointer ${
                 isActive
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'text-white/70 hover:text-white hover:bg-white/10'
+                  ? 'bg-neutral-900 text-white font-semibold shadow-sm'
+                  : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 font-medium'
               }`}
             >
               {item.icon}

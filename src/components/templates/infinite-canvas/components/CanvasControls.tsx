@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 
 interface CanvasControlsProps {
   onZoomIn: () => void;
@@ -10,8 +11,8 @@ interface CanvasControlsProps {
 }
 
 /**
- * CanvasControls — Tombol kontrol canvas di bagian atas.
- * [ RESET CAM (•) ] [ ZOOM IN (+) ] [ ZOOM OUT (-) ]
+ * CanvasControls — Tombol kontrol zoom & reset kamera di bagian atas.
+ * Dikemas dalam kapsul glassmorphism mengambang yang elegan dan konsisten dengan HUD bawah.
  */
 export function CanvasControls({
   onZoomIn,
@@ -20,28 +21,40 @@ export function CanvasControls({
   zoom,
 }: CanvasControlsProps) {
   return (
-    <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10 flex gap-6 font-mono text-xs text-white/50 select-none">
+    <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 p-1.5 rounded-full bg-white/95 backdrop-blur-md border border-neutral-250 shadow-[0_4px_16px_rgba(0,0,0,0.06)] select-none">
       <button
+        type="button"
         onClick={onReset}
-        className="hover:text-white transition-colors cursor-pointer"
+        title="Reset Kamera ke Pusat"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
       >
-        [ RESET CAM (•) ]
+        <RotateCcw className="w-3.5 h-3.5" />
+        <span className="hidden sm:inline font-mono text-[11px] font-semibold">RESET</span>
       </button>
+
+      <div className="h-4 w-px bg-neutral-200" />
+
       <button
-        onClick={onZoomIn}
-        className="hover:text-white transition-colors cursor-pointer"
-      >
-        [ ZOOM IN (+) ]
-      </button>
-      <button
+        type="button"
         onClick={onZoomOut}
-        className="hover:text-white transition-colors cursor-pointer"
+        title="Perkecil Kanvas (Zoom Out)"
+        className="p-1.5 rounded-full text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
       >
-        [ ZOOM OUT (-) ]
+        <ZoomOut className="w-3.5 h-3.5" />
       </button>
-      <span className="text-white/30">
+
+      <span className="font-mono text-[11px] font-semibold text-neutral-700 px-1 min-w-10 text-center">
         {Math.round(zoom * 100)}%
       </span>
+
+      <button
+        type="button"
+        onClick={onZoomIn}
+        title="Perbesar Kanvas (Zoom In)"
+        className="p-1.5 rounded-full text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
+      >
+        <ZoomIn className="w-3.5 h-3.5" />
+      </button>
     </div>
   );
 }
