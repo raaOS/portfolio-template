@@ -894,6 +894,100 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // API: Client Status Board (health-check + domain untuk semua klien arsip)
+  if (url === '/api/status' && req.method === 'GET') {
+    try {
+      if (!fs.existsSync(ARCHIVE_DIR)) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, clients: [], latestVersion: null }));
+        return;
+      }
+
+      const folders = fs
+        .readdirSync(ARCHIVE_DIR, { withFileTypes: true })
+        .filter((d) => d.isDirectory())
+        .map((d) => d.name)
+        .sort((a, b) => a.localeCompare(b));
+
+      const clients = folders
+        .filter((f) => fs.existsSync(path.join(ARCHIVE_DIR, f, 'config.env')))
+        .map((folderName) => {
+          const envPath = path.join(ARCHIVE_DIR, folderName, 'config.env');
+          const env = fs.existsSync(envPath) ? parseEnv(fs.readFileSync(envPath, 'utf-8')) : {};
+          return {
+            id: folderName,
+            clientName: env.CUSTOMER_NAME || folderName,
+            clientSlug: env.CUSTOMER_SLUG || folderName.replace(/^\d+_/, ''),
+            websiteUrl: env.WEBSITE_URL || `https://${env.CUSTOMER_SLUG || folderName}.pages.dev`,
+            adminUrl: env.ADMIN_URL || `https://${env.CUSTOMER_SLUG || folderName}.pages.dev/admin`,
+            customDomain: env.CUSTOM_DOMAIN || '',
+            templateKey: env.ACTIVE_TEMPLATE_KEY || 'os-desktop',
+          };
+        });
+
+      // Health-check paralel: fetch ringan dengan timeout 8 detik per klien.
+      const checked = await Promise.all(
+        clients.map(async (c) => {
+          try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 8000);
+            const start = Date.now();
+            const healthRes = await fetch(`${c.websiteUrl.replace(/\/+$/, '')}/api/health`, {
+              signal: controller.signal,
+            });
+            clearTimeout(timer);
+            const latencyMs = Date.now() - start;
+            let version: string | null = null;
+            let dbStatus: string | null = null;
+            try {
+              const body = (await healthRes.json()) as {
+                version?: string;
+                database?: string;
+                status?: string;
+              };
+              version = body.version || null;
+              dbStatus = body.database || null;
+            } catch {
+              // health endpoint merespon non-JSON — anggap hidup tanpa detail.
+            }
+            return {
+              ...c,
+              online: healthRes.ok,
+              httpStatus: healthRes.status,
+              latencyMs,
+              deployedVersion: version,
+              database: dbStatus,
+            };
+          } catch {
+            return {
+              ...c,
+              online: false,
+              httpStatus: null,
+              latencyMs: null,
+              deployedVersion: null,
+              database: null,
+            };
+          }
+        })
+      );
+
+      // Versi template lokal (CHANGELOG.md paling atas) untuk perbandingan.
+      let latestVersion: string | null = null;
+      const changelogPath = path.join(ROOT_DIR, 'CHANGELOG.md');
+      if (fs.existsSync(changelogPath)) {
+        const match = fs.readFileSync(changelogPath, 'utf-8').match(/##\s*\[([^\]]+)\]/);
+        latestVersion = match ? match[1] : null;
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, clients: checked, latestVersion }));
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, message: (err as Error).message }));
+    }
+    return;
+  }
+
   // 404
   res.writeHead(404, { 'Content-Type': 'text/plain' });
   res.end('Not Found');

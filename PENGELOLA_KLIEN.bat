@@ -23,8 +23,9 @@ echo Server siap di http://localhost:4567
 echo.
 echo Menu yang tersedia di browser:
 echo   [1] Pendaftaran Klien Baru (1-Klik Setup Cloudflare)
-echo   [2] Kelola Custom Domain Klien
-echo   [3] Update Versi Template ke Klien (Bugfix & Fitur Baru)
+echo   [2] Status Klien (Pantau Online/Offline, Versi ^& Domain Semua Klien)
+echo   [3] Kelola Custom Domain Klien
+echo   [4] Update Versi Template ke Klien (Bugfix ^& Fitur Baru)
 echo.
 echo JANGAN TUTUP JENDELA INI SELAMA PORTAL SEDANG DIGUNAKAN.
 echo ========================================================
