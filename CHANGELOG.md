@@ -3,6 +3,16 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.2] - 2026-09-13
+
+### Ganti Password Mandiri & Panel Pantauan Status Website
+
+- **Ganti Password Langsung dari Ruang Admin:** Kini Anda bisa mengganti password login admin secara mandiri lewat menu "Keamanan" di bilah menu atas ruang admin — cukup masukkan password lama dan password baru (min. 8 karakter, dilengkapi indikator kekuatan password). Sebelumnya fitur ini tidak berfungsi sebagaimana mestinya, kini sudah diperbaiki dan tersambung langsung ke akun Anda.
+- **Pemantauan Status Website oleh Tim Kami:** Portal internal kami kini memiliki panel "Status Klien" yang memantau kesehatan website seluruh klien sekaligus — status online/offline, kecepatan respons server, versi template terpasang, dan domain aktif. Jika website Anda mengalami gangguan atau ketinggalan versi, tim kami mengetahuinya lebih cepat.
+- **Reset Password Darurat:** Jika Anda sampai lupa password sama sekali dan terkunci dari ruang admin, tim kami kini dapat mereset password Anda dengan cepat dan aman, lalu mengirimkan password baru melalui WhatsApp.
+
+---
+
 ## [1.3.1] - 2026-09-13
 
 ### Penguatan Keamanan Upload Video & Penutupan Audit Keamanan
