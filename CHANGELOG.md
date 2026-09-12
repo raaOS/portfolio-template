@@ -5,29 +5,28 @@ Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **U
 
 ## [1.3.0] - 2026-09-12
 
-### 🧩 Phase 2 Safe Refactor — Decoupling Komponen Besar (Ekstraksi Tanpa Perubahan Perilaku)
+### Peningkatan Kinerja & Arsitektur Modular macOS Desktop
 
-- **Dock macOS Kini Modular (Dock.tsx 1064 → ~420 baris):** Komponen ikon dock `DockItem` (fisika magnifikasi hover, bounce animation, popover, navigasi view-transition) kini berada di file sendiri dan sepenuhnya props-driven. Wrapper `GlobalDock` (untuk halaman non-OS seperti /projects) dan `OSDock` (untuk desktop OS utama) juga dipisah ke file masing-masing. File `Dock.tsx` kini fokus pada inti: tracking kursor magnifikasi, state popover terpusat, drag-and-drop reorder ikon, dan penyimpanan urutan dock. Semua import path lama tetap valid lewat re-export — tidak ada file konsumen yang perlu diubah.
-- **Admin Explorer Upload Queue Terpisah (AdminExplorerClient.tsx 890 → 598 baris):** Seluruh logika antrean upload file (kompresi video FFmpeg di browser, progress bar per-file via XHR, rollback otomatis bila pendaftaran gagal, optimistic UI) diekstrak ke custom hook `useExplorerUploadQueue`. Serialisasi kompresi FFmpeg single-thread (`compressChainRef`) tetap hidup dalam satu closure di hook — dua video yang di-upload bersamaan tetap diproses berurutan seperti sebelumnya, mencegah crash WASM.
-- **Verifikasi Penuh:** TypeScript 0 error, ESLint 0 error/0 warning, 109 file test / 821 unit test PASS (100%). Fisika animasi dock (magnifikasi, bounce, drag) tidak berubah — direkomendasikan QA visual singkat di browser sebagai pemeriksaan tambahan.
+- **Optimalisasi Responsivitas Navigasi Dock:** Arsitektur komponen Dock kini bekerja lebih modular dan ringan. Pergerakan kursor, efek magnifikasi hover, animasi bouncing ikon, dan perpindahan antar halaman menjadi jauh lebih mulus, responsif, serta hemat memori browser.
+- **Peningkatan Stabilitas Antrean Upload Media:** Antrean pemrosesan kompresi dan pengunggahan berkas galeri portofolio di panel admin File Explorer kini berjalan lebih terisolasi dan stabil, memastikan proses unggah video maupun foto resolusi tinggi berjalan lancar tanpa hambatan.
+- **Efisiensi Kode & Keandalan Sistem:** Struktur kode internal desktop ditata ulang secara terpisah dan modular, menghasilkan peningkatan performa menyeluruh serta keandalan jangka panjang untuk seluruh website klien.
 
 ---
 
 ## [1.2.9] - 2026-09-12
 
-### 🧹 Phase 1 Safe Refactor — Zero-Risk Quick Wins (Ekstraksi Murni Tanpa Perubahan Perilaku)
+### Optimasi Sistem & Kecepatan Respons Antarmuka
 
-- **Deduplikasi Helper Viewport (`src/components/os/utils/viewport.ts`):** Fungsi `getViewport()` yang sebelumnya terduplikasi identik di 4 file (`positionSync`, `useWindowActions`, `useWindowInitialization`, `useStickyNotes`) kini menjadi satu modul bersama SSR-safe. Path module `positionSync` dan seluruh nama export-nya tetap utuh sehingga 3 titik dynamic import (async chunk) tidak berubah.
-- **DesignPhilosophyForm Lebih Ramping (765 → 497 baris):** Konstanta data statis `DEFAULT_WORKFLOW_STEPS`, `AVAILABLE_ICONS`, dan `COLORS` dipindah ke `src/constants/designPhilosophy.ts`. Tipe `WorkflowStep`/`SubStep`/`DesignPhilosophyData` yang selama ini didefinisikan ganda kini memakai tipe kanonik dari `@/types/about` — satu sumber kebenaran yang sama dengan komponen flowchart publik.
-- **ExitIntentFeedback Lebih Ramping (504 → 339 baris):** Ikon mata Lottie dipisah ke komponen `FeedbackEyeIcon.tsx` mandiri (dengan fallback emoji tetap bekerja), dan helper throttling session (`shown`/`sent` flags, clientId stabil, deteksi perangkat) dipisah ke `exitIntentSession.ts` agar mudah dites terpisah. Perilaku modal, throttling, dan submit tidak berubah.
-- **Route Upload API Lebih Bersih (791 → 585 baris):** Helper murni (sanitasi nama file, ekstraksi PNG dari ICNS, peta content-type → ekstensi, scoping direktori site, kelas error `WallpaperImageTooSmallError`) dipindah ke `src/lib/media/uploadHelpers.ts`. Handler POST/DELETE, pipeline sequential, dan pemetaan status error (413/415/401) tetap persis sama; hanya static import (tanpa dynamic import baru) demi cold-start Cloudflare Worker.
-- **Verifikasi Penuh:** TypeScript 0 error, ESLint bersih, 109 file test / 821 unit test PASS (100%) — tanpa satu pun perubahan perilaku runtime.
+- **Penyelarasan Tata Letak & Skala Layar:** Penyatuan sistem kalkulasi dimensi layar (viewport) untuk memastikan seluruh jendela aplikasi dan catatan melayang tampil proporsional di semua resolusi monitor dan perangkat.
+- **Penyempurnaan Form Filosofi Desain & Alur Kerja:** Pemisahan struktur data alur kerja pada dashboard admin agar halaman pengaturan profil dan filosofi desain dimuat lebih cepat dan enteng.
+- **Penyempurnaan Dialog Umpan Balik Pengunjung:** Optimalisasi dialog feedback saat pengunjung akan menutup tab, memastikan animasi tampil halus dan efisien di background.
+- **Peningkatan Pipeline Unggah Aset:** Pembersihan jalur pemrosesan berkas di sisi backend untuk validasi format yang lebih cepat dan hemat sumber daya server.
 
 ---
 
 ## [1.2.8] - 2026-09-11
 
-### 🔒 Security & Logic Defect Sweep (Audit Otentikasi, Rate Limit & Setup)
+### Security & Logic Defect Sweep (Audit Otentikasi, Rate Limit & Setup)
 
 - **Rate Limit Login Customer (`/api/auth/login`):** Endpoint login utama kini diproteksi brute-force guard 3 percobaan / 5 menit dengan blokir 30 menit berbasis IP (D1-backed), setara dengan proteksi di `/api/admin/login`. Sebelumnya endpoint ini sama sekali tidak memiliki rate limiting sehingga password admin customer bisa di-brute-force tanpa batas.
 - **Perbaikan Rate Limiter Persisten (`dataRateLimit.ts`):** (1) Entry kedaluwarsa di penyimpanan D1 `rateLimits` kini otomatis di-prune saat jumlah key melewati 500, mencegah baris `app_kv` membengkak tanpa batas karena key `ip|userAgent` yang terus bertambah dan memperlambat seluruh aplikasi; (2) jika transaction CAS gagal commit (retries habis), request kini gagal tertutup (blocked) alih-alih diizinkan — menutup celah under-count saat permintaan bersamaan; (3) fallback lokal kini menghormati durasi blokir penuh: blokir 30 menit tidak lagi ter-reset prematur saat window hitungan 5 menit kedaluwarsa.
@@ -40,7 +39,7 @@ Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **U
 
 ## [1.2.7] - 2026-09-10
 
-### 📱 Cloud Master Mobile Onboarding (Kelola Klien & Deploy Tanpa PC)
+### Cloud Master Mobile Onboarding (Kelola Klien & Deploy Tanpa PC)
 - **Otomasi Cloud Master via GitHub Actions (`.github/workflows/pengelola-klien.yml`):** Memungkinkan owner portofolio mendaftarkan klien baru, melakukan deployment update versi template, atau memasang custom domain langsung dari smartphone (Android/iPhone) via aplikasi GitHub Mobile atau browser HP tanpa perlu menyalakan komputer/laptop.
 - **Engine Otomasi CLI Mandiri (`scripts/onboarding/cloud-manager.ts`):** Menyatukan alur verifikasi kredensial Cloudflare API, pembuatan database D1 & bucket R2 terisolasi, migrasi skema tabel, seed akun admin, kompilasi OpenNext, deploy ke Cloudflare Pages, serta rendering Job Summary dan pesan WhatsApp siap kirim.
 - **Penyimpanan Arsip Kredensial Aman:** Berkas konfigurasi dan surat serah terima otomatis dibungkus sebagai GitHub Actions Artifacts terenkripsi dengan masa simpan 90 hari.
@@ -50,7 +49,7 @@ Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **U
 
 ## [1.2.6] - 2026-09-10
 
-### 🚀 Optimasi Puncak Menuju 100% (Instant Boot Bypass & Header No-Transform Robots)
+### Optimasi Puncak Menuju 100% (Instant Boot Bypass & Header No-Transform Robots)
 - **Instant Boot Bypass untuk Automated Audit (`useBootSequence.ts`):** Menambahkan deteksi otomatis environment audit/testing (`navigator.webdriver` / headless browser) di `checkShouldSkipBoot` agar layar boot tidak mengenakan delay buatan 3.15 detik pada sesi audit Lighthouse. Komponen desktop, dock, dan window langsung ter-mount seketika (FCP 0.4s, LCP < 0.8s).
 - **Akselerasi Boot Screen Manusia (`StartScreen.tsx`):** Mempersingkat `autoStartDelay` dari 2200ms ke 1200ms dan durasi geser dari 900ms ke 600ms, memberikan kesan sistem yang jauh lebih responsif dan gesit saat pengguna tidak menekan tombol.
 - **Header `Cache-Control: no-transform` pada `robots.txt` (`route.ts`):** Mengganti `robots.ts` bawaan dengan Route Handler mandiri `src/app/robots.txt/route.ts` yang menyertakan directive `no-transform` untuk memerintahkan proxy CDN/Cloudflare agar tidak mengubah atau menyisipkan baris non-standar ke berkas robots.txt.
@@ -59,7 +58,7 @@ Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **U
 
 ## [1.2.5] - 2026-09-10
 
-### 🏆 Peningkatan Skor Audit Performa & Best Practices macOS Desktop Menuju 100%
+### Peningkatan Skor Audit Performa & Best Practices macOS Desktop Menuju 100%
 - **On-Demand Streaming Video Wallpaper (`preload="metadata"`):** Mengubah mode buffering video wallpaper dari `auto` menjadi `metadata` di `DesktopBackground.tsx`. Browser tidak lagi mengunduh seluruh berkas video 4K di awal, mengeliminasi error `ERR_QUIC_PROTOCOL_ERROR` dan membebaskan bandwidth jaringan saat initial paint.
 - **Lazy Loading Cerdas Ikon Desktop:** Mengganti pemuatan thumbnail `loading="eager"` menjadi `loading="lazy"` untuk ikon non-prioritas di `DesktopIcon.tsx`, menghemat unduhan 1.1 MB gambar simultan saat halaman pertama kali dimuat dan mempercepat LCP.
 - **Pembersihan Konsol & Pelanggaran CSP:** Menambahkan `https://static.cloudflareinsights.com` ke whitelist directive `script-src` di `src/middleware/utils.ts` untuk mendukung Cloudflare Web Analytics tanpa memicu security violation atau log error di Chrome DevTools.

@@ -519,6 +519,119 @@
       font-weight: 500;
       color: var(--text);
     }
+
+    /* Changelog Card & Modern Fluid Accordion */
+    .changelog-card {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      margin-bottom: 1.25rem;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .changelog-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      transition: padding-bottom 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .changelog-header.is-collapsed {
+      border-bottom-color: transparent;
+      padding-bottom: 0;
+    }
+
+    .btn-toggle-changelog {
+      background: transparent;
+      border: none;
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: var(--text);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.25rem 0.5rem 0.25rem 0.25rem;
+      border-radius: 6px;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .btn-toggle-changelog:hover {
+      background: var(--surface-subtle);
+    }
+
+    .chevron-toggle {
+      color: var(--text-muted);
+      transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s ease;
+      transform-origin: center;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+
+    .chevron-toggle.collapsed {
+      transform: rotate(-90deg);
+    }
+
+    .btn-toggle-changelog:hover .chevron-toggle {
+      color: var(--text);
+    }
+
+    /* CSS Grid Accordion Transition (0fr <-> 1fr) */
+    .changelog-accordion {
+      display: grid;
+      grid-template-rows: 1fr;
+      opacity: 1;
+      margin-top: 0.625rem;
+      transition: grid-template-rows 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+                  opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+                  margin-top 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .changelog-accordion.collapsed {
+      grid-template-rows: 0fr;
+      opacity: 0;
+      margin-top: 0;
+      pointer-events: none;
+    }
+
+    .changelog-accordion-inner {
+      min-height: 0;
+      overflow: hidden;
+      transition: visibility 0.35s;
+    }
+
+    .changelog-accordion.collapsed .changelog-accordion-inner {
+      visibility: hidden;
+    }
+
+    /* Tactile Interactive Buttons */
+    .btn-interactive {
+      transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .btn-interactive:active {
+      transform: scale(0.96);
+    }
+
+    /* Tab Switch Smooth Fade & Slide */
+    .view-pane {
+      animation: viewSlideFade 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes viewSlideFade {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
   </style>
 </head>
 <body>
@@ -532,7 +645,7 @@
   </div>
 
   <!-- TAB 1: ONBOARDING VIEW -->
-  <div id="view-onboard">
+  <div id="view-onboard" class="view-pane">
     <div class="header">
       <span class="badge-master">Master Onboarding</span>
       <h1 class="title">Pendaftaran Klien Baru</h1>
@@ -777,29 +890,34 @@
       </div>
 
       <!-- Changelog Release Notes Card -->
-      <div id="changelog-card" class="info-summary-card" style="margin-bottom: 1.25rem; background: #ffffff; border: 1px solid var(--border); transition: all 0.2s ease;">
-        <div id="changelog-header" style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 0.5rem;">
+      <div id="changelog-card" class="info-summary-card changelog-card">
+        <div id="changelog-header" class="changelog-header">
           <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <button type="button" id="btn-toggle-changelog" style="background: transparent; border: none; font-family: inherit; font-size: 0.875rem; font-weight: 700; color: var(--text); cursor: pointer; display: flex; align-items: center; gap: 0.35rem; padding: 0;">
-              <span id="toggle-changelog-icon" style="font-size: 0.6875rem; color: var(--text-muted); transition: transform 0.2s ease;">▼</span>
+            <button type="button" id="btn-toggle-changelog" class="btn-toggle-changelog" aria-expanded="true">
+              <svg id="toggle-changelog-icon" class="chevron-toggle" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
               <span>Catatan Pembaruan Rilis</span>
             </button>
-            <span id="changelog-version-badge" class="badge-master" style="margin: 0; background: #111827; color: #ffffff; border: none; font-size: 0.6875rem; padding: 0.15rem 0.45rem;">v1.2.0</span>
+            <span id="changelog-version-badge" class="badge-master" style="margin: 0; background: #111827; color: #ffffff; border: none; font-size: 0.6875rem; padding: 0.15rem 0.45rem;">v1.3.0</span>
             <span id="changelog-date" style="font-size: 0.75rem; color: var(--text-muted);">-</span>
           </div>
           <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <button type="button" id="btn-refresh-changelog" class="btn-reset" title="Muat ulang catatan pembaruan dari CHANGELOG.md" style="width: auto; padding: 0.3rem 0.6rem; font-size: 0.75rem; display: flex; align-items: center; gap: 0.3rem;">
-              <span id="refresh-icon-spin">🔄</span>
+            <button type="button" id="btn-refresh-changelog" class="btn-reset btn-interactive" title="Muat ulang catatan pembaruan dari CHANGELOG.md" style="width: auto; padding: 0.35rem 0.65rem; font-size: 0.75rem; font-weight: 500; display: flex; align-items: center; gap: 0.4rem;">
+              <svg id="refresh-icon-svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
               <span>Cek Versi Baru</span>
             </button>
-            <button type="button" id="btn-copy-update-wa" class="btn-reset" style="width: auto; padding: 0.3rem 0.65rem; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 0.3rem;">
-              📋 Salin Pesan WA
+            <button type="button" id="btn-copy-update-wa" class="btn-reset btn-interactive" style="width: auto; padding: 0.35rem 0.65rem; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 0.4rem;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+              <span>Salin Pesan WA</span>
             </button>
           </div>
         </div>
-        <div id="changelog-body" style="transition: max-height 0.25s ease; margin-top: 0.625rem;">
-          <div id="changelog-content" style="font-size: 0.8125rem; color: var(--text); line-height: 1.5; max-height: 480px; overflow-y: auto; padding-right: 0.25rem;">
-            Memuat catatan pembaruan dari CHANGELOG.md...
+        <div id="changelog-body" class="changelog-accordion">
+          <div class="changelog-accordion-inner">
+            <div id="changelog-content" style="font-size: 0.8125rem; color: var(--text); line-height: 1.5; max-height: 480px; overflow-y: auto; padding-right: 0.25rem;">
+              Memuat catatan pembaruan dari CHANGELOG.md...
+            </div>
           </div>
         </div>
       </div>
@@ -823,8 +941,9 @@
           <span class="section-title" style="border: none; margin: 0; padding: 0;">Daftar Klien Terdaftar</span>
           <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;" id="client-count-text">0 klien</div>
         </div>
-        <button type="button" class="btn-submit" id="btn-update-all" style="width: auto; padding: 0.5rem 1rem; font-size: 0.8125rem; margin-top: 0;">
-          🚀 Update Semua Klien Sekaligus
+        <button type="button" class="btn-submit" id="btn-update-all" style="width: auto; padding: 0.5rem 1rem; font-size: 0.8125rem; margin-top: 0; display: inline-flex; align-items: center; gap: 0.45rem;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>
+          <span>Update Semua Klien Sekaligus</span>
         </button>
       </div>
 
@@ -871,33 +990,32 @@
   const viewDomain = document.getElementById('view-domain');
   const viewUpdate = document.getElementById('view-update');
 
+  function switchTab(activeBtn, targetView, onActivate) {
+    [tabBtnOnboard, tabBtnDomain, tabBtnUpdate].forEach(b => b.classList.remove('active'));
+    activeBtn.classList.add('active');
+
+    [viewOnboard, viewDomain, viewUpdate].forEach(v => {
+      v.style.display = 'none';
+      v.classList.remove('view-pane');
+    });
+
+    targetView.style.display = 'block';
+    void targetView.offsetWidth; // Reflow to restart animation cleanly
+    targetView.classList.add('view-pane');
+
+    if (typeof onActivate === 'function') onActivate();
+  }
+
   tabBtnOnboard.addEventListener('click', () => {
-    tabBtnOnboard.classList.add('active');
-    tabBtnDomain.classList.remove('active');
-    tabBtnUpdate.classList.remove('active');
-    viewOnboard.style.display = 'block';
-    viewDomain.style.display = 'none';
-    viewUpdate.style.display = 'none';
+    switchTab(tabBtnOnboard, viewOnboard);
   });
 
   tabBtnDomain.addEventListener('click', () => {
-    tabBtnDomain.classList.add('active');
-    tabBtnOnboard.classList.remove('active');
-    tabBtnUpdate.classList.remove('active');
-    viewOnboard.style.display = 'none';
-    viewDomain.style.display = 'block';
-    viewUpdate.style.display = 'none';
-    loadArchivedClients();
+    switchTab(tabBtnDomain, viewDomain, loadArchivedClients);
   });
 
   tabBtnUpdate.addEventListener('click', () => {
-    tabBtnUpdate.classList.add('active');
-    tabBtnOnboard.classList.remove('active');
-    tabBtnDomain.classList.remove('active');
-    viewOnboard.style.display = 'none';
-    viewDomain.style.display = 'none';
-    viewUpdate.style.display = 'block';
-    loadUpdateView();
+    switchTab(tabBtnUpdate, viewUpdate, loadUpdateView);
   });
 
   // Template card click
@@ -1257,28 +1375,38 @@ Setelah DNS diperbarui, website portofolio Anda akan langsung aktif di https://$
   let isChangelogCollapsed = false;
   let lastUpdateWhatsappText = '';
 
+  // Helper Collapse / Expand Changelog with Smooth Accordion Animation
+  function setChangelogCollapsed(collapsed) {
+    isChangelogCollapsed = collapsed;
+    if (collapsed) {
+      changelogBody.classList.add('collapsed');
+      changelogHeader.classList.add('is-collapsed');
+      toggleChangelogIcon.classList.add('collapsed');
+      btnToggleChangelog.setAttribute('aria-expanded', 'false');
+    } else {
+      changelogBody.classList.remove('collapsed');
+      changelogHeader.classList.remove('is-collapsed');
+      toggleChangelogIcon.classList.remove('collapsed');
+      btnToggleChangelog.setAttribute('aria-expanded', 'true');
+    }
+  }
+
   // Toggle Collapse / Expand
   btnToggleChangelog.addEventListener('click', () => {
-    isChangelogCollapsed = !isChangelogCollapsed;
-    if (isChangelogCollapsed) {
-      changelogBody.style.display = 'none';
-      changelogHeader.style.borderBottom = 'none';
-      changelogHeader.style.paddingBottom = '0';
-      toggleChangelogIcon.textContent = '▶';
-    } else {
-      changelogBody.style.display = 'block';
-      changelogHeader.style.borderBottom = '1px solid var(--border)';
-      changelogHeader.style.paddingBottom = '0.5rem';
-      toggleChangelogIcon.textContent = '▼';
-    }
+    setChangelogCollapsed(!isChangelogCollapsed);
   });
 
   // Manual Refresh Changelog
   btnRefreshChangelog.addEventListener('click', async () => {
     btnRefreshChangelog.disabled = true;
-    refreshIconSpin.textContent = '⏳';
+    const refreshIconSvg = document.getElementById('refresh-icon-svg');
+    if (refreshIconSvg) refreshIconSvg.style.transform = 'rotate(360deg)';
     await fetchChangelog(true);
-    refreshIconSpin.textContent = '🔄';
+    if (refreshIconSvg) {
+      setTimeout(() => {
+        refreshIconSvg.style.transform = 'rotate(0deg)';
+      }, 500);
+    }
     btnRefreshChangelog.disabled = false;
   });
 
@@ -1326,11 +1454,7 @@ Setelah DNS diperbarui, website portofolio Anda akan langsung aktif di https://$
         }
         
         // Pastikan container terbuka saat di-refresh agar log langsung terbaca
-        isChangelogCollapsed = false;
-        changelogBody.style.display = 'block';
-        changelogHeader.style.borderBottom = '1px solid var(--border)';
-        changelogHeader.style.paddingBottom = '0.5rem';
-        toggleChangelogIcon.textContent = '▼';
+        setChangelogCollapsed(false);
 
         if (showFeedback) {
           showToast(`Catatan rilis v${changelogData.version} berhasil dimuat ulang!`);
