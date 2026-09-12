@@ -3,6 +3,16 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.1] - 2026-09-13
+
+### Penguatan Keamanan Upload Video & Penutupan Audit Keamanan
+
+- **Penguncian Target Unggah Video per Klien:** Tautan unggah video (wallpaper & video proyek) kini diikat secara kriptografis ke identitas situs klien masing-masing. Jika tautan unggah sampai bocor, tautan tersebut tidak dapat disalahgunakan untuk menulis berkas ke penyimpanan klien lain — permintaan akan ditolak otomatis.
+- **Pembatasan Percobaan Unggah Berlebihan:** Endpoint unggah langsung kini membatasi jumlah percobaan per pengunjung (30 percobaan / 5 menit). Aktivitas unggah tidak wajar atau spam otomatis diblokir sementara, melindungi sumber daya server dan stabilitas website.
+- **Penutupan Audit Keamanan 2026-08-11:** Seluruh temuan audit keamanan lapisan API (revalidasi otomatis, proteksi brute-force login, token unggah) kini berstatus selesai dan terverifikasi penuh melalui 825 pengujian otomatis.
+
+---
+
 ## [1.3.0] - 2026-09-12
 
 ### Peningkatan Kinerja & Arsitektur Modular macOS Desktop

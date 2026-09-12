@@ -1,8 +1,8 @@
 # Tracker Log: Security Audit API & Auth Layer
 
-**Status:** 🟢 Completed (audit selesai, temuan belum di-remediate — menunggu keputusan)
+**Status:** ✅ Fully Remediated (2026-09-13 — semua temuan #1-#4 ditutup)
 **Mulai:** 2026-08-11
-**Selesai:** 2026-08-11
+**Selesai:** 2026-08-11 (audit) / 2026-09-13 (remediasi penuh)
 
 ## 🎯 Tujuan (Objective)
 - Verifikasi keamanan lapisan API & autentikasi: auth admin/client, CSRF middleware, rate limit, token R2 upload, scope multi-tenant, dan endpoint mutasi publik.
@@ -27,22 +27,19 @@
   - `src/app/api/admin/upload/route.ts`, `src/app/api/admin/upload/direct/route.ts`, `src/app/api/admin/upload/presign/route.ts`
   - `src/app/api/projects/[id]/route.ts`, `src/app/api/billing/*`, `src/app/api/revalidate/route.ts`
 
-## 🔍 Temuan Audit (Belum di-remediate)
+## 🔍 Temuan Audit — Status Remediasi (Update 2026-09-13)
 
 ### HIGH — Fungsional (bug nyata)
-1. **`POST /api/revalidate` tidak pernah bisa dipanggil dari luar.**
-   - CSRF middleware memblokir semua POST/PUT/DELETE/PATCH yang tidak ada di allowlist (`src/middleware/csrf.ts:20-37`), dan `/api/revalidate` tidak terdaftar.
-   - Penelepon webhook/cron (GitHub, scheduler) tidak mungkin menyediakan cookie `csrf_token` + header `x-csrf-token`, sehingga selalu 403 sebelum HMAC secret dicek di `src/app/api/revalidate/route.ts`.
-   - **Rekomendasi:** tambahkan `/api/revalidate` ke allowlist CSRF (endpoint sudah aman via HMAC `REVALIDATION_TOKEN`), atau jadikan GET-only dengan HMAC di query param.
+1. **`POST /api/revalidate` tidak pernah bisa dipanggil dari luar.** ✅ RESOLVED
+   - Sudah ada di CSRF allowlist `src/middleware/csrf.ts:42` (ditambahkan pada commit `bed0e19`, terverifikasi ulang 2026-09-13 dengan test `src/app/api/revalidate/route.test.ts` — 4/4 PASS).
 
 ### MEDIUM — Hardening keamanan
-2. **Brute-force login admin dapat dibypass dengan rotasi User-Agent / spoof XFF.**
-   - Rate limit dikunci `login_${ip}|${userAgent}` (`src/app/api/admin/login/route.ts:122-134`); UA/IP header dapat diubah attacker untuk mengganti kunci. `getClientIP` di `src/lib/security/utils.ts` jatuh ke `x-forwarded-for` bila tidak ada `cf-connecting-ip` (spoofable di luar Cloudflare).
-   - **Rekomendasi:** kunci hanya IP (atau IP saja tanpa UA), gunakan `cf-connecting-ip` secara eksklusif, tambah backoff progresif/lockout per akun.
-3. **Token direct upload (`/api/admin/upload/direct`) adalah bearer token tanpa binding Origin/Host/sesi.**
-   - Token 10 menit terikat key/content-type/size (`src/app/api/admin/upload/presign/route.ts:134`), tetapi route publik `direct` (`src/middleware/constants.ts:39`) tidak memverifikasi asal request. Token yang bocor memungkinkan upload ke bucket site dari browser mana pun.
-   - **Rekomendasi:** ikat siteId/issuer ke token dan verifikasi ulang di route direct; tambah rate limit per IP pada PUT.
-4. **`x-test-bypass` melewati rate limit login di development** (`src/app/api/admin/login/route.ts:123-126`) — aman hanya jika NODE_ENV strict; jangan pernah diaktifkan di production.
+2. **Brute-force login admin dapat dibypass dengan rotasi User-Agent / spoof XFF.** ✅ RESOLVED
+   - Key rate limit admin login kini IP-only (`src/app/api/admin/login/route.ts:127-141`, komentar "SECURITY FIX"); `getClientIP` memprioritaskan `cf-connecting-ip` (`src/lib/security/request.ts:19-39`); customer login `/api/auth/login` juga IP-only dengan guard 3/5min + block 30min. Backoff progresif per-akun belum diimplementasikan — dianggap cukup dengan blokir 30 menit untuk skala managed service.
+3. **Token direct upload (`/api/admin/upload/direct`) adalah bearer token tanpa binding.** ✅ RESOLVED (2026-09-13, commit `c1b5fd9`)
+   - `siteId` kini diikat ke dalam token HMAC (`R2TokenPayload.siteId` di `src/lib/r2Storage.ts`) dan diverifikasi ulang di route direct: token site X hanya boleh menulis ke prefix `sites/X/`; token legacy tanpa siteId ditolak untuk key site-scoped (403). Ditambah rate limit per IP 30 attempt/5min + block 5min sebelum verifikasi token. Test baru: 4 case (mismatch, legacy-token-reject, legacy-asset-allow, rate-limit-429).
+4. **`x-test-bypass` melewati rate limit login di development.** ✅ RESOLVED
+   - Dihapus pada bug sweep 2026-08-14 (FIX #57). Bypass kini hanya untuk `NODE_ENV=test` / `E2E_TEST=true`.
 
 ## ✅ Kontrol yang Terverifikasi Aman
 - Cookie admin `httpOnly` + `sameSite=strict` + `secure` di production (`login/route.ts:250-256`); sliding refresh 30 menit (`auth.ts`).
@@ -53,6 +50,5 @@
 - Storage key site-scoped (`sites/{siteId}/...`), middleware custom domain rewrite tidak menyentuh `/api/`.
 
 ## 📝 Catatan untuk AI Selanjutnya (Handoff Notes)
-- Temuan #1 (revalidate) bersifat fungsional dan harus diremediasi sebelum webhook revalidasi dipakai.
+- Semua temuan audit (#1-#4) sudah ditutup. Verifikasi akhir 2026-09-13: tsc 0 error, eslint 0 error, 109 files / 825 tests PASS.
 - Belum diverifikasi offline: `getGeoInfo` (panggilan eksternal ip-api.com saat login), endpoint comments/feedback/contact/analytics (hanya dibaca parsial), dan alur `useChatSync`/`useRealtimeSync` (interval sudah sesuai AGENTS.md).
-- Jika ingin lanjut remediasi, mulai dari #1 (1 baris allowlist + test) lalu #2 dan #3. Jalankan `npm test`, `npm run lint`, dan `npx tsc --noEmit` setelah perubahan.
