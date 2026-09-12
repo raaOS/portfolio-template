@@ -11,8 +11,8 @@
 - Customer dapat admin panel (macOS desktop style) untuk kelola konten
 - SITE_ID hardcoded per deployment, tidak ada multi-site resolution
 
-**Fase Saat Ini:** Fondasi managed service sudah selesai (Sprint 75). Admin panel customer sudah fungsional.
-**Tugas Aktif:** Backlog managed service — owner dashboard, customer dashboard, password reset, content migration.
+**Fase Saat Ini:** Fondasi managed service selesai (Sprint 75+). Admin panel customer fungsional, demo content termigrasi (Sprint 79), audit keamanan 2026-08-11 closed (2026-09-13).
+**Tugas Aktif (Backlog):** Password reset self-service customer (`site_users` belum punya flow change/reset password — hanya login/logout/check-auth). Item backlog lama yang usang: ~~owner dashboard~~ (dihapus Sprint 75/78), ~~customer dashboard~~ (selesai Sprint 75–78), ~~content migration~~ (selesai Sprint 79).
 
 > **ARCHIVED (Sprint 0-74):** Sprint lama mencatat evolusi dari portofolio pribadi → multi-tenant SaaS → managed service. Log sprint lama masih relevan untuk memahami *why* keputusan desain, tapi kode dan arsitektur yang dijelaskan sudah **tidak merepresentasikan kondisi terkini**. AI wajib merujuk Sprint 75+ untuk arsitektur current.
 
@@ -393,6 +393,6 @@ Kustomisasi per-section template `landing-bento` (Pro-only): kontrak settings zo
       - *Status:* 🟢 Completed
       - *Isi:* Fase pertama refactor file terlarang (konsensus GLM 5.3 + Gemini 3.8, 0 behavior change): (1) dedup `getViewport()` 4 file → `os/utils/viewport.ts`; (2) `DesignPhilosophyForm` 765→497 baris (constants → `src/constants/designPhilosophy.ts`, tipe dedup ke kanonik `@/types/about`); (3) `ExitIntentFeedback` 504→339 baris (`FeedbackEyeIcon` Lottie + session helpers → file terpisah); (4) `upload/route.ts` 791→585 baris (helpers murni → `src/lib/media/uploadHelpers.ts`, static imports only, error mapping verbatim). Guard dipatuhi: barrel `positionSync` utuh (3 dynamic import aman), stub legacy tetap diekspor, 8 protected cores tidak tersentuh. Verifikasi: tsc 0 error, eslint bersih, 109 files / 821 tests PASS.
 
-  109. **[Phase 2 Safe Refactor — Decoupling Komponen Besar (v1.3.0)](file:///C:/Users/USER/Documents/portfolio-template/docs/tracker/logs/refactor_phase2_decoupling.md)**
-      - *Status:* 🟢 Completed
-      - *Isi:* Fase kedua refactor terencana (0 behavior change): (1) `Dock.tsx` 1064→~420 baris — ekstrak `DockItem` (hover physics/bounce/popover, props-driven), `GlobalDock`, `OSDock` ke file sendiri; core Dock (magnifikasi `mouseX`, popover terpusat, dnd-kit + admin persist) tetap satu unit; barrel re-export menjaga 2 import path lama; (2) `AdminExplorerClient.tsx` 890→598 baris — antrean upload & kompresi FFmpeg pindah ke hook `useExplorerUploadQueue` yang memegang sendiri `compressChainRef` + `currentParentIdRef` (serialisasi WASM tetap satu closure). Verifikasi: tsc 0 error, eslint 0 error/0 warning, 109 files / 821 tests PASS. Disarankan QA visual manual (magnifikasi/bounce/drag dock).
+   109. **[Phase 2 Safe Refactor — Decoupling Komponen Besar (v1.3.0)](file:///C:/Users/USER/Documents/portfolio-template/docs/tracker/logs/refactor_phase2_decoupling.md)**
+       - *Status:* 🟢 Completed + QA Visual Verified (2026-09-13: magnifikasi dock 72→110px, popover, window open, Notes toggle — semua PASS)
+       - *Isi:* Fase kedua refactor terencana (0 behavior change): (1) `Dock.tsx` 1064→~420 baris — ekstrak `DockItem` (hover physics/bounce/popover, props-driven), `GlobalDock`, `OSDock` ke file sendiri; core Dock (magnifikasi `mouseX`, popover terpusat, dnd-kit + admin persist) tetap satu unit; barrel re-export menjaga 2 import path lama; (2) `AdminExplorerClient.tsx` 890→598 baris — antrean upload & kompresi FFmpeg pindah ke hook `useExplorerUploadQueue` yang memegang sendiri `compressChainRef` + `currentParentIdRef` (serialisasi WASM tetap satu closure). Verifikasi: tsc 0 error, eslint 0 error/0 warning, 109 files / 821 tests PASS. QA visual dock selesai 2026-09-13 (drag reorder admin opsional).
