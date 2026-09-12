@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { uploadToR2, verifyR2UploadToken } from '@/lib/r2Storage';
+import { checkDataRateLimit } from '@/lib/dataRateLimit';
+import { getClientIP } from '@/lib/security/request';
 
 export const dynamic = 'force-dynamic';
+
+// SECURITY: Rate limit per IP untuk route publik ini. Tanpa ini, attacker
+// bisa spam PUT dengan token kadaluarsa/invalid untuk membakar CPU Worker.
+const MAX_UPLOAD_ATTEMPTS_PER_WINDOW = 30;
+const UPLOAD_RATE_LIMIT_WINDOW = 5 * 60 * 1000;
+const UPLOAD_BLOCK_DURATION = 5 * 60 * 1000;
 
 type FixedLengthStreamConstructor = new (expectedLength: number | bigint) => {
   readable: ReadableStream<Uint8Array>;
@@ -50,8 +58,41 @@ export async function OPTIONS() {
 
 export async function PUT(req: NextRequest) {
   try {
+    // SECURITY: Rate-limit sebelum verifikasi token agar token-guessing
+    // dan spam request tidak membakar resource Worker.
+    const rateLimitIp = getClientIP(req);
+    const rateLimit = await checkDataRateLimit(
+      `r2direct_${rateLimitIp}`,
+      MAX_UPLOAD_ATTEMPTS_PER_WINDOW,
+      UPLOAD_RATE_LIMIT_WINDOW,
+      UPLOAD_BLOCK_DURATION
+    );
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many upload attempts. Please try again later.' },
+        {
+          status: 429,
+          headers: { 'Retry-After': String(rateLimit.retryAfter ?? 60) },
+        }
+      );
+    }
+
     const token = req.nextUrl.searchParams.get('token') || '';
     const payload = await verifyR2UploadToken(token);
+
+    // SECURITY: Site binding — token yang diterbitkan untuk site X hanya
+    // boleh menulis ke prefix `sites/X/`. Token default-site (tanpa siteId)
+    // tetap hanya boleh menulis ke `assets/wallpapers/`. Token yang bocor
+    // tidak bisa dipakai lintas site.
+    if (payload.siteId) {
+      const expectedPrefix = `sites/${payload.siteId}/`;
+      if (!payload.key.startsWith(expectedPrefix)) {
+        return NextResponse.json({ error: 'Upload token site mismatch' }, { status: 403 });
+      }
+    } else if (payload.key.startsWith('sites/')) {
+      // Token legacy tanpa siteId tidak boleh menulis ke prefix site.
+      return NextResponse.json({ error: 'Upload token site mismatch' }, { status: 403 });
+    }
 
     const isAllowedKey =
       payload.key.startsWith('assets/wallpapers/') ||

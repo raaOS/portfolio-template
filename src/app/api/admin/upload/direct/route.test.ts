@@ -1,16 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const { uploadToR2Mock, verifyR2UploadTokenMock, getAdminSiteContextMock, enforceSiteStorageQuotaUnlockedMock } = vi.hoisted(() => ({
+const {
+  uploadToR2Mock,
+  verifyR2UploadTokenMock,
+  getAdminSiteContextMock,
+  enforceSiteStorageQuotaUnlockedMock,
+  checkDataRateLimitMock,
+} = vi.hoisted(() => ({
   uploadToR2Mock: vi.fn(),
   verifyR2UploadTokenMock: vi.fn(),
   getAdminSiteContextMock: vi.fn(),
   enforceSiteStorageQuotaUnlockedMock: vi.fn(),
+  checkDataRateLimitMock: vi.fn(),
 }));
 
 vi.mock('@/lib/r2Storage', () => ({
   uploadToR2: uploadToR2Mock,
   verifyR2UploadToken: verifyR2UploadTokenMock,
+}));
+
+vi.mock('@/lib/dataRateLimit', () => ({
+  checkDataRateLimit: checkDataRateLimitMock,
 }));
 
 vi.mock('@/lib/admin/projectSiteContext', () => ({
@@ -52,7 +63,9 @@ describe('PUT /api/admin/upload/direct', () => {
       contentType: 'video/mp4',
       cacheControl: 'public, max-age=31536000, immutable',
       maxSize: 1024,
+      siteId: 'site-1',
     });
+    checkDataRateLimitMock.mockResolvedValue({ allowed: true });
     uploadToR2Mock.mockResolvedValue({
       key: 'sites/site-1/projects/videos/demo.mp4',
       url: 'https://cdn.example.com/sites/site-1/projects/videos/demo.mp4',
@@ -136,4 +149,68 @@ describe('PUT /api/admin/upload/direct', () => {
       storageMb: 100,
     });
   });
+
+  it('rejects token whose key prefix does not match the bound siteId', async () => {
+    // Token diterbitkan untuk site-1, tapi key menunjuk site lain.
+    verifyR2UploadTokenMock.mockResolvedValue({
+      key: 'sites/site-2/projects/videos/evil.mp4',
+      contentType: 'video/mp4',
+      cacheControl: 'public, max-age=31536000, immutable',
+      maxSize: 1024,
+      siteId: 'site-1',
+    });
+
+    const response = await PUT(buildRequest({ body: 'hello' }));
+
+    expect(response.status).toBe(403);
+    expect(await body_error(response)).toBe('Upload token site mismatch');
+    expect(uploadToR2Mock).not.toHaveBeenCalled();
+  });
+
+  it('rejects legacy token without siteId targeting a site-scoped key', async () => {
+    verifyR2UploadTokenMock.mockResolvedValue({
+      key: 'sites/site-1/projects/videos/legacy.mp4',
+      contentType: 'video/mp4',
+      cacheControl: 'public, max-age=31536000, immutable',
+      maxSize: 1024,
+    });
+
+    const response = await PUT(buildRequest({ body: 'hello' }));
+
+    expect(response.status).toBe(403);
+    expect(await body_error(response)).toBe('Upload token site mismatch');
+    expect(uploadToR2Mock).not.toHaveBeenCalled();
+  });
+
+  it('allows legacy token without siteId for default-site assets folder', async () => {
+    verifyR2UploadTokenMock.mockResolvedValue({
+      key: 'assets/wallpapers/demo.mp4',
+      contentType: 'video/mp4',
+      cacheControl: 'public, max-age=31536000, immutable',
+      maxSize: 1024,
+    });
+
+    const response = await PUT(buildRequest({ body: 'hello' }));
+
+    expect(response.status).toBe(200);
+    expect(uploadToR2Mock).toHaveBeenCalledWith(
+      expect.objectContaining({ key: 'assets/wallpapers/demo.mp4' })
+    );
+  });
+
+  it('blocks requests when the IP rate limit is exhausted', async () => {
+    checkDataRateLimitMock.mockResolvedValue({ allowed: false, retryAfter: 120 });
+
+    const response = await PUT(buildRequest({ body: 'hello' }));
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get('Retry-After')).toBe('120');
+    expect(verifyR2UploadTokenMock).not.toHaveBeenCalled();
+    expect(uploadToR2Mock).not.toHaveBeenCalled();
+  });
 });
+
+async function body_error(response: Response) {
+  const body = (await response.json()) as { error?: string };
+  return body.error;
+}

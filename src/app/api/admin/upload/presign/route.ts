@@ -135,6 +135,7 @@ export async function POST(req: NextRequest) {
       key,
       contentType,
       maxSize: size,
+      siteId,
     });
 
     return NextResponse.json({

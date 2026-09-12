@@ -32,6 +32,12 @@ type R2TokenPayload = {
   cacheControl: string;
   exp: number;
   maxSize: number;
+  /**
+   * SECURITY: Site penerbit token. Token yang bocor tidak bisa dipakai
+   * untuk menulis ke prefix site lain — route direct memverifikasi
+   * prefix `sites/{siteId}/` pada `key` sebelum menerima body.
+   */
+  siteId?: string;
 };
 
 type R2LikeObject = {
@@ -459,12 +465,14 @@ export async function createR2PresignedPutUrl({
   cacheControl = DEFAULT_UPLOAD_CACHE_CONTROL,
   expiresInSeconds = 600,
   maxSize = 60 * 1024 * 1024,
+  siteId,
 }: {
   key: string;
   contentType: string;
   cacheControl?: string;
   expiresInSeconds?: number;
   maxSize?: number;
+  siteId?: string;
 }): Promise<{
   uploadUrl: string;
   publicUrl: string;
@@ -488,6 +496,7 @@ export async function createR2PresignedPutUrl({
     cacheControl,
     exp: Math.floor(Date.now() / 1000) + expiresInSeconds,
     maxSize,
+    siteId,
   });
 
   return {

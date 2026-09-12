@@ -117,6 +117,7 @@ export async function POST(
       contentType: parsed.data.contentType,
       cacheControl: VIDEO_CACHE_CONTROL,
       maxSize: parsed.data.size,
+      siteId: site.siteId,
     });
 
     logOperationalEvent({
