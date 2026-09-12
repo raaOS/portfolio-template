@@ -10,24 +10,17 @@ interface ChangePasswordModalProps {
   onClose: () => void;
 }
 
-type ActiveTab = 'password' | 'pin';
-
 export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProps) {
   const [mounted, setMounted] = useState(false);
-  const [activeTab, setActiveTab] = useState<ActiveTab>('password');
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [newPin, setNewPin] = useState('');
-  const [confirmPin, setConfirmPin] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [showOld, setShowOld] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [showNewPin, setShowNewPin] = useState(false);
-  const [showConfirmPin, setShowConfirmPin] = useState(false);
 
   const csrfToken = useCsrfToken();
 
@@ -62,15 +55,11 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
     setOldPassword('');
     setNewPassword('');
     setConfirmPassword('');
-    setNewPin('');
-    setConfirmPin('');
     setError(null);
     setSuccess(false);
     setShowOld(false);
     setShowNew(false);
     setShowConfirm(false);
-    setShowNewPin(false);
-    setShowConfirmPin(false);
   };
 
   const handleClose = () => {
@@ -83,54 +72,41 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
     setError(null);
 
     if (!oldPassword) {
-      setError('Sandi lama wajib diisi.');
+      setError('Password saat ini wajib diisi.');
       return;
     }
 
-    if (activeTab === 'password') {
-      if (newPassword !== confirmPassword) {
-        setError('Sandi baru dan konfirmasi sandi tidak cocok.');
-        return;
-      }
+    if (newPassword !== confirmPassword) {
+      setError('Password baru dan konfirmasi tidak cocok.');
+      return;
+    }
 
-      if (newPassword.length < 8) {
-        setError('Sandi baru harus minimal 8 karakter.');
-        return;
-      }
-    } else {
-      if (newPin !== confirmPin) {
-        setError('PIN baru dan konfirmasi PIN tidak cocok.');
-        return;
-      }
+    if (newPassword.length < 8) {
+      setError('Password baru harus minimal 8 karakter.');
+      return;
+    }
 
-      if (!/^\d{4}$/.test(newPin)) {
-        setError('PIN baru harus berupa 4 digit angka.');
-        return;
-      }
+    if (newPassword === oldPassword) {
+      setError('Password baru harus berbeda dari password saat ini.');
+      return;
     }
 
     setIsLoading(true);
 
     try {
-      const url = activeTab === 'password' ? '/api/admin/password' : '/api/admin/pin';
-      const payload =
-        activeTab === 'password' ? { oldPassword, newPassword } : { oldPassword, newPin };
-
-      const res = await fetch(url, {
+      const res = await fetch('/api/auth/change-password', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           'x-csrf-token': csrfToken || '',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ currentPassword: oldPassword, newPassword }),
       });
 
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        throw new Error(
-          data?.error ||
-            (activeTab === 'password' ? 'Gagal mengubah sandi' : 'Gagal mengubah PIN')
-        );
+        throw new Error(data?.error || 'Gagal mengubah password');
       }
 
       setSuccess(true);
@@ -142,12 +118,6 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const switchTab = (tab: ActiveTab) => {
-    setActiveTab(tab);
-    setError(null);
-    setSuccess(false);
   };
 
   const modalContent = (
@@ -179,47 +149,16 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
                 <ShieldCheck size={32} />
               </div>
-              <h3 className="mb-2 text-xl font-bold text-gray-800">
-                {activeTab === 'password' ? 'Sandi Berhasil Diubah!' : 'PIN Berhasil Diubah!'}
-              </h3>
+              <h3 className="mb-2 text-xl font-bold text-gray-800">Password Berhasil Diubah!</h3>
               <p className="text-sm text-gray-500">
-                {activeTab === 'password'
-                  ? 'Sandi admin telah diperbarui.'
-                  : 'PIN admin telah diperbarui.'}
+                Password login admin Anda telah diperbarui. Gunakan password baru saat login berikutnya.
               </p>
             </div>
           ) : (
             <div className="animate-in fade-in slide-in-from-left-4 space-y-4">
-              <div className="mb-2 flex border-b border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => switchTab('password')}
-                  className={`flex-1 border-b-2 pb-3 text-center text-sm font-medium transition-all duration-150 ${
-                    activeTab === 'password'
-                      ? 'border-blue-600 font-semibold text-blue-600'
-                      : 'border-transparent text-gray-400 hover:text-gray-600'
-                  }`}
-                >
-                  Ubah Sandi
-                </button>
-                <button
-                  type="button"
-                  onClick={() => switchTab('pin')}
-                  className={`flex-1 border-b-2 pb-3 text-center text-sm font-medium transition-all duration-150 ${
-                    activeTab === 'pin'
-                      ? 'border-blue-600 font-semibold text-blue-600'
-                      : 'border-transparent text-gray-400 hover:text-gray-600'
-                  }`}
-                >
-                  Ubah PIN
-                </button>
-              </div>
-
               <form onSubmit={handleSubmit} className="space-y-4">
                 <p className="text-xs leading-relaxed text-gray-500">
-                  {activeTab === 'password'
-                    ? 'Ubah sandi admin dengan verifikasi sandi lama.'
-                    : 'Ubah PIN console admin. PIN harus berupa 4 digit angka.'}
+                  Ubah password login admin Anda dengan verifikasi password saat ini.
                 </p>
 
                 {error && (
@@ -230,201 +169,136 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
                 )}
 
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700">Sandi Lama</label>
+                  <label htmlFor="change-old-password" className="text-sm font-medium text-gray-700">
+                    Password Saat Ini
+                  </label>
                   <div className="relative">
                     <Lock
                       className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
                       size={16}
                     />
                     <input
+                      id="change-old-password"
                       type={showOld ? 'text' : 'password'}
                       value={oldPassword}
                       onChange={(e) => setOldPassword(e.target.value)}
                       className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-10 pr-10 text-sm text-gray-800 placeholder-gray-400 transition-shadow focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      placeholder="Masukkan sandi saat ini"
+                      placeholder="Masukkan password saat ini"
                       required
                       disabled={isLoading}
+                      autoComplete="current-password"
                     />
                     <button
                       type="button"
                       onClick={() => setShowOld((value) => !value)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      aria-label={showOld ? 'Sembunyikan password' : 'Tampilkan password'}
                     >
                       {showOld ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
                 </div>
 
-                {activeTab === 'password' ? (
-                  <>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-gray-700">Sandi Baru</label>
-                      <div className="relative">
-                        <KeyRound
-                          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                          size={16}
+                <div className="space-y-1.5">
+                  <label htmlFor="change-new-password" className="text-sm font-medium text-gray-700">
+                    Password Baru
+                  </label>
+                  <div className="relative">
+                    <KeyRound
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                      size={16}
+                    />
+                    <input
+                      id="change-new-password"
+                      type={showNew ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-10 pr-10 text-sm text-gray-800 placeholder-gray-400 transition-shadow focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      placeholder="Minimal 8 karakter"
+                      required
+                      disabled={isLoading}
+                      minLength={8}
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNew((value) => !value)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      aria-label={showNew ? 'Sembunyikan password' : 'Tampilkan password'}
+                    >
+                      {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                  {newPassword.length > 0 && (
+                    <div className="animate-in fade-in slide-in-from-top-1 mt-2">
+                      <div className="flex h-1.5 w-full gap-1 overflow-hidden rounded-full bg-gray-100">
+                        <div
+                          className={`h-full transition-all duration-300 ${strength.score >= 1 ? strength.color : 'bg-transparent'}`}
+                          style={{ width: '33.33%' }}
                         />
-                        <input
-                          type={showNew ? 'text' : 'password'}
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                          className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-10 pr-10 text-sm text-gray-800 placeholder-gray-400 transition-shadow focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          placeholder="Minimal 8 karakter"
-                          required
-                          disabled={isLoading}
-                          minLength={8}
+                        <div
+                          className={`h-full transition-all duration-300 ${strength.score >= 2 ? strength.color : 'bg-transparent'}`}
+                          style={{ width: '33.33%' }}
                         />
-                        <button
-                          type="button"
-                          onClick={() => setShowNew((value) => !value)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        >
-                          {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
-                        </button>
+                        <div
+                          className={`h-full transition-all duration-300 ${strength.score >= 3 ? strength.color : 'bg-transparent'}`}
+                          style={{ width: '33.33%' }}
+                        />
                       </div>
-                      {newPassword.length > 0 && (
-                        <div className="animate-in fade-in slide-in-from-top-1 mt-2">
-                          <div className="flex h-1.5 w-full gap-1 overflow-hidden rounded-full bg-gray-100">
-                            <div
-                              className={`h-full transition-all duration-300 ${strength.score >= 1 ? strength.color : 'bg-transparent'}`}
-                              style={{ width: '33.33%' }}
-                            />
-                            <div
-                              className={`h-full transition-all duration-300 ${strength.score >= 2 ? strength.color : 'bg-transparent'}`}
-                              style={{ width: '33.33%' }}
-                            />
-                            <div
-                              className={`h-full transition-all duration-300 ${strength.score >= 3 ? strength.color : 'bg-transparent'}`}
-                              style={{ width: '33.33%' }}
-                            />
-                          </div>
-                          <p
-                            className={`mt-1.5 text-xs font-medium ${
-                              strength.score === 1
-                                ? 'text-red-500'
-                                : strength.score === 2
-                                  ? 'text-orange-500'
-                                  : 'text-[#00AA5B]'
-                            }`}
-                          >
-                            Kekuatan: {strength.label}
-                          </p>
-                        </div>
-                      )}
+                      <p
+                        className={`mt-1.5 text-xs font-medium ${
+                          strength.score === 1
+                            ? 'text-red-500'
+                            : strength.score === 2
+                              ? 'text-orange-500'
+                              : 'text-[#00AA5B]'
+                        }`}
+                      >
+                        Kekuatan: {strength.label}
+                      </p>
                     </div>
+                  )}
+                </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-gray-700">
-                        Konfirmasi Sandi Baru
-                      </label>
-                      <div className="relative">
-                        <KeyRound
-                          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                          size={16}
-                        />
-                        <input
-                          type={showConfirm ? 'text' : 'password'}
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-10 pr-10 text-sm text-gray-800 placeholder-gray-400 transition-shadow focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          placeholder="Ulangi sandi baru"
-                          required
-                          disabled={isLoading}
-                          minLength={8}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirm((value) => !value)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        >
-                          {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
-                        </button>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-gray-700">
-                        PIN Baru (4 Digit)
-                      </label>
-                      <div className="relative">
-                        <KeyRound
-                          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                          size={16}
-                        />
-                        <input
-                          type={showNewPin ? 'text' : 'password'}
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          maxLength={4}
-                          value={newPin}
-                          onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
-                          className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-10 pr-10 text-sm text-gray-800 placeholder-gray-400 transition-shadow focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          placeholder="Masukkan 4 digit angka"
-                          required
-                          disabled={isLoading}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowNewPin((value) => !value)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        >
-                          {showNewPin ? <EyeOff size={16} /> : <Eye size={16} />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-gray-700">
-                        Konfirmasi PIN Baru
-                      </label>
-                      <div className="relative">
-                        <KeyRound
-                          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                          size={16}
-                        />
-                        <input
-                          type={showConfirmPin ? 'text' : 'password'}
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          maxLength={4}
-                          value={confirmPin}
-                          onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ''))}
-                          className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-10 pr-10 text-sm text-gray-800 placeholder-gray-400 transition-shadow focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          placeholder="Ulangi 4 digit angka"
-                          required
-                          disabled={isLoading}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPin((value) => !value)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        >
-                          {showConfirmPin ? <EyeOff size={16} /> : <Eye size={16} />}
-                        </button>
-                      </div>
-                    </div>
-                  </>
-                )}
+                <div className="space-y-1.5">
+                  <label htmlFor="change-confirm-password" className="text-sm font-medium text-gray-700">
+                    Konfirmasi Password Baru
+                  </label>
+                  <div className="relative">
+                    <KeyRound
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                      size={16}
+                    />
+                    <input
+                      id="change-confirm-password"
+                      type={showConfirm ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-10 pr-10 text-sm text-gray-800 placeholder-gray-400 transition-shadow focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      placeholder="Ulangi password baru"
+                      required
+                      disabled={isLoading}
+                      minLength={8}
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirm((value) => !value)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      aria-label={showConfirm ? 'Sembunyikan password' : 'Tampilkan password'}
+                    >
+                      {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
 
                 <div className="pt-4">
                   <button
                     type="submit"
-                    disabled={
-                      isLoading ||
-                      !oldPassword ||
-                      (activeTab === 'password'
-                        ? !newPassword || !confirmPassword || strength.score < 1
-                        : newPin.length !== 4 || confirmPin.length !== 4)
-                    }
+                    disabled={isLoading || !oldPassword || !newPassword || !confirmPassword || strength.score < 1}
                     className="flex w-full items-center justify-center rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100"
                   >
-                    {isLoading
-                      ? 'Menyimpan...'
-                      : activeTab === 'password'
-                        ? 'Simpan Sandi Baru'
-                        : 'Simpan PIN Baru'}
+                    {isLoading ? 'Menyimpan...' : 'Simpan Password Baru'}
                   </button>
                 </div>
               </form>

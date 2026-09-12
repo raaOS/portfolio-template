@@ -9,6 +9,7 @@ export * from './auth/password';
 export * from './auth/csrf';
 export * from './auth/session';
 export * from './auth/login';
+export * from './auth/changePassword';
 export * from './auth/guard';
 export * from './db/connection';
 export * from './db/schema';
