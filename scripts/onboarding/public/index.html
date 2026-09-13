@@ -608,6 +608,62 @@
       visibility: hidden;
     }
 
+    /* Template Log Sub-Tabs inside Changelog */
+    .template-log-tabs {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      border-bottom: 1px solid var(--border);
+      padding: 0.25rem 0 0.625rem 0;
+      margin-bottom: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .btn-template-tab {
+      background: var(--surface-subtle);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.35rem 0.65rem;
+      font-family: inherit;
+      font-size: 0.78125rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: all 0.15s ease;
+    }
+
+    .btn-template-tab:hover {
+      color: var(--text);
+      border-color: #cbd5e1;
+    }
+
+    .btn-template-tab.active {
+      background: #111827;
+      color: #ffffff;
+      border-color: #111827;
+      font-weight: 600;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+    }
+
+    .badge-tab-count {
+      background: var(--border);
+      color: var(--text-muted);
+      font-size: 0.6875rem;
+      font-weight: 600;
+      padding: 0.08rem 0.4rem;
+      border-radius: 9999px;
+      line-height: 1.2;
+    }
+
+    .btn-template-tab.active .badge-tab-count {
+      background: rgba(255, 255, 255, 0.22);
+      color: #ffffff;
+    }
+
     /* Tactile Interactive Buttons */
     .btn-interactive {
       transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), background 0.15s ease, border-color 0.15s ease;
@@ -955,15 +1011,30 @@
               <svg id="refresh-icon-svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
               <span>Cek Versi Baru</span>
             </button>
-            <button type="button" id="btn-copy-update-wa" class="btn-reset btn-interactive" style="width: auto; padding: 0.35rem 0.65rem; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 0.4rem;">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-              <span>Salin Pesan WA</span>
-            </button>
           </div>
         </div>
         <div id="changelog-body" class="changelog-accordion">
           <div class="changelog-accordion-inner">
-            <div id="changelog-content" style="font-size: 0.8125rem; color: var(--text); line-height: 1.5; max-height: 480px; overflow-y: auto; padding-right: 0.25rem;">
+            <!-- 2 Sub-Tabs Log Template -->
+            <div class="template-log-tabs">
+              <div style="display: flex; gap: 0.35rem; align-items: center;">
+                <button type="button" class="btn-template-tab active" data-tab="infinite-canvas">
+                  <span>🎨 Infinite Canvas</span>
+                  <span class="badge-tab-count" id="badge-count-canvas">0</span>
+                </button>
+                <button type="button" class="btn-template-tab" data-tab="os-desktop">
+                  <span>🖥️ macOS Desktop</span>
+                  <span class="badge-tab-count" id="badge-count-desktop">0</span>
+                </button>
+              </div>
+              <button type="button" id="btn-copy-tab-wa" class="btn-reset btn-interactive" title="Salin pesan WA pembaruan untuk template yang sedang dipilih" style="width: auto; padding: 0.35rem 0.75rem; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 0.4rem; background: #047857; color: #ffffff; border-radius: 6px; border: 1px solid #059669;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                <span id="btn-copy-tab-wa-text">Salin WA (Canvas)</span>
+              </button>
+            </div>
+
+            <!-- Content Container: Compact Height, No Long Scroll! -->
+            <div id="changelog-content" style="font-size: 0.8125rem; color: var(--text); line-height: 1.5; max-height: 320px; overflow-y: auto; padding-right: 0.25rem;">
               Memuat catatan pembaruan dari CHANGELOG.md...
             </div>
           </div>
@@ -1556,11 +1627,21 @@ Setelah DNS diperbarui, website portofolio Anda akan langsung aktif di https://$
   const toggleChangelogIcon = document.getElementById('toggle-changelog-icon');
   const btnRefreshChangelog = document.getElementById('btn-refresh-changelog');
   const refreshIconSpin = document.getElementById('refresh-icon-spin');
-  const btnCopyUpdateWa = document.getElementById('btn-copy-update-wa');
+  const btnCopyTabWa = document.getElementById('btn-copy-tab-wa');
+  const btnCopyTabWaText = document.getElementById('btn-copy-tab-wa-text');
+  const badgeCountCanvas = document.getElementById('badge-count-canvas');
+  const badgeCountDesktop = document.getElementById('badge-count-desktop');
 
   let isUpdating = false;
   let isChangelogCollapsed = false;
+  let activeChangelogTab = 'infinite-canvas';
+  let cachedReleases = [];
   let lastUpdateWhatsappText = '';
+  let lastUpdateWhatsappMessages = {
+    'os-desktop': '',
+    'infinite-canvas': '',
+    'general': ''
+  };
 
   // Helper Collapse / Expand Changelog with Smooth Accordion Animation
   function setChangelogCollapsed(collapsed) {
@@ -1597,6 +1678,85 @@ Setelah DNS diperbarui, website portofolio Anda akan langsung aktif di https://$
     btnRefreshChangelog.disabled = false;
   });
 
+  function renderChangelogTab(tabKey) {
+    activeChangelogTab = tabKey;
+
+    // Update tab button visual active state
+    document.querySelectorAll('.btn-template-tab').forEach((b) => {
+      b.classList.toggle('active', b.getAttribute('data-tab') === tabKey);
+    });
+
+    // Update Salin WA button styling and text
+    if (btnCopyTabWaText) {
+      btnCopyTabWaText.textContent = tabKey === 'os-desktop' ? 'Salin WA (macOS)' : 'Salin WA (Canvas)';
+    }
+    if (btnCopyTabWa) {
+      if (tabKey === 'os-desktop') {
+        btnCopyTabWa.style.background = '#0f172a';
+        btnCopyTabWa.style.borderColor = '#334155';
+      } else {
+        btnCopyTabWa.style.background = '#047857';
+        btnCopyTabWa.style.borderColor = '#059669';
+      }
+    }
+
+    if (!cachedReleases || cachedReleases.length === 0) {
+      changelogContent.textContent = 'Belum ada catatan pembaruan di CHANGELOG.md.';
+      return;
+    }
+
+    const isCanvasSec = (t) => /canvas|kanvas|3d|🎨/i.test(t);
+    const isDesktopSec = (t) => /macos|desktop|mac os|🖥️/i.test(t);
+    const isSystemSec = (t) => /sistem|admin|keamanan|core|semua klien|umum|⚙️/i.test(t);
+
+    let cHtml = '';
+
+    cachedReleases.forEach((rel, rIdx) => {
+      const matchingSections = (rel.sections || []).filter((sec) => {
+        if (tabKey === 'os-desktop') {
+          return isDesktopSec(sec.title) || isSystemSec(sec.title);
+        } else {
+          return isCanvasSec(sec.title) || isSystemSec(sec.title);
+        }
+      });
+
+      if (matchingSections.length === 0) return;
+
+      const isLatest = rIdx === 0;
+      if (cHtml) {
+        cHtml += `<div style="border-top: 1px dashed var(--border); margin: 0.75rem 0 0.65rem 0;"></div>`;
+      }
+
+      cHtml += `<div style="display: flex; align-items: center; gap: 0.45rem; margin-bottom: 0.35rem; flex-wrap: wrap;">`;
+      cHtml += `<span style="font-weight: 700; font-size: 0.875rem; color: var(--text);">Versi ${escapeHtml(rel.version)}</span>`;
+      if (rel.date) {
+        cHtml += `<span style="font-size: 0.75rem; color: var(--text-muted);">(${escapeHtml(rel.date)})</span>`;
+      }
+      if (isLatest) {
+        cHtml += `<span style="background: #059669; color: #ffffff; font-size: 0.625rem; font-weight: 600; padding: 0.1rem 0.45rem; border-radius: 9999px;">Terbaru</span>`;
+      }
+      cHtml += `</div>`;
+
+      for (const sec of matchingSections) {
+        cHtml += `<div style="font-weight: 600; font-size: 0.8125rem; margin-top: 0.35rem; margin-bottom: 0.15rem; color: var(--text); display: flex; align-items: center; gap: 0.35rem;">`;
+        cHtml += `<span>${escapeHtml(sec.title)}</span>`;
+        cHtml += `<span style="font-size: 0.6875rem; color: var(--text-muted); font-weight: normal;">(${sec.items.length} pembaruan)</span>`;
+        cHtml += `</div>`;
+        cHtml += `<ul style="margin-left: 1.25rem; margin-bottom: 0.35rem; list-style-type: disc;">`;
+        for (const item of sec.items) {
+          cHtml += `<li style="margin-bottom: 0.15rem; color: var(--text-muted); font-size: 0.78125rem; line-height: 1.45;">${escapeHtml(item)}</li>`;
+        }
+        cHtml += `</ul>`;
+      }
+    });
+
+    if (!cHtml) {
+      cHtml = `<div style="color: var(--text-muted); font-size: 0.78125rem; padding: 0.5rem 0;">Tidak ada catatan pembaruan khusus untuk template ini.</div>`;
+    }
+
+    changelogContent.innerHTML = cHtml;
+  }
+
   async function fetchChangelog(showFeedback = false) {
     try {
       const resChangelog = await fetch('/api/changelog?t=' + Date.now());
@@ -1605,42 +1765,35 @@ Setelah DNS diperbarui, website portofolio Anda akan langsung aktif di https://$
         changelogVersionBadge.textContent = `v${changelogData.version || '1.0.0'}`;
         changelogDate.textContent = changelogData.date ? `(${changelogData.date})` : '';
         lastUpdateWhatsappText = changelogData.whatsappMessage || '';
+        lastUpdateWhatsappMessages = changelogData.whatsappMessages || {
+          'os-desktop': lastUpdateWhatsappText,
+          'infinite-canvas': lastUpdateWhatsappText,
+          'general': lastUpdateWhatsappText
+        };
 
-        const releases = changelogData.releases || [];
-        if (releases.length > 0) {
-          let cHtml = '';
-          releases.forEach((rel, rIdx) => {
-            const isLatest = rIdx === 0;
-            if (rIdx > 0) {
-              cHtml += `<div style="border-top: 1px dashed var(--border); margin: 0.85rem 0 0.75rem 0;"></div>`;
-            }
-            cHtml += `<div style="display: flex; align-items: center; gap: 0.45rem; margin-bottom: 0.4rem; flex-wrap: wrap;">`;
-            cHtml += `<span style="font-weight: 700; font-size: 0.875rem; color: var(--text);">Versi ${escapeHtml(rel.version)}</span>`;
-            if (rel.date) {
-              cHtml += `<span style="font-size: 0.75rem; color: var(--text-muted);">(${escapeHtml(rel.date)})</span>`;
-            }
-            if (isLatest) {
-              cHtml += `<span style="background: #059669; color: #ffffff; font-size: 0.625rem; font-weight: 600; padding: 0.1rem 0.45rem; border-radius: 9999px;">Terbaru</span>`;
-            }
-            cHtml += `</div>`;
+        cachedReleases = changelogData.releases || [];
 
-            if (rel.sections && rel.sections.length > 0) {
-              for (const sec of rel.sections) {
-                cHtml += `<div style="font-weight: 600; font-size: 0.8125rem; margin-top: 0.35rem; margin-bottom: 0.15rem; color: var(--text);">${escapeHtml(sec.title)}</div>`;
-                cHtml += `<ul style="margin-left: 1.25rem; margin-bottom: 0.35rem; list-style-type: disc;">`;
-                for (const item of sec.items) {
-                  cHtml += `<li style="margin-bottom: 0.15rem; color: var(--text-muted); font-size: 0.78125rem; line-height: 1.45;">${escapeHtml(item)}</li>`;
-                }
-                cHtml += `</ul>`;
-              }
+        // Hitung badge total pembaruan rilis terbaru per template
+        const isCanvasSec = (t) => /canvas|kanvas|3d|🎨/i.test(t);
+        const isDesktopSec = (t) => /macos|desktop|mac os|🖥️/i.test(t);
+        const isSystemSec = (t) => /sistem|admin|keamanan|core|semua klien|umum|⚙️/i.test(t);
+
+        let cCount = 0;
+        let dCount = 0;
+        if (cachedReleases.length > 0) {
+          for (const sec of (cachedReleases[0].sections || [])) {
+            if (isCanvasSec(sec.title)) cCount += sec.items.length;
+            if (isDesktopSec(sec.title)) dCount += sec.items.length;
+            if (isSystemSec(sec.title)) {
+              cCount += sec.items.length;
+              dCount += sec.items.length;
             }
-          });
-          changelogContent.innerHTML = cHtml;
-        } else {
-          changelogContent.textContent = 'Belum ada catatan pembaruan di CHANGELOG.md.';
+          }
         }
-        
-        // Pastikan container terbuka saat di-refresh agar log langsung terbaca
+        if (badgeCountCanvas) badgeCountCanvas.textContent = String(cCount);
+        if (badgeCountDesktop) badgeCountDesktop.textContent = String(dCount);
+
+        renderChangelogTab(activeChangelogTab);
         setChangelogCollapsed(false);
 
         if (showFeedback) {
@@ -1652,18 +1805,34 @@ Setelah DNS diperbarui, website portofolio Anda akan langsung aktif di https://$
     }
   }
 
-  btnCopyUpdateWa.addEventListener('click', async () => {
-    if (!lastUpdateWhatsappText) {
+  // Event listener tab log template
+  document.querySelectorAll('.btn-template-tab').forEach((b) => {
+    b.addEventListener('click', () => {
+      const tabKey = b.getAttribute('data-tab');
+      if (tabKey) renderChangelogTab(tabKey);
+    });
+  });
+
+  async function copyTextToClipboard(text, successToast) {
+    if (!text) {
       showToast('Belum ada catatan pembaruan untuk disalin.');
       return;
     }
     try {
-      await navigator.clipboard.writeText(lastUpdateWhatsappText);
-      showToast('Pesan pengumuman update berhasil disalin ke clipboard!');
+      await navigator.clipboard.writeText(text);
+      showToast(successToast);
     } catch {
-      alert('Pesan Pengumuman:\n\n' + lastUpdateWhatsappText);
+      alert('Pesan Pengumuman:\n\n' + text);
     }
-  });
+  }
+
+  if (btnCopyTabWa) {
+    btnCopyTabWa.addEventListener('click', () => {
+      const text = lastUpdateWhatsappMessages[activeChangelogTab] || lastUpdateWhatsappMessages['general'] || lastUpdateWhatsappText;
+      const label = activeChangelogTab === 'os-desktop' ? 'macOS Desktop' : 'Infinite Canvas';
+      copyTextToClipboard(text, `Pesan WA untuk template ${label} berhasil disalin!`);
+    });
+  }
 
   async function loadUpdateView() {
     updateErrorMessage.style.display = 'none';
@@ -1710,20 +1879,26 @@ Setelah DNS diperbarui, website portofolio Anda akan langsung aktif di https://$
       let html = '';
       for (const client of clients) {
         html += `
-          <div class="client-card" style="border: 1px solid var(--border); border-radius: 8px; padding: 0.875rem 1rem; display: flex; justify-content: space-between; align-items: center; background: #ffffff;">
-            <div style="flex: 1; padding-right: 1rem;">
+          <div class="client-card" style="border: 1px solid var(--border); border-radius: 8px; padding: 0.875rem 1rem; display: flex; justify-content: space-between; align-items: center; background: #ffffff; gap: 0.75rem; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 240px;">
               <div style="display: flex; align-items: center; gap: 0.5rem;">
                 <span style="font-weight: 600; font-size: 0.875rem; color: var(--text);">${escapeHtml(client.clientName)}</span>
-                <span style="font-size: 0.6875rem; color: var(--text-muted); background: var(--surface-subtle); padding: 0.1rem 0.4rem; border-radius: 4px;">${client.templateKey === 'os-desktop' ? 'macOS Desktop' : '3D Canvas'}</span>
+                <span style="font-size: 0.6875rem; color: var(--text-muted); background: var(--surface-subtle); padding: 0.1rem 0.4rem; border-radius: 4px;">${client.templateKey === 'os-desktop' ? 'macOS Desktop' : 'Infinite Canvas'}</span>
               </div>
               <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
                 <a href="${client.websiteUrl}" target="_blank" style="color: var(--text-muted); text-decoration: underline;">${client.websiteUrl}</a>
                 ${client.customDomain ? ` • <strong style="color: var(--success);">${escapeHtml(client.customDomain)}</strong>` : ''}
               </div>
             </div>
-            <button type="button" class="btn-reset btn-update-single" data-folder="${client.id}" style="width: auto; padding: 0.45rem 0.85rem; font-size: 0.75rem; font-weight: 600; white-space: nowrap;">
-              Update Klien Ini
-            </button>
+            <div style="display: flex; align-items: center; gap: 0.45rem;">
+              <button type="button" class="btn-reset btn-interactive btn-copy-client-wa" data-name="${escapeHtml(client.clientName)}" data-template="${client.templateKey || 'os-desktop'}" title="Salin pesan WA personal khusus untuk ${escapeHtml(client.clientName)}" style="width: auto; padding: 0.45rem 0.75rem; font-size: 0.75rem; font-weight: 600; white-space: nowrap; background: var(--surface-subtle); color: var(--text); border: 1px solid var(--border); display: flex; align-items: center; gap: 0.35rem;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                <span>📱 Salin WA</span>
+              </button>
+              <button type="button" class="btn-reset btn-update-single" data-folder="${client.id}" style="width: auto; padding: 0.45rem 0.85rem; font-size: 0.75rem; font-weight: 600; white-space: nowrap;">
+                Update Klien Ini
+              </button>
+            </div>
           </div>
         `;
       }
@@ -1738,6 +1913,21 @@ Setelah DNS diperbarui, website portofolio Anda akan langsung aktif di https://$
           if (confirm(`Yakin ingin mengupdate website ${name} ke versi template terbaru?`)) {
             triggerDeploy({ folderName });
           }
+        });
+      });
+
+      // Attach client personal WA copy events
+      document.querySelectorAll('.btn-copy-client-wa').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const clientName = btn.getAttribute('data-name') || 'Kak';
+          const templateKey = btn.getAttribute('data-template') || 'os-desktop';
+          let baseMessage = lastUpdateWhatsappMessages[templateKey] || lastUpdateWhatsappMessages['general'] || lastUpdateWhatsappText || '';
+
+          if (clientName && clientName !== 'Kak') {
+            baseMessage = baseMessage.replace(/^Halo Kak! 👋/m, `Halo Kak ${clientName}! 👋`);
+          }
+
+          copyTextToClipboard(baseMessage, `Pesan WA untuk ${clientName} (${templateKey === 'os-desktop' ? 'macOS' : 'Canvas'}) berhasil disalin!`);
         });
       });
     } catch (e) {

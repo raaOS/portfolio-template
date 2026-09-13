@@ -673,28 +673,69 @@ const server = http.createServer(async (req, res) => {
       const latestRelease = releases[0] || { version: '1.0.0', date: '', sections: [] };
       const version = latestRelease.version;
       const date = latestRelease.date;
-      const sections = latestRelease.sections;
+      const sections = latestRelease.sections || [];
 
-      const waBulletPoints: string[] = [];
+      // Klasifikasikan seksi dan butir pembaruan rilis terbaru
+      const isCanvasSec = (t: string) => /canvas|kanvas|3d|🎨/i.test(t);
+      const isDesktopSec = (t: string) => /macos|desktop|mac os|🖥️/i.test(t);
+
+      const canvasPoints: string[] = [];
+      const desktopPoints: string[] = [];
+      const systemPoints: string[] = [];
+      const allPoints: string[] = [];
+
       for (const sec of sections) {
         for (const item of sec.items) {
           const shortItem = item.split(':')[0].trim();
-          waBulletPoints.push(`• ${shortItem}`);
+          const point = `• ${shortItem}`;
+          allPoints.push(point);
+
+          if (isCanvasSec(sec.title)) {
+            canvasPoints.push(point);
+          } else if (isDesktopSec(sec.title)) {
+            desktopPoints.push(point);
+          } else {
+            systemPoints.push(point);
+          }
         }
       }
 
-      const whatsappMessage = [
-        `Halo Kak! 👋`,
-        `Website portofolio Kakak baru saja kami perbarui ke Versi ${version} (${date}):`,
-        ``,
-        `✨ Yang Baru di Pembaruan Ini:`,
-        waBulletPoints.slice(0, 5).join('\n'),
-        ``,
-        `Seluruh data foto karya, biodata, dan akun admin Kakak tetap 100% aman dan terjaga. Selamat berkarya! 🚀`,
-      ].join('\n');
+      // Helper pembuat pesan WhatsApp yang rapi dan personal
+      const createWaMessage = (templateName: string, points: string[]) => {
+        const list = points.length > 0 ? points.slice(0, 5).join('\n') : '• Pembaruan performa, keamanan sistem, dan stabilitas server.';
+        return [
+          `Halo Kak! 👋`,
+          `Website portofolio Kakak${templateName ? ` (${templateName})` : ''} baru saja kami perbarui ke Versi ${version} (${date}):`,
+          ``,
+          `✨ Yang Baru di Pembaruan Ini:`,
+          list,
+          ``,
+          `Seluruh data foto karya, biodata, dan akun admin Kakak tetap 100% aman dan terjaga. Selamat berkarya! 🚀`,
+        ].join('\n');
+      };
+
+      // Gabungkan poin spesifik template dengan poin sistem global
+      const waDesktopPoints = [...desktopPoints, ...systemPoints];
+      const waCanvasPoints = [...canvasPoints, ...systemPoints];
+
+      const whatsappMessages = {
+        'os-desktop': createWaMessage('macOS Desktop', waDesktopPoints),
+        'infinite-canvas': createWaMessage('Infinite Canvas', waCanvasPoints),
+        'general': createWaMessage('', allPoints),
+      };
+
+      const whatsappMessage = whatsappMessages.general;
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: true, version, date, sections, releases, whatsappMessage }));
+      res.end(JSON.stringify({ 
+        success: true, 
+        version, 
+        date, 
+        sections, 
+        releases, 
+        whatsappMessages,
+        whatsappMessage 
+      }));
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: false, message: (err as Error).message }));

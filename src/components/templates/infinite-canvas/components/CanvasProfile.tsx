@@ -32,7 +32,7 @@ export function CanvasProfile({
   const availabilityText = availability?.text || (isAvailable ? 'Available for work' : 'Currently booked');
 
   return (
-    <div className="relative flex flex-col items-center gap-4 p-8 rounded-2xl bg-white border border-neutral-200 shadow-[0_8px_30px_rgba(0,0,0,0.06)] max-w-sm text-center select-none transition-all duration-300 hover:border-neutral-300 hover:shadow-[0_12px_36px_rgba(0,0,0,0.09)]">
+    <div className="relative flex flex-col items-center gap-4 p-8 rounded-2xl bg-white border border-neutral-200 max-w-sm text-center select-none transition-all duration-300 hover:border-neutral-300">
       {/* Availability Status Badge */}
       <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-neutral-50 border border-neutral-200 text-xs text-neutral-700">
         <span
@@ -45,7 +45,7 @@ export function CanvasProfile({
 
       {/* Avatar */}
       {avatarUrl ? (
-        <div className="relative w-24 h-24 rounded-full overflow-hidden border border-neutral-200 shadow-sm group">
+        <div className="relative w-24 h-24 rounded-full overflow-hidden border border-neutral-200 group">
           <img
             src={avatarUrl}
             alt={name}
@@ -56,7 +56,7 @@ export function CanvasProfile({
           />
         </div>
       ) : (
-        <div className="w-24 h-24 rounded-full bg-neutral-900 border border-neutral-200 flex items-center justify-center text-white text-2xl font-bold shadow-sm">
+        <div className="w-24 h-24 rounded-full bg-neutral-900 border border-neutral-200 flex items-center justify-center text-white text-2xl font-bold">
           {name.charAt(0) || 'P'}
         </div>
       )}
@@ -84,7 +84,7 @@ export function CanvasProfile({
           <button
             type="button"
             onClick={onExploreProjects}
-            className="flex-1 px-3 py-2 text-xs font-semibold text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors shadow-sm cursor-pointer"
+            className="flex-1 px-3 py-2 text-xs font-semibold text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors cursor-pointer"
           >
             Jelajahi Karya
           </button>

@@ -3,9 +3,36 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.3] - 2026-09-13
+
+### 🎨 Template Infinite Canvas
+
+- **Pengalih Gaya Latar Belakang Grid (Canvas Grid Style Switcher):** Menghadirkan tombol pengalih gaya kisi-kisi latar belakang di bilah kontrol kamera atas dengan 3 varian artistik yang dapat diganti secara instan: **DOTS** (pola titik-titik arsitektural minimalis), **GRID** (garis kotak-kotak blueprint / millimeter graph paper ala software arsitek), dan **BLANK** (kanvas polos bersih tanpa pola). Posisi kisi-kisi kini bergerak secara presisi dan dinamis mengikuti geseran kursor (*pan tracking*) serta otomatis tersimpan di memori browser (*localStorage persistence*).
+- **Desain Flat & Shadowless Bersih (Penghapusan Seluruh Shadow):** Menghilangkan seluruh efek bayangan (*drop-shadows*) pada antarmuka demo Infinite Canvas — meliputi kartu proyek, bilah kontrol kamera atas, kapsul translate bahasa, Dock navigasi teks bawah, panel drawer slide-over kiri dan kanan, tombol *traffic lights*, avatar profil, dan kartu memo. Tampilan kini mengusung gaya *flat aesthetic* modern yang bersih, presisi (*crisp borders*), dan elegan tanpa distorsi bayangan.
+- **Fitur Translate Bahasa di Pojok Kanan (ID / EN Ala macOS Template):** Menghadirkan pengalih bahasa dwibahasa (Bahasa Indonesia & English) berupa kapsul melayang (*floating glassmorphism pill*) di pojok kanan atas kanvas, persis seperti bilah menu atas macOS Desktop. Dilengkapi slider animasi spring halus yang berpindah antara opsi "ID" dan "EN". Saat beralih ke bahasa Inggris, seluruh teks navigasi Dock ("Contact Me", "Notes", "Projects") serta subjudul dan tombol drawer kiri otomatis menyesuaikan secara real-time.
+- **Tampilan Karya Murni Media dengan Rasio Asli (100% Tanpa Crop):** 10 aset karya yang ditampilkan di kanvas kini murni menyajikan media visual (gambar & video looping) dengan mempertahankan **rasio aspek aslinya masing-masing** (baik poster vertikal 3:4/4:5, format story 9:16, maupun lanskap 16:9). Tidak ada lagi pemotongan gambar (*crop*) yang terpaksa. Kotak teks, judul, deskripsi, dan badge kategori telah dihilangkan dari permukaan kanvas agar estetika karya tampil utuh. Detail lengkap proyek disajikan elegan saat karya diklik melalui jendela slide-over kanan bergaya macOS.
+- **Detail Proyek Slide-Over Kanan Bergaya macOS:** Menghilangkan popup modal tengah saat kartu karya diklik, digantikan dengan panel meluncur mulus dari sisi kanan layar (*Right Slide Drawer*). Panel ini mengadopsi antarmuka jendela macOS lengkap dengan tombol *traffic lights* mini yang presisi (12px dengan efek hover simbol `X`, `-`, `+`), tombol toggle ukuran, dan tata letak dua kolom (pratinjau media + bilah interaksi di kiri, serta tab ringkasan, narasi proses, galeri, dan ulasan di kanan). Sizing traffic lights di drawer kiri juga diselaraskan ke standar 12px yang sama.
+- **Kanvas Bersih & Panel Interaktif Meluncur dari Kiri:** Seluruh widget profil, keahlian, pengalaman, dan kontak dipindahkan dari permukaan bidang kanvas sehingga kanvas murni berfokus pada eksplorasi karya. Informasi ini kini dapat diakses secara instan saat dibutuhkan melalui panel yang meluncur elegan dari sisi kiri (*Left Slide Drawer*).
+- **Dock Navigasi Teks Minimalis & Elegan:** Menggantikan ikon pada Dock bawah dengan tombol teks (*pure text navigation pill*): **About Me**, **WA**, **Project**, **Hubungi Saya**, dan **Noted**. Tampilan menjadi jauh lebih jelas, informatif, dan mewah dengan kapsul *frosted glassmorphism* tanpa tebak-tebakan arti ikon. Dilengkapi indikator aktif dan animasi spring saat disentuh.
+- **Penyebaran 10 Aset Karya ke Segala Penjuru (Atas, Bawah, Kanan, Kiri):** Tata letak kartu proyek di kanvas kini menampilkan 10 karya terpilih yang berpencar secara artistik di 4 kuadran (Utara, Selatan, Barat, Timur) mengitari area tengah dengan rotasi dinamis dan garansi tanpa tabrakan (*zero collision*). Area pusat kanvas menjadi lapang dan leluasa dijelajahi dengan drag dan zoom.
+- **Pengaturan & Penyimpanan Posisi Karya (Drag-and-Drop ke Database D1):** Dalam Mode Admin, setiap kartu proyek kini dapat digeser (*drag-and-drop*) langsung di atas kanvas dengan perhitungan kompensasi zoom yang presisi. Posisi kustom koordinat `{ x, y }` disimpan terisolasi dengan prefix khusus (`canvas-[id]`) sehingga tidak saling menimpa atau mengganggu koordinat desktop macOS.
+- **Ikon Rahasia Mata Lottie Bergerak:** Menggantikan teks "Login Admin" di bilah kontrol atas dengan ikon animasi mata Lottie (`mata.json`) yang berkedip dan estetik. Pengunjung umum melihatnya sebagai maskot/logo studio, sementara pemilik website dapat mengkliknya sebagai jalur pintas rahasia (*easter-egg*) menuju portal admin.
+- **Polesan Bilah Kontrol Kamera & Dropdown Grid:** Memperbaiki sejumlah ketidaksimetrisan pada bilah kontrol kamera atas: padding tombol RESET dan GRID disamakan (`px-3`), tombol zoom kini menggunakan padding horizontal konsisten (`px-2.5`) dengan perataan vertikal presisi (`leading-none`), lebar minimum persentase zoom diperlebar (`min-w-12`) agar angka 3 digit tidak terpotong, dan dropdown pemilih gaya grid diperbesar (`px-4 py-2`) dengan sudut yang lebih tajam (`rounded-lg`). Popup dropdown kini tampil tepat di tengah bawah tombol pemicu berkat perbaikan konflik transform CSS antara Tailwind (`-translate-x-1/2`) dan Motion (`scale`/`y`) menggunakan komposisi transform terpadu via `style={{ x: '-50%' }}`.
+
+### 🖥️ Template macOS Desktop
+
+- **Stabilitas & Isolasi Kinerja Puncak:** Seluruh komponen inti desktop macOS tetap berjalan optimal dengan isolasi state penuh, memastikan fitur-fitur baru pada kanvas tidak memengaruhi alokasi memori browser maupun fluiditas desktop simulator.
+
+### ⚙️ Pembaruan Sistem, Admin & Keamanan (Semua Klien)
+
+- **Mode Admin & Mode Visitor Terintegrasi Universal:** Menghadirkan dukungan otentikasi admin dua mode yang seragam di seluruh template. Saat pemilik website login sebagai admin, sistem otomatis mengaktifkan bilah kontrol admin melayang dengan proteksi token aman.
+- **Rute Cerdas & Navigasi Pengalihan:** Mengatasi error 404 saat mengakses rute preview/admin dengan rute pengalihan cerdas (*smart redirect*) otomatis ke portal login admin dan kembali langsung ke halaman aktif setelah berhasil masuk.
+
+---
+
 ## [1.3.2] - 2026-09-13
 
-### Ganti Password Mandiri & Panel Pantauan Status Website
+### ⚙️ Pembaruan Sistem, Admin & Keamanan (Semua Klien)
 
 - **Ganti Password Langsung dari Ruang Admin:** Kini Anda bisa mengganti password login admin secara mandiri lewat menu "Keamanan" di bilah menu atas ruang admin — cukup masukkan password lama dan password baru (min. 8 karakter, dilengkapi indikator kekuatan password). Sebelumnya fitur ini tidak berfungsi sebagaimana mestinya, kini sudah diperbaiki dan tersambung langsung ke akun Anda.
 - **Pemantauan Status Website oleh Tim Kami:** Portal internal kami kini memiliki panel "Status Klien" yang memantau kesehatan website seluruh klien sekaligus — status online/offline, kecepatan respons server, versi template terpasang, dan domain aktif. Jika website Anda mengalami gangguan atau ketinggalan versi, tim kami mengetahuinya lebih cepat.
@@ -15,7 +42,7 @@ Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **U
 
 ## [1.3.1] - 2026-09-13
 
-### Penguatan Keamanan Upload Video & Penutupan Audit Keamanan
+### ⚙️ Pembaruan Sistem, Admin & Keamanan (Semua Klien)
 
 - **Penguncian Target Unggah Video per Klien:** Tautan unggah video (wallpaper & video proyek) kini diikat secara kriptografis ke identitas situs klien masing-masing. Jika tautan unggah sampai bocor, tautan tersebut tidak dapat disalahgunakan untuk menulis berkas ke penyimpanan klien lain — permintaan akan ditolak otomatis.
 - **Pembatasan Percobaan Unggah Berlebihan:** Endpoint unggah langsung kini membatasi jumlah percobaan per pengunjung (30 percobaan / 5 menit). Aktivitas unggah tidak wajar atau spam otomatis diblokir sementara, melindungi sumber daya server dan stabilitas website.
@@ -25,9 +52,12 @@ Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **U
 
 ## [1.3.0] - 2026-09-12
 
-### Peningkatan Kinerja & Arsitektur Modular macOS Desktop
+### 🖥️ Template macOS Desktop
 
 - **Optimalisasi Responsivitas Navigasi Dock:** Arsitektur komponen Dock kini bekerja lebih modular dan ringan. Pergerakan kursor, efek magnifikasi hover, animasi bouncing ikon, dan perpindahan antar halaman menjadi jauh lebih mulus, responsif, serta hemat memori browser.
+
+### ⚙️ Pembaruan Sistem, Admin & Keamanan (Semua Klien)
+
 - **Peningkatan Stabilitas Antrean Upload Media:** Antrean pemrosesan kompresi dan pengunggahan berkas galeri portofolio di panel admin File Explorer kini berjalan lebih terisolasi dan stabil, memastikan proses unggah video maupun foto resolusi tinggi berjalan lancar tanpa hambatan.
 - **Efisiensi Kode & Keandalan Sistem:** Struktur kode internal desktop ditata ulang secara terpisah dan modular, menghasilkan peningkatan performa menyeluruh serta keandalan jangka panjang untuk seluruh website klien.
 
@@ -35,9 +65,12 @@ Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **U
 
 ## [1.2.9] - 2026-09-12
 
-### Optimasi Sistem & Kecepatan Respons Antarmuka
+### 🖥️ Template macOS Desktop
 
 - **Penyelarasan Tata Letak & Skala Layar:** Penyatuan sistem kalkulasi dimensi layar (viewport) untuk memastikan seluruh jendela aplikasi dan catatan melayang tampil proporsional di semua resolusi monitor dan perangkat.
+
+### ⚙️ Pembaruan Sistem, Admin & Keamanan (Semua Klien)
+
 - **Penyempurnaan Form Filosofi Desain & Alur Kerja:** Pemisahan struktur data alur kerja pada dashboard admin agar halaman pengaturan profil dan filosofi desain dimuat lebih cepat dan enteng.
 - **Penyempurnaan Dialog Umpan Balik Pengunjung:** Optimalisasi dialog feedback saat pengunjung akan menutup tab, memastikan animasi tampil halus dan efisien di background.
 - **Peningkatan Pipeline Unggah Aset:** Pembersihan jalur pemrosesan berkas di sisi backend untuk validasi format yang lebih cepat dan hemat sumber daya server.

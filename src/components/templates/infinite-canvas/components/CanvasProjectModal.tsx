@@ -34,7 +34,7 @@ export function CanvasProjectModal({ project, onClose }: CanvasProjectModalProps
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-white border border-neutral-200 rounded-2xl shadow-2xl flex flex-col text-neutral-900 select-text"
+        className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-white border border-neutral-200 rounded-2xl flex flex-col text-neutral-900 select-text"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -92,7 +92,7 @@ export function CanvasProjectModal({ project, onClose }: CanvasProjectModalProps
                 onClick={() => setSelectedMedia(url)}
                 className={`relative w-16 h-12 rounded-lg overflow-hidden border-2 transition-all shrink-0 cursor-pointer ${
                   activeMedia === url
-                    ? 'border-neutral-900 ring-1 ring-neutral-900 scale-105 shadow-sm'
+                    ? 'border-neutral-900 ring-1 ring-neutral-900 scale-105'
                     : 'border-neutral-200 opacity-70 hover:opacity-100'
                 }`}
               >

@@ -21,7 +21,7 @@ export function CanvasContact({ contact, testimonials, style }: CanvasContactPro
 
   return (
     <div
-      className="absolute select-none -translate-x-1/2 -translate-y-1/2 bg-white border border-neutral-200 rounded-2xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.06)] w-80 md:w-96 space-y-5 transition-all duration-300 hover:border-neutral-400 hover:shadow-[0_12px_32px_rgba(0,0,0,0.1)]"
+      className="absolute select-none -translate-x-1/2 -translate-y-1/2 bg-white border border-neutral-200 rounded-2xl p-6 w-80 md:w-96 space-y-5 transition-all duration-300 hover:border-neutral-400"
       style={style}
     >
       {/* Header */}

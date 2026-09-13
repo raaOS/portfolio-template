@@ -29,7 +29,7 @@ export function CanvasNavigator({
   return (
     <nav
       aria-label="Canvas Section Navigation"
-      className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 p-1 rounded-full bg-white/95 backdrop-blur-md border border-neutral-200 shadow-[0_4px_20px_rgba(0,0,0,0.08)] select-none"
+      className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 p-1 rounded-full bg-white/95 backdrop-blur-md border border-neutral-200 select-none"
     >
       {items
         .filter((item) => item.show)
@@ -42,7 +42,7 @@ export function CanvasNavigator({
               onClick={() => onNavigate(item.key)}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs transition-all duration-200 cursor-pointer ${
                 isActive
-                  ? 'bg-neutral-900 text-white font-semibold shadow-sm'
+                  ? 'bg-neutral-900 text-white font-semibold'
                   : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 font-medium'
               }`}
             >
