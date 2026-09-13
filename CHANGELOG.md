@@ -3,17 +3,6 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
-## [1.3.3] - 2026-09-13
-
-### Halaman Depan Baru: Demo yang Hidup, Bukan Sekadar Tampilan
-
-- **Berkenalan dengan "Living Demo":** Saat membuka halaman depan kami, Anda akan disambut sebuah desktop macOS mungil yang bergerak sendiri — kursor bergerak, jendela aplikasi terbuka, galeri karya terlihat. Dan ini bukan video: gerakkan mouse Anda dan seluruh panggung akan berhenti, menyerahkan kendali penuh kepada Anda — geser jendelanya, klik dock-nya, tutup jendelanya.
-- **Kata-Kata yang Lebih Jujur:** Kami menulis ulang seluruh halaman depan dengan bahasa yang seharusnya kami pakai sejak awal — untuk Anda yang sibuk berkarya, bukan untuk mesin pencari. Termasuk bagian yang berani menanyakan: "sudah berapa lama domain Anda menganggur?"
-- **Bukti, Bukan Janji:** Daftar keunggulan kini diterjemahkan langsung ke kehidupan Anda — aktif dalam 48 jam, ganti konten dalam 2 menit, unggah video 4K tanpa hambatan, dan dukungan WhatsApp berbahasa manusia.
-- **Pesan-Pesan Nyata:** Bagian testimoni kami tampilkan bergaya percakapan WhatsApp — karena di sanalah klien Anda sesungguhnya berbincang tentang Anda.
-
----
-
 ## [1.3.2] - 2026-09-13
 
 ### Ganti Password Mandiri & Panel Pantauan Status Website
