@@ -93,3 +93,6 @@ arsip-klien/
 
 # tooling cache & agent scratch
 .codebuddy/
+
+# sesi test e2e (jangan pernah tayang)
+tests/e2e/.auth/
