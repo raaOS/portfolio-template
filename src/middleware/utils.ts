@@ -49,7 +49,12 @@ export function addSecurityHeaders(response: NextResponse): NextResponse {
     [
       "default-src 'self'",
       isProd
-        ? "script-src 'self' 'unsafe-inline' https://www.youtube.com https://s.ytimg.com https://static.cloudflareinsights.com"
+        ? // 'wasm-unsafe-eval' (bukan 'unsafe-eval'): izinkan kompilasi
+          // WebAssembly secara terbatas — dipakai preload GLTF (drei/meshopt)
+          // di halaman publik spatial & FFmpeg WASM kompresor admin. Tanpa
+          // ini keduanya melempar CompileError di production (Lighthouse
+          // errors-in-console BP 92, terverifikasi 2026-09-26).
+          "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://www.youtube.com https://s.ytimg.com https://static.cloudflareinsights.com"
         : "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https://www.youtube.com https://s.ytimg.com https://static.cloudflareinsights.com",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https: blob:",
