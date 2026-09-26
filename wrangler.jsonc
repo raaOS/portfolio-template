@@ -15,6 +15,16 @@
       "bucket_name": "portfolio-template-media"
     }
   ],
+  "kv_namespaces": [
+    {
+      "binding": "NEXT_INC_CACHE_KV",
+      "id": "45637426c41046f985dfa29edccc3053"
+    },
+    {
+      "binding": "NEXT_TAG_CACHE_KV",
+      "id": "cb5634a164b64fe3842783c8ced942cf"
+    }
+  ],
   "observability": {
     "enabled": true
   }
