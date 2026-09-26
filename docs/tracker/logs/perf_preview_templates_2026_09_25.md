@@ -93,3 +93,9 @@ v2-*: awal | v3-osdesktop.json: desktop preset bukti fix opacity | v3m-*: pasca-
 1. **os-desktop → 80+** butuh memotong mainthread, bukan LCP lagi: `3-ftgc6l1aivb.js` (infinite-canvas engine ke-bundle di route os? cek dynamic import) + ScriptEval 2.7s. Target: code-split DesktopIconsLayer/lottie lebih agresif.
 2. **Deploy produksi** `npm run cf:deploy` = publish ke akun klien (irreversible) → WAJIB perintah eksplisit owner. Working tree ±70 file uncommitted (Sprint 90/91 WIP owner) → JANGAN commit tanpa perintah.
 3. BP92 spatial: audit audio autoplay console errors — belum digali.
+
+## SUSULAN (sesi 26/09 siang-sore, terukur produksi)
+- CSP prod: + 'wasm-unsafe-eval' (scope hanya script-src prod). errors-in-console 5->0, BP spatial 92->100. Verifikasi prod run2+: errors 0.
+- KV cache OpenNext (NEXT_INC_CACHE_KV + NEXT_TAG_CACHE_KV namespaces) -> TTFB prod 15-17s -> 0.13-1.1s (curl, x-nextjs-cache HIT).
+- Spatial split: SpatialScene.tsx via next/dynamic(ssr:false) di gate canvasReady (idle timeout 20s / interaksi pointer+wheel seketika); HDR adamsbridge 1566KB->216KB (subagent pixel-diff 3.2/255 = jitter animasi saja; AMAN). Prod: P41->62, LCP 5.0-6.2s -> 1.5-1.8s (2 run), TBT 3.0-4.4s (idle mount masih dlm jendela ukur; disengaja, jujur). A98 BP100.
+- Gate ulang: tsc 0, eslint 0, build 67/67, vitest 851/851. Deploy versi spatial-split live.
