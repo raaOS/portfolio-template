@@ -1,6 +1,5 @@
-#!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
-
+# husky v9: tidak perlu shebang + source husky.sh lagi (baris itu DEPRECATED
+# dan akan GAGAL di husky v10 — dibersihkan 2026-09-26, isi pemeriksaan utuh).
 echo "🔍 Running pre-commit checks..."
 npm run lint 2>&1 | head -20
 if [ $? -ne 0 ]; then

@@ -1,6 +1,4 @@
-#!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
-
+# husky v9 style (tanpa shebang/source husky.sh — lihat pre-commit)
 echo "🚀 Running pre-push checks..."
 
 # Run audit checks
