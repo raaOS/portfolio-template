@@ -45,6 +45,7 @@ function CheckoutForm() {
   const TEMPLATES = [
     { id: 'os-desktop', label: 'OS Desktop', desc: 'Desktop simulator bergaya macOS' },
     { id: 'infinite-canvas', label: 'Infinite Canvas', desc: 'Drag dan zoom project cards' },
+    { id: 'spatial-gallery', label: 'Spatial Gallery', desc: '3D spatial gallery dengan curved grid dan orbital artwork' },
   ];
 
   const selectedTemplate = TEMPLATES.find((t) => t.id === templateId) || TEMPLATES[0];

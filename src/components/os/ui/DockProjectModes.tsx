@@ -2,7 +2,7 @@
 
 import React, { useCallback, useState } from 'react';
 import { m } from 'motion/react';
-import { Grid, Box } from 'lucide-react';
+import { Grid, Box, type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useTransitionRouter } from 'next-view-transitions';
 import { AnimatePresence } from 'motion/react';
@@ -10,7 +10,7 @@ import { AnimatePresence } from 'motion/react';
 interface ModeOption {
   id: string;
   label: string;
-  icon: React.ElementType;
+  icon: LucideIcon;
   view: string;
   description: string;
 }

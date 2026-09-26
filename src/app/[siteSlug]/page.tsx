@@ -6,6 +6,7 @@ import { canUseWhatsappTestimonials } from '@/lib/product/sitePlan';
 import { mapD1ToTemplateData } from '@/lib/templates/dataMapper';
 import OSDesktopRenderer from '@/components/templates/os-desktop/OSDesktopRenderer';
 import InfiniteCanvasRenderer from '@/components/templates/infinite-canvas/InfiniteCanvasRenderer';
+import SpatialGalleryRenderer from '@/components/templates/spatial-gallery/SpatialGalleryRenderer';
 
 export const revalidate = 60;
 
@@ -62,6 +63,10 @@ export default async function TenantPage({ params }: TenantPageProps) {
 
   if (activeTemplateKey === 'infinite-canvas') {
     return <InfiniteCanvasRenderer data={templateData} />;
+  }
+
+  if (activeTemplateKey === 'spatial-gallery') {
+    return <SpatialGalleryRenderer data={templateData} />;
   }
 
   return <OSDesktopRenderer data={templateData} />;
