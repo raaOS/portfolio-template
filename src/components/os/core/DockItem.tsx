@@ -217,8 +217,12 @@ export function DockItem({
       className="group relative flex aspect-square shrink-0 cursor-pointer items-center justify-center rounded-[18px] outline-none transition-[filter] duration-200 hover:brightness-110 focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
       role={isLinkWrapped ? undefined : 'button'}
       aria-label={isLinkWrapped ? undefined : label}
-      aria-haspopup={popoverContent ? 'menu' : undefined}
-      aria-expanded={popoverContent ? isPopoverOpen : undefined}
+      // A11y fix (Fase 5): aria-haspopup/aria-expanded hanya valid pada
+      // elemen ber-role interaktif. Saat isLinkWrapped, role dihapus (anchor
+      // luar yang handle interaksi) -> atribut ini jadi aria-allowed-attr
+      // violation (skor A11y mobile os 89).
+      aria-haspopup={!isLinkWrapped && popoverContent ? 'menu' : undefined}
+      aria-expanded={!isLinkWrapped && popoverContent ? isPopoverOpen : undefined}
       tabIndex={isLinkWrapped ? -1 : 0}
       onKeyDown={handleKeyDown}
     >

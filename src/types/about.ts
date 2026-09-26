@@ -190,13 +190,14 @@ export interface AboutData {
   softSkills: AboutSoftSkills;
   designPhilosophy?: DesignPhilosophy;
 
-  // OS Configuration
+  // OS & Template Configuration
   desktopPreferences?: DesktopPreferences;
   wallpaperConfig?: WallpaperConfig;
   dockConfig?: DockPreferences;
   windowPreferences?: WindowPreferences;
   islandNotifications?: AboutIslandNotification[];
   soundConfig?: SoundConfig;
+  spatialGalleryConfig?: SpatialGalleryConfig;
 
   labels?: {
     experienceTitle?: string;
@@ -208,19 +209,27 @@ export interface AboutData {
   lastUpdated: string;
 }
 
+export interface SpatialGalleryConfig {
+  centerModelUrl?: string; // e.g. '/models/helmet.glb' or R2 URL
+  centerModelName?: string;
+  materialStyle?: 'glass' | 'original'; // 'glass' (crystal) or 'original'
+  modelScale?: number; // scale multiplier: 0.5 to 2.0 (default: 1.0)
+}
+
 export interface UpdateAboutData {
   hero?: Partial<AboutHero>;
   professional?: Partial<AboutProfessional>;
   softSkills?: Partial<AboutSoftSkills>;
   designPhilosophy?: Partial<DesignPhilosophy>;
 
-  // OS Configuration
+  // OS & Template Configuration
   desktopPreferences?: Partial<DesktopPreferences>;
   wallpaperConfig?: WallpaperConfig;
   dockConfig?: DockPreferences;
   windowPreferences?: WindowPreferences;
   islandNotifications?: AboutIslandNotification[];
   soundConfig?: SoundConfig;
+  spatialGalleryConfig?: SpatialGalleryConfig;
 
   labels?: Partial<AboutData['labels']>;
 }

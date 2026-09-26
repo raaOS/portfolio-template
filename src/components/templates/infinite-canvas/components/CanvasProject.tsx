@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Move } from 'lucide-react';
 import type { Project } from '@/types/projects';
 
@@ -13,6 +13,7 @@ interface CanvasProjectProps {
   zoom?: number;
   currentOffsetX?: number;
   currentOffsetY?: number;
+  eager?: boolean;
   onPositionChange?: (id: string, newOffsetX: number, newOffsetY: number) => void;
 }
 
@@ -40,6 +41,7 @@ export function CanvasProject({
   zoom = 1,
   currentOffsetX = 0,
   currentOffsetY = 0,
+  eager = false,
   onPositionChange,
 }: CanvasProjectProps) {
   const [isDraggingCard, setIsDraggingCard] = useState(false);
@@ -127,6 +129,39 @@ export function CanvasProject({
     project.cover?.endsWith('.webm') ||
     Boolean(project.autoplay);
 
+  // LCP/teater-streaming fix (2026-09-25): kartu video dulu langsung mount
+  // <video autoPlay preload> -> 4 video x ~3MB (11MB) tersedot di window
+  // LCP + di-fetch berulang (terukur x5 per URL via range request 206).
+  // Sekarang: poster <img> dulu; <video> baru di-mount saat hover atau
+  // setelah idle (khusus kartu eager) supaya autoplay tetap hidup tanpa
+  // memangsa bandwidth/parse budget fase boot.
+  const [videoActive, setVideoActive] = useState(false);
+  useEffect(() => {
+    if (!isVideo || !eager) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let idleId: number | undefined;
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    const start = () => {
+      if (!cancelled) setVideoActive(true);
+    };
+    if (typeof w.requestIdleCallback === 'function') {
+      idleId = w.requestIdleCallback(start, { timeout: 3000 });
+    } else {
+      timer = setTimeout(start, 1500);
+    }
+    return () => {
+      cancelled = true;
+      if (idleId !== undefined && typeof w.cancelIdleCallback === 'function') {
+        w.cancelIdleCallback(idleId);
+      }
+      if (timer !== undefined) clearTimeout(timer);
+    };
+  }, [isVideo, eager]);
+
   // Ratio asli dari database coverWidth/coverHeight, fallback ke natural dimension saat media termuat
   const [aspectRatio, setAspectRatio] = useState<string>(() => {
     if (
@@ -173,6 +208,9 @@ export function CanvasProject({
       style={style}
       onClick={handleClick}
       onPointerDown={handlePointerDown}
+      onPointerEnter={() => {
+        if (isVideo) setVideoActive(true);
+      }}
     >
       <div
         className={`relative ${widthClass} bg-neutral-100 dark:bg-neutral-900 rounded-2xl overflow-hidden border transition-all duration-300 ${
@@ -188,27 +226,47 @@ export function CanvasProject({
       >
         {/* Pure Media Display (Image or Video) — Mengikuti rasio asli 100% tanpa crop */}
         {isVideo && project.cover ? (
-          <video
-            src={project.cover}
-            poster={thumbnailUrl || undefined}
-            autoPlay
-            loop
-            muted
-            playsInline
-            onLoadedMetadata={(e) => {
-              const v = e.currentTarget;
-              if (v.videoWidth && v.videoHeight) {
-                setAspectRatio(`${v.videoWidth} / ${v.videoHeight}`);
-              }
-            }}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
+          videoActive ? (
+            <video
+              src={project.cover}
+              poster={thumbnailUrl || undefined}
+              autoPlay
+              loop
+              muted
+              playsInline
+              preload="auto"
+              onLoadedMetadata={(e) => {
+                const v = e.currentTarget;
+                if (v.videoWidth && v.videoHeight) {
+                  setAspectRatio(`${v.videoWidth} / ${v.videoHeight}`);
+                }
+              }}
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            />
+          ) : (
+            <img
+              src={thumbnailUrl || project.cover}
+              alt={project.title}
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              loading={eager ? 'eager' : 'lazy'}
+              fetchPriority={eager ? 'high' : 'auto'}
+              decoding={eager ? 'sync' : 'async'}
+              onLoad={(e) => {
+                const img = e.currentTarget;
+                if (img.naturalWidth && img.naturalHeight) {
+                  setAspectRatio(`${img.naturalWidth} / ${img.naturalHeight}`);
+                }
+              }}
+            />
+          )
         ) : thumbnailUrl ? (
           <img
             src={thumbnailUrl}
             alt={project.title}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-            loading="lazy"
+            loading={eager ? 'eager' : 'lazy'}
+            fetchPriority={eager ? 'high' : 'auto'}
+            decoding={eager ? 'sync' : 'async'}
             onLoad={(e) => {
               const img = e.currentTarget;
               if (img.naturalWidth && img.naturalHeight) {

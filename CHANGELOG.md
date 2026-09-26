@@ -3,6 +3,67 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.7] - 2026-09-26
+
+### ⚡ Optimasi Performa Preview (Lighthouse) — 3 Template
+
+- **Halaman preview jadi statis (ISR):** `/preview/os-desktop`, `/preview/infinite-canvas`, `/preview/spatial-gallery` kini di-pre-render saat build (`generateStaticParams`). Waktu tunggu server turun dari ±6 detik menjadi ±0,03 detik — fondasi semua perbaikan skor berikutnya.
+- **Perbaikan storage lokal:** gagal muat aset saat menjalankan template di PC tanpa koneksi Cloudflare (menyebabkan belasan request ulang dan skor performa palsu) sudah ditutup; aset wallpapers/video termuat normal secara lokal.
+- **Template Spatial Gallery:** layar putih total saat dibuka dari HP sekarang hilang. Poster gambar karya tampil seketika dari HTML pertama (bukan dari WebGL), mesin 3D baru mengambil alih setelah tekstur siap. Skor performa mobile terukur **91–93** (dari gagal total), LCP 1,5–1,9 detik.
+- **Template Infinite Canvas:** video karya tidak lagi membanjiri fase buka halaman — poster JPG dimuat duluan, video baru di-fetch saat browser santai atau saat kursor diarahkan ke kartu. Skor **78–80** (dari 65), LCP 7,3s → 5,2s, Speed Index 8,0s → 1,9s.
+- **Template macOS Desktop — teka-teki LCP terpecahkan:** wallpaper fullscreen ternyata SELALU diabaikan browser sebagai elemen konten terbesar karena rect-nya persis 100% viewport (dianggap latar halaman, bukan konten — perilaku mesin render Chrome, direproduksi di halaman uji terisolasi). Perbaikan: tinggi stage wallpaper dikurangi 1 pixel (`calc(100%-1px)`) — tidak terlihat oleh mata, tapi membuat wallpaper resmi menjadi elemen LCP terukur. Ditambah pembersih `filter: blur(0px)` sisa animasi dan penghapusan atribut ARIA liar di Dock. Efek: elemen LCP kini wallpaper @±0,8 detik (terverifikasi laporan Lighthouse), Accessible mobile naik 89 → 96.
+- **Perbaikan suite test:** `localStorage` hilang di environment test versi jsdom terbaru — polyfill minimal ditambahkan; **112 file / 851 test PASS** kembali.
+
+_Catatan teknis lengkap: `docs/tracker/logs/perf_preview_templates_2026_09_25.md`._
+
+---
+
+## [1.3.6] - 2026-09-25
+
+### 🔒 Keamanan & Stabilitas (Audit Eksternal)
+
+- **Upgrade Next.js 16.2.12 → 16.3.6:** Menutup kerentanan CRITICAL *Unauthenticated Remote Code Execution* (GHSA-p293-qw3h-jr36 & RCE Image Optimization AVIF).
+- **Sweep dependency audit bersih 0 temuan:** PostCSS 8.5.28 (path traversal), sharp 0.35.4 (libvips/libheif), Vitest 4.1.11 (moderate), undici/ws/js-yaml via `npm audit fix`. Override `postcss` dinaikkan ke `^8.5.28` global + nested next.
+- **Perbaikan redirect mati (bug senyap):** `next.config.mjs` memiliki dua blok `redirects()` duplikat — JavaScript hanya memakai definisi terakhir, sehingga redirect `/works/*`, `/project/*`, `/home`, `/index`, `/indeks` selama ini TIDAK berfungsi. Blok duplikat dihapus, seluruh redirect aktif kembali (terverifikasi HTTP 308 di build production).
+- **Hardening CSP:** Middleware kini menambahkan `worker-src 'self' blob:` (menjamin kompresi FFmpeg WASM admin tidak mati saat CSP aktif), plus header `X-DNS-Prefetch-Control`, `Permissions-Policy`, COOP/COEP yang sebelumnya hanya ada di config build.
+- **Pemisahan secret R2 upload:** Penandaan URL unggah R2 kini wajib `JWT_SECRET` — fallback ke `REVALIDATION_TOKEN` dihapus agar token revalidate tidak bisa dipakai memalsukan tanda tangan unggah.
+- **Bugfix tipe Dock:** `DockProjectModes` kini memakai tipe `LucideIcon` (sebelumnya `React.ElementType` memicu error `never` yang membuntukan `tsc`).
+
+---
+
+## [1.3.5] - 2026-09-18
+
+### 🌌 Template Spatial Gallery
+
+- **Perbaikan Bug Kritis: Aset Database Tampil Hitam:** Memperbaiki bug di mana seluruh tile gambar dari database D1/R2 tampil hitam pekat di halaman `/preview/spatial-gallery` — helm 3D dan grid shader render normal, tetapi gambar karya tidak muncul. Root cause: implementasi manual `TextureLoader.load()` / `new Texture(img)` via `useState` asinkron saat mem-port kode dari `helmetsrc` gagal mengupload texture ke GPU dengan color space yang benar dan melewatkan siklus `gl.initTexture`. Perbaikan: diganti dengan `useTexture` dari `@react-three/drei` (suspense-based loader) yang otomatis menangani decoding, sRGB color space, caching, dan upload GPU ke WebGL — persis pola yang berhasil di kode asli `helmetsrc`.
+- **Perbaikan Import Missing Suspense:** Mengimpor `Suspense` dari `'react'` yang sebelumnya terlewat dan memicu `ReferenceError: Suspense is not defined` di error boundary.
+- **Koreksi Rotasi Tile (Anti-Mirror):** Menyesuaikan sudut rotasi Y tile silinder (`ry = -(theta - Math.PI / 2)`) agar bagian depan gambar menghadap ke arah kamera pengunjung di luar silinder, sehingga teks dan karya tidak terbalik/mirrored.
+- **Dukungan Poster untuk Video Cover (Lengkap 21 Proyek):** Mengintegrasikan `getVideoPosterSource()` agar proyek dengan cover video `.mp4` secara otomatis menggunakan gambar poster pendamping (`.jpg`), sehingga seluruh 21 proyek portofolio tampil lengkap di ring silinder 3D tanpa ada yang ter-skip.
+- **Fallback Aset Lokal `/tube/`:** Jika database tidak memiliki gambar (semua cover = video / gallery kosong), sistem otomatis fallback ke 9 aset gambar bawaan dari `helmetsrc` (`/tube/im1.jpg`–`im9.jpg`) di `public/tube/`.
+
+---
+
+## [1.3.4] - 2026-09-15
+
+### 🌌 Template Spatial Gallery
+
+- **Rombak Total Engine 3D (Particle Sphere):** Menggantikan seluruh engine scene lama template Spatial Gallery dengan efek **Particle Sphere 3D Orbit** yang baru: 1.500 partikel debu halus membentuk bola fibonacci raksasa yang mengambang di ruang angkasa, sementara hingga 24 gambar karya project Anda mengorbit rapi membentuk cincin di bidang ekuator bola. Seluruh galaksi berputar otomatis perlahan tanpa perlu sentuhan.
+- **Interaksi Penuh Bebas Jelajah (Drag, Scroll, Pan):** Pengunjung kini dapat men-drag untuk memutar sudut pandang galaksi, scroll untuk zoom masuk/keluar, dan pan untuk menggeser fokus — kontrol navigasi 3D standar industri yang sebelumnya tidak tersedia sama sekali.
+- **Karya Mengelilingi Pusar Secara Teratur:** Gambar tidak lagi menumpuk atau bertabrakan. Setiap karya otomatis menempati slot orbit yang terdistribusi merata 360° mengelilingi pusat bola, menghadap keluar sehingga selalu terlihat jelas dari segala arah pandang.
+- **Rasio Aspek Asli Setiap Karya (Tanpa Crop & Tanpa Distorsi):** Gambar karya kini tampil dengan **rasio aspek aslinya masing-masing** — karya lanskap tampil melebar natural, karya potret tampil tegak elegan, tanpa dipaksa kotak 1:1. Tinggi visual disamakan rapi di seluruh orbit sehingga komposisi tetap tertata, dilengkapi pengaman rasio agar thumbnail ekstrem (format story 9:16 maupun panorama) tidak merusak ritme lingkaran.
+- **Kecerdasan Memuat Media dengan Rantai Fallback:** Sistem kini cerdas mencari gambar pengganti bila sebuah karya gagal dimuat — otomatis mencoba poster video, cover utama, lalu gambar galeri pertama — sehingga slot kosong tetap tampil anggun dengan warna aksen, tidak pernah membuat aplikasi crash.
+- **Performa Hemat Resource (1 Draw Call untuk 1.500 Partikel):** Partikel dirender menggunakan teknologi *instanced mesh* sehingga 1.500 titik debu hanya membebani GPU seolah satu objek tunggal. Distribusi partikel deterministik yang stabil juga menjamin tidak ada kedipan layout saat halaman dimuat ulang.
+
+### 🖥️ Template macOS Desktop
+
+- **Perbaikan Stabilitas Build:** Memperbaiki warning import yang tersisa dari refactor Dock terdahulu yang muncul berulang kali pada setiap pembaruan kode di lingkungan pengembangan.
+
+### 🌌 Template Infinite Canvas
+
+- **Ketahanan Posisi Kartu:** Memperbaiki logika pembacaan posisi kartu karya tersimpan agar tidak salah membaca data rusak (nilai koordinat tidak valid) — kini kartu kembali ke formasi default 4 kuadran yang seimbang.
+
+---
+
 ## [1.3.3] - 2026-09-13
 
 ### 🎨 Template Infinite Canvas

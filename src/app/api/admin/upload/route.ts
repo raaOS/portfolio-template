@@ -180,6 +180,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const is3DModelUpload =
+      contentType === 'model/gltf-binary' ||
+      contentType === 'model/gltf+json' ||
+      file.name.toLowerCase().endsWith('.glb') ||
+      file.name.toLowerCase().endsWith('.gltf');
+
+    if (is3DModelUpload && !contentType.startsWith('model/')) {
+      contentType = file.name.toLowerCase().endsWith('.gltf')
+        ? 'model/gltf+json'
+        : 'model/gltf-binary';
+    }
+
     const isVideoUpload = contentType.startsWith('video/');
     const isImageUpload = contentType.startsWith('image/');
     const isAudioUpload = contentType.startsWith('audio/');
@@ -187,9 +199,18 @@ export async function POST(req: NextRequest) {
     const MAX_IMAGE_BYTES = 30 * 1024 * 1024;
     const MAX_VIDEO_BYTES_FORMDATA = 60 * 1024 * 1024;
     const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
+    const MAX_3D_MODEL_BYTES = 50 * 1024 * 1024;
 
     const currentSize = buffer.length;
 
+    if (is3DModelUpload && currentSize > MAX_3D_MODEL_BYTES) {
+      return NextResponse.json(
+        {
+          error: `Model 3D ${(currentSize / 1024 / 1024).toFixed(1)} MB melewati batas ${MAX_3D_MODEL_BYTES / 1024 / 1024} MB.`,
+        },
+        { status: 413 }
+      );
+    }
     if (isImageUpload && currentSize > MAX_IMAGE_BYTES) {
       return NextResponse.json(
         {
@@ -346,6 +367,8 @@ export async function POST(req: NextRequest) {
         targetDir = 'assets/sounds';
       } else if (folderParam === 'wallpapers') {
         targetDir = 'assets/wallpapers';
+      } else if (folderParam === 'models') {
+        targetDir = 'assets/models';
       } else if (folderParam && folderParam.startsWith('assets/')) {
         targetDir = folderParam;
       } else {
@@ -373,10 +396,12 @@ export async function POST(req: NextRequest) {
         (folderParam.startsWith('assets/') ||
           folderParam === 'temp' ||
           folderParam === 'wallpapers' ||
-          folderParam === 'sounds')
+          folderParam === 'sounds' ||
+          folderParam === 'models')
       ) {
         if (folderParam === 'wallpapers') targetDir = 'assets/wallpapers';
         else if (folderParam === 'sounds') targetDir = 'assets/sounds';
+        else if (folderParam === 'models') targetDir = 'assets/models';
         else targetDir = folderParam;
       } else {
         targetDir = 'assets/media';

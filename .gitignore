@@ -90,3 +90,6 @@ PRD_ContextPack_*.docx
 
 # Client Archives (contains private client tokens)
 arsip-klien/
+
+# tooling cache & agent scratch
+.codebuddy/

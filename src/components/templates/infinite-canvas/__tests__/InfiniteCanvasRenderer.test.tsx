@@ -358,26 +358,29 @@ describe('InfiniteCanvasRenderer', () => {
     expect(screen.getByRole('button', { name: 'Noted' })).toBeInTheDocument();
   });
 
-  it('merender tombol grid style switcher dan mengubah gaya latar belakang saat diklik', () => {
+  it('merender dropdown grid style switcher dan mengubah gaya latar belakang saat dipilih', () => {
     mockIsAdmin = false;
     const data = createMockData(10);
     render(<InfiniteCanvasRenderer data={data} />);
 
-    // Tombol grid style toggle
-    const gridBtn = screen.getByRole('button', { name: /ganti gaya grid/i });
+    // Trigger dropdown grid style
+    const gridBtn = screen.getByRole('button', { name: /pilih gaya grid/i });
     expect(gridBtn).toBeInTheDocument();
     expect(gridBtn).toHaveTextContent('DOTS');
 
-    // Klik 1x: beralih ke GRID (Blueprint lines)
+    // Buka dropdown lalu pilih GRID (Blueprint lines)
     fireEvent.click(gridBtn);
+    fireEvent.click(screen.getByRole('button', { name: /^GRID$/i }));
     expect(gridBtn).toHaveTextContent('GRID');
 
-    // Klik 2x: beralih ke BLANK (Polos)
+    // Buka lagi lalu pilih BLANK (Polos)
     fireEvent.click(gridBtn);
+    fireEvent.click(screen.getByRole('button', { name: /^BLANK$/i }));
     expect(gridBtn).toHaveTextContent('BLANK');
 
-    // Klik 3x: kembali ke DOTS
+    // Buka lagi lalu kembali ke DOTS
     fireEvent.click(gridBtn);
+    fireEvent.click(screen.getByRole('button', { name: /^DOTS$/i }));
     expect(gridBtn).toHaveTextContent('DOTS');
   });
 });

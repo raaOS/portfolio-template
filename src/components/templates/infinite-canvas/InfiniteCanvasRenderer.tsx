@@ -121,12 +121,16 @@ export default function InfiniteCanvasRenderer({ data }: TemplateRendererProps) 
 
     displayProjects.forEach((p, index) => {
       const defaultPos = getProjectPosition(index);
-      const localPos = savedInLocal[`canvas-${p.id}`] || savedInLocal[p.id];
-      const dbPos = savedInDb[`canvas-${p.id}`] || (savedInDb[p.id] && (savedInDb[p.id].x < 0 || savedInDb[p.id].y < 0) ? savedInDb[p.id] : undefined);
+      const localKey = `canvas-${p.id}`;
+      const localPos = savedInLocal[localKey];
+      const rawDbPos = savedInDb[localKey];
+      const dbPos = (rawDbPos && typeof rawDbPos.x === 'number' && typeof rawDbPos.y === 'number')
+        ? rawDbPos
+        : undefined;
 
       if (localPos && typeof localPos.x === 'number') {
         initial[p.id] = { offsetX: localPos.x, offsetY: localPos.y, rotate: defaultPos.rotate };
-      } else if (dbPos && typeof dbPos.x === 'number') {
+      } else if (dbPos) {
         initial[p.id] = { offsetX: dbPos.x, offsetY: dbPos.y, rotate: defaultPos.rotate };
       } else {
         initial[p.id] = defaultPos;
@@ -389,6 +393,7 @@ export default function InfiniteCanvasRenderer({ data }: TemplateRendererProps) 
               zoom={zoom}
               currentOffsetX={pos.offsetX}
               currentOffsetY={pos.offsetY}
+              eager={index < 4}
               onPositionChange={handlePositionChange}
               onSelect={(p) => setSelectedProject(p)}
               style={{

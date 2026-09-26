@@ -221,20 +221,6 @@ const nextConfig = {
       },
     ];
   },
-  async redirects() {
-    return [
-      {
-        source: '/admin/templates',
-        destination: '/admin',
-        permanent: false,
-      },
-      {
-        source: '/admin/templates/:path*',
-        destination: '/admin',
-        permanent: false,
-      },
-    ];
-  },
   // Production optimizations
   productionBrowserSourceMaps: false,
   poweredByHeader: false,

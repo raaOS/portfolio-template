@@ -16,7 +16,7 @@ export default defineConfig({
       '**/node_modules/**',
       '**/dist/**',
       '**/cypress/**',
-      '**/.{idea,git,cache,output,temp}/**',
+      '**/.{idea,git,cache,output,temp,kilo,next,open-next,wrangler,playwright-cli,tmp}/**',
       '**/{karma,rollup,webpack,vite,vitest,ava,babel,nyc,cypress,tsup,build}.config.*',
       '**/tests/e2e/**',
     ],

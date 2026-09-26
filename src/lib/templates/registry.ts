@@ -26,6 +26,11 @@ export const TEMPLATES: TemplateMeta[] = [
     name: 'Infinite Canvas',
     description: 'Infinite canvas dengan drag-to-explore dan zoom untuk melihat project.',
   },
+  {
+    id: 'spatial-gallery',
+    name: 'Spatial Gallery',
+    description: 'Portfolio 3D spatial gallery dengan curved grid, orbital artwork, dan central metallic sculpture.',
+  },
 ];
 
 /**

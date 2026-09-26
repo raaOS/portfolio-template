@@ -175,8 +175,28 @@ function getS3FallbackModulePath() {
   return `./r2Storage${suffix}`;
 }
 
+/**
+ * Runtime-aware S3 fallback loader.
+ *
+ * Cloudflare Worker build TIDAK boleh meng-bundle `@aws-sdk/*` (bloat
+ * ~600KB, nodejs_compat tidak menjamin API S3 penuh). Karena itu jalur
+ * Worker pakai `webpackIgnore` + dynamic string path agar bundler
+ * melewatkan resolusi import.
+ *
+ * Tapi di jalur Node (`next start` production, `next dev`), trick yang
+ * sama bikin modul `r2StorageS3` tidak ikut ter-bundle → runtime crash
+ * `Cannot find module .next/server/chunks/r2StorageS3` → setiap request
+ * `/r2/...` balas 502. Terukur bikin LCP os-desktop 7-15s & canvas
+ * retry-storm 261 request di Lighthouse.
+ *
+ * Solusi: guard pakai `process.env.NEXT_RUNTIME`. DefinePlugin Next
+ * mengganti konstanta ini SAAT compile (per-target: 'nodejs' | 'edge')
+ * sehingga bundler dead-code-eliminate branch yang tidak relevan:
+ *   - Node build   → hanya import statis yang bertahan (ter-bundle, aman)
+ *   - Edge build   → hanya webpackIgnore path yang bertahan (aws-sdk keluar)
+ */
 async function getS3Fallback(): Promise<S3FallbackModule> {
-  if (process.env.NODE_ENV === 'development') {
+  if (process.env.NEXT_RUNTIME !== 'edge') {
     return import('./r2StorageS3') as Promise<S3FallbackModule>;
   }
 
@@ -384,9 +404,11 @@ export async function listR2ObjectKeys(input: ListR2ObjectsInput) {
 }
 
 function getUploadTokenSecret() {
-  const secret = process.env.JWT_SECRET || process.env.REVALIDATION_TOKEN;
+  // Jangan fallback ke REVALIDATION_TOKEN: secret harus dipisahkan per keperluan.
+  // REVALIDATION_TOKEN dipakai /api/revalidate sebagai bearer token, bukan signing key.
+  const secret = process.env.JWT_SECRET;
   if (!secret) {
-    throw new Error('JWT_SECRET or REVALIDATION_TOKEN is required to sign R2 upload URLs');
+    throw new Error('JWT_SECRET is required to sign R2 upload URLs');
   }
   return secret;
 }

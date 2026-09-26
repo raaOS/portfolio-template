@@ -139,10 +139,51 @@ export const infiniteCanvasCrudConfig: TemplateCrudConfig = {
   ],
 };
 
+/**
+ * Spatial Gallery — minimal CRUD: about, projects only
+ */
+export const spatialGalleryCrudConfig: TemplateCrudConfig = {
+  templateId: 'spatial-gallery',
+  entities: [
+    {
+      id: 'about',
+      label: 'Profil & About',
+      description: 'Kelola info profil, bio, headline, dan avatar.',
+      apiPath: '/api/templates/spatial-gallery/about',
+      adminPath: '/admin/content/profile',
+      fields: [
+        { key: 'hero.name', label: 'Nama', type: 'text', required: true },
+        { key: 'hero.title', label: 'Title / Jabatan', type: 'text' },
+        { key: 'hero.headline', label: 'Headline', type: 'textarea' },
+        { key: 'hero.description', label: 'Deskripsi', type: 'textarea' },
+        { key: 'professional.bio', label: 'Bio Lengkap', type: 'textarea' },
+      ],
+    },
+    {
+      id: 'projects',
+      label: 'Projects',
+      description: 'Kelola daftar project portfolio.',
+      apiPath: '/api/templates/spatial-gallery/projects',
+      adminPath: '/admin/projects',
+      fields: [
+        { key: 'title', label: 'Judul', type: 'text', required: true },
+        { key: 'description', label: 'Deskripsi', type: 'textarea' },
+        { key: 'cover_url', label: 'Cover Image', type: 'image' },
+        { key: 'tags', label: 'Tags', type: 'array' },
+        { key: 'year', label: 'Tahun', type: 'text' },
+        { key: 'category', label: 'Kategori', type: 'text' },
+        { key: 'featured', label: 'Featured', type: 'boolean' },
+        { key: 'status', label: 'Status', type: 'text' },
+      ],
+    },
+  ],
+};
+
 /** All registered CRUD configs */
 export const TEMPLATE_CRUD_CONFIGS: Record<string, TemplateCrudConfig> = {
   'os-desktop': osDesktopCrudConfig,
   'infinite-canvas': infiniteCanvasCrudConfig,
+  'spatial-gallery': spatialGalleryCrudConfig,
 };
 
 /**

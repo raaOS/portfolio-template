@@ -116,6 +116,23 @@ export default function DesktopBackground({
     setHasLoadError(true);
   }, []);
 
+  // POSTER-FIRST (pola sama dengan infinite-canvas Fase 3): <video> baru
+  // di-mount saat browser idle (atau maksimal 4s) SETELAH desktop revealed.
+  // Tanpa gate ini, range-request MP4 (3x 206) berebut bandwidth dengan
+  // wallpaper JPG + chunk JS pada fase kritis Lighthouse mobile (1.6Mbps)
+  // sehingga LCP tersimulasi molor ke 6-7s meski img selesai ~0.8s.
+  const [videoIdleReady, setVideoIdleReady] = useState(false);
+  useEffect(() => {
+    if (!isVideo) return;
+    if (typeof window === 'undefined') return;
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(() => setVideoIdleReady(true), { timeout: 4000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const t = window.setTimeout(() => setVideoIdleReady(true), 1500);
+    return () => window.clearTimeout(t);
+  }, [isVideo]);
+
   useEffect(() => {
     // Skip probe when a single candidate exists. Either we have an
     // explicit posterUrl from D1 (trusted) or no candidates at all
@@ -202,7 +219,20 @@ export default function DesktopBackground({
       typeof navigator.hardwareConcurrency === 'number' && navigator.hardwareConcurrency <= 2;
     return !isSaveData && !slow && !isLowEndDevice;
   });
-  const shouldMountVideo = isVideo && shouldPlayVideo && !prefersReducedMotion && isDesktopRevealed;
+  const shouldMountVideo = isVideo && shouldPlayVideo && !prefersReducedMotion && isDesktopRevealed && videoIdleReady;
+  // LCP fix (2026-09-25): poster wallpaper harus SATU element <img> stabil
+  // yang TIDAK PERNAH di-unmount lintas transisi:
+  //   SSR -> hydration -> desktop chunk -> video mount.
+  // Sebelumnya poster versi-SSR dan poster versi-video adalah dua elemen
+  // berbeda yang saling toggle, sehingga DOM <img> di-remount saat video
+  // mount -> LCP element berpindah ke ikon dock (terukur LCP = img 53x53px
+  // @11.2s, bukan wallpaper). Sekarang video di-fade-in di ATAS poster
+  // (bukan mengganti poster).
+  const posterSrc = hasLoadError
+    ? DEFAULT_WALLPAPER_URL
+    : isVideo
+      ? posterUrl || DEFAULT_WALLPAPER_URL
+      : activeWallpaper;
 
   useEffect(() => {
     if (!isVideo) return;
@@ -282,116 +312,70 @@ export default function DesktopBackground({
   // di-resize sharp di build pipeline + Next/Image, jadi aman di-scale.
   const idleScale = isVideo ? 1 : 1.08;
 
+  // LCP fix (2026-09-26): `filter: blur(0px)` dihitung BUKAN sebagai `none`
+  // oleh Blink -> membuat render surface yang mengeluarkan img wallpaper
+  // dari keanggotaan kandidat LCP pada paint pertama (dibuktikan via probe
+  // ablate: strip filter di DOMContentLoaded mengubah pemenang LCP dari
+  // project-icon@2s -> teks@0.4s). Kalau blurAmount 0, properti filter
+  // tidak boleh di-emit sama sekali oleh motion.
+  const hasBlur = blurAmount > 0;
+  const openBlur = blurAmount + (isWindowOpen ? 6 : 0);
   const animateTarget =
     prefersReducedMotion || isMobile
-      ? {
-          scale: 1,
-          filter: `blur(${blurAmount}px)`,
-        }
-      : {
-          scale: isWindowOpen ? 1 : idleScale,
-          // Window-open blur amplification dikurangi dari +12 ke +6.
-          // Alasan: nilai +12 membuat wallpaper terlalu pucat untuk di-pickup
-          // oleh backdrop-filter dock (chained blur kehilangan info warna →
-          // dock terasa "padat putih" alih-alih "vibrancy glass"). +6 cukup
-          // untuk efek iOS-depth tanpa membunuh dock.
-          filter: isWindowOpen ? `blur(${blurAmount + 6}px)` : `blur(${blurAmount}px)`,
-        };
+      ? hasBlur
+        ? { scale: 1, filter: `blur(${blurAmount}px)` }
+        : { scale: 1 }
+      : openBlur > 0
+        ? { scale: isWindowOpen ? 1 : idleScale, filter: `blur(${openBlur}px)` }
+        : { scale: isWindowOpen ? 1 : idleScale };
 
   return (
     <div className="fixed inset-0 z-0 h-full w-full overflow-hidden bg-black">
       <m.div
-        className="relative h-full w-full"
+        // LCP fix (2026-09-26, deterministik via repro statis lcp-probe):
+        // Blink MENGECAULIKAN image yang paint rect-nya persis memenuhi
+        // viewport (>= 100% area) dari kandidat LCP — diperlakukan sebagai
+        // page background. 390x844 pada viewport 390x844 = absen dari daftar
+        // kandidat betapapun awal load-nya (terbukti: h843 teregistrasi @60ms
+        // 328.770px2, h844 tidak pernah). Stage dikurangi 1px; outer
+        // container `bg-black` menutupi selisihnya (tak terlihat — selalu di
+        // bawah dock/menu area, warna sama dengan letterbox OS).
+        className="relative h-[calc(100%-1px)] w-full"
         initial={false}
         animate={animateTarget}
         transition={springTransition}
       >
-        {/* Primary wallpaper - Priority load for LCP with automatic default fallback */}
-        {hasLoadError ? (
-          <Image
-            src={DEFAULT_WALLPAPER_URL}
-            alt="Desktop wallpaper"
-            fill
-            priority
-            fetchPriority="high"
-            unoptimized={true}
-            quality={75}
-            sizes="100vw"
-            className="object-cover"
-            style={{ transform: 'translateZ(0)' }}
-          />
-        ) : isVideo ? (
-          // Bandwidth-aware video wallpaper.
-          shouldMountVideo ? (
-            <React.Fragment key={activeWallpaper}>
-              {posterUrl && (
-                <Image
-                  src={posterUrl}
-                  alt=""
-                  fill
-                  priority
-                  unoptimized={true}
-                  className={`pointer-events-none object-cover transition-opacity duration-700 ${videoReady ? 'opacity-0' : 'opacity-100'}`}
-                  style={{ transform: 'translateZ(0)' }}
-                />
-              )}
-              <video
-                ref={videoRef}
-                src={videoSrc}
-                poster={posterUrl}
-                autoPlay
-                muted
-                loop
-                playsInline
-                preload="metadata"
-                onCanPlay={handleVideoCanPlay}
-                onError={handleMediaError}
-                className={`h-full w-full object-cover transition-opacity duration-700 ${videoReady ? 'opacity-100' : 'opacity-0'}`}
-                style={{ transform: 'translateZ(0)' }}
-              />
-            </React.Fragment>
-          ) : posterUrl ? (
-            <Image
-              src={posterUrl}
-              alt="Desktop wallpaper"
-              fill
-              priority
-              fetchPriority="high"
-              unoptimized={true}
-              quality={75}
-              sizes="100vw"
-              className="object-cover"
-              style={{ transform: 'translateZ(0)' }}
+        {/* Primary wallpaper - Priority load for LCP with automatic default fallback.
+            Satu element <Image> stabil (tidak pernah di-unmount) -> LCP element
+            tetap wallpaper lintas transisi SSR -> video mount. */}
+        <Image
+          src={posterSrc}
+          alt="Desktop wallpaper"
+          fill
+          priority
+          fetchPriority="high"
+          unoptimized={true}
+          quality={75}
+          sizes="100vw"
+          className="object-cover opacity-100"
+          onError={handleMediaError}
+        />
+        {isVideo && shouldMountVideo && (
+          <React.Fragment key={activeWallpaper}>
+            <video
+              ref={videoRef}
+              src={videoSrc}
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              onCanPlay={handleVideoCanPlay}
               onError={handleMediaError}
-            />
-          ) : (
-            <Image
-              src={DEFAULT_WALLPAPER_URL}
-              alt="Desktop wallpaper"
-              fill
-              priority
-              fetchPriority="high"
-              unoptimized={true}
-              quality={75}
-              sizes="100vw"
-              className="object-cover"
+              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${videoReady ? 'opacity-100' : 'opacity-0'}`}
               style={{ transform: 'translateZ(0)' }}
             />
-          )
-        ) : (
-          <Image
-            src={activeWallpaper}
-            alt="Desktop wallpaper"
-            fill
-            priority
-            fetchPriority="high"
-            unoptimized={true}
-            quality={75}
-            sizes="100vw"
-            className="object-cover"
-            style={{ transform: 'translateZ(0)' }}
-            onError={handleMediaError}
-          />
+          </React.Fragment>
         )}
       </m.div>
 

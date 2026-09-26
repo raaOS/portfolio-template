@@ -9,6 +9,14 @@ import InfiniteCanvasRenderer from '@/components/templates/infinite-canvas/Infin
 
 export const revalidate = 60;
 
+const PREVIEW_SLUGS = ['os-desktop', 'infinite-canvas', 'spatial-gallery'] as const;
+
+// Tanpa ini /preview/* selalu render penuh per-request (TTFB 6.3s terukur di
+// produksi). Dengan gSP, halaman jadi ISR: pre-render saat build + cache 60s.
+export function generateStaticParams() {
+  return PREVIEW_SLUGS.map((template) => ({ template }));
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -23,7 +31,9 @@ export async function generateMetadata({
       ? 'macOS Desktop OS Template Demo'
       : templateSlug === 'infinite-canvas'
         ? '3D Infinite Canvas Template Demo'
-        : 'Portfolio Template Demo';
+        : templateSlug === 'spatial-gallery'
+          ? '3D Spatial Gallery Template Demo'
+          : 'Portfolio Template Demo';
 
   return {
     title,
@@ -90,6 +100,11 @@ export default async function PreviewPage({
   switch (templateSlug) {
     case 'infinite-canvas':
       return <InfiniteCanvasRenderer data={templateData} />;
+    case 'spatial-gallery':
+      const { default: SpatialGalleryRenderer } = await import(
+        '@/components/templates/spatial-gallery/SpatialGalleryRenderer'
+      );
+      return <SpatialGalleryRenderer data={templateData} />;
     case 'os-desktop':
       // Redirect ke homepage jika pilih OS Desktop
       const { default: OSDesktopRenderer } = await import(

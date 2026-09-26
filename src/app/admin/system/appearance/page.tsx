@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Monitor, Image as ImageIcon } from 'lucide-react';
+import { useState, lazy, Suspense } from 'react';
+import { Monitor, Image as ImageIcon, Box } from 'lucide-react';
 import { AdminAuthGuard } from '../../components/AdminAuthGuard';
 import { AdminHeader } from '../../components/components/AdminHeader';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
@@ -10,6 +10,8 @@ import { useAdminContent } from '../../hooks/useAdminContent';
 import WallpaperManager from '../components/WallpaperManager';
 import DesktopProjectsForm from '../components/DesktopProjectsForm';
 import AdminLoading from '@/components/admin/AdminLoading';
+
+const SpatialModelManager = lazy(() => import('../components/SpatialModelManager'));
 
 function AppearanceClientContent() {
   const { csrfToken } = useAdminAuth();
@@ -23,7 +25,7 @@ function AppearanceClientContent() {
 
   const { projects } = useAdminContent(csrfToken);
 
-  const [activeSubTab, setActiveSubTab] = useState<'wallpaper' | 'desktop'>('wallpaper');
+  const [activeSubTab, setActiveSubTab] = useState<'wallpaper' | 'desktop' | 'spatial'>('wallpaper');
 
   if (loading && !systemData) {
     return (
@@ -82,6 +84,17 @@ function AppearanceClientContent() {
             <Monitor className="h-4 w-4" />
             Ikon Desktop
           </button>
+          <button
+            onClick={() => setActiveSubTab('spatial')}
+            className={`flex items-center gap-2 border-b-2 px-6 py-3 text-sm font-semibold transition-all ${
+              activeSubTab === 'spatial'
+                ? 'border-purple-600 text-purple-600'
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+            }`}
+          >
+            <Box className="h-4 w-4" />
+            Objek 3D Spatial
+          </button>
         </div>
 
         {/* Tab Content */}
@@ -102,7 +115,7 @@ function AppearanceClientContent() {
                 isLoading={systemIsPlaceholder}
               />
             </div>
-          ) : (
+          ) : activeSubTab === 'desktop' ? (
             <div className="space-y-8">
               <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
                 <h3 className="flex items-center gap-2 font-bold text-blue-800">
@@ -117,6 +130,25 @@ function AppearanceClientContent() {
                 data={systemData.desktopPreferences}
                 onUpdate={(data) => handleUpdateSystem({ desktopPreferences: data })}
               />
+            </div>
+          ) : (
+            <div className="space-y-8">
+              <div className="mb-6 rounded-lg border border-purple-200 bg-purple-50 p-4">
+                <h3 className="flex items-center gap-2 font-bold text-purple-800">
+                  <Box className="h-5 w-5" /> Objek 3D Tengah — Spatial Gallery
+                </h3>
+                <p className="mt-1 text-sm text-purple-600">
+                  Ganti model 3D di tengah ring template Spatial Gallery. Upload file .glb kustom atau gunakan preset bawaan.
+                </p>
+              </div>
+              <Suspense fallback={<AdminLoading size="default" />}>
+                <SpatialModelManager
+                  data={systemData.spatialGalleryConfig}
+                  onUpdate={(cfg) => handleUpdateSystem({ spatialGalleryConfig: cfg })}
+                  csrfToken={csrfToken}
+                  isLoading={systemIsPlaceholder}
+                />
+              </Suspense>
             </div>
           )}
         </div>

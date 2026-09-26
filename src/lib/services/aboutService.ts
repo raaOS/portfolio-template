@@ -88,6 +88,10 @@ function extractAboutAssets(data: AboutData): string[] {
     }
   }
 
+  if (data.spatialGalleryConfig?.centerModelUrl) {
+    assets.push(data.spatialGalleryConfig.centerModelUrl);
+  }
+
   return assets;
 }
 
@@ -151,6 +155,10 @@ export const aboutService = {
         ),
         soundConfig: { ...current.soundConfig, ...(updates.soundConfig || {}) } as SoundConfig,
         labels: { ...(current.labels || {}), ...(updates.labels || {}) } as AboutData['labels'],
+        spatialGalleryConfig:
+          updates.spatialGalleryConfig !== undefined
+            ? updates.spatialGalleryConfig
+            : current.spatialGalleryConfig,
 
         lastUpdated: new Date().toISOString(),
       };

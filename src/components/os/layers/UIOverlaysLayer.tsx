@@ -4,7 +4,7 @@ import React from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'motion/react';
 import MenuBar from '../core/MenuBar';
-import { OSDock } from '../core/Dock';
+import { OSDock } from '../core/OSDock';
 import { DockPortal } from '@/components/layout/GlobalDockSlot';
 
 import type { AboutData } from '@/types/about';

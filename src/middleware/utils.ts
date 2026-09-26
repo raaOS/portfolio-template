@@ -56,6 +56,9 @@ export function addSecurityHeaders(response: NextResponse): NextResponse {
       "font-src 'self' data:",
       "connect-src 'self' https: wss: http://localhost:* ws://localhost:* blob:",
       "media-src 'self' https: data: blob:",
+      // FFmpeg WASM (BackgroundUploadContext / useFFmpeg) load worker & core dari
+      // blob: URL via toBlobURL — tanpa direktif ini kompresi video admin mati di production.
+      "worker-src 'self' blob:",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",

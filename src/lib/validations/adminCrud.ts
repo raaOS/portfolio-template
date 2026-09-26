@@ -308,6 +308,15 @@ const aboutLabelsSchema = z
   })
   .strict();
 
+const spatialGalleryConfigSchema = z
+  .object({
+    centerModelUrl: shortText(1000).optional(),
+    centerModelName: shortText(200).optional(),
+    materialStyle: z.enum(['glass', 'original']).optional(),
+    modelScale: z.coerce.number().min(0.1).max(10).optional(),
+  })
+  .strict();
+
 export const updateAboutSchema = z
   .object({
     hero: aboutHeroSchema.partial().optional(),
@@ -321,6 +330,7 @@ export const updateAboutSchema = z
     islandNotifications: z.array(islandNotificationSchema).max(100).optional(),
     soundConfig: z.record(z.string(), soundSettingSchema).optional(),
     labels: aboutLabelsSchema.optional(),
+    spatialGalleryConfig: spatialGalleryConfigSchema.optional(),
   })
   .strict()
   .refine(

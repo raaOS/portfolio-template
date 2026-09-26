@@ -7,6 +7,12 @@
 
 ## 0. AI Workflow & Tracker System (MANDATORY)
 
+> **Aturan Kerja Ponytail (AKTIF — mode "lazy senior dev", wajib di semua tugas mulai 2026-09-26):**
+> Sebelum menulis kode, berhenti di tangga pertama yang berlaku: (1) perlu dibuat sama sekali? (2) sudah ada di codebase ini? pakai ulang. (3) ada di stdlib? (4) fitur native platform? (5) dependency yang sudah terpasang? (6) bisa satu baris? (7) baru tulis kode sesedikit mungkin yang bekerja.
+> DILARANG: abstraksi yang tidak diminta, dependency baru tanpa perlu, boilerplate, overthinking. Bug fix = akar masalah (cek semua caller). TIDAK boleh dimalas: memahami masalah (baca & trace dulu), validasi input, keamanan, aksesibilitas, anti-halusinasi — setiap klaim hasil wajib angka/file terverifikasi. Perubahan logika yang sudah ada → laporkan dulu ke owner, minta izin, baru eksekusi.
+> (Sumber ruleset: DietrichGebert/ponytail — sama dengan `~/.cursor/rules/ponytail.mdc`.)
+
+
 Sistem dokumentasi pelacakan pekerjaan (Tracker) telah diaktifkan untuk menghemat penggunaan token (*context window*) AI di repositori ini.
 
 1. **MANDATORY READ (Saat Sesi Baru):**
@@ -537,3 +543,13 @@ Guna mengunci dependency yang rentan, pastikan kolom `overrides` di file `packag
 
 _Terakhir Diperbarui: 2026-09-01_
 _Tingkat Kepercayaan Informasi: Terverifikasi Penuh oleh Pengujian Unit & Sistem_
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
