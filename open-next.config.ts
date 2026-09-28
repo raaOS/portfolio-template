@@ -11,10 +11,22 @@ const incrementalCache = async () =>
 const tagCache = async () =>
   (await import('@opennextjs/cloudflare/overrides/tag-cache/kv-next-tag-cache')).default;
 
+// QUEUE REVALIDASI (2026-09-28): sebelumnya `queue: 'direct'` — ternyata dipetakan ke
+// `overrides/queue/direct.js` (object bernama `dev-queue`) yang me-revalidate dengan
+// fetch() ke URL publiknya sendiri, tanpa memeriksa hasil. Dokumentasi resmi OpenNext:
+// "`direct` mode ... only works in preview mode (i.e. `wrangler dev`)" -> di produksi
+// ISR 60s tidak pernah commit (x-opennext-cache: STALE permanen, terukur 6/6 + timing
+// GET 135-868ms vs revalidasi nyata 6-9s). Memory queue memakai service binding
+// WORKER_SELF_REFERENCE (dispatch in-Workers, bukan lewat URL publik) DAN mengecek
+// `x-nextjs-cache: REVALIDATED`, sehingga kegagalan revalidasi ikut ter-log.
+// Binding `services`-nya ada di wrangler.jsonc.
+const queue = async () =>
+  (await import('@opennextjs/cloudflare/overrides/queue/memory-queue')).default;
+
 const config = defineCloudflareConfig({
   incrementalCache,
   tagCache,
-  queue: 'direct',
+  queue,
   enableCacheInterception: true,
 });
 

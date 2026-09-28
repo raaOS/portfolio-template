@@ -43,6 +43,11 @@ export async function POST(request: NextRequest) {
     revalidatePath('/');
     revalidatePath('/about');
     revalidatePath('/contact');
+    // Preview demo: halaman ISR (revalidate = 60) yang tidak pernah masuk daftar
+    // mana pun, jadi webhook push tidak pernah menyegarkan render demo.
+    revalidatePath('/preview/os-desktop');
+    revalidatePath('/preview/infinite-canvas');
+    revalidatePath('/preview/spatial-gallery');
 
     console.log('[Revalidate] Webhook received & revalidated all paths');
 

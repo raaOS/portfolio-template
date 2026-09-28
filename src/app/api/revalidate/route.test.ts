@@ -87,4 +87,29 @@ describe('POST /api/revalidate', () => {
     expect(body.revalidated).toBe(true);
     expect(typeof body.now).toBe('number');
   });
+
+  it('revalidates every preview demo route', async () => {
+    const { revalidatePath } = await import('next/cache');
+    vi.mocked(revalidatePath).mockClear();
+
+    const secret = 'test-secret';
+    process.env.REVALIDATION_TOKEN = secret;
+    const payload = JSON.stringify({ ref: 'refs/heads/main' });
+    const crypto = await import('crypto');
+    const digest =
+      'sha256=' + crypto.createHmac('sha256', secret).update(Buffer.from(payload)).digest('hex');
+
+    const request = new NextRequest('http://localhost/api/revalidate', {
+      method: 'POST',
+      headers: { 'x-hub-signature-256': digest },
+      body: payload,
+    });
+
+    const response = await POST(request as never);
+
+    expect(response.status).toBe(200);
+    expect(vi.mocked(revalidatePath)).toHaveBeenCalledWith('/preview/os-desktop');
+    expect(vi.mocked(revalidatePath)).toHaveBeenCalledWith('/preview/infinite-canvas');
+    expect(vi.mocked(revalidatePath)).toHaveBeenCalledWith('/preview/spatial-gallery');
+  });
 });

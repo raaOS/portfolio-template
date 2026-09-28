@@ -25,6 +25,14 @@
       "id": "cb5634a164b64fe3842783c8ced942cf"
     }
   ],
+  // Dipakai memory queue (open-next.config.ts) untuk memicu ISR revalidation lewat
+  // service binding in-Workers, bukan fetch ke URL publik. Nama service = nama worker.
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "portfolio-os-template"
+    }
+  ],
   "observability": {
     "enabled": true
   }
