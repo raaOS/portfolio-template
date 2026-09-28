@@ -3,6 +3,51 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.9] - 2026-09-28
+
+### ⚙️ Perbaikan ISR: Revalidasi Background Tidak Pernah Commit di Produksi
+
+- **Gejala:** halaman `/preview/*` dan `/projects` selalu `x-opennext-cache: STALE` (6/6 pengukuran selama 75 detik, padahal `s-maxage=1`), sehingga perubahan data tidak pernah menyebar sampai ada deploy.
+- **Akar masalah:** `open-next.config.ts` memakai `queue: 'direct'` yang dipetakan ke `overrides/queue/direct.js` — object bernama harfiah **`dev-queue`**. Ia me-revalidate dengan `fetch()` ke **URL publiknya sendiri** dari dalam Worker, **tanpa memeriksa hasilnya**. Dokumentasi resmi OpenNext Cloudflare: *"`direct` mode ... only works in preview mode (i.e. `wrangler dev`)"*, dan build bahkan memperingatkan *not recommended for use in production*. Terbukti dari timing: GET saat `STALE` hanya butuh **135–868 ms**, sedangkan HEAD revalidasi identik yang dikirim dari luar butuh **6–9 detik** dan menghasilkan `REVALIDATED` → `HIT`. Mekanismenya sehat; yang rusak hanya pemanggilnya.
+- **Perbaikan:** `queue` diganti ke **memory queue** `@opennextjs/cloudflare/overrides/queue/memory-queue` yang memakai **service binding** `WORKER_SELF_REFERENCE` (dispatch di dalam Workers, bukan lewat URL publik) dan **mengecek** `x-nextjs-cache: REVALIDATED` sehingga kegagalan revalidasi ikut ter-log alih-alih diam. Binding `services` ditambahkan ke `wrangler.jsonc` — persis seperti template resmi OpenNext yang sebelumnya absen di repo ini.
+- **Webhook `/api/revalidate` kini ikut menyegarkan demo:** ditambahkan `revalidatePath` untuk `/preview/os-desktop`, `/preview/infinite-canvas`, `/preview/spatial-gallery`. Sebelumnya ketiga route itu tidak pernah masuk daftar revalidate mana pun.
+- **Temuan lanjutan:** `revalidatePath('/', 'layout')` ternyata **tidak** menutup `/preview/*` (Next menulis tag `_N_T_/layout`, sedangkan tag cache `mode='nextMode'` menilai staleness dari tag entri halaman) — diverifikasi 2× dengan jendela 30 dan 90 detik. Route preview selama ini hanya segar saat deploy.
+- **Verifikasi:** `npx tsc --noEmit` 0 error, `npx eslint src` 0 error, `npx vitest run` **113 files / 857 tests PASS** (1 test baru untuk webhook preview), `wrangler deploy --dry-run` mengonfirmasi binding `env.WORKER_SELF_REFERENCE`. Deploy sukses, Version ID `cd763c10-630d-4dad-aa42-e34b8adfa102`, bundle kini berisi `memory-queue` (6 file) dan **`dev-queue` = 0 file**.
+- ⚠️ **Status verifikasi end-to-end: tertunda.** Sesaat setelah deploy, Cloudflare menutup kuota baca KV harian (`Failed to get from cache: KV get() limit exceeded for the day`), sehingga semua route ter-cache jatuh ke render penuh (TTFB 6–17 detik) dan memory queue belum sempat teruji di produksi. Kuota diharapkan reset **00:00 UTC**; verifikasi ulang wajib dijalankan setelah itu.
+
+## [1.3.8] - 2026-09-28
+
+### 📱 Penyelarasan UI/UX Dock macOS Desktop (Mobile & Desktop)
+
+- **Penyelarasan Ukuran & Proporsi Dock Mobile:** Mengubah ukuran ikon Dock pada mode mobile menjadi fix `48px × 48px` (dari sebelumnya `clamp(44px, 13vw, 52px)` dan basis `64px` yang membengkak). Tinggi kapsul Dock mobile kini diturunkan ke `68px` dengan border radius `24px` (sebelumnya `72px/76px` dengan radius `28px`).
+- **Posisi & Penataan Ikon Mobile:** Mengganti perataan vertikal baris ikon mobile menjadi `items-center justify-center gap-2 px-5 py-2` (sebelumnya `items-end` menempel ke bawah dengan `gap-1`), sehingga seluruh ikon tersusun rapi persis di tengah kapsul kaca Dock identik dengan `portfolio ramos`.
+- **Fisika Magnifikasi & Animasi Kustom Mobile:** Mematikan efek lonjakan hover magnifikasi pada layar sentuh (`hoverScaleMultiplier = 1` di mobile, `1.35x` di desktop), menyematkan utility `touch-manipulation`, dan menyelaraskan animasi bounce elastis (`scaleX/scaleY` squish kenyal) saat ikon di-tap di perangkat layar sentuh.
+- **Sinkronisasi Viewport Otomatis:** Menambahkan pendengar event resize viewport dinamis pada `OSDock` agar perubahan orientasi atau resolusi layar mobile langsung terdeteksi tanpa delay atau inkonsistensi state.
+- **Posisi Dock Safe-Area-Inset Mobile:** Menyelaraskan posisi fixed Dock di `GlobalDockSlot` dengan referensi — menggunakan `bottom-[max(0.75rem,env(safe-area-inset-bottom))]` + `pb-[env(safe-area-inset-bottom)]` agar Dock tidak tertimpa gesture bar di iPhone/Android modern (sebelumnya `bottom-4` statis).
+- **Hardening Popover Outside-Click:** Menambahkan 50ms delay registrasi listener, deteksi klik di dalam `[data-dock-toolbar]`, dan handler `touchstart` agar popover Dock (mis. selector mode Projects) tidak langsung tertutup saat tap di mobile.
+- **DockPortal Fallback (perbaikan regresi dock preview):** Fallback render di `DockPortal` dipertahankan untuk route yang tidak punya `GlobalDockSlot` (root layout `/preview/*`). Mengembalikannya menjadi `null` membuat **dock hilang total di `/preview/os-desktop`** karena `target` selalu `null` di route itu. Fallback kini sengaja **tanpa `id` dan tanpa `viewTransitionName`** (mencegah duplikat 1-frame dengan slot asli saat hydration — duplikat `view-transition-name` membuat Chrome membuang pasangan snapshot animasi) dan memakai `className` identik dengan slot sehingga tidak ada lompatan posisi.
+
+### 🖼️ Perbaikan Poster Wallpaper Video (semua poster sempat isinya foto orang)
+
+- **Akar masalah:** script upload Sprint 83 (`upload-video-wallpapers-r2-d1.ts`) membuat **satu** `posterBuffer` dari `public/wallpapers/optimized-wallpaper.png` (berisi foto orang) lalu meng-upload buffer yang sama sebagai poster ke-4 wallpaper video → keempat poster JPG di R2 identik byte-per-byte (`5E845822…`, 37.402 byte). Saat halaman dibuka, elemen LCP poster langsung menampilkan foto orang itu sebelum video fade-in (dan terus tampil pada perangkat hemat-data / ≤2 core / reduced-motion).
+- **Poster diganti frame asli:** tiap video ditangkap pada frame 0,5 detik (1920×1080, canvas browser) dan di-upload ulang ke key yang sama — kini **4 MD5 berbeda**: Hunt `B3ECD5F8…` (394.974 byte), Zen Kois `6046AB47…`, Pink Bloom `609A4E88…`, Sachiro `BAC7D48E…`.
+- **Cache di-bust:** `posterUrl` keempat entry di D1 (`app_kv` → `content_default-site` & `content`) ditambah `?v=2` karena response diset `Cache-Control: public, max-age=31536000, immutable` (tanpa ini, browser yang sudah memuat poster lama menyimpannya sampai setahun).
+- **`extractStoragePath()` membuang query/fragment:** key R2 tidak pernah berisi `?…`, sehingga `posterUrl` `?v=2` tetap menghasilkan key valid untuk hapus media, `storage-stats`, dan audit orphan (sebelumnya bisa terbaca sebagai *dangling* oleh `clear-dangling-wallpapers`).
+- **Script lama diperbaiki:** pembuatan + upload poster bersama dihapus dari `upload-video-wallpapers-r2-d1.ts` (regresi landmine bila dijalankan ulang), dan `?v=2` ditanam di 4 `posterUrl` hardcoded-nya agar rerun tidak membalik cache-bust. Fix one-time tersedia di `scripts/cloudflare/fix-wallpaper-posters.ts` (dry-run default, `--apply` untuk eksekusi).
+- **Verifikasi:** `npx tsc --noEmit` 0 error, `npx eslint src` 0 error, `npx vitest run` **113 files / 856 tests PASS** (5 test baru untuk `extractStoragePath`), dan poster yang ter-render di `/preview/os-desktop` kini = frame video yang benar.
+
+### 🖼️ Wallpapers Statis: Foto Orang Diganti Frame "Veil of Thorns"
+
+- **Isi ulang, bukan sekadar hapus:** 3 file statis yang masih direferensikan (`optimized-wallpaper.webp/png` + `1772328103874-…wallaper.webp` fallback `DEFAULT_WALLPAPER_URL`) ditulis ulang isinya menjadi frame video aktif Hunt "Veil of Thorns" (1920×1080) — webp q60 (192.372 B), png palet 1152×648 (181.725 B), semuanya di bawah aturan repo <200KB. Kini tidak ada satu pun foto orang di `public/wallpapers/`.
+- **10 file foto tak terpakai dihapus:** seluruh `.avif` + 4 file `177*`/`1769*` webp tidak punya referensi di D1/kode/manifes — dihapus daripada diganti (mengganti file mati hanya menumpuk repo). Sisa folder: 3 file.
+- **2 entry picker "macOS Monterey" di-rename + isi R2 ditimpa:** entry tetap ada (tidak dihapus), hanya namanya jadi "Veil of Thorns (Statis)" dan "Veil of Thorns (Statis, PNG)"; objek R2 `optimized-wallpaper.*` di-upload ulang dengan isi frame baru dan `url` D1-nya diberi `?v=2` (cache R2 immutable) di kedua baris `app_kv`.
+- **2 objek R2 orphan (foto orang) dihapus:** `1771963001387…` & `1771963212220…` kini 404 — tidak ada referensi di mana pun.
+- **Landmine rerun dibersihkan:** `fix-wallpapers-d1-r2.ts` (buang upload file yang sudah dihapus, rename entry + `?v=2`, dan **tidak lagi mereset `activeWallpaperId`/`blur` customer** saat dijalankan ulang) serta `upload-video-wallpapers-r2-d1.ts` (2 entry statis hardcoded ikut nama baru + `?v=2`). Fix one-time: `scripts/cloudflare/fix-wallpaper-statics.ts` (dry-run default, `--apply`).
+- **Verifikasi:** D1 dump → nama baru + `?v=2` di 2 baris, `activeWallpaperId` tetap video; GET `?v=2` → MD5 baru `1CFFD9DC9243…` (= file lokal), orphan 404; `/preview/os-desktop` tampil wallpaper frame video (bukan foto orang), console bersih; `tsc` 0, `eslint src` 0, vitest **113 files / 856 tests PASS**.
+- **Demo produksi (`makeitbetter.my.id`) ikut diperbarui:** laporan "foto orang muncul lagi di detik awal pada demo" ternyata bukan data — D1 & R2 produksi sudah benar, yang basi adalah **snapshot HTML preview (cache ISR)** yang masih menulis `posterUrl` tanpa `?v=2` (pengunjung lama kena foto orang dari cache `immutable` setahun) plus **file `public/wallpapers/` di server yang belum terganti** (file `DEFAULT_WALLPAPER_URL` masih foto orang). Keduanya beres dengan deploy ulang: HTML preview kini memakai `?v=2` + nama "Veil of Thorns (Statis)", ketiga file `public/wallpapers/` kini berisi frame video Hunt, dan verifikasi browser sesi bersih menampilkan desktop tanpa satu pun foto orang (0 error console).
+
+---
+
 ## [1.3.7] - 2026-09-26
 
 ### ⚡ Optimasi Performa Preview (Lighthouse) — 3 Template
