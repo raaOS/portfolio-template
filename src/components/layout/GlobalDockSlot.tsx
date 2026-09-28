@@ -55,20 +55,32 @@ function getServerSnapshot(): HTMLElement | null {
  * akses context, tapi konten visual-nya di-portal ke slot ini supaya rect
  * dock identik di kedua snapshot lintas semua route.
  */
+/**
+ * Kelas layout dock slot — DIPAKAI BERSAMA oleh {@link GlobalDockSlot} dan
+ * fallback {@link DockPortal} supaya rect dock identik dan tidak ada lompatan
+ * 1 frame saat target portal baru tersedia.
+ */
+const DOCK_SLOT_CLASS =
+  'pointer-events-none fixed bottom-[max(0.75rem,env(safe-area-inset-bottom,12px))] left-0 right-0 flex justify-center pb-[env(safe-area-inset-bottom,0px)] print:hidden';
+
 export function DockPortal({ children }: { children: ReactNode }) {
   const target = useSyncExternalStore(subscribeSlot, getSlotSnapshot, getServerSnapshot);
 
+  // Fallback WAJIB untuk route yang tidak memasang GlobalDockSlot — yaitu
+  // route di root layout (`/preview/*`), karena LayoutClient hanya dipasang di
+  // `(site)/layout.tsx` dan `[siteSlug]/layout.tsx`. Tanpa fallback ini
+  // `target` selalu null → DockPortal return null → OSDock/GlobalDock tidak
+  // pernah masuk DOM dan dock hilang total (bug: dock tidak muncul di
+  // /preview/os-desktop).
+  //
+  // Sengaja TANPA `id` dan TANPA `viewTransitionName`: pada route yang punya
+  // slot, ref callback slot baru terpasang di commit phase, jadi 1 frame pertama
+  // fallback ini hidup berdampingan dengan slot asli. Duplikat `id` dan
+  // duplikat `view-transition-name` membuat Chrome membuang pasangan snapshot
+  // view transition (dock ikut slide / animasi patah).
   if (!target) {
     return (
-      <div
-        id={GLOBAL_DOCK_SLOT_ID}
-        className="pb-safe pointer-events-none fixed bottom-4 left-0 right-0 flex justify-center print:hidden"
-        style={{
-          viewTransitionName: 'global-dock',
-          zIndex: 99999,
-        }}
-        aria-hidden="false"
-      >
+      <div className={DOCK_SLOT_CLASS} style={{ zIndex: 99999 }}>
         {children}
       </div>
     );
@@ -94,7 +106,7 @@ export default function GlobalDockSlot() {
     <div
       ref={setSlot}
       id={GLOBAL_DOCK_SLOT_ID}
-      className="pb-safe pointer-events-none fixed bottom-4 left-0 right-0 flex justify-center print:hidden"
+      className={DOCK_SLOT_CLASS}
       style={{
         viewTransitionName: 'global-dock',
         zIndex: 99999,

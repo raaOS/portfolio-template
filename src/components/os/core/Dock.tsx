@@ -95,11 +95,11 @@ function SortableDockItem({
     zIndex: isDragging ? Z_LAYERS.DOCK + 10 : 'auto',
     position: 'relative' as const,
     display: 'flex',
-    alignItems: 'end',
-    touchAction: isMobile ? 'manipulation' : 'none',
+    alignItems: isMobile ? ('center' as const) : ('end' as const),
+    touchAction: isMobile ? ('manipulation' as const) : ('none' as const),
   };
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div ref={setNodeRef} style={style} {...attributes} {...(isMobile ? {} : listeners)}>
       {children}
     </div>
   );
@@ -287,9 +287,30 @@ export default function Dock({
   // Outside click untuk menutup popover — single listener di parent Dock.
   useEffect(() => {
     if (!anyPopoverOpen) return;
-    const handleOutside = () => closePopover();
-    window.addEventListener('click', handleOutside);
-    return () => window.removeEventListener('click', handleOutside);
+
+    let cleanup: (() => void) | undefined;
+    const timer = setTimeout(() => {
+      const handleOutside = (e: MouseEvent | TouchEvent) => {
+        const target = e.target as Node | null;
+        if (target && target instanceof Element && target.closest('[data-dock-toolbar="true"]')) {
+          return;
+        }
+        closePopover();
+      };
+
+      window.addEventListener('click', handleOutside);
+      window.addEventListener('touchstart', handleOutside);
+
+      cleanup = () => {
+        window.removeEventListener('click', handleOutside);
+        window.removeEventListener('touchstart', handleOutside);
+      };
+    }, 50);
+
+    return () => {
+      clearTimeout(timer);
+      if (cleanup) cleanup();
+    };
   }, [anyPopoverOpen, closePopover]);
 
   useEffect(() => {
@@ -298,16 +319,20 @@ export default function Dock({
     return () => cancelAnimationFrame(frame);
   }, []);
 
-  const filteredItems = sortedItems;
-
   const dockBaseWidth =
-    filteredItems.length > 0 ? filteredItems.length * 64 + (filteredItems.length - 1) * 8 + 24 : 0;
-  const hoverCaptureWidth = dockBaseWidth + 160;
+    sortedItems.length > 0 ? sortedItems.length * 52 + (sortedItems.length - 1) * 10 + 32 : 0;
+  const hoverCaptureWidth = dockBaseWidth + 120;
 
+  const tickingRef = React.useRef(false);
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
       if (anyPopoverOpen) return;
-      mouseX.set(e.clientX);
+      if (tickingRef.current) return;
+      tickingRef.current = true;
+      requestAnimationFrame(() => {
+        mouseX.set(e.clientX);
+        tickingRef.current = false;
+      });
     },
     [anyPopoverOpen, mouseX]
   );
@@ -359,7 +384,7 @@ export default function Dock({
                     dari stacking context. Hanya mode desktop. */}
         {!isMobile && (
           <div
-            className="fixed bottom-0 left-1/2 h-28 -translate-x-1/2 cursor-default"
+            className="fixed bottom-0 left-1/2 h-24 -translate-x-1/2 cursor-default"
             style={{
               width: hoverCaptureWidth,
               pointerEvents: anyPopoverOpen ? 'none' : 'auto',
@@ -373,7 +398,7 @@ export default function Dock({
         )}
         <nav
           data-dock-toolbar="true"
-          className={`pointer-events-auto relative ${isMobile ? 'max-w-[95vw]' : ''}`}
+          className={`pointer-events-auto relative ${isMobile ? 'max-w-[90vw]' : ''}`}
           style={{ zIndex: Z_LAYERS.DOCK }}
           role="toolbar"
           aria-label="Application dock"
@@ -391,8 +416,8 @@ export default function Dock({
         >
           {/* iOS-style transparent glass without blur: translucent layers, border, and shadow only. */}
           <div
-            className={`pointer-events-none absolute inset-0 overflow-hidden rounded-[28px] ${
-              isMobile ? 'h-[72px]' : 'h-[96px]'
+            className={`pointer-events-none absolute inset-0 overflow-hidden ${
+              isMobile ? 'h-[68px] rounded-[24px]' : 'h-[72px] rounded-[22px]'
             }`}
             style={{
               background:
@@ -411,21 +436,21 @@ export default function Dock({
             onDragEnd={handleDragEnd}
           >
             <SortableContext
-              items={filteredItems.map((item) => item.id)}
+              items={sortedItems.map((item) => item.id)}
               strategy={horizontalListSortingStrategy}
             >
               {/* Icon row */}
               <div
-                className={`relative z-10 flex items-end ${
+                className={`relative z-10 flex ${
                   isMobile
-                    ? 'scrollbar-hide h-[76px] gap-1 overflow-visible px-1.5 py-2'
-                    : 'h-[104px] gap-1.5 px-3 py-4'
+                    ? 'scrollbar-hide h-[68px] items-center justify-center gap-2 overflow-visible px-5 py-2'
+                    : 'h-[72px] items-end gap-2.5 px-4 py-2.5'
                 }`}
                 style={{
                   minWidth: isMobile ? 'auto' : dockBaseWidth,
                 }}
               >
-                {filteredItems.map((item, index) => {
+                {sortedItems.map((item, index) => {
                   const dockItem = (
                     <DockItem
                       key={item.id}
@@ -444,7 +469,7 @@ export default function Dock({
                       disableTooltips={disableTooltips}
                       isOpen={item.isOpen}
                       isFirstItem={index === 0}
-                      isLastItem={index === filteredItems.length - 1}
+                      isLastItem={index === sortedItems.length - 1}
                     />
                   );
 
@@ -461,7 +486,9 @@ export default function Dock({
                         {dockItem}
                       </Link>
                     ) : (
-                      dockItem
+                      <div className="flex items-end rounded-[18px] focus-visible:outline-none">
+                        {dockItem}
+                      </div>
                     );
 
                   return (

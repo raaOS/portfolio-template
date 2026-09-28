@@ -79,14 +79,9 @@ export function DockItem({
     return val - bounds.x - bounds.width / 2;
   });
 
-  const baseWidth = isMobile ? 64 : 72;
-  const magnification = isMobile ? 88 : 110;
-  const hoverScaleMultiplier = magnification / baseWidth;
-  const scaleSync = useTransform(distance, isMobile ? [-100, 0, 100] : [-140, 0, 140], [
-    1,
-    hoverScaleMultiplier,
-    1,
-  ]);
+  const baseWidth = isMobile ? 48 : 52;
+  const hoverScaleMultiplier = isMobile ? 1 : 1.35;
+  const scaleSync = useTransform(distance, [-100, 0, 100], [1, hoverScaleMultiplier, 1]);
   const springScale = useSpring(scaleSync, { mass: 0.1, stiffness: 250, damping: 20 });
   const width = useTransform(springScale, (s) => (anyPopoverOpen ? baseWidth : s * baseWidth));
   const height = useTransform(springScale, (s) => (anyPopoverOpen ? baseWidth : s * baseWidth));
@@ -191,9 +186,7 @@ export function DockItem({
       // in interactive" (a11y violation) dan tidak duplikat focus stop.
       data-dock-focusable={isLinkWrapped ? undefined : 'true'}
       style={
-        isMobile
-          ? { width: 'clamp(44px, 13vw, 52px)', height: 'clamp(44px, 13vw, 52px)' }
-          : { width, height, transformOrigin: 'center bottom' }
+        isMobile ? { width: 48, height: 48 } : { width, height, transformOrigin: 'center bottom' }
       }
       animate={
         activeBounce
@@ -214,7 +207,7 @@ export function DockItem({
           : { type: 'spring', mass: 0.1, stiffness: 250, damping: 20 }
       }
       onClick={handleClick}
-      className="group relative flex aspect-square shrink-0 cursor-pointer items-center justify-center rounded-[18px] outline-none transition-[filter] duration-200 hover:brightness-110 focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+      className="group relative flex aspect-square shrink-0 cursor-pointer touch-manipulation items-center justify-center rounded-[18px] outline-none transition-[filter] duration-200 hover:brightness-110 focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
       role={isLinkWrapped ? undefined : 'button'}
       aria-label={isLinkWrapped ? undefined : label}
       // A11y fix (Fase 5): aria-haspopup/aria-expanded hanya valid pada

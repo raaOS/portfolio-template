@@ -5,7 +5,7 @@
 // ═══════════════════════════════════════════════════════════════════
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { useTransitionRouter } from 'next-view-transitions';
 import { Grid, User, Mail, FileText } from 'lucide-react';
@@ -54,9 +54,18 @@ export function OSDock({
   notesVisible,
   bouncingId,
   className,
-  isMobile = false,
+  isMobile: isMobileProp = false,
 }: OSDockProps) {
   const router = useTransitionRouter();
+  const [isMobile, setIsMobile] = useState(isMobileProp);
+
+  useEffect(() => {
+    const syncViewport = () => setIsMobile(window.innerWidth < 768);
+    syncViewport();
+    window.addEventListener('resize', syncViewport);
+    return () => window.removeEventListener('resize', syncViewport);
+  }, []);
+
   const pathname = usePathname();
   const projectsHref = buildTenantProjectsHref(pathname);
   const projectsBasePath = getTenantBasePath(pathname);
