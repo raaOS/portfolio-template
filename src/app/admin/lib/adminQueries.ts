@@ -10,6 +10,7 @@ import type { TestimonialData } from '@/types/testimonial';
 import type { NoteData } from '@/components/os/ui/elements/StickyNoteItem';
 import type { PlanQuota, ProductPlan, SiteQuotaOverride } from '@/lib/product/sitePlan';
 import type { SiteStorageUsage } from '@/lib/product/siteStorageUsage';
+import type { SiteAnalyticsSummary } from '@/lib/services/analyticsService';
 import aboutFallback from '@/data/about.json';
 import contactFallback from '@/data/contact.json';
 import experienceFallback from '@/data/experience.json';
@@ -26,6 +27,7 @@ export const ADMIN_DATA_GC_TIME = 60 * 60 * 1000;
 export const ADMIN_QUERY_KEYS = {
   about: ['admin', 'about'] as const,
   aboutPhilosophy: ['admin', 'about', 'philosophy'] as const,
+  analytics: ['admin', 'analytics'] as const,
   clientSites: ['admin', 'client-sites'] as const,
   commentCounts: ['comments', 'counts'] as const,
   contact: ['admin', 'contact'] as const,
@@ -172,6 +174,12 @@ export function fetchAdminAboutFresh() {
 
 export function fetchAdminAboutPhilosophy() {
   return fetchJson('/api/about/philosophy');
+}
+
+export async function fetchAdminAnalytics(): Promise<SiteAnalyticsSummary> {
+  const data = await fetchJson<{ summary?: SiteAnalyticsSummary }>('/api/analytics');
+  if (!data.summary) throw new Error('Ringkasan analitik tidak tersedia');
+  return data.summary;
 }
 
 export function fetchAdminCommentCounts() {

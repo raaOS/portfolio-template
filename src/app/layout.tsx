@@ -7,6 +7,7 @@ import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 
 import UnregisterSW from '@/components/shared/UnregisterSW';
 import DevWebVitalsGate from '@/components/shared/DevWebVitalsGate';
+import PageViewTracker from '@/components/layout/PageViewTracker';
 import { ViewTransitions } from 'next-view-transitions';
 import { APP_VERSION } from '@/lib/constants';
 
@@ -125,6 +126,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 {children}
                 <UnregisterSW />
                 <DevWebVitalsGate />
+                <PageViewTracker />
               </ErrorBoundary>
             </ToastProvider>
           </Providers>

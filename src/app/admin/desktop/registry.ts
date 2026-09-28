@@ -16,6 +16,7 @@ import {
   MessageSquareText,
   Image as ImageIcon,
   Sparkles,
+  BarChart3,
 } from 'lucide-react';
 import type { AdminZone } from './types';
 
@@ -106,7 +107,7 @@ export const ADMIN_ZONES: AdminZone[] = [
   {
     id: 'system',
     label: 'Sistem & Tampilan',
-    description: 'Atur wallpaper, dock, widget, dan efek suara OS',
+    description: 'Atur wallpaper, dock, widget, efek suara OS, dan statistik pengunjung',
     icon: Monitor,
     iconColor: 'text-cyan-600',
     iconBg: 'bg-cyan-500',
@@ -156,6 +157,15 @@ export const ADMIN_ZONES: AdminZone[] = [
         iconBg: 'bg-violet-100',
         defaultWidth: 900,
         defaultHeight: 650,
+      },
+      {
+        id: 'analytics',
+        label: 'Statistik Pengunjung',
+        icon: BarChart3,
+        iconColor: 'text-teal-600',
+        iconBg: 'bg-teal-100',
+        defaultWidth: 950,
+        defaultHeight: 680,
       },
     ],
   },
@@ -226,6 +236,7 @@ export const APP_ROUTE_MAP: Record<string, string> = {
   widgets: '/admin/system/widgets',
   sounds: '/admin/system/sounds',
   ai: '/admin/system/ai',
+  analytics: '/admin/system/analytics',
   notifications: '/admin/communications/notifications',
   messages: '/admin/communications/messages',
   feedback: '/admin/communications/feedback',

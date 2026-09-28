@@ -8,6 +8,10 @@ import { queryD1, isD1Configured } from '@/lib/cloudflareD1';
 export interface SiteAnalyticsSummary {
   siteId: string;
   totalViews: number;
+  topPages: Array<{
+    path: string;
+    views: number;
+  }>;
   uniqueProjectsCount: number;
   topProjects: Array<{
     title: string;
@@ -18,15 +22,68 @@ export interface SiteAnalyticsSummary {
     name: string;
     clicks: number;
   }>;
+  otherEvents: Array<{
+    event: string;
+    count: number;
+  }>;
   lastActive: string;
 }
 
-const VALID_EVENT_TYPES = new Set(['page_view', 'project_view', 'app_view']);
+/**
+ * Event yang boleh dicatat. Daftar ini ditutup dengan sengaja: endpoint
+ * POST /api/analytics terbuka untuk pengunjung, jadi `event_type` yang bebas
+ * membuat baris baru tanpa batas di tabel D1 (setiap baris baru = 1 write).
+ * Saat menambah event baru, tambahkan namanya di sini.
+ */
+const VALID_EVENT_TYPES = new Set([
+  'page_view',
+  'header_search_click',
+  'CV_PRINT',
+  'CV_DOWNLOAD_PREMIUM',
+]);
+
+/**
+ * Route publik yang dicatat sebagai page view. Bucket diambil dari segmen
+ * pertama path (`/projects/abc` → `/projects`) supaya jumlah baris dibatasi
+ * oleh daftar ini, bukan oleh path apa pun yang bisa dikirim pihak luar.
+ * Path di luar daftar masuk ke bucket `/lain` — tambahkan route baru di sini.
+ */
+const PUBLIC_PAGE_SEGMENTS = new Set([
+  '/',
+  '/about',
+  '/contact',
+  '/cv',
+  '/projects',
+  '/preview',
+  '/checkout',
+  '/orders',
+]);
+
+/** Event yang menarik menyimpan slug per-item; sisanya selalu 'main'. */
+const SLUGGED_EVENTS = new Set(['page_view', 'project_view', 'app_view']);
+
+export function isSupportedAnalyticsEvent(event: string): boolean {
+  return VALID_EVENT_TYPES.has(event);
+}
+
+function bucketPagePath(pathname?: string): string {
+  const clean = (pathname || '').split('#')[0].split('?')[0];
+  if (!clean || clean === '/') return '/';
+  const first = clean.replace(/^\/+/, '').split('/')[0];
+  const segment = `/${first}`;
+  return PUBLIC_PAGE_SEGMENTS.has(segment) ? segment : '/lain';
+}
 
 export class AnalyticsService {
   /**
    * Mencatat ping event analitik dari pengunjung publik.
-   * Writes to D1 site_analytics (aggregated) and audit_logs (raw).
+   * Menulis 1 baris UPSERT ke D1 `site_analytics` per hit — sengaja tanpa
+   * tulisan ke `audit_logs` agar jejak keamanan tidak tercampur baris
+   * analitik dan agar 1 kunjungan = 1 write D1.
+   *
+   * Return `false` hanya untuk input yang tidak valid; kegagalan D1 dicatat
+   * ke log dan tidak dibalikkan sebagai error supaya tracking tak pernah
+   * merusak UX.
    */
   async recordHit(
     siteId: string,
@@ -36,7 +93,11 @@ export class AnalyticsService {
     if (!siteId || !eventType) return false;
     if (!VALID_EVENT_TYPES.has(eventType)) return false;
 
-    const slug = targetSlug || 'main';
+    const slug = !SLUGGED_EVENTS.has(eventType)
+      ? 'main'
+      : eventType === 'page_view'
+        ? bucketPagePath(targetSlug)
+        : targetSlug || 'main';
     const now = new Date().toISOString();
 
     if (!isD1Configured()) return false;
@@ -49,14 +110,6 @@ export class AnalyticsService {
          ON CONFLICT(site_id, event_type, target_slug)
          DO UPDATE SET hit_count = hit_count + 1, last_active = excluded.last_active`,
         [siteId, eventType, slug, now]
-      );
-
-      // Also write raw event to audit_logs for detailed analysis
-      const id = `hit_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-      await queryD1(
-        `INSERT INTO audit_logs (id, site_id, action, entity_type, created_at)
-         VALUES (?, ?, ?, ?, ?)`,
-        [id, siteId, `ANALYTICS_${eventType.toUpperCase()}_${slug}`, 'analytics', now]
       );
     } catch (err) {
       console.warn('[AnalyticsService] Failed to record hit:', err);
@@ -90,8 +143,10 @@ export class AnalyticsService {
       }
 
       let totalViews = 0;
+      const pagePaths: Array<{ path: string; views: number }> = [];
       const projectViews: Array<{ slug: string; views: number }> = [];
       const appClicks: Array<{ name: string; clicks: number }> = [];
+      const otherEvents: Array<{ event: string; count: number }> = [];
       let lastActive = '';
 
       for (const row of rows) {
@@ -99,12 +154,17 @@ export class AnalyticsService {
 
         if (row.event_type === 'page_view') {
           totalViews += row.hit_count;
+          pagePaths.push({ path: row.target_slug, views: row.hit_count });
         } else if (row.event_type === 'project_view') {
           projectViews.push({ slug: row.target_slug, views: row.hit_count });
         } else if (row.event_type === 'app_view') {
           appClicks.push({ name: row.target_slug, clicks: row.hit_count });
+        } else {
+          otherEvents.push({ event: row.event_type, count: row.hit_count });
         }
       }
+
+      const topPages = pagePaths.sort((a, b) => b.views - a.views);
 
       const topProjects = projectViews
         .sort((a, b) => b.views - a.views)
@@ -119,9 +179,11 @@ export class AnalyticsService {
       return {
         siteId,
         totalViews,
+        topPages,
         uniqueProjectsCount: topProjects.length,
         topProjects,
         popularApps,
+        otherEvents: otherEvents.sort((a, b) => b.count - a.count),
         lastActive: lastActive || new Date().toISOString(),
       };
     } catch (err) {
@@ -134,9 +196,11 @@ export class AnalyticsService {
     return {
       siteId,
       totalViews: 0,
+      topPages: [],
       uniqueProjectsCount: 0,
       topProjects: [],
       popularApps: [],
+      otherEvents: [],
       lastActive: new Date().toISOString(),
     };
   }
