@@ -3,6 +3,20 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.10] - 2026-09-28
+
+### 📊 Analitik Pengunjung: Dari Blob 100 Entri yang Tak Pernah Dibaca Menjadi D1 + Panel Admin
+
+- **Masalahnya:** fitur analitik ada di tiga tempat dan tidak satu pun saling tersambung. Event dikirim `useAnalytics` → disimpan di JSON `analytics/logs` yang **dibatasi 100 entri** (entri terlama terbuang, dan tiap event membaca-lalu-menulis seluruh array); tabel D1 `site_analytics` dari Sprint 63 **tidak pernah di-import di mana pun**; `GET /api/analytics` **tidak dibaca UI mana pun**. Di samping itu **tidak ada page view sama sekali** — yang dikirim cuma 3 event langka (`header_search_click`, `CV_PRINT`, `CV_DOWNLOAD_PREMIUM`), jadi tidak ada angka kunjungan untuk ditampilkan.
+- **Sekarang:** satu jalur yang utuh — beacon `page_view` (`PageViewTracker` di root layout, mengikuti perubahan route, melewati `/admin` dan `/setup`) → `POST /api/analytics` → **UPSERT 1 baris ke D1 `site_analytics`** → `GET /api/analytics` → **panel "Statistik Pengunjung"** baru di desktop admin (zone *Sistem & Tampilan*): total kunjungan, halaman tercatat, terakhir aktif, halaman populer, plus bagian proyek/aplikasi yang otomatis muncul begitu datanya ada.
+- **Penghemat kuota (penting, mengingat insiden kuota KV kemarin):** 1 kunjungan kini = **1 write D1**, dan tulisan baris analitik ke tabel `audit_logs` **dihapus** agar jejak keamanan tidak tercampur (sebelumnya 2 write per hit, ditambah 1 read blob).
+- **Dibatasi desain, bukan oleh kepercayaan:** `event` di luar allowlist kini `400`, dan path halaman di-bucket ke segmen route yang dikenal (`/projects/abc` → `/projects`, sisanya `/lain`) — endpoint ini terbuka untuk pengunjung, jadi kunci yang bebas akan membuat baris D1 tanpa batas. Jumlah baris per site kini terkunci pada daftar route yang dikenal. Rate limit 30 req/60 detik tetap berlaku.
+- **`GET /api/analytics`** kini mengembalikan `{ summary }` menggantikan `{ logs }` — tidak ada UI yang membaca bentuk lama (telah diverifikasi lewat grep seluruh repo).
+- **Catatan perubahan perilaku:** `event` di luar daftar yang diizinkan kini ditolak (sebelumnya diterima apa pun), dan deskripsi folder zone *Sistem & Tampilan* ikut disesuaikan agar menyebut statistik pengunjung.
+- **Verifikasi:** `npx tsc --noEmit` 0 error, `npx eslint src` 0 error, `npx vitest run` **113 files / 863 tests PASS** (6 test baru: allowlist, bucketing, slug tetap untuk event non-page, 401, bentuk ringkasan). Uji runtime: `page_view` → `200`, event di luar allowlist → `400`, payload kosong → `400`, `GET` tanpa login → `401`, `/admin/system/analytics` → `307` ke login, halaman publik tetap `200`. **Bukti tulis ke D1 remote terbaca langsung:** `/projects` (dari input `/projects/some-project` — bucketing terbukti di data nyata), `/about`, `/`, `/preview`.
+- ⚠️ **Belum diverifikasi:** tampilan panel di browser — membaca datanya butuh login admin, dan `.env.local` hanya menyimpan hash `ADMIN_PASSWORD_SCRYPT`, bukan sandi plaintext.
+- ⚠️ **Ditemukan sampingan, belum ditangani:** app **"Asisten AI" tidak terdaftar di `PANEL_MAP`** sehingga membuka app itu dari folder zone menampilkan *"Panel "ai" belum tersedia"*.
+
 ## [1.3.9] - 2026-09-28
 
 ### ⚙️ Perbaikan ISR: Revalidasi Background Tidak Pernah Commit di Produksi
