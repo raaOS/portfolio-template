@@ -26,11 +26,12 @@ async function main() {
     },
   });
 
+  // Catatan (2026-09-28): `1771963001387…` & `1771963212220…` dibuang dari daftar —
+  // file lokalnya sudah dihapus dan objek R2-nya (foto orang) sudah dihapus oleh
+  // `fix-wallpaper-statics.ts`. Isi wallpaper statis kini frame "Veil of Thorns".
   const wallpapersToUpload = [
     { file: 'optimized-wallpaper.webp', key: 'assets/wallpapers/optimized-wallpaper.webp', mime: 'image/webp' },
     { file: 'optimized-wallpaper.png', key: 'assets/wallpapers/optimized-wallpaper.png', mime: 'image/png' },
-    { file: '1771963001387-yfwye4hggmcu-wallaper.webp', key: 'assets/wallpapers/1771963001387-yfwye4hggmcu-wallaper.webp', mime: 'image/webp' },
-    { file: '1771963212220-fy3vb66wba5k-wallaper.webp', key: 'assets/wallpapers/1771963212220-fy3vb66wba5k-wallaper.webp', mime: 'image/webp' },
   ];
 
   for (const item of wallpapersToUpload) {
@@ -68,23 +69,19 @@ async function main() {
     const content = JSON.parse(row.value);
     const existingCollection = content.about?.wallpaperConfig?.collection || [];
 
+    // Nama + url mengikuti kondisi D1 (lihat `fix-wallpaper-statics.ts`):
+    // isinya frame video "Veil of Thorns", `?v=2` untuk bust cache immutable R2.
     const defaultWallpapers = [
       {
         id: 'w-default-optimized-wallpaper-webp',
-        name: 'macOS Monterey Gradient',
-        url: '/r2/assets/wallpapers/optimized-wallpaper.webp',
+        name: 'Veil of Thorns (Statis)',
+        url: '/r2/assets/wallpapers/optimized-wallpaper.webp?v=2',
         type: 'image'
       },
       {
         id: 'w-default-optimized-wallpaper-png',
-        name: 'macOS Monterey High-Res',
-        url: '/r2/assets/wallpapers/optimized-wallpaper.png',
-        type: 'image'
-      },
-      {
-        id: 'w-default-abstract-flow',
-        name: 'Abstract Flow Wallpaper',
-        url: '/r2/assets/wallpapers/1771963001387-yfwye4hggmcu-wallaper.webp',
+        name: 'Veil of Thorns (Statis, PNG)',
+        url: '/r2/assets/wallpapers/optimized-wallpaper.png?v=2',
         type: 'image'
       }
     ];
@@ -95,12 +92,16 @@ async function main() {
 
     const newCollection = [...defaultWallpapers, ...filteredCollection];
 
+    // Guard rerun (2026-09-28): jangan reset pilihan wallpaper aktif & blur
+    // customer — hanya isi default kalau belum ada. (Sebelumnya hardcode
+    // activeWallpaperId → wallpaper aktif balik ke gambar statis saat rerun.)
+    const prevConfig = content.about.wallpaperConfig || {};
     content.about = content.about || {};
     content.about.wallpaperConfig = {
-      ...content.about.wallpaperConfig,
-      activeWallpaperId: 'w-default-optimized-wallpaper-webp',
+      ...prevConfig,
+      activeWallpaperId: prevConfig.activeWallpaperId || 'w-default-optimized-wallpaper-webp',
       collection: newCollection,
-      blur: 0
+      blur: prevConfig.blur ?? 0
     };
 
     const updateRes = await d1Query(

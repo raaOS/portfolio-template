@@ -18,24 +18,30 @@ export function resolveStorageUrl(url: string): string {
 export function extractStoragePath(url: string): string | null {
   if (!url) return null;
 
+  // Media URL boleh membawa cache-buster (mis. `poster.jpg?v=2`). Object key
+  // R2 tidak pernah menyertakan query/fragment — buang dulu supaya key hasil
+  // ekstraksi tetap valid untuk delete / storage-stats / audit orphan.
+  const clean = url.split('#')[0].split('?')[0];
+  if (!clean) return null;
+
   try {
-    if (url.startsWith('/r2/assets/') || url.startsWith('/r2/temp/')) {
-      return url.substring('/r2/'.length);
+    if (clean.startsWith('/r2/assets/') || clean.startsWith('/r2/temp/')) {
+      return clean.substring('/r2/'.length);
     }
 
-    if (url.startsWith('r2/assets/') || url.startsWith('r2/temp/')) {
-      return url.substring('r2/'.length);
+    if (clean.startsWith('r2/assets/') || clean.startsWith('r2/temp/')) {
+      return clean.substring('r2/'.length);
     }
 
-    if (url.startsWith('/assets/') || url.startsWith('/temp/')) {
-      return url.substring(1);
+    if (clean.startsWith('/assets/') || clean.startsWith('/temp/')) {
+      return clean.substring(1);
     }
 
-    if (url.startsWith('assets/') || url.startsWith('temp/')) {
-      return url;
+    if (clean.startsWith('assets/') || clean.startsWith('temp/')) {
+      return clean;
     }
 
-    const urlObj = new URL(url);
+    const urlObj = new URL(clean);
     const decodedPath = decodeURIComponent(urlObj.pathname.replace(/^\/+/, ''));
 
     if (decodedPath.startsWith('r2/assets/') || decodedPath.startsWith('r2/temp/')) {

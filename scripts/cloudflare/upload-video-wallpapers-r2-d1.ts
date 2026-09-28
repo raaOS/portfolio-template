@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import sharp from 'sharp';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 const envContent = fs.readFileSync('.env.local', 'utf8');
@@ -17,12 +16,12 @@ const r2Secret = parseEnv('CLOUDFLARE_R2_SECRET_ACCESS_KEY');
 const bucket = parseEnv('CLOUDFLARE_R2_BUCKET');
 
 async function main() {
-  console.log('--- 1. Generating poster image ---');
-  const posterBuffer = await sharp('public/wallpapers/optimized-wallpaper.png')
-    .resize(1920, 1080, { fit: 'cover' })
-    .jpeg({ quality: 80 })
-    .toBuffer();
-
+  // Poster side-car TIDAK lagi dibuat di sini. Versi lama menghasilkan SATU
+  // buffer dari `public/wallpapers/optimized-wallpaper.png` (foto orang) lalu
+  // meng-upload buffer yang sama ke poster ke-4 video — semua poster jadi
+  // identik dan salah. Poster kini di-capture per video (frame 0.5s) dan
+  // di-upload lewat `scripts/cloudflare/fix-wallpaper-posters.ts`.
+  console.log('--- 1. Uploading videos to R2 ---');
   const s3 = new S3Client({
     region: 'auto',
     endpoint: `https://${acc}.r2.cloudflarestorage.com`,
@@ -70,18 +69,7 @@ async function main() {
         })
       );
       console.log(`Uploaded ${item.key}`);
-
-      // Also upload poster
-      await s3.send(
-        new PutObjectCommand({
-          Bucket: bucket,
-          Key: item.posterKey,
-          Body: posterBuffer,
-          ContentType: 'image/jpeg',
-          CacheControl: 'public, max-age=31536000, immutable',
-        })
-      );
-      console.log(`Uploaded poster ${item.posterKey}`);
+      // Poster sengaja TIDAK di-upload di sini (lihat catatan di atas).
     } else {
       console.warn(`File not found: ${item.source}`);
     }
@@ -113,39 +101,39 @@ async function main() {
           url: '/r2/assets/wallpapers/1780744973336-hunt-showdown-veil-of-thorns-3840x2160.mp4',
           name: 'Hunt Showdown Veil of Thorns',
           type: 'video',
-          posterUrl: '/r2/assets/wallpapers/1780744973336-hunt-showdown-veil-of-thorns-3840x2160.jpg'
+          posterUrl: '/r2/assets/wallpapers/1780744973336-hunt-showdown-veil-of-thorns-3840x2160.jpg?v=2'
         },
         {
           id: 'w-1780767617527-zen-kois',
           url: '/r2/assets/wallpapers/1780767617527-zen-kois-wallpaper-50s-upload-safe.mp4',
           name: 'Zen Kois Live Wallpaper',
           type: 'video',
-          posterUrl: '/r2/assets/wallpapers/1780767617527-zen-kois-wallpaper-50s-upload-safe.jpg'
+          posterUrl: '/r2/assets/wallpapers/1780767617527-zen-kois-wallpaper-50s-upload-safe.jpg?v=2'
         },
         {
           id: 'w-1779992198762-pink-bloom',
           url: '/r2/assets/wallpapers/1779992198762-pink-bloom-field-clear-sky-live-wallpaper-wallsflow-com.mp4',
           name: 'Pink Bloom Field Clear Sky',
           type: 'video',
-          posterUrl: '/r2/assets/wallpapers/1779992198762-pink-bloom-field-clear-sky-live-wallpaper-wallsflow-com.jpg'
+          posterUrl: '/r2/assets/wallpapers/1779992198762-pink-bloom-field-clear-sky-live-wallpaper-wallsflow-com.jpg?v=2'
         },
         {
           id: 'w-1780086176924-sachiro',
           url: '/r2/assets/wallpapers/1780086176924-sachiro-dark-nights-3840x2160.mp4',
           name: 'Sachiro Dark Nights',
           type: 'video',
-          posterUrl: '/r2/assets/wallpapers/1780086176924-sachiro-dark-nights-3840x2160.jpg'
+          posterUrl: '/r2/assets/wallpapers/1780086176924-sachiro-dark-nights-3840x2160.jpg?v=2'
         },
         {
           id: 'w-default-optimized-wallpaper-webp',
-          name: 'macOS Monterey Gradient',
-          url: '/r2/assets/wallpapers/optimized-wallpaper.webp',
+          name: 'Veil of Thorns (Statis)',
+          url: '/r2/assets/wallpapers/optimized-wallpaper.webp?v=2',
           type: 'image'
         },
         {
           id: 'w-default-optimized-wallpaper-png',
-          name: 'macOS Monterey High-Res',
-          url: '/r2/assets/wallpapers/optimized-wallpaper.png',
+          name: 'Veil of Thorns (Statis, PNG)',
+          url: '/r2/assets/wallpapers/optimized-wallpaper.png?v=2',
           type: 'image'
         }
       ];
