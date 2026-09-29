@@ -16,6 +16,7 @@ import { cookies } from 'next/headers';
 import { cleanEnvVar } from '@/lib/utils/env';
 import { db } from '@/lib/database';
 import { logAdminActivity } from '@/lib/services/auditLogger';
+import { SITE_ID } from '@/crud/shared/config';
 import {
   ADMIN_TOKEN_COOKIE,
   ADMIN_TOKEN_COOKIE_LEGACY,
@@ -79,11 +80,15 @@ export const getAdminToken = (): string => {
     throw new Error('JWT_SECRET is not configured');
   }
 
-  return sign({ sub: 'admin', role: 'admin', iat: Math.floor(Date.now() / 1000) }, JWT_SECRET, {
-    expiresIn: '2h',
-    issuer: 'portfolio-admin',
-    audience: 'admin-panel',
-  });
+  return sign(
+    { sub: 'admin', role: 'admin', siteId: SITE_ID, iat: Math.floor(Date.now() / 1000) },
+    JWT_SECRET,
+    {
+      expiresIn: '2h',
+      issuer: 'portfolio-admin',
+      audience: 'admin-panel',
+    }
+  );
 };
 
 export const verifyAdminToken = (token: string): boolean => {
@@ -98,7 +103,13 @@ export const verifyAdminToken = (token: string): boolean => {
     });
 
     if (typeof payload === 'object' && payload !== null && 'sub' in payload) {
-      return (payload as { sub?: string }).sub === 'admin';
+      const claims = payload as { sub?: string; siteId?: string };
+      if (claims.sub !== 'admin') return false;
+      // SECURITY FIX (audit 2026-09-29): token wajib terikat ke deployment ini.
+      // Tanpa klaim siteId, token lama yang ditandatangani dengan JWT_SECRET
+      // bersama antar deployment diterima di mana pun. Token yang diterbitkan
+      // sebelum fix ini tidak punya klaim → ditolak (logout sesi 2 jam, aman).
+      return claims.siteId === SITE_ID;
     }
     return false;
   } catch {

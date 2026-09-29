@@ -139,7 +139,9 @@ export async function GET(request: Request) {
   } catch (error: unknown) {
     console.error('YouTube Search API error:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal Server Error' },
+      // SECURITY FIX (audit 2026-09-29): jangan teruskan error.message
+      // internal (bisa memuat detail URL/key) ke respons publik.
+      { error: 'Internal Server Error' },
       { status: 500 }
     );
   }
