@@ -53,5 +53,9 @@ export async function enforceRequestRateLimit(
   windowMs: number,
   blockMs: number
 ) {
-  return checkDataRateLimit(getClientIdentifier(request, scope), maxAttempts, windowMs, blockMs);
+  // SECURITY FIX (audit 2026-09-29): key rate limit WAJIB IP-only.
+  // Key lama `scope:ip|userAgent` bisa di-reset pelaku dengan mengganti
+  // header User-Agent sehingga seluruh limit (checkout, proof upload,
+  // translate AI, PIN verify, dll) tidak berarti. Rotasi UA bukan identitas.
+  return checkDataRateLimit(`${scope}:${getClientIP(request)}`, maxAttempts, windowMs, blockMs);
 }

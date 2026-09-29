@@ -21,6 +21,13 @@ export async function getSettingsData() {
   }
 }
 
+// SECURITY FIX (audit 2026-09-29): allowlist eksplisit untuk caller non-admin.
+// Row `settings` juga menampung field sensitif (settings/adminPassword,
+// settings/adminPin — hash yang ditulis endpoint legacy), jadi membuang
+// `bannedWords` saja (blocklist) tetap membocorkan field lain. Allowlist:
+// hanya flag boolean publik yang boleh keluar.
+const PUBLIC_SETTINGS_KEYS = ['maintenanceMode', 'allowComments'] as const;
+
 export async function GET(request: NextRequest) {
   const data = await getSettingsData();
   const isAdmin = await validateAdminRequest(request, { checkCsrf: false });
@@ -29,7 +36,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data);
   }
 
-  const { bannedWords: _bannedWords, ...publicSettings } = data;
+  const publicSettings = Object.fromEntries(
+    PUBLIC_SETTINGS_KEYS.filter((key) => key in data).map((key) => [key, data[key]])
+  );
   return NextResponse.json(publicSettings);
 }
 

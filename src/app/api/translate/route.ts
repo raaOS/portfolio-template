@@ -6,6 +6,12 @@ const MAX_TRANSLATE_REQUESTS = 20;
 const TRANSLATE_WINDOW_MS = 60 * 1000;
 const TRANSLATE_BLOCK_MS = 5 * 60 * 1000;
 
+// SECURITY FIX (audit 2026-09-29): endpoint AI publik memakai API key milik
+// owner. Limit per-menit saja masih membebaskan ~28rb request/hari/IP, jadi
+// tambah kuota harian keras sebagai plafon biaya.
+const DAILY_MAX_TRANSLATE_REQUESTS = 200;
+const DAILY_TRANSLATE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
 const translatePayloadSchema = z.object({
   text: z.string().max(5000).optional(),
   targetLanguage: z.string().max(50).optional(),
@@ -64,6 +70,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'Too many requests. Please try again later.', retryAfter: rateLimit.retryAfter },
         { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfter) } }
+      );
+    }
+
+    const dailyLimit = await enforceRequestRateLimit(
+      req,
+      'translate_daily',
+      DAILY_MAX_TRANSLATE_REQUESTS,
+      DAILY_TRANSLATE_WINDOW_MS,
+      DAILY_TRANSLATE_WINDOW_MS
+    );
+
+    if (!dailyLimit.allowed) {
+      return NextResponse.json(
+        {
+          error: 'Daily translation quota reached. Please try again tomorrow.',
+          retryAfter: dailyLimit.retryAfter,
+        },
+        { status: 429, headers: { 'Retry-After': String(dailyLimit.retryAfter) } }
       );
     }
 
