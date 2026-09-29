@@ -9,6 +9,16 @@ import { enforceRequestRateLimit } from '@/lib/security/request';
  */
 export async function GET(request: NextRequest) {
   try {
+    // SECURITY FIX (audit 2026-09-29): cek slug juga membaca D1 — beri limit
+    // IP-only agar tidak bisa dijadikan pembanjiran query.
+    const rateLimit = await enforceRequestRateLimit(request, 'billing_slug_check', 30, 60_000, 300_000);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Terlalu banyak permintaan. Silakan coba lagi beberapa saat.', retryAfter: rateLimit.retryAfter },
+        { status: 429 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const slug = searchParams.get('slug');
 
@@ -40,7 +50,10 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const rateLimit = await enforceRequestRateLimit(request, 'billing_checkout', 10, 60_000, 300_000);
+    // SECURITY FIX (audit 2026-09-29): pool nominal unik hanya 999 slot yang
+    // dikunci 24 jam per order — limit diperketat (5/menit, block 10 menit)
+    // dan key-nya sudah IP-only sejak perbaikan rate limiter.
+    const rateLimit = await enforceRequestRateLimit(request, 'billing_checkout', 5, 60_000, 600_000);
     if (!rateLimit.allowed) {
       return NextResponse.json(
         { error: 'Terlalu banyak permintaan. Silakan coba lagi beberapa saat.', retryAfter: rateLimit.retryAfter },

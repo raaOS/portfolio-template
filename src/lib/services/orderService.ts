@@ -3,6 +3,7 @@ import { queryD1 } from '@/lib/cloudflareD1';
 import { cleanEnvVar } from '@/lib/utils/env';
 import { isSlugAvailable } from './slugService';
 import { getPaymentConfig, type PaymentConfig } from './paymentConfigService';
+import { deleteFromR2, isR2StorageConfigured, listR2ObjectKeys } from '@/lib/r2Storage';
 import { PLAN_BASE_PRICES } from '@/constants/plans';
 
 export interface OrderRecord {
@@ -79,16 +80,23 @@ async function expireStalePendingOrders(nowIso: string): Promise<void> {
   // bukti palsu dan admin lupa cancel): dibatalkan otomatis setelah 7 hari agar
   // reservasi slug & nominal unik tidak terkunci selamanya (index unik partial
   // hanya melindungi pending/waiting/activating, bukan canceled).
-  await queryD1(
+  // RETURNING id dipakai (sekali jalan) agar file bukti di R2 ikut dibersihkan.
+  const staleWaitingIds = await queryD1<{ id: string }>(
     `UPDATE orders
      SET status = 'canceled',
          cancel_reason = ?,
          payment_proof_url = NULL,
          updated_at = ?
      WHERE status = 'waiting_verification'
-       AND datetime(updated_at) <= datetime(?, '-7 days')`,
+       AND datetime(updated_at) <= datetime(?, '-7 days')
+     RETURNING id`,
     ['Dibatalkan otomatis: bukti pembayaran tidak selesai diverifikasi dalam 7 hari.', nowIso, nowIso]
   );
+
+  // Bersihkan juga file bukti bayarnya di R2 (DB sudah tidak merujuknya).
+  for (const row of staleWaitingIds || []) {
+    if (row?.id) await cleanupOrderProofObjects(row.id);
+  }
 
   const staleOrders = await queryD1<{
     id: string;
@@ -477,15 +485,26 @@ async function sendOrderExpiredEmail({
 /**
  * Verifies a plaintext access token against the stored hash for an order.
  * Returns true if the token matches, false otherwise.
+ *
+ * SECURITY FIX (audit 2026-09-29): token juga kadaluarsa berdasarkan umur
+ * order — tautan `?token=` yang bocor (riwayat browser, log) tidak berlaku
+ * selamanya. Order aktif (status aktif) tetap memakai jendela alaminya;
+ * order terminal ditutup 90 hari setelah `created_at`.
  */
+const ORDER_TOKEN_MAX_AGE_DAYS = 90;
+
 export async function verifyOrderAccessToken(orderId: string, token: string): Promise<boolean> {
   if (!orderId || !token) return false;
-  const rows = await queryD1<{ access_token_hash: string | null }>(
-    'SELECT access_token_hash FROM orders WHERE id = ?',
+  const rows = await queryD1<{ access_token_hash: string | null; created_at?: string }>(
+    'SELECT access_token_hash, created_at FROM orders WHERE id = ?',
     [orderId]
   );
   const row = rows[0];
   if (!row?.access_token_hash) return false;
+  if (row.created_at) {
+    const ageMs = Date.now() - new Date(row.created_at).getTime();
+    if (ageMs > ORDER_TOKEN_MAX_AGE_DAYS * 24 * 60 * 60 * 1000) return false;
+  }
   const inputHash = hashAccessToken(token);
   if (inputHash.length !== row.access_token_hash.length) return false;
   return crypto.timingSafeEqual(
@@ -563,11 +582,14 @@ export async function createOrder(
     }
 
     try {
+      // SECURITY FIX (audit 2026-09-29): templateId diterima route checkout
+      // tapi sebelumnya tidak pernah ikut INSERT — pilihan template buyer
+      // hilang diam-diam. Kolom `template_id` sudah ada di schema orders.
       await queryD1(
         `INSERT INTO orders (
           id, desired_slug, buyer_name, buyer_email, buyer_whatsapp,
-          plan, amount, payment_method, access_token_hash, status, expires_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'manual_qris', ?, 'pending_payment', ?, ?, ?)`,
+          plan, amount, payment_method, access_token_hash, status, expires_at, created_at, updated_at, template_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'manual_qris', ?, 'pending_payment', ?, ?, ?, ?)`,
         [
           attemptOrderId,
           slugLower,
@@ -579,7 +601,8 @@ export async function createOrder(
           hashAccessToken(attemptAccessToken),
           expiresAt,
           createdAt,
-          updatedAt
+          updatedAt,
+          input.templateId ?? null
         ]
       );
       orderId = attemptOrderId;
@@ -605,7 +628,7 @@ export async function createOrder(
 
   const newOrder: OrderRecord = {
     id: orderId,
-    template_id: null,
+    template_id: input.templateId ?? null,
     desired_slug: slugLower,
     buyer_name: input.buyerName.trim(),
     buyer_email: input.buyerEmail.trim().toLowerCase(),
@@ -723,14 +746,27 @@ export async function uploadPaymentProof(
   }
 
   try {
+    // SECURITY FIX (audit 2026-09-29): re-upload dari status
+    // `waiting_verification` TIDAK me-reset `updated_at`, sehingga timer
+    // auto-cancel 7 hari tetap dihitung dari bukti pertama — upload ulang
+    // berulang tidak lagi bisa mengunci slug & nominal unik tanpa bayar.
+    // First upload (pending_payment) dan late payment (expired) tetap
+    // memulai jendela 7 hari baru.
     await queryD1(
       `UPDATE orders
        SET payment_proof_url = ?,
            status = 'waiting_verification',
            expires_at = CASE WHEN ? THEN ? ELSE expires_at END,
-           updated_at = ?
+           updated_at = CASE WHEN ? THEN updated_at ELSE ? END
        WHERE id = ?`,
-      [normalizedProofUrl, isLatePayment ? 1 : 0, lateExpiresAt, updatedAt, orderId]
+      [
+        normalizedProofUrl,
+        isLatePayment ? 1 : 0,
+        lateExpiresAt,
+        wasWaitingVerification ? 1 : 0,
+        updatedAt,
+        orderId,
+      ]
     );
   } catch (err) {
     if (isUniqueConstraintError(err, 'amount')) {
@@ -890,7 +926,9 @@ export async function activateOrder(
     createdRows.push({ kind: 'site_subscription', id: `sub_${siteId}` });
 
     // Update Order status to activated
-    await queryD1('UPDATE orders SET status = "activated", site_id = ?, updated_at = ? WHERE id = ?', [
+    // SQL literal: pakai quote tunggal ('activated') — D1 menolak identifer
+    // quoted double-quote bila SQLITE_DQS=0 (temuan audit 2026-09-29).
+    await queryD1("UPDATE orders SET status = 'activated', site_id = ?, updated_at = ? WHERE id = ?", [
       siteId,
       now,
       orderId
@@ -947,6 +985,20 @@ export async function activateOrder(
 // Cancel / Refund Order
 // ---------------------------------------------------------------------------
 
+/**
+ * Hapus semua objek bukti bayar milik order di R2 (prefix `orders/{id}/`).
+ * Best-effort: kegagalan cleanup tidak boleh menggagalkan pembatalan order.
+ */
+async function cleanupOrderProofObjects(orderId: string): Promise<void> {
+  if (!isR2StorageConfigured()) return;
+  try {
+    const keys = await listR2ObjectKeys({ prefix: `orders/${orderId}/` });
+    await Promise.all(keys.map((key) => deleteFromR2(key)));
+  } catch (error) {
+    console.warn('[OrderService] Gagal membersihkan bukti bayar di R2:', error);
+  }
+}
+
 export async function cancelOrder(
   orderId: string,
   reason?: string
@@ -985,6 +1037,12 @@ export async function cancelOrder(
   }
 
   const cancelReason = reason?.trim() || 'Dibatalkan oleh Admin (Bukti bayar tidak valid / mutasi tidak ditemukan)';
+
+  // SECURITY FIX (audit 2026-09-29): bersihkan objek bukti bayar di R2.
+  // Sebelumnya DB dibersihkan (payment_proof_url = NULL) tapi file di prefix
+  // `orders/{orderId}/` tetap tertinggal selamanya — PII bukti transfer
+  // masih bisa diakses siapa pun yang punya URL-nya.
+  await cleanupOrderProofObjects(orderId);
 
   // Cleanup: clear sensitive payment proof URL.
   // Keep `amount` intact for late-payment reconciliation and keep `access_token_hash`

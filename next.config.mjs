@@ -155,7 +155,10 @@ const nextConfig = {
           },
           {
             key: 'Strict-Transport-Security',
-            value: 'max-age=63072000; includeSubDomains; preload',
+            // Disamakan dengan nilai di src/middleware/utils.ts (sebelumnya
+            // beda: 63072000 di sini vs 31536000 di middleware → header kembar
+            // dengan nilai konflik tergantung jalur mana yang menang).
+            value: 'max-age=31536000; includeSubDomains; preload',
           },
           {
             key: 'X-Frame-Options',
@@ -167,7 +170,9 @@ const nextConfig = {
           },
           {
             key: 'Referrer-Policy',
-            value: 'origin-when-cross-origin',
+            // Disamakan dengan src/middleware/utils.ts (nilai lama
+            // `origin-when-cross-origin` bocorkan full URL lintas origin).
+            value: 'strict-origin-when-cross-origin',
           },
           {
             key: 'Permissions-Policy',

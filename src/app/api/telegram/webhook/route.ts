@@ -1,5 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { activateOrder, cancelOrder } from '@/lib/services/orderService';
+import { enforceRequestRateLimit } from '@/lib/security/request';
+
+// SECURITY FIX (audit 2026-09-29):
+// 1. Perbandingan secret pakai timing-safe equal.
+// 2. Callback hanya diproses bila berasal dari chat admin
+//    (TELEGRAM_ADMIN_CHAT_ID) — mengunci notifikasi ke chat yang benar.
+// 3. buyer_whatsapp disanitasi (hanya digit) sebelum ditanam ke pesan HTML.
+
+function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, 'utf8');
+  const bufB = Buffer.from(b, 'utf8');
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
 
 interface TelegramCallbackQuery {
   id?: string;
@@ -17,6 +32,16 @@ interface TelegramWebhookPayload {
 
 export async function POST(request: NextRequest) {
   try {
+    // SECURITY FIX (audit 2026-09-29): rate limit IP-only — webhook resmi
+    // Telegram hanya butuh ~beberapa request/menit saat admin klik tombol.
+    const rateLimit = await enforceRequestRateLimit(request, 'telegram_webhook', 30, 60_000, 300_000);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests', retryAfter: rateLimit.retryAfter },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfter) } }
+      );
+    }
+
     // 1. SECURITY: Always verify secret header — reject if not configured
     const secret = process.env.TELEGRAM_BOT_SECRET;
     if (!secret) {
@@ -25,7 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     const headerSecret = request.headers.get('x-telegram-bot-api-secret-token');
-    if (headerSecret !== secret) {
+    if (!headerSecret || !safeEqual(headerSecret, secret)) {
       return NextResponse.json({ error: 'Unauthorized secret token' }, { status: 401 });
     }
 
@@ -38,6 +63,14 @@ export async function POST(request: NextRequest) {
       const chatId = callbackQuery.message?.chat?.id;
       const messageId = callbackQuery.message?.message_id;
       const botToken = process.env.TELEGRAM_BOT_TOKEN;
+
+      // Izinkan hanya callback dari chat admin. Bila env belum di-set tetap
+      // diproses (kompatibilitas setup lama) tapi dicatat.
+      const adminChatId = process.env.TELEGRAM_ADMIN_CHAT_ID;
+      if (adminChatId && String(chatId) !== adminChatId) {
+        console.warn('[TelegramWebhook] Callback from unknown chat ignored:', chatId);
+        return NextResponse.json({ ok: true });
+      }
 
       // Handle Activate Order Button
       if (callbackData.startsWith('activate_')) {
@@ -91,8 +124,9 @@ export async function POST(request: NextRequest) {
         }
 
         if (botToken && callbackQuery.message && chatId && messageId && result.success) {
-          const waLink = result.order?.buyer_whatsapp
-            ? `\n\n💬 <b>Chat WA Pembeli untuk Transfer Balik:</b> https://wa.me/${result.order.buyer_whatsapp}`
+          const waDigits = (result.order?.buyer_whatsapp || '').replace(/\D/g, '');
+          const waLink = waDigits
+            ? `\n\n💬 <b>Chat WA Pembeli untuk Transfer Balik:</b> https://wa.me/${waDigits}`
             : '';
 
           await fetch(`https://api.telegram.org/bot${botToken}/editMessageText`, {

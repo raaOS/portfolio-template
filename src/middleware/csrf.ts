@@ -41,7 +41,14 @@ export function checkCSRF(request: NextRequest) {
       // `x-hub-signature-256` di handler, bukan cookie CSRF.
       '/api/revalidate',
     ];
-    if (!allowlistPaths.some((p) => pathname.startsWith(p))) {
+    // SECURITY FIX (audit 2026-09-29): pencocokan per-segmen — `startsWith`
+    // mentah mengizinkan path baru yang kebetulan berawalan sama (mis.
+    // `/api/billing/orders-preview`) lolos CSRF tanpa disadari. Allowlist hanya
+    // cocok untuk path persis atau anak path (`entry + '/'`).
+    const isAllowlisted = allowlistPaths.some(
+      (p) => pathname === p || pathname.startsWith(`${p}/`)
+    );
+    if (!isAllowlisted) {
       const csrfToken = request.headers.get(CSRF_TOKEN_HEADER);
       const sessionCsrfToken = request.cookies.get(CSRF_TOKEN_COOKIE)?.value;
 

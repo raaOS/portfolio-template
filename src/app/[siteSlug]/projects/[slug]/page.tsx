@@ -54,6 +54,9 @@ export default async function TenantProjectPage({ params }: TenantProjectPagePro
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
+          // SECURITY FIX (audit 2026-09-29): escape `<` agar judul/deskripsi
+          // project yang mengandung `</script>` tidak menutup tag & mengeksekusi
+          // skrip (stored XSS via konten project).
           __html: JSON.stringify(
             generateStructuredData('project', {
               title: project.title,
@@ -64,7 +67,7 @@ export default async function TenantProjectPage({ params }: TenantProjectPagePro
               year: project.year,
               slug: project.slug,
             })
-          ),
+          ).replace(/</g, '\\u003c'),
         }}
       />
       <ProjectDetailTwoColumn
