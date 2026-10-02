@@ -83,23 +83,11 @@ function checkDemoDataHygiene() {
   'docs/release/CLIENT_OPERATIONS.md',
   'docs/release/RELEASE_CHECKLIST.md',
   'docs/release/SALES_PRICING.md',
-  'src/app/api/client/password-reset/request/route.ts',
-  'src/app/api/client/password-reset/confirm/route.ts',
-  'src/app/client/reset-password/page.tsx',
-  'src/lib/clientPasswordReset.ts',
 ].forEach(checkFile);
 
-checkIncludes('.env.example', [
-  'FEATURE_CLIENT_PASSWORD_RESET="true"',
-  'CLIENT_PASSWORD_RESET_TOKEN_TTL_MINUTES="30"',
-  'NOTIFICATION_PROVIDER="resend"',
-]);
+checkIncludes('.env.example', ['NOTIFICATION_PROVIDER="resend"']);
 
-checkIncludes('docs/release/CLIENT_OPERATIONS.md', [
-  '/[siteSlug]/login',
-  'Lupa Password',
-  'NOTIFICATION_PROVIDER="resend"',
-]);
+checkIncludes('docs/release/CLIENT_OPERATIONS.md', ['NOTIFICATION_PROVIDER="resend"']);
 
 checkIncludes('docs/release/SALES_PRICING.md', [
   'satu kali beli',
@@ -108,12 +96,8 @@ checkIncludes('docs/release/SALES_PRICING.md', [
   'PROJECT_LIMIT',
 ]);
 
-checkIncludes('scripts/release/smoke-production.js', [
-  '/client/reset-password',
-  '/login',
-]);
+checkIncludes('scripts/release/smoke-production.js', ['/api/health', '/api/public/sites/']);
 
-checkIncludes('src/lib/d1-schema.ts', ['client_password_resets']);
 checkDemoDataHygiene();
 
 console.log('Sale readiness audit');

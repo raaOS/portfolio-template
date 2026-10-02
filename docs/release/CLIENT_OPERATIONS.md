@@ -27,34 +27,20 @@ Di Master Dashboard:
    - link login `/[siteSlug]/login`
    - email akses
    - password awal
-   - instruksi reset password
 
-## Reset Password Client
+## Notifikasi Email ke Pembeli
 
-Ada dua jalur:
-
-1. Self-service client:
-   - Client buka `/[siteSlug]/login`.
-   - Klik `Lupa Password`.
-   - Isi site slug dan email.
-   - Sistem mengirim reset link ke email jika akses cocok.
-   - Client membuat password baru di `/client/reset-password?token=...`.
-
-2. Master override:
-   - Master buka site di dashboard.
-   - Isi field `Reset password`.
-   - Simpan client access.
-   - Gunakan ini hanya untuk support manual.
-
-Reset self-service production membutuhkan provider email:
+Email struk (saat order dibuat) dan email serah-terima (setelah pembayaran
+diverifikasi & order aktif) dikirim lewat provider email generik:
 
 ```env
-FEATURE_CLIENT_PASSWORD_RESET="true"
 NOTIFICATION_PROVIDER="resend"
 NOTIFICATION_API_KEY=""
 NOTIFICATION_DEFAULT_FROM=""
 NEXT_PUBLIC_SITE_URL="https://domain-kamu.com"
 ```
+
+Tanpa keempat nilai tersebut, pembeli tidak menerima email sama sekali.
 
 ## Flow Project Client
 

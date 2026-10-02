@@ -922,6 +922,41 @@ export async function uploadPaymentProof(
   return { success: true };
 }
 
+/**
+ * Tiket kerja "kasir → bengkel".
+ *
+ * Order sudah `activated` berarti pembayaran sudah masuk, jadi pekerjaan
+ * berikutnya di tangan owner (di luar sistem): siapkan Gmail klien, akun
+ * Cloudflare, provisioning lewat PENGELOLA_KLIEN.bat, deploy, lalu
+ * serah-terima. Tiket ini dikirim ke chat Telegram admin sebagai pengingat
+ * langkah kerja. Best-effort: kegagalan kirim tidak boleh memengaruhi
+ * hasil aktivasi.
+ */
+async function sendWorkshopTicket(order: OrderRecord, siteUrl: string): Promise<void> {
+  const steps = [
+    '1. Buat Gmail untuk klien.',
+    '2. Buat akun Cloudflare klien (Account ID + API Token izin D1, Pages, R2).',
+    '3. Jalankan PENGELOLA_KLIEN.bat → menu [1] Pendaftaran Klien Baru.',
+    '4. Deploy lewat portal yang sama.',
+    '5. Kirim akses ke klien (URL + login /admin).',
+    '6. Tandai order selesai dan simpan datanya di arsip-klien/.',
+  ];
+
+  const text =
+    `🔧 <b>TIKET KERJA — ORDER AKTIF</b>\n\n` +
+    `ID: <code>${escapeTelegramHtml(order.id)}</code>\n` +
+    `Slug: <code>${escapeTelegramHtml(order.desired_slug)}</code>\n` +
+    `Pembeli: ${escapeTelegramHtml(order.buyer_name)}\n` +
+    `WA: ${escapeTelegramHtml(order.buyer_whatsapp)}\n` +
+    `Email: ${escapeTelegramHtml(order.buyer_email)}\n` +
+    `URL: <a href="${escapeTelegramHtml(siteUrl)}">${escapeTelegramHtml(siteUrl)}</a>\n\n` +
+    `☑️ <b>Langkah bengkel:</b>\n` +
+    steps.map((step) => `   ${escapeTelegramHtml(step)}`).join('\n') +
+    `\n\n📖 Panduan lengkap: docs/operations/BENGKEL_HANDOFF.md`;
+
+  await sendTelegramMessage({}, text);
+}
+
 // ---------------------------------------------------------------------------
 // Activate Order
 // ---------------------------------------------------------------------------
@@ -1070,6 +1105,9 @@ export async function activateOrder(
   } catch (err) {
     console.error(`[activateOrder] Handoff email failed for order ${orderId}:`, err);
   }
+
+  // Tiket kerja kasir → bengkel (lihat sendWorkshopTicket).
+  await sendWorkshopTicket(order, siteUrl);
 
   const message = `Berhasil mengaktifkan pesanan ${order.id}. Site URL: ${siteUrl}`;
 

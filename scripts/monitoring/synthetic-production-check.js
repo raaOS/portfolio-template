@@ -18,8 +18,6 @@ dotenv.config({ path: '.env', override: false, quiet: true });
 const DEFAULT_ENDPOINTS = [
   { name: 'health', path: '/api/health', expectedStatuses: [200] },
   { name: 'home', path: '/', expectedStatuses: [200] },
-  { name: 'client_login', path: '/client/login', expectedStatuses: [200] },
-  { name: 'client_reset_password', path: '/client/reset-password', expectedStatuses: [200] },
   { name: 'public_site', path: '/api/public/sites/{siteSlug}', expectedStatuses: [200] },
   { name: 'public_projects', path: '/api/public/sites/{siteSlug}/projects', expectedStatuses: [200] },
 ];

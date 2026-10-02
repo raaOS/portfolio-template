@@ -118,53 +118,29 @@ function checkFfmpegBaseUrl() {
   pass('NEXT_PUBLIC_FFMPEG_BASE_URL is production-safe');
 }
 
-function checkClientPasswordReset() {
-  const resetEnabled = process.env.FEATURE_CLIENT_PASSWORD_RESET !== 'false';
-  if (!resetEnabled) {
-    fail(
-      'Client password reset is enabled',
-      'Set FEATURE_CLIENT_PASSWORD_RESET=true for sale-ready production.'
-    );
-    return;
-  }
-
-  pass('Client password reset is enabled');
-
-  const ttl = Number(process.env.CLIENT_PASSWORD_RESET_TOKEN_TTL_MINUTES);
-  if (!Number.isInteger(ttl) || ttl < 5 || ttl > 120) {
-    fail(
-      'Client password reset TTL is valid',
-      'Set CLIENT_PASSWORD_RESET_TOKEN_TTL_MINUTES between 5 and 120.'
-    );
-  } else {
-    pass('Client password reset TTL is valid');
-  }
-
+function checkNotificationProvider() {
   const provider = process.env.NOTIFICATION_PROVIDER?.trim().toLowerCase() || '';
   if (provider === 'resend') {
-    pass('Client password reset email provider is supported');
+    pass('Notification provider is supported');
   } else {
-    fail(
-      'Client password reset email provider is supported',
-      'Set NOTIFICATION_PROVIDER=resend.'
-    );
+    fail('Notification provider is supported', 'Set NOTIFICATION_PROVIDER=resend.');
   }
 
   if (process.env.NOTIFICATION_API_KEY?.trim()) {
-    pass('Client password reset email API key is configured');
+    pass('Notification email API key is configured');
   } else {
-    fail('Client password reset email API key is configured');
+    fail('Notification email API key is configured');
   }
 
   if (process.env.NOTIFICATION_DEFAULT_FROM?.trim()) {
-    pass('Client password reset email sender is configured');
+    pass('Notification email sender is configured');
   } else {
-    fail('Client password reset email sender is configured');
+    fail('Notification email sender is configured');
   }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || '';
   if (!siteUrl) {
-    fail('NEXT_PUBLIC_SITE_URL is configured for reset links');
+    fail('NEXT_PUBLIC_SITE_URL is configured');
     return;
   }
 
@@ -292,7 +268,7 @@ async function main() {
 
   checkFfmpegLocalFiles();
   checkFfmpegBaseUrl();
-  checkClientPasswordReset();
+  checkNotificationProvider();
   checkWranglerR2Binding();
 
   if (report.missingRequired.length === 0 && report.backendIssues.length === 0 && report.confirmed) {

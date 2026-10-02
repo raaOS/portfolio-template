@@ -141,7 +141,6 @@ async function audit(options: Options) {
 
   const siteScopedTables = [
     'client_access',
-    'client_password_resets',
     'site_quota_overrides',
     'projects',
     'project_narratives',

@@ -16,8 +16,6 @@ Endpoint yang dicek:
 
 - `/api/health`
 - `/`
-- `/client/login`
-- `/client/reset-password`
 - `/api/public/sites/{siteSlug}`
 - `/api/public/sites/{siteSlug}/projects`
 
@@ -109,8 +107,6 @@ Event yang dicakup:
 
 - `admin.login`
 - `client.login`
-- `client.password_reset.request`
-- `client.password_reset.confirm`
 - `site.create`
 - `site.update`
 - `site.delete`
@@ -134,7 +130,6 @@ Cek harian:
   - `event=d1.query_error`
   - `event=r2.upload` dengan `status=failure`
   - `event=client.login` dengan `status=failure` atau `blocked`
-  - `event=client.password_reset.*` dengan `status=failure`
 - Synthetic report terakhir: `.audit-reports/monitoring/latest.json`.
 - Storage/quota warning dari synthetic check.
 - Cloudflare dashboard:

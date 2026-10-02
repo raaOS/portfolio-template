@@ -3,6 +3,17 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.16] - 2026-10-03
+
+### 🔧 Tiket Kerja Otomatis: dari Kasir ke Bengkel + Pembersihan Sisa Fitur Lama
+
+- **Tiket kerja Telegram.** Begitu kamu menekan **✅ Verifikasi & Aktifkan** pada pesan Telegram, pembeli menerima email serah-terima **dan kamu sekarang menerima tiket kerja** berisi 6 langkah bengkel: (1) order aktif, (2) siapkan Gmail klien, (3) buat akun Cloudflare klien, (4) jalankan `PENGELOLA_KLIEN.bat`, (5) deploy, (6) serah-terima akses + tandai selesai — lengkap dengan ID order, slug, nama/WA/email pembeli, dan URL website. Sebelumnya pesan itu hanya berubah jadi "STATUS: ACTIVATED" tanpa panduan langkah, sehingga pekerjaan setelah bayar murni mengandalkan ingatan.
+- **Panduan bengkel baru:** `docs/operations/BENGKEL_HANDOFF.md` menjelaskan keenam langkah itu langkah demi langkah, termasuk menu portal yang benar-benar dipakai, cara menyimpan data klien di `arsip-klien/`, dan cara mereset password klien kalau mereka lupa.
+- **Fitur "Lupa Password" lama dibersihkan sampai tuntas.** Tombol dan halaman reset password sudah lama dihapus dari website, tapi sisa-sisanya masih tersebar: 5 pengecekan rilis yang membuat audit gagal, script monitoring yang mengecek halaman sudah-404, contoh environment variable, script backup, script uji beban, dan 13 dokumen (termasuk FAQ owner yang menjanjikan fitur yang tidak ada). Semua dibersihkan. **Cara beli dan cara login tidak berubah sama sekali** — password klien tetap di-reset manual lewat `scripts/cloudflare/reset-customer-password.ts`.
+- **Audit kesiapan jualan kini hijau:** `npm run release:sale-readiness` naik dari 17/22 (gagal) menjadi **13/13 lolos**.
+- **Pembersihan database (menunggu deploy).** `npx tsx scripts/cloudflare/remove-plan-columns.ts` kini juga menghapus tabel lama `client_password_resets`, di samping kolom `plan` dan tabel `site_subscriptions`. Dry-run sudah dijalankan dan **kelima perintah terkonfirmasi masih ada** di database produksi. **Jangan jalankan `--apply` sebelum versi ini ter-deploy** — panel admin dan kasir yang tayang sekarang masih membaca kolom `plan`.
+- **Gate:** `tsc` 0 error, `eslint` 0 error, **114 file / 881 test lolos**.
+
 ## [1.3.15] - 2026-10-03
 
 ### 🗑️ Konsep Paket Lite/Pro dan Langganan Dihapus — Cara Beli Tetap Sama

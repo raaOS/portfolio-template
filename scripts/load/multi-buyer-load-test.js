@@ -71,7 +71,6 @@ function parseArgs(argv) {
     videoSizeMb: 1,
     skipMedia: false,
     skipVideoPut: false,
-    passwordResetMode: 'skip',
     cleanupAfter: false,
   };
   Object.assign(options, fileConfig);
@@ -160,11 +159,6 @@ function parseArgs(argv) {
       options.skipMedia = true;
     } else if (arg === '--skip-video-put') {
       options.skipVideoPut = true;
-    } else if (arg === '--password-reset-mode') {
-      options.passwordResetMode = next || options.passwordResetMode;
-      index += 1;
-    } else if (arg.startsWith('--password-reset-mode=')) {
-      options.passwordResetMode = arg.slice('--password-reset-mode='.length);
     } else if (arg === '--cleanup-after') {
       options.cleanupAfter = true;
     } else if (arg === '--help' || arg === '-h') {
@@ -183,9 +177,6 @@ function parseArgs(argv) {
   }
   if (!Number.isFinite(options.timeoutMs) || options.timeoutMs < 1000) {
     throw new Error('--timeout-ms must be at least 1000.');
-  }
-  if (!['skip', 'request'].includes(options.passwordResetMode)) {
-    throw new Error('--password-reset-mode must be skip or request.');
   }
   if (!/^[a-z0-9-]+$/.test(options.runId)) {
     throw new Error('--run-id may only contain lowercase letters, numbers, and hyphens.');
@@ -222,7 +213,6 @@ Options:
   --video-size-mb <n>          Video direct-upload payload size. Default 1.
   --skip-media                 Skip cover/gallery/video upload.
   --skip-video-put             Presign video but skip PUT body upload.
-  --password-reset-mode <mode> skip or request. Default skip.
   --cleanup-after              Delete created sites after run.
   --request-delay-ms <ms>      Delay between requests per tenant. Default 1500.
   --max-retries <n>            Retry count for 503/429 errors. Default 3.
@@ -805,21 +795,6 @@ async function tenantFlow(tenant, admin, options, metrics) {
       },
     });
 
-    if (options.passwordResetMode === 'request') {
-      await requestDelay(delay);
-      await client.request('POST', '/api/client/password-reset/request', {
-        tenant: tenant.slug,
-        name: 'password_reset.request',
-        expectedStatuses: [200],
-        json: {
-          siteSlug: tenant.slug,
-          email: tenant.email,
-        },
-      });
-    } else {
-      result.skipped.push('password_reset.request');
-    }
-
     result.ok = true;
     result.client = client;
     return result;
@@ -1005,7 +980,6 @@ function buildReport({ options, baseUrl, dryRunPlan, tenantResults, isolation, c
       confirmHost: options.confirmHost,
       allow25: options.allow25,
       allow50: options.allow50,
-      passwordResetMode: options.passwordResetMode,
       cleanupAfter: options.cleanupAfter,
     },
     dryRunPlan,

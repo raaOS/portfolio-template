@@ -122,13 +122,11 @@ JWT_SECRET=""
 PASSWORD_SALT=""
 ADMIN_PASSWORD_SCRYPT=""
 REVALIDATION_TOKEN=""
-FEATURE_CLIENT_PASSWORD_RESET="true"
-CLIENT_PASSWORD_RESET_TOKEN_TTL_MINUTES="30"
 ```
 
 Generate fresh secrets per product install. Do not reuse personal portfolio secrets.
 
-For production client password reset, configure email delivery:
+For order emails (payment receipt and handoff), configure email delivery:
 
 ```env
 NOTIFICATION_PROVIDER="resend"
@@ -228,7 +226,7 @@ After deploy:
 7. Create a client access account.
 8. Send the client `/[siteSlug]/login`, email, and initial password.
 9. Login as client at `/[siteSlug]/login`.
-10. Test `Lupa Password` and confirm the reset email is delivered.
+10. Test the order confirmation email and the handoff email after activation.
 11. Upload a cover/gallery media file.
 12. Verify media appears and R2 usage updates.
 

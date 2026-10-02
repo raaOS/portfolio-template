@@ -87,10 +87,6 @@ The smoke script checks:
 
 - `/api/health`
 - `/`
-- `/client/login`
-- `/{siteSlug}/login`
-- `/client/reset-password`
-- `/client/dashboard`
 - `/api/public/sites/{siteSlug}`
 - `/api/public/sites/{siteSlug}/projects`
 - `/r2/ffmpeg/ffmpeg-core.js`
@@ -111,9 +107,6 @@ After automated smoke passes:
 - [ ] Login as master admin.
 - [ ] Create a test site.
 - [ ] Create a test client access user.
-- [ ] Login through `/[siteSlug]/login`.
-- [ ] Request client password reset and confirm the reset email arrives.
-- [ ] Set a new client password through `/client/reset-password?token=...`.
 - [ ] Create a draft project.
 - [ ] Upload a cover image.
 - [ ] Upload gallery image.

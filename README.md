@@ -97,7 +97,6 @@ npm run release:smoke    # Smoke-test a deployed production URL
 
 - Master admin manages sites, quotas, client access, and safe deletion.
 - Clients use self-service dashboard access scoped to their own site.
-- Clients can request password reset by email when `FEATURE_CLIENT_PASSWORD_RESET=true` and a notification/email provider is configured.
 - Every client is self-service. Capacity differences come only from each site's quota.
 
 ## Important Notes

@@ -1,11 +1,13 @@
 #!/usr/bin/env tsx
 /**
- * Pembersihan database: sisa kolom/tabel paket Lite/Pro + langganan.
+ * Pembersihan database: sisa kolom/tabel paket Lite/Pro, langganan, dan
+ * tabel reset password self-service.
  *
- * Kode (v1.3.15) sudah tidak membaca maupun menulis jejak berikut:
+ * Kode (v1.3.15+) sudah tidak membaca maupun menulis jejak berikut:
  *   - kolom `sites.plan`
  *   - kolom `orders.plan`
  *   - tabel `site_subscriptions` (serta index `idx_site_subscriptions_site`)
+ *   - tabel `client_password_resets` (fitur reset password self-service sudah dihapus)
  *
  * Skrip ini HANYA menyiapkan eksekusi. Jalankan setelah kode versi baru
  * sudah ter-deploy, supaya kode lama tidak lagi membaca kolom yang dihapus.
@@ -86,7 +88,14 @@ async function main() {
     present: hasSubscriptionIndex,
   });
 
-  console.log('Rencana pembersihan jejak paket Lite/Pro + langganan');
+  const hasPasswordResets = await tableExists('client_password_resets');
+  plan.push({
+    label: 'DROP TABLE client_password_resets',
+    sql: hasPasswordResets ? 'DROP TABLE IF EXISTS client_password_resets' : null,
+    present: hasPasswordResets,
+  });
+
+  console.log('Rencana pembersihan jejak paket Lite/Pro, langganan, dan reset password');
   console.log('----------------------------------------------------');
   for (const step of plan) {
     console.log(`  ${step.present ? '[ada ]' : '[n/a ]'} ${step.label}`);

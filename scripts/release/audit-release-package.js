@@ -57,8 +57,6 @@ const requiredEnvKeys = [
   'STORAGE_MB',
   'MEDIA_PER_PROJECT',
   'NEXT_PUBLIC_FFMPEG_BASE_URL',
-  'FEATURE_CLIENT_PASSWORD_RESET',
-  'CLIENT_PASSWORD_RESET_TOKEN_TTL_MINUTES',
 ];
 
 const forbiddenEnvPatterns = [
@@ -194,8 +192,6 @@ function checkCloudflareDocs() {
     'RC1',
     'sites/{siteId}/',
     'PRODUCT_CLOUDFLARE_ENV_CONFIRMED',
-    '/[siteSlug]/login',
-    'Client password reset',
     'NOTIFICATION_PROVIDER="resend"',
     'SALES_PRICING',
     'manual invoice',

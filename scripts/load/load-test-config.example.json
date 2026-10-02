@@ -11,6 +11,5 @@
   "videoSizeMb": 1,
   "skipMedia": false,
   "skipVideoPut": false,
-  "passwordResetMode": "skip",
   "cleanupAfter": false
 }

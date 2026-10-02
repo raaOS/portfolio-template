@@ -49,9 +49,8 @@ Client melaporkan tidak bisa login di `/<siteSlug>/login` atau `/client/login`.
    - Coba lagi.
 
 5. **Password salah:**
-   - Jangan minta password client; arahkan ke reset password.
-   - URL reset: `/<siteSlug>/login` → klik "Lupa password" atau langsung ke `/client/reset-password`.
-   - Jika `FEATURE_CLIENT_PASSWORD_RESET` tidak aktif, operator harus reset manual via Master Dashboard → Client Access → set password baru.
+   - Jangan minta password client.
+   - Tidak ada reset password self-service — password klien direset manual oleh owner.
 
 ### Eskalasi
 
@@ -60,44 +59,40 @@ Eskalasi ke developer jika:
 - Error selain 400/403/429 muncul di Cloudflare Worker logs.
 - Client access sudah benar tapi JWT token tetap tidak terbit.
 
-## 2. Email Reset Password Tidak Masuk
+## 2. Email Pembeli Tidak Masuk
 
 ### Gejala
 
-Client sudah klik "Lupa password" dan submit email, tapi tidak menerima email reset.
+Pembeli melaporkan tidak menerima email order (struk) atau email serah terima setelah pembayaran diverifikasi.
 
 ### Langkah Diagnosa
 
-1. **Cek fitur aktif:**
-   - Pastikan `FEATURE_CLIENT_PASSWORD_RESET=true` di env production.
-   - Jika `false`, reset hanya bisa dilakukan manual oleh operator via Master Dashboard.
-
-2. **Cek notification provider:**
-   - Pastikan `NOTIFICATION_PROVIDER` terisi (biasanya `resend`).
+1. **Cek notification provider:**
+   - Pastikan `NOTIFICATION_PROVIDER` terisi (harus `resend`).
    - Pastikan `NOTIFICATION_API_KEY` dan `NOTIFICATION_DEFAULT_FROM` terisi.
-   - Tanpa ini, email tidak akan terkirim.
+   - Tanpa ini, email tidak akan terkirim sama sekali.
 
-3. **Cek spam/junk folder:**
-   - Minta client cek folder spam/junk/promotions.
+2. **Cek spam/junk folder:**
+   - Minta pembeli cek folder spam/junk/promotions.
    - Email dari Resend kadang masuk spam jika domain pengirim belum verified SPF/DKIM.
 
-4. **Cek token TTL:**
-   - Default: `CLIENT_PASSWORD_RESET_TOKEN_TTL_MINUTES=30`.
-   - Jika client menunggu terlalu lama (>30 menit), token sudah expired. Suruh kirim ulang.
+3. **Cek alamat email di order:**
+   - Buka `/admin` → Orders → pastikan `buyer_email` tertulis benar.
+   - Typo alamat membuat email terkirim tapi tidak pernah sampai.
 
-5. **Cek rate limit reset:**
-   - Endpoint reset password juga dilindungi rate limit.
-   - Jika terlalu banyak request, tunggu cooldown.
+4. **Cek status order:**
+   - Email struk hanya dikirim saat order baru dibuat.
+   - Email serah terima hanya dikirim setelah order berstatus `activated`.
 
-6. **Verifikasi via Cloudflare logs:**
-   - Filter Worker logs: `event=client.password_reset.request`.
-   - Jika ada `status=success` tapi email tidak masuk, masalah ada di provider email (Resend delivery issue).
+5. **Verifikasi via Cloudflare logs:**
+   - Filter Worker logs pada request keluar ke `api.resend.com`.
+   - Jika request sukses tapi email tidak masuk, masalah ada di provider email (Resend delivery issue).
 
 ### Eskalasi
 
 Eskalasi ke developer jika:
-- Resend API sudah `sent=true` tapi email tidak pernah sampai setelah cek spam.
-- Error D1 muncul saat insert token reset.
+- Resend API sudah merespon sukses tapi email tidak pernah sampai setelah cek spam.
+- Email struk/serah terima tidak terkirim sama sekali padahal env notifikasi sudah benar.
 
 ## 3. Upload Cover/Gallery/Video Gagal
 

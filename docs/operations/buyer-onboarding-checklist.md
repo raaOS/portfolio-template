@@ -90,4 +90,4 @@ Jika buyer memerlukan quota di luar default plan:
 
 - Jangan buat lebih dari satu client access per site kecuali memang dibutuhkan.
 - Pastikan status site dan quota-nya benar sebelum mengirim kredensial.
-- Reset password self-service hanya tersedia jika `FEATURE_CLIENT_PASSWORD_RESET=true` dan notification provider aktif.
+- Tidak ada reset password self-service; perubahan password klien dilakukan manual oleh owner.

@@ -27,5 +27,3 @@ Gunakan flag `FEATURE_*` (bukan tiers paket) untuk menyembunyikan/menampilkan fi
 - UI client tidak boleh memanggil endpoint master/platform seperti admin login, admin password/PIN, clear-cache, revalidate, health, settings platform, atau metrics internal.
 - Route pembeli memakai pola tenant: login di `/[siteSlug]/login`, public site di `/[siteSlug]`, dan public project di `/[siteSlug]/projects`.
 - Jangan membuat UI yang mengarahkan tenant ke route global seperti `/projects` jika sedang berada di site tenant; gunakan path tenant seperti `/${siteSlug}/projects`.
-- Reset password client memakai flow self-service: tombol `Lupa Password` di login, request generic, email reset link, lalu form `/client/reset-password?token=...`.
-- UI reset tidak boleh menampilkan token secara langsung dan tidak boleh memberi pesan yang membocorkan apakah email/site benar-benar terdaftar.
