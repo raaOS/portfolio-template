@@ -83,7 +83,35 @@
 - `eslint src` → 0 error
 - `vitest run` (seluruh suite) → **PASS (exit 0)** — termasuk `settings`, `translate`, `chat/*`, `orderService` (24 test), `csrf`, `customerAuth` (6 test).
 
+## 🔎 Hasil Verifikasi Produksi (2026-09-30, akses env disetujui owner)
+
+Diverifikasi langsung ke akun Cloudflare owner memakai `C:\Users\USER\Documents\tamplate-portofolio\.env.local` (akun `69c1e830…`, DB `portfolio-template-prod` = `7a8b4eaa-…`):
+
+| Yang diverifikasi | Hasil | Implikasi |
+|---|---|---|
+| Key `settings/adminPassword` / `adminPin` | **TIDAK ADA** — tabel `content` sudah tidak ada; `site_settings` 0 baris; `platform_settings` hanya `billing_expire_sweep_at` + `payment_config`; `app_kv` (6 key, 312 KB) tidak mengandung string itu | Temuan HIGH #1 **murni pencegahan** — tidak pernah ada hash yang bisa bocor |
+| `TELEGRAM_ADMIN_CHAT_ID` | **terisi** (`6116803120`) | Guard webhook aktif begitu env ikut ter-deploy |
+| `CLOUDFLARE_R2_PUBLIC_BASE_URL` | `/r2` (lewat route aplikasi, bukan domain R2 publik) | Exposure bergantung pada allowlist route |
+| Prefiks `orders/` di route publik | **diblokir** (allowlist hanya `assets/`, `temp/`, `sites/`, `platform/` + 2 file ffmpeg) | Uji langsung ke `makeitbetter.my.id`: `/r2/assets/…jpg` → **200**, `/r2/orders/…` → **404** |
+| Order dengan bukti bayar | **0 dari 12 order** punya `payment_proof_url` | Belum ada file bukti di bucket |
+
+**Kesimpulan: bukti transfer TIDAK terekspos publik.** ✅
+
+## 🐞 Temuan Tambahan Pasca-Verifikasi (diperbaiki — CHANGELOG 1.3.12)
+
+Karena prefiks `orders/` memang diblokir dengan benar, URL bukti hasil upload file (`/r2/orders/…`) selalu 404 — sehingga **tombol "Lihat Resi" di panel admin tidak akan pernah bisa menampilkan gambar hasil upload file**. Bukan regresi: string `orders/` tidak pernah ada di allowlist sejak commit asal (`bed0e19`), jadi fitur ini memang belum pernah berfungsi untuk file (jalur "tempel URL manual" tetap jalan). Keamanannya benar; hanya fungsinya yang bolong.
+
+**Perbaikan (jangan dibalik):**
+- `src/app/api/billing/orders/[orderId]/proof/route.ts` **(baru)** — satu-satunya jendela akses bukti: cek sesi admin (`checkAdminAuth`) ATAU token order (`verifyOrderAccessToken`) → stream objek R2 dengan `cache-control: private, max-age=3600` + `nosniff` + `content-disposition: inline`. Key yang dibaca selalu berawalan `orders/{orderId}/` (tidak mungkin membaca berkas order lain), path traversal & skema `javascript:` ditolak, URL asing dialihkan (302), bukan ikut diperambat. Scope rate limit `billing_proof_get` 60/menit.
+- `src/app/api/billing/orders/[orderId]/proof/route.test.ts` **(baru)** — 13 test: gerbang otorisasi (401 tanpa token, token salah, admin lolos tanpa token, 429), penyajian (404 tanpa bukti, stream + header private, content-type dari ekstensi, 404 file hilang, 503 R2 belum konfigurasi), dan pembatasan lintas order (order A ≠ order B, traversal, redirect URL eksternal, skema berbahaya).
+- `src/app/admin/desktop/panels/OrdersPanel.tsx` — tombol "Lihat Resi" menunjuk `/api/billing/orders/{id}/proof` alih-alih URL R2 mentah.
+
+**Yang sengaja TIDAK dilakukan:** menambah `orders/` ke allowlist `/r2` — itu akan membuka PII bukti transfer ke publik dan membatalkan perlindungan yang sudah ada.
+
+**CSP (keputusan owner):** pengeras level tanpa-risiko (`object-src 'none'`, `base-uri 'self'`, `form-action 'self'`, `frame-ancestors 'self'`) **sudah ada** sejak sebelum audit (diverifikasi terhadap `0c0a35c`) dan sudah diterapkan juga ke jalur static asset. Pengetatan `script-src` (nonce) **ditunda** — butuh pengujian browser terhadap suara, kompresi video WASM, dan preload GLTF.
+
 ## 📝 Catatan untuk AI Selanjutnya (Handoff)
-- **Semua temuan di log ini sudah di-remediasi** dan diverifikasi (tsc/eslint/test hijau). Belum di-commit (perubahan di working tree).
-- Sisa yang butuh keputusan/akses owner (bukan blocker): (a) CSP `script-src 'unsafe-inline'` — perbaikan selesai sebatas penambahan header di jalur static asset + escape JSON-LD; mengganti ke nonce CSP penuh adalah perubahan besar yang butuh keputusan produk; (b) verifikasi env produksi: nilai `PASSWORD_SALT`/`JWT_SECRET` per deployment, `TELEGRAM_BOT_SECRET` & `TELEGRAM_ADMIN_CHAT_ID`, `CLOUDFLARE_R2_PUBLIC_BASE_URL` (apakah menampilkan objek `orders/`), keberadaan key `settings/adminPassword` di D1 produksi, dan perilaku D1 terhadap SQL literal `"activated"` (kini tidak relevan — sudah pakai `'activated'`); (c) token `admin_token` lama (tanpa klaim `siteId`) akan ditolak setelah deploy → sesi admin aktif logout sekali.
+- **Semua temuan di log ini sudah di-remediasi** dan diverifikasi (tsc/eslint/test hijau), lalu **di-commit pada cabang `fix/security-audit-2026-09-29`** (berbasis puncak `main` `0c0a35c`): `d3723aa` HIGH → `2c70914` MEDIUM → `787c730` LOW + dokumentasi → commit ke-4 untuk perbaikan "Lihat Resi" + CHANGELOG 1.3.12. Cabang ini masih perlu di-merge ke `main` oleh owner.
+- ⚠️ **Worktree ini awalnya dalam kondisi *detached HEAD*** dan `main` sedang di-checkout di lokasi lain (`C:/Users/USER/Documents/tamplate-portofolio`) — jangan commit langsung di detached HEAD.
+- Sisa yang butuh keputusan/akses owner (bukan blocker): (a) CSP `script-src 'unsafe-inline'` — nonce CSP penuh ditunda, butuh keputusan produk + uji browser; (b) ~~verifikasi env produksi~~ **SUDAH SELESAI 2026-09-30** (lihat tabel di atas) — yang belum diverifikasi hanya apakah `TELEGRAM_ADMIN_CHAT_ID` & `CLOUDFLARE_R2_PUBLIC_BASE_URL` benar-benar ter-set di **env runtime Pages project** (bukan hanya `.env.local` lokal), butuh akses dashboard Pages; (c) token `admin_token` lama (tanpa klaim `siteId`) akan ditolak setelah deploy → sesi admin aktif logout sekali.
 - Audit sebelumnya yang sudah di-remediasi: `security_audit_api_2026_08_11.md` (jangan dibuka ulang), `audit_logic_defects_2026_09_11.md`.

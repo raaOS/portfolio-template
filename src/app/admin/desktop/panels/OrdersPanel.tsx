@@ -386,7 +386,7 @@ export default function OrdersPanel() {
                       <td className="py-3.5 px-4 align-top text-center">
                         {ord.payment_proof_url ? (
                           <button
-                            onClick={() => setViewImageModalUrl(ord.payment_proof_url || null)}
+                            onClick={() => setViewImageModalUrl(`/api/billing/orders/${ord.id}/proof`)}
                             className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all border border-slate-200 shadow-xs active:scale-95"
                           >
                             <Eye className="w-3.5 h-3.5 text-blue-600 shrink-0" />

@@ -3,6 +3,17 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.12] - 2026-09-30
+
+### 🧾 Tombol "Lihat Resi" di Panel Admin Kembali Berhasil Menampilkan Bukti Transfer
+
+- **Masalahnya (ditemukan saat verifikasi produksi, bukan dari audit awal):** file bukti bayar disimpan di bucket R2 dengan path `orders/{id}/…`, sedangkan route publik `/r2/…` **sengaja menolak** path `orders/` agar bukti transfer (berisi nama, nominal, dan tangkapan layar rekening) tidak bisa diakses siapa pun. Akibatnya URL gambar yang tersimpan selalu menjawab **404** — begitu ada pembeli yang mengunggah bukti lewat file, admin menekan "Lihat Resi" dan melihat gambar rusak.
+- **Perbaikannya:** endpoint baru `GET /api/billing/orders/{id}/proof` yang menjadi **satu-satunya jendela akses** bukti bayar — memverifikasi sesi login admin *atau* tautan akses pembeli dulu, baru mengirimkan filenya dengan header `cache-control: private` (tidak boleh disimpan bersama/CDN) dan `nosniff`. Tombol "Lihat Resi" kini menunjuk ke endpoint ini.
+- **Yang sengaja tidak dilakukan:** menambahkan `orders/` ke daftar path publik. Cara itu memang lebih cepat, tapi akan membuka bukti transfer ke publik dan justru membatalkan perlindungan yang sudah ada.
+- **Dijamin lewat 13 test otomatis:** penolakan tanpa token, token tidak cocok, batas laju, alih order (order A tidak bisa membaca berkas order B), penolakan `javascript:`, URL asing dialihkan — bukan ikut diperambat, dan kembalinya 404 bila berkas sudah lenyap dari bucket.
+- **Tidak ada perubahan lain:** lapisan pengeras CSP (`object-src 'none'`, `base-uri 'self'`, `form-action 'self'`, `frame-ancestors 'self'`) sudah terpasang sejak sebelumnya dan sudah diverifikasi tidak perlu ditambah. Pengetatan `script-src` (nonce) tetap ditunda karena berisiko mematikan suara, kompresi video, dan model 3D.
+- **Verifikasi:** `tsc --noEmit` 0 error, `eslint src` 0 error, `vitest run` **114 file / 876 test PASS**.
+
 ## [1.3.11] - 2026-09-29
 
 ### 🔒 Pembersihan Keamanan Menyeluruh: 19 Temuan Audit Alur Login, Pembayaran & API (4 High / 8 Medium / 7 Low)
