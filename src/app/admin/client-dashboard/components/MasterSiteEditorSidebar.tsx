@@ -24,7 +24,6 @@ interface MasterSiteEditorSidebarProps {
   activeClientAccessDraft: ClientAccessDraft;
   activePublicUrl: string;
   activePublicSlug: string;
-  clientLoginPath: string;
   deleteConfirmSlug: string;
   canSaveSite: boolean;
   isSiteDraftValid: boolean;
@@ -54,7 +53,6 @@ export function MasterSiteEditorSidebar({
   activeClientAccessDraft,
   activePublicUrl,
   activePublicSlug,
-  clientLoginPath,
   deleteConfirmSlug,
   canSaveSite,
   isSiteDraftValid,
@@ -206,32 +204,19 @@ export function MasterSiteEditorSidebar({
                       </a>
                     </div>
                   </div>
-                  {clientLoginPath && (
+                  {activeSiteDraft.customDomain?.trim() && (
                     <div className="mt-2 border-t border-zinc-200 pt-2 text-[11px] text-zinc-500 space-y-1">
-                      <div>
-                        Login client:{' '}
+                      <div className="text-[11px] font-medium text-emerald-700">
+                        Custom Domain:{' '}
                         <a
-                          href={clientLoginPath}
+                          href={`https://${activeSiteDraft.customDomain.trim().replace(/^https?:\/\//, '')}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="font-mono text-zinc-900 underline hover:text-zinc-950"
+                          className="font-mono underline hover:text-emerald-900"
                         >
-                          {clientLoginPath}
+                          https://{activeSiteDraft.customDomain.trim().replace(/^https?:\/\//, '')}
                         </a>
                       </div>
-                      {activeSiteDraft.customDomain?.trim() && (
-                        <div className="text-[11px] font-medium text-emerald-700">
-                          Custom Domain:{' '}
-                          <a
-                            href={`https://${activeSiteDraft.customDomain.trim().replace(/^https?:\/\//, '')}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="font-mono underline hover:text-emerald-900"
-                          >
-                            https://{activeSiteDraft.customDomain.trim().replace(/^https?:\/\//, '')}
-                          </a>
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>

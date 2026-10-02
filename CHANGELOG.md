@@ -3,6 +3,17 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.14] - 2026-10-02
+
+### 🧹 Pembersihan Rute Login Klien yang Sudah Mati + Penghapusan Alias Admin `/portal`
+
+- **Latar:** sistem "login klien" lama sudah dihapus sengaja pada refactor sebelumnya, tapi **sisa-sisanya masih tertinggal** dan semuanya sudah mengarah ke halaman yang tidak ada (404).
+- **Yang dihapus:** rute `/{slug}/login`, tombol **"Login Client"** dan **"Atur Password"** di halaman status pesanan (keduanya 404), blok **"Login client:"** di sidebar admin, serta alias admin tersembunyi **`/portal`** (3 rewrite) beserta daftar rute middleware-nya.
+- **Konsekuensi yang perlu diketahui:** setelah ini **panel admin hanya bisa dibuka lewat `/admin` dan `/admin/login`**. Jika ada bookmark `/portal`, tolong diperbarui. Login admin sendiri **tidak terpengaruh** — sudah diverifikasi sebelum penghapusan.
+- **Logo mata di pojok kiri atas tetap ada** (sesuai permintaan), hanya **tidak mengarah ke mana pun lagi** saat diklik — sebelumnya ia menuju tautan 404.
+- **Yang tidak disentuh:** preview template dan jalur admin lain tetap utuh; tombol **"Custom Domain"** di sidebar admin tetap tampil seperti biasa.
+- **Verifikasi:** `tsc --noEmit` 0 error, `eslint src` 0 error, `vitest run` **114 file / 879 test PASS**, sisa rujukan ke rute yang dihapus **0**.
+
 ## [1.3.13] - 2026-10-02
 
 ### ✉️ Pembeli Kini Langsung Dapat Email "Website Anda Sudah Aktif" Setelah Order Diaktifkan

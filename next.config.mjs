@@ -93,18 +93,10 @@ const nextConfig = {
   },
   async rewrites() {
     return [
-      {
-        source: '/portal',
-        destination: '/admin',
-      },
-      {
-        source: '/portal/login',
-        destination: '/admin/login',
-      },
-      {
-        source: '/portal/:path*',
-        destination: '/admin/:path*',
-      },
+      // CATATAN (2026-10-02): alias admin tersembunyi `/portal` -> `/admin`
+      // sudah dihapus atas permintaan owner. Admin kini hanya bisa dibuka
+      // lewat `/admin` dan `/admin/login` (keduanya tetap berfungsi).
+      //
       // Swallow legacy Vite HMR client requests (harmless 404s in Next dev)
       // Handle __webpack_hmr requests to suppress 404 errors in logs
       {

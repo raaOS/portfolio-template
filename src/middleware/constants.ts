@@ -23,7 +23,7 @@
 // `validateAdminRequest`/`checkAdminAuth` sendiri. Adding ke proxy
 // adalah extra layer (defense-in-depth) — kalau proxy reject, handler
 // tidak kepanggil; kalau proxy approve, handler tetap re-validate.
-export const protectedRoutes = ['/admin', '/api/admin', '/portal'];
+export const protectedRoutes = ['/admin', '/api/admin'];
 
 // Public routes — explicitly excluded dari auth check meski match
 // `protectedRoutes`. Login endpoints harus di sini supaya user yang
@@ -32,7 +32,6 @@ export const protectedRoutes = ['/admin', '/api/admin', '/portal'];
 // karena endpoint itu memang menjawab status auth untuk visitor/admin.
 export const publicRoutes = [
   '/admin/login',
-  '/portal/login',
   '/api/admin/check-auth',
   '/api/admin/login',
   '/api/admin/logout',

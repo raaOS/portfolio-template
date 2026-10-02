@@ -1000,7 +1000,6 @@ export default function ClientDashboardPanel() {
   const canUploadCover = canMutate && !coverUploadMutation.isPending;
   const maxGalleryItems = selectedSite ? Math.max(0, selectedSite.quota.mediaPerProject - 1) : 0;
   const remainingGallerySlots = Math.max(0, maxGalleryItems - draft.gallery.length);
-  const clientLoginPath = activePublicSlug ? `/${activePublicSlug}/login` : '';
   const canUploadGallery =
     canMutate &&
     !galleryUploadMutation.isPending &&
@@ -1457,7 +1456,6 @@ export default function ClientDashboardPanel() {
           activeClientAccessDraft={activeClientAccessDraft}
           activePublicUrl={activePublicUrl}
           activePublicSlug={activePublicSlug}
-          clientLoginPath={clientLoginPath}
           deleteConfirmSlug={deleteConfirmSlug}
           canSaveSite={canSaveSite}
           isSiteDraftValid={isSiteDraftValid}

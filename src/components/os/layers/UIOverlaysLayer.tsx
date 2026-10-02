@@ -41,8 +41,6 @@ const MissionControl = dynamic(() => import('../core/MissionControl'), {
 
 interface UIOverlaysLayerProps {
   siteId?: string;
-  siteSlug?: string;
-  loginUrl?: string;
   navToChat: (chatId?: string) => void;
   openWhatsAppList: () => void;
   testimonialContacts: ContactProfile[];
@@ -62,8 +60,6 @@ interface UIOverlaysLayerProps {
 
 export default function UIOverlaysLayer({
   siteId,
-  siteSlug,
-  loginUrl,
   navToChat: _navToChat,
   openWhatsAppList,
   testimonialContacts: _testimonialContacts,
@@ -124,9 +120,6 @@ export default function UIOverlaysLayer({
             transition={{ duration: 0.15 }}
           >
             <MenuBar
-              siteId={siteId}
-              siteSlug={siteSlug}
-              loginUrl={loginUrl}
               activeWindow={topWindowTitle || 'Finder'}
               onAbout={() => openWindow('about')}
               onSearch={() => setShowSpotlight(true)}

@@ -91,7 +91,7 @@ Pesan `Site URL` itu hanya muncul sebagai **popup/pesan Telegram di sisi admin**
 
 ## 5. Temuan tambahan / Handoff
 
-1. **Rute mati `/{slug}/login`.** `src/app/[siteSlug]/login/page.tsx` → redirect ke `/client/login` yang tidak ada → 404. Tidak diperbaiki di rilis ini karena perbaikannya menyentuh logika yang sudah ada (perlu izin owner): pilihan wajar = (a) hapus rute alias itu, atau (b) arahkan ke halaman yang memang ada. Sementara ini **tidak ada yang menautkannya** dari email/ UI aktif, jadi dampaknya terbatas.
+1. **Rute mati `/{slug}/login` → SUDAH DIHAPUS (2026-10-02, lihat entri 124 / `cleanup_dead_client_login_2026_10_02.md`).** Pada saat penulisan log ini rute alias `src/app/[siteSlug]/login/page.tsx` masih mengarah ke `/client/login` yang tidak ada (404), dan masih ada 5 penunjuknya (logo mata MenuBar, blok "Login client" sidebar admin, tombol "Login Client" & "Atur Password" di halaman order). Semuanya sudah dibersihkan atas permintaan owner, bersamaan dengan penghapusan alias admin `/portal`.
 2. **Email serah-terima hanya terkirim setelah kode ini di-deploy.** Order yang sudah teraktivasi sebelum deploy tidak dikirimi ulang (tidak ada mekanisme kirim ulang — disengaja).
 3. **Usulan berikutnya yang belum dikerjakan** (dari daftar yang sama): (a) **cron harian Wrangler** untuk `sweepExpiredOrders` + backup D1/R2 + audit media yatim — saat ini `wrangler.jsonc` **tidak punya `crons` sama sekali**, sehingga order kedaluwarsa hanya ditutup ketika admin membuka panel Order; (b) pemindahan `JWT_SECRET`/`PASSWORD_SALT`/`TELEGRAM_BOT_TOKEN` ke Worker secrets.
 

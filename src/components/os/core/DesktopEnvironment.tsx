@@ -81,7 +81,6 @@ export interface DesktopEnvironmentProps {
   children?: React.ReactNode;
   siteId?: string;
   siteSlug?: string;
-  loginUrl?: string;
   aboutData?: AboutData | null;
   experienceData?: ExperienceData | null;
   hardSkillsData?: HardSkillsData | null;
@@ -92,8 +91,6 @@ export interface DesktopEnvironmentProps {
 
 interface DesktopMainBaseProps {
   siteId: string;
-  siteSlug?: string;
-  loginUrl?: string;
   aboutData?: AboutData | null;
   experienceData?: ExperienceData | null;
   hardSkillsData?: HardSkillsData | null;
@@ -121,8 +118,6 @@ interface DesktopMainProps extends DesktopMainBaseProps {
 
 export default function DesktopEnvironment({
   siteId = 'default-site',
-  siteSlug,
-  loginUrl,
   aboutData,
   experienceData,
   hardSkillsData,
@@ -186,8 +181,6 @@ export default function DesktopEnvironment({
     >
       <DesktopMainWithLogout
         siteId={siteId}
-        siteSlug={siteSlug}
-        loginUrl={loginUrl}
         aboutData={aboutData}
         experienceData={experienceData}
         hardSkillsData={hardSkillsData}
@@ -229,8 +222,6 @@ function DesktopMainWithLogout({ originalLogout, ...props }: DesktopMainWithLogo
 
 function DesktopMain({
   siteId,
-  siteSlug,
-  loginUrl,
   aboutData,
   experienceData: _experienceData,
   hardSkillsData: _hardSkillsData,
@@ -821,8 +812,6 @@ function DesktopMain({
               </React.Suspense>
               <UIOverlaysLayer
                 siteId={siteId}
-                siteSlug={siteSlug}
-                loginUrl={loginUrl}
                 navToChat={navToChat}
                 openWhatsAppList={openWhatsAppList}
                 testimonialContacts={testimonialContacts}

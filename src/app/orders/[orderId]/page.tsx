@@ -15,7 +15,6 @@ import {
   Laptop,
   CheckCircle2,
   Clock,
-  KeyRound,
   Landmark,
   Printer,
   ShieldCheck,
@@ -710,18 +709,6 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ orderId
                   className="rounded-lg bg-emerald-600 px-3 py-2 text-[11px] font-bold text-white shadow-sm shadow-emerald-600/20 transition-all hover:bg-emerald-700"
                 >
                   Buka Website
-                </a>
-                <a
-                  href={`/client/login?site=${order.desired_slug}`}
-                  className="rounded-lg bg-slate-900 px-3 py-2 text-[11px] font-bold text-white transition-all hover:bg-slate-800"
-                >
-                  Login Client
-                </a>
-                <a
-                  href={`/client/reset-password?site=${order.desired_slug}&email=${encodeURIComponent(order.buyer_email)}`}
-                  className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-[11px] font-bold text-slate-700 transition-all hover:bg-slate-50"
-                >
-                  <KeyRound className="h-3.5 w-3.5 text-slate-500" /> Atur Password
                 </a>
               </div>
             </div>
