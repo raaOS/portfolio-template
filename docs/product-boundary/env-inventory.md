@@ -30,7 +30,7 @@ Use these with the new Cloudflare account dedicated to the sellable template pro
 
 ## Product Feature Flags
 
-These define what the product enables by plan. Keep defaults conservative.
+These define what the product enables for every deployment. Keep defaults conservative.
 
 - `FEATURE_CLIENT_DASHBOARD`
 - `FEATURE_MASTER_DASHBOARD`
@@ -38,12 +38,9 @@ These define what the product enables by plan. Keep defaults conservative.
 - `FEATURE_NOTIFICATIONS`
 - `FEATURE_CUSTOM_DOMAIN`
 - `FEATURE_ANALYTICS`
-- `PLAN_LITE_PROJECT_LIMIT`
-- `PLAN_LITE_STORAGE_MB`
-- `PLAN_LITE_MEDIA_PER_PROJECT`
-- `PLAN_PRO_PROJECT_LIMIT`
-- `PLAN_PRO_STORAGE_MB`
-- `PLAN_PRO_MEDIA_PER_PROJECT`
+- `PROJECT_LIMIT`
+- `STORAGE_MB`
+- `MEDIA_PER_PROJECT`
 
 ## Product Optional
 
@@ -51,8 +48,6 @@ These are platform-owned product integrations, not personal portfolio integratio
 
 - `AI_PROVIDER`
 - `AI_API_KEY`
-- `AI_MONTHLY_TOKEN_LIMIT_LITE`
-- `AI_MONTHLY_TOKEN_LIMIT_PRO`
 - Additional notification-specific variables if another provider is added later.
 - `CLOUDFLARE_R2_BINDING` (default `MEDIA_BUCKET`; only needed if the Worker binding name differs from `wrangler.jsonc`)
 - `NEXT_PUBLIC_FFMPEG_BASE_URL` (default `/r2/ffmpeg`; browser FFmpeg core files are stored in R2 keys `ffmpeg/*` and served through the app proxy)

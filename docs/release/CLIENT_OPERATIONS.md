@@ -19,13 +19,11 @@ Di Master Dashboard:
 
 1. Buat `Client/Site Baru`.
 2. Isi site name dan public slug.
-3. Pilih plan Lite atau Pro.
-4. Atur billing status dan period end.
-5. Buat client access:
+3. Buat client access:
    - email client
    - password awal
    - status `active`
-6. Kirim ke client:
+4. Kirim ke client:
    - link login `/[siteSlug]/login`
    - email akses
    - password awal
@@ -65,11 +63,11 @@ Client bisa:
 - membuat project baru;
 - mengedit title, slug, status, dan metadata;
 - upload cover;
-- upload gallery image/video sesuai plan dan quota;
+- upload gallery image/video sesuai quota;
 - publish/unpublish project;
 - melihat preview public site setelah ada project published.
 
-Lite dan Pro sama-sama self-service. Beda utamanya ada di quota dan fitur Pro.
+Semua client self-service. Beda kapasitas hanya pada quota site masing-masing.
 
 ## Preview Site
 
@@ -87,11 +85,11 @@ Jika project masih kosong, UI menampilkan empty state dan tombol tambah project.
 Saat client melapor error:
 
 - cek site status (`active` atau `suspended`);
-- cek billing status;
+- cek status site (active/suspended);
 - cek quota project/storage/media;
 - cek apakah client login dengan slug yang benar;
 - cek apakah media berada di prefix `sites/{siteId}/...`;
-- cek plan Lite/Pro jika fitur tidak muncul;
+- cek quota override site jika fitur tidak muncul;
 - cek provider email jika reset password tidak sampai.
 
 ## Boundary
@@ -103,4 +101,4 @@ Client tidak mendapat:
 - API token D1/R2;
 - akses ke data client lain.
 
-Master tetap bertanggung jawab atas plan, quota, billing metadata, reset manual, suspend/activate, dan support override.
+Master tetap bertanggung jawab atas quota, reset manual, suspend/activate, dan support override.

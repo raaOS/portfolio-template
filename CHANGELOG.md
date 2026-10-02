@@ -3,6 +3,28 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.15] - 2026-10-03
+
+### 🗑️ Konsep Paket Lite/Pro dan Langganan Dihapus — Cara Beli Tetap Sama
+
+- **Apa yang berubah:** istilah **"paket Lite"**, **"paket Pro"**, serta sistem **langganan/billing bulanan** kini **tidak ada lagi** di mana pun — tidak di halaman pesan, tidak di panel admin, tidak di database, tidak di dokumen. Sekarang hanya ada **satu penawaran dengan satu harga** (`Rp199.000`), sama untuk semua pembeli.
+- **Yang TIDAK berubah (penting):** **cara pembeli memesan tetap persis seperti sebelumnya** — isi form di `/checkout`, pilih alamat website (slug), bayar lewat QRIS/transfer, upload bukti bayar, lalu website dibuat setelah pembayaran diverifikasi. Tombol, halaman, dan email pesanan tetap berfungsi.
+- **Konsekuensi kecil yang perlu diketahui:**
+  - Label **"Paket & Slug"** di panel pesanan kini hanya **"Slug"**; baris **"Paket Terpilih"** di halaman status pesanan dihapus.
+  - Badge nama paket di daftar site admin kini menampilkan **status site (active/suspended)**.
+  - **Dropdown pemilihan Plan** di editor site admin **dihapus** (sebelumnya hanya muncul kalau `FEATURE_MASTER_DASHBOARD=true`).
+  - **Email & pesan Telegram** pesanan/aktivasi tidak lagi menyebut kata "Paket" (struk, kadaluarsa, serah terima).
+  - **Opsi `--plan`** pada script uji beban (`multi-buyer-load-test.js`) dihapus.
+  - Enviroment variable `PLAN_LITE_*` / `PLAN_PRO_*` / `AI_MONTHLY_TOKEN_LIMIT_LITE|PRO` diganti jadi `PROJECT_LIMIT`, `STORAGE_MB`, `MEDIA_PER_PROJECT` (nilai bawaan tetap 50 / 5000 / 50).
+- **Berkas ikut dibersihkan:** `src/lib/product/sitePlan.ts` dihapus (digabung ke `siteQuota.ts`), `src/constants/plans.ts` diganti nama jadi `src/constants/pricing.ts`, `docs/release/LITE_PRO_SCOPE.md` dihapus, dan `docs/release/SALES_PRICING.md` ditulis ulang jadi satu harga tanpa langganan.
+- **Database: kode dulu, data belakangan.** Skrip pembersih sudah disiapkan **tetapi BELUM dijalankan** ke database produksi. Jalankan setelah versi ini ter-deploy:
+  ```bash
+  npx tsx scripts/cloudflare/remove-plan-columns.ts          # lihat rencana (aman)
+  npx tsx scripts/cloudflare/remove-plan-columns.ts --apply  # eksekusi
+  ```
+  Skrip ini menghapus kolom `plan` di tabel `sites` dan `orders`, plus tabel `site_subscriptions`.
+- **Verifikasi:** `tsc --noEmit` 0 error, `eslint src` 0 error, `vitest run` **114 file / 879 test PASS**, sisa rujukan "Lite/Pro/plan/langganan" di kode & dokumen aktif **0** (catatan riwayat di log tracker sengaja dibiarkan).
+
 ## [1.3.14] - 2026-10-02
 
 ### 🧹 Pembersihan Rute Login Klien yang Sudah Mati + Penghapusan Alias Admin `/portal`

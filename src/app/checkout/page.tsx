@@ -3,7 +3,7 @@
 import React, { Suspense, useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { BASE_PRICE, formatIdr } from '@/constants/plans';
+import { BASE_PRICE, formatIdr } from '@/constants/pricing';
 
 function CheckoutForm() {
   const router = useRouter();

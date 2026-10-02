@@ -6,8 +6,7 @@ Template jawaban support untuk operator. Copy-paste dan sesuaikan bagian dalam k
 
 ## SLA
 
-- **Lite**: respon maksimal 1×24 jam hari kerja.
-- **Pro**: target respon dalam 12 jam hari kerja. Detail SLA final ditentukan setelah Sprint 47 billing selesai.
+- **Semua buyer**: respon maksimal 1×24 jam hari kerja.
 
 ---
 
@@ -104,19 +103,18 @@ Salam,
 ```
 Halo [nama buyer],
 
-Storage atau quota project Anda saat ini sudah mencapai batas plan [Lite/Pro].
+Storage atau quota project Anda saat ini sudah mencapai batas quota.
 
-Detail quota plan Anda:
+Detail quota Anda:
 - Project: maksimal [X] project
 - Storage: maksimal [X] MB
 - Media per project: maksimal [X] file
 
 Beberapa opsi yang tersedia:
 1. **Hapus media/project yang tidak dipakai** — ini akan mengurangi usage dan memberi ruang untuk upload baru.
-2. **Upgrade plan** — upgrade dari Lite ke Pro untuk mendapatkan limit yang lebih besar.
-3. **Custom quota** — hubungi kami jika Anda butuh penambahan quota spesifik tanpa ganti plan.
+2. **Custom quota add-on** — hubungi kami jika Anda butuh penambahan quota spesifik.
 
-Silakan kabari kami jika ingin upgrade atau penambahan quota, dan kami akan bantu prosesnya.
+Silakan kabari kami jika Anda butuh penambahan quota, dan kami akan bantu prosesnya.
 
 Salam,
 [nama operator]

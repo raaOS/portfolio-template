@@ -25,7 +25,6 @@ export const D1_SCHEMA_QUERIES = [
     id TEXT PRIMARY KEY,
     slug TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL,
-    plan TEXT NOT NULL DEFAULT 'lite',
     status TEXT NOT NULL DEFAULT 'active',
     active_template_key TEXT DEFAULT 'os-desktop',
     client_slug_change_count INTEGER NOT NULL DEFAULT 0,
@@ -34,20 +33,7 @@ export const D1_SCHEMA_QUERIES = [
     updated_at TEXT NOT NULL
   ) STRICT;`,
 
-  // 1c. Site Subscription Metadata
-  `CREATE TABLE IF NOT EXISTS site_subscriptions (
-    id TEXT PRIMARY KEY,
-    site_id TEXT NOT NULL UNIQUE,
-    plan TEXT NOT NULL DEFAULT 'lite',
-    status TEXT NOT NULL DEFAULT 'trialing',
-    current_period_end TEXT,
-    external_customer_id TEXT,
-    external_subscription_id TEXT,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  ) STRICT;`,
-
-  // 1d. Site Quota Overrides
+  // 1b. Site Quota Overrides
   SITE_QUOTA_OVERRIDES_TABLE_SQL,
 
   // 2. Projects
@@ -90,7 +76,7 @@ export const D1_SCHEMA_QUERIES = [
     updated_at TEXT NOT NULL
   ) STRICT;`,
 
-  // 5. Submissions (Pro Client)
+  // 5. Submissions
   `CREATE TABLE IF NOT EXISTS submissions (
     id TEXT PRIMARY KEY,
     site_id TEXT NOT NULL,
@@ -127,7 +113,6 @@ export const D1_SCHEMA_QUERIES = [
     buyer_name TEXT NOT NULL,
     buyer_email TEXT NOT NULL,
     buyer_whatsapp TEXT NOT NULL,
-    plan TEXT NOT NULL DEFAULT 'pro',
     amount INTEGER NOT NULL DEFAULT 0,
     payment_method TEXT DEFAULT 'manual_qris',
     payment_proof_url TEXT,
@@ -173,7 +158,6 @@ export const D1_SCHEMA_QUERIES = [
   // INDEXES
   // ==========================================
   `CREATE INDEX IF NOT EXISTS idx_sites_slug ON sites(slug);`,
-  `CREATE INDEX IF NOT EXISTS idx_site_subscriptions_site ON site_subscriptions(site_id);`,
   SITE_QUOTA_OVERRIDES_INDEX_SQL,
   `CREATE INDEX IF NOT EXISTS idx_projects_site_status_order ON projects(site_id, status, order_index);`,
   `CREATE INDEX IF NOT EXISTS idx_projects_site_slug ON projects(site_id, slug);`,

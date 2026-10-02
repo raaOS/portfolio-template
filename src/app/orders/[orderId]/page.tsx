@@ -29,7 +29,6 @@ interface OrderData {
   buyer_name: string;
   buyer_email: string;
   buyer_whatsapp: string;
-  plan: string;
   amount: number;
   payment_method: string;
   payment_proof_url?: string | null;
@@ -312,7 +311,7 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ orderId
   const adminWa = (paymentInfo?.adminWhatsapp || process.env.NEXT_PUBLIC_ADMIN_WA || '628123456789').replace(/\D/g, '');
   const selectedLabel = selectedAccount ? selectedAccount.label : 'QRIS';
   const waText = encodeURIComponent(
-    `Halo Admin, saya sudah memesan Portfolio OS ${order.plan.toUpperCase()}.\nOrder ID: ${order.id}\nNama: ${order.buyer_name}\nSlug: ${order.desired_slug}\nMetode: ${selectedLabel}`
+    `Halo Admin, saya sudah memesan Portfolio OS.\nOrder ID: ${order.id}\nNama: ${order.buyer_name}\nSlug: ${order.desired_slug}\nMetode: ${selectedLabel}`
   );
   const waUrl = `https://wa.me/${adminWa}?text=${waText}`;
 
@@ -461,22 +460,16 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ orderId
               <span className="text-slate-500 font-medium">Pemesan:</span>
               <span className="font-bold text-slate-900">{order.buyer_name} ({order.buyer_email})</span>
             </div>
-            <div className="flex flex-col items-start gap-1 border-b border-slate-200/60 pb-1.5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-slate-500 font-medium">Target Website:</span>
               <span className="font-mono font-bold text-blue-600">makeitbetter.my.id/{order.desired_slug}</span>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-slate-500 font-medium">Paket Terpilih:</span>
-              <span className="font-extrabold text-slate-900 uppercase bg-white px-2.5 py-0.5 rounded border border-slate-200">
-                {order.plan} PLAN
-              </span>
             </div>
           </div>
 
           {/* Compact bill summary */}
           <div className="border-y border-slate-800 py-3 text-xs">
             <div className="flex items-center justify-between gap-3 text-slate-600">
-              <span>Portfolio OS {order.plan.toUpperCase()}</span>
+              <span>Portfolio OS</span>
               <span className="font-mono">{formatRupiah(order.amount)}</span>
             </div>
             <div className="mt-2 flex items-center justify-between gap-3">

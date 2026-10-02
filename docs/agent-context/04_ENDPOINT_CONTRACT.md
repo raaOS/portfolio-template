@@ -10,9 +10,8 @@ Endpoint adalah kontrak baku. Frontend tidak boleh "menebak" shape data.
 
 ## Admin API (Auth Required)
 - `POST /admin/sites` -> Buat site baru (Master only).
-- `PUT /admin/sites/:id` -> Edit data site, plan, billing metadata, dan custom quota add-on.
+- `PUT /admin/sites/:id` -> Edit data site, status, dan custom quota add-on.
 - `PUT /admin/sites/:id/quota` -> Legacy contract; quota custom sekarang masuk payload `PUT /admin/sites` sebagai `quotaOverride`.
-- `PUT /admin/sites/:id/features` -> Atur feature flags Lite/Pro.
 - `POST /admin/projects` -> Buat project scoped `site_id` sebagai admin/master override.
 - `PUT /admin/projects/:id` -> Edit project scoped `site_id`.
 - `DELETE /admin/projects/:id` -> Soft delete project.
@@ -43,10 +42,10 @@ Endpoint adalah kontrak baku. Frontend tidak boleh "menebak" shape data.
 - Jika endpoint mutasi bisa dipakai admin dan client, wajib resolve `siteId`, validasi actor terhadap site, cek plan/quota/feature flag bila relevan, dan revalidate path tenant.
 - Jangan menjadikan `default-site` sebagai fallback data untuk tenant non-default. Tenant non-default harus membaca data sendiri atau fallback template statis yang aman.
 
-## Plan Rules
-- Semua endpoint mutasi wajib memvalidasi `site_id`, membership, quota, dan feature flags.
-- Lite dan Pro sama-sama self-service. Lite dibatasi quota dan fitur; Pro membuka fitur lanjutan.
-- Default quota berasal dari env `PLAN_*`; custom quota per site disimpan di D1 `site_quota_overrides` dan hanya menaikkan limit di atas default plan.
+## Quota Rules
+- Semua endpoint mutasi wajib memvalidasi `site_id`, membership, dan quota.
+- Setiap client self-service untuk site-nya sendiri.
+- Default quota berasal dari env `PROJECT_LIMIT`, `STORAGE_MB`, `MEDIA_PER_PROJECT`; custom quota per site disimpan di D1 `site_quota_overrides` dan hanya menaikkan limit di atas default.
 - Jangan membuat endpoint baru yang mengasumsikan Vercel atau 1 deployment per client.
 
 ## Standar Response Sukses

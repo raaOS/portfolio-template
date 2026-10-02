@@ -235,11 +235,11 @@ After deploy:
 ## 8. Operating Model
 
 - Master admin creates and manages sites.
-- Master admin sets Lite/Pro plan and billing metadata.
+- Master admin sets site status and optional quota overrides.
 - Client dashboard is self-service per site.
 - Client password reset is self-service only when email delivery is configured.
-- Lite clients are limited by project, storage, and media-per-project quota.
-- Pro clients get higher quota and optional integrations.
+- All clients are limited by project, storage, and media-per-project quota.
+- Higher quota is sold as an add-on when needed.
 
 ## 9. Do Not Do
 

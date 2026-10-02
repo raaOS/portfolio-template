@@ -72,7 +72,6 @@ describe('POST /api/admin/sites/[siteId]/project-video/presign', () => {
     getAdminSiteContextMock.mockResolvedValue({
       siteId: 'site-1',
       status: 'active',
-      plan: 'pro',
       quota: {
         projectLimit: 50,
         storageMb: 5000,

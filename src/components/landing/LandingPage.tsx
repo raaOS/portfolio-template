@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { formatIdr, BASE_PRICE } from '@/constants/plans';
+import { formatIdr, BASE_PRICE } from '@/constants/pricing';
 import './landing.css';
 
 const TEMPLATES = [

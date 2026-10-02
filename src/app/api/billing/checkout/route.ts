@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/billing/checkout
- * Buat order baru. Plan dan slug sekarang opsional — default 'pro' dan auto-generate.
+ * Buat order baru. Slug opsional — auto-generate dari nama buyer.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { buyerName, buyerEmail, buyerWhatsapp, plan, desiredSlug, templateId } = body;
+    const { buyerName, buyerEmail, buyerWhatsapp, desiredSlug, templateId } = body;
 
     if (!buyerName || !buyerEmail || !buyerWhatsapp) {
       return NextResponse.json({ error: 'Data form checkout tidak lengkap' }, { status: 400 });
@@ -78,14 +78,11 @@ export async function POST(request: NextRequest) {
           .replace(/^-|-$/g, '')
           .slice(0, 30) || 'portfolio';
 
-    const selectedPlan = plan === 'lite' ? 'lite' : 'pro';
-
     const result = await createOrder(
       {
         buyerName,
         buyerEmail,
         buyerWhatsapp,
-        plan: selectedPlan,
         desiredSlug: slug,
         templateId: typeof templateId === 'string' && templateId.trim() ? templateId.trim() : undefined,
       },

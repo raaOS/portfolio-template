@@ -42,7 +42,6 @@ describe('orderService', () => {
         buyerName: 'Nanda',
         buyerEmail: 'nanda@test.com',
         buyerWhatsapp: '628123456789',
-        plan: 'pro',
         desiredSlug: 'nanda-design'
       });
 
@@ -65,7 +64,6 @@ describe('orderService', () => {
         buyerName: 'Nanda',
         buyerEmail: 'nanda@test.com',
         buyerWhatsapp: '628123456789',
-        plan: 'pro',
         desiredSlug: 'nanda-design'
       });
 
@@ -91,7 +89,6 @@ describe('orderService', () => {
         buyerName: 'Nanda',
         buyerEmail: 'nanda@test.com',
         buyerWhatsapp: '628123456789',
-        plan: 'pro',
         desiredSlug: 'nanda-design'
       });
 
@@ -135,7 +132,6 @@ describe('orderService', () => {
         buyerName: 'Nanda',
         buyerEmail: 'nanda@test.com',
         buyerWhatsapp: '628123456789',
-        plan: 'pro',
         desiredSlug: 'nanda-design'
       });
 
@@ -164,7 +160,6 @@ describe('orderService', () => {
         buyerName: 'Nanda',
         buyerEmail: 'nanda@test.com',
         buyerWhatsapp: '628123456789',
-        plan: 'pro',
         desiredSlug: 'nanda-design'
       });
 
@@ -179,7 +174,6 @@ describe('orderService', () => {
         buyerName: 'Orang Lain',
         buyerEmail: 'other@test.com',
         buyerWhatsapp: '628123456789',
-        plan: 'pro',
         desiredSlug: 'nanda-design'
       });
 
@@ -200,7 +194,6 @@ describe('orderService', () => {
         buyerName: 'Nanda',
         buyerEmail: 'dup@test.com',
         buyerWhatsapp: '628123456789',
-        plan: 'lite',
         desiredSlug: 'dup-site'
       });
 
@@ -232,7 +225,6 @@ describe('orderService', () => {
           {
             id: 'ORD-123',
             status: 'pending_payment',
-            plan: 'pro',
             desired_slug: 'nanda-design',
             buyer_name: 'Nanda',
             buyer_whatsapp: '62812345'
@@ -252,7 +244,6 @@ describe('orderService', () => {
             id: 'ORD-124',
             status: 'expired',
             amount: 299001,
-            plan: 'pro',
             desired_slug: 'late-design',
             buyer_name: 'Nanda Late',
             buyer_whatsapp: '62812345'
@@ -273,7 +264,6 @@ describe('orderService', () => {
             id: 'ORD-124',
             status: 'expired',
             amount: 299001,
-            plan: 'pro',
             desired_slug: 'late-design',
             buyer_name: 'Nanda Late',
             buyer_whatsapp: '62812345'
@@ -293,7 +283,6 @@ describe('orderService', () => {
             id: 'ORD-124',
             status: 'expired',
             amount: 299001,
-            plan: 'pro',
             desired_slug: 'late-design',
             buyer_name: 'Nanda Late',
             buyer_whatsapp: '62812345'
@@ -325,7 +314,6 @@ describe('orderService', () => {
         buyer_name: 'Nanda',
         buyer_email: 'newbuyer@test.com',
         buyer_whatsapp: '628123456789',
-        plan: 'pro',
         payment_proof_url: 'https://proof.png',
         status: 'waiting_verification'
       };
@@ -333,7 +321,6 @@ describe('orderService', () => {
       vi.mocked(cloudflareD1.queryD1)
         .mockResolvedValueOnce([order]) // lock order with UPDATE RETURNING
         .mockResolvedValueOnce([]) // insert sites
-        .mockResolvedValueOnce([]) // insert site_subscriptions
         .mockResolvedValueOnce([]) // update order activated
         .mockResolvedValueOnce([]); // insert audit_log
 
@@ -360,7 +347,6 @@ describe('orderService', () => {
         buyer_name: 'Nanda',
         buyer_email: 'cleanup@test.com',
         buyer_whatsapp: '628123456789',
-        plan: 'pro',
         payment_proof_url: 'https://proof.png',
         status: 'waiting_verification'
       };
@@ -368,7 +354,6 @@ describe('orderService', () => {
       vi.mocked(cloudflareD1.queryD1)
         .mockResolvedValueOnce([order]) // lock order
         .mockResolvedValueOnce([]) // insert sites
-        .mockResolvedValueOnce([]) // insert site_subscriptions
         .mockRejectedValueOnce(new Error('UPDATE orders activated failed')); // fail after inserts
 
       const res = await activateOrder('ORD-777');
@@ -380,7 +365,6 @@ describe('orderService', () => {
       );
       const deleteSql = deleteCalls.map(([sql]) => String(sql));
       expect(deleteSql.some((sql) => sql.includes('DELETE FROM sites WHERE id = ?'))).toBe(true);
-      expect(deleteSql.some((sql) => sql.includes('DELETE FROM site_subscriptions WHERE id = ?'))).toBe(true);
     });
   });
 
@@ -404,7 +388,6 @@ describe('orderService', () => {
         buyer_name: 'Nanda',
         buyer_email: 'newbuyer@test.com',
         buyer_whatsapp: '628123456789',
-        plan: 'pro',
         amount: 1500000,
         payment_proof_url: 'https://proof.png',
         status: 'waiting_verification',
@@ -413,7 +396,6 @@ describe('orderService', () => {
       vi.mocked(cloudflareD1.queryD1)
         .mockResolvedValueOnce([order]) // lock order with UPDATE RETURNING
         .mockResolvedValueOnce([]) // insert sites
-        .mockResolvedValueOnce([]) // insert site_subscriptions
         .mockResolvedValueOnce([]) // update order activated
         .mockResolvedValueOnce([]); // insert audit_log
     }
@@ -503,7 +485,6 @@ describe('orderService', () => {
             buyer_email: 'a@b.com',
             buyer_name: 'A',
             desired_slug: 'stale-site',
-            plan: 'pro',
           },
         ]) // UPDATE ... RETURNING (expired)
         .mockResolvedValueOnce([]); // activating recovery update
@@ -551,7 +532,6 @@ describe('orderService', () => {
         buyer_name: 'L',
         buyer_email: 'late@test.com',
         buyer_whatsapp: '628',
-        plan: 'pro',
         payment_proof_url: null,
         status: 'waiting_verification',
       };
@@ -562,7 +542,6 @@ describe('orderService', () => {
         .mockResolvedValueOnce([]) // existingClients check (empty)
         .mockResolvedValueOnce([]) // insert sites
         .mockResolvedValueOnce([]) // insert client_access
-        .mockResolvedValueOnce([]) // insert site_subscriptions
         .mockResolvedValueOnce([]) // update order activated
         .mockResolvedValueOnce([]); // insert audit_log
 

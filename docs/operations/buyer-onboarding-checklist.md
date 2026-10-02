@@ -18,7 +18,6 @@ Checklist ini untuk operator yang meng-onboard buyer baru ke Portfolio OS Templa
 - [ ] Isi:
   - **Nama site**: nama bisnis/portfolio buyer.
   - **Slug**: URL-friendly identifier (contoh: `studio-andi`). Akan menjadi `<domain>/<slug>`.
-  - **Plan**: pilih `lite` atau `pro` sesuai paket yang dibeli.
 - [ ] Klik **Simpan**.
 - [ ] Catat **Site ID** dan **Slug** yang sudah terbuat.
 
@@ -48,11 +47,11 @@ Checklist ini untuk operator yang meng-onboard buyer baru ke Portfolio OS Templa
 
 - [ ] Buyer membuka Client Dashboard setelah login.
 - [ ] Buyer mengisi konten profil melalui modul yang tersedia:
-  - Profil / About (Lite & Pro)
-  - Kontak (Lite & Pro)
-  - Pengalaman / Hard Skills (Lite & Pro)
-  - Pengaturan Sistem / Tampilan (Pro only)
-  - Testimoni (Pro only)
+  - Profil / About
+  - Kontak
+  - Pengalaman / Hard Skills
+  - Pengaturan Sistem / Tampilan (jika `FEATURE_*` terkait aktif)
+  - Testimoni (jika `FEATURE_*` terkait aktif)
 
 ### 6. Buyer Buat Project Pertama
 
@@ -90,5 +89,5 @@ Jika buyer memerlukan quota di luar default plan:
 ## Catatan
 
 - Jangan buat lebih dari satu client access per site kecuali memang dibutuhkan.
-- Jika buyer membeli plan Pro, pastikan plan di Master Dashboard sudah benar sebelum mengirim kredensial.
+- Pastikan status site dan quota-nya benar sebelum mengirim kredensial.
 - Reset password self-service hanya tersedia jika `FEATURE_CLIENT_PASSWORD_RESET=true` dan notification provider aktif.

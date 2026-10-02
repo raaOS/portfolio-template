@@ -28,7 +28,6 @@ interface OrderItem {
   buyer_name: string;
   buyer_email: string;
   buyer_whatsapp: string;
-  plan: string;
   amount: number;
   payment_method: string;
   payment_proof_url?: string | null;
@@ -314,7 +313,7 @@ export default function OrdersPanel() {
               <tr>
                 <th className="py-3 px-3.5 font-semibold whitespace-nowrap min-w-[130px]">Order ID & Waktu</th>
                 <th className="py-3 px-3.5 font-semibold whitespace-nowrap min-w-[150px]">Pembeli</th>
-                <th className="py-3 px-3.5 font-semibold whitespace-nowrap min-w-[120px]">Paket & Slug</th>
+                <th className="py-3 px-3.5 font-semibold whitespace-nowrap min-w-[120px]">Slug</th>
                 <th className="py-3 px-3.5 font-semibold text-right whitespace-nowrap min-w-[100px]">Nominal Unik</th>
                 <th className="py-3 px-3.5 font-semibold text-center whitespace-nowrap min-w-[100px]">Bukti Bayar</th>
                 <th className="py-3 px-3.5 font-semibold whitespace-nowrap min-w-[140px]">Status & Catatan</th>
@@ -365,13 +364,8 @@ export default function OrdersPanel() {
                         </a>
                       </td>
 
-                      {/* Plan & Slug */}
+                      {/* Slug */}
                       <td className="py-3.5 px-4 align-top">
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-blue-700 font-extrabold text-[10px] uppercase">
-                            {ord.plan}
-                          </span>
-                        </div>
                         <span className="font-mono text-emerald-700 text-xs block font-bold tracking-tight">
                           /{ord.desired_slug}
                         </span>

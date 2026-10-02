@@ -101,7 +101,7 @@ export function MasterSiteTable({
                       selected ? 'bg-white/15 text-white' : 'bg-zinc-100 text-zinc-700'
                     }`}
                   >
-                    {site.plan}
+                    {site.status}
                   </span>
                 </div>
 

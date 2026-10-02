@@ -81,7 +81,6 @@ function checkDemoDataHygiene() {
 [
   'docs/release/BUYER_ONBOARDING.md',
   'docs/release/CLIENT_OPERATIONS.md',
-  'docs/release/LITE_PRO_SCOPE.md',
   'docs/release/RELEASE_CHECKLIST.md',
   'docs/release/SALES_PRICING.md',
   'src/app/api/client/password-reset/request/route.ts',
@@ -103,11 +102,10 @@ checkIncludes('docs/release/CLIENT_OPERATIONS.md', [
 ]);
 
 checkIncludes('docs/release/SALES_PRICING.md', [
-  'managed subscription per site',
-  'manual invoice',
+  'satu kali beli',
+  'QRIS/transfer',
   'Add-on Quota',
-  'Lite',
-  'Pro',
+  'PROJECT_LIMIT',
 ]);
 
 checkIncludes('scripts/release/smoke-production.js', [

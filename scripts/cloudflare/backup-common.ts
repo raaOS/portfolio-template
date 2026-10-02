@@ -43,7 +43,6 @@ export type D1BackupFile = {
 export const DEFAULT_D1_BACKUP_TABLES = [
   'sites',
   'client_access',
-  'site_subscriptions',
   'client_password_resets',
   'site_quota_overrides',
   'projects',
@@ -58,7 +57,6 @@ export const DEFAULT_D1_BACKUP_TABLES = [
 export const RESTORE_TABLE_ORDER = [
   'sites',
   'client_access',
-  'site_subscriptions',
   'client_password_resets',
   'site_quota_overrides',
   'projects',

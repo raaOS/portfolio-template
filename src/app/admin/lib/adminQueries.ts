@@ -8,7 +8,7 @@ import type { Label } from '@/types/labels';
 import type { Project } from '@/types/projects';
 import type { TestimonialData } from '@/types/testimonial';
 import type { NoteData } from '@/components/os/ui/elements/StickyNoteItem';
-import type { PlanQuota, ProductPlan, SiteQuotaOverride } from '@/lib/product/sitePlan';
+import type { SiteQuota, SiteQuotaOverride } from '@/lib/product/siteQuota';
 import type { SiteStorageUsage } from '@/lib/product/siteStorageUsage';
 import type { SiteAnalyticsSummary } from '@/lib/services/analyticsService';
 import aboutFallback from '@/data/about.json';
@@ -69,12 +69,10 @@ export interface AdminSiteSummary {
   id: string;
   slug: string;
   name: string;
-  plan: ProductPlan;
   status: string;
   createdAt: string;
   updatedAt: string;
-  quota: PlanQuota;
-  quotaDefault: PlanQuota;
+  quota: SiteQuota;
   quotaOverride: SiteQuotaOverride;
   usage: {
     projects: number;
@@ -86,14 +84,6 @@ export interface AdminSiteSummary {
     status: string;
     updatedAt: string;
     lastLoginAt: string | null;
-  } | null;
-  billing: {
-    plan: ProductPlan;
-    status: string;
-    currentPeriodEnd: string | null;
-    externalCustomerId: string | null;
-    externalSubscriptionId: string | null;
-    updatedAt: string;
   } | null;
   customDomain: {
     customDomain: string | null;

@@ -39,10 +39,14 @@ vi.mock('@/lib/r2Storage', () => ({
   deleteFromR2: deleteFromR2Mock,
 }));
 
-vi.mock('@/lib/product/siteQuota', () => ({
-  loadSiteQuotaOverrideMap: vi.fn().mockResolvedValue(new Map()),
-  upsertSiteQuotaOverride: vi.fn().mockResolvedValue(undefined),
-}));
+vi.mock('@/lib/product/siteQuota', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/product/siteQuota')>();
+  return {
+    ...actual,
+    loadSiteQuotaOverrideMap: vi.fn(),
+    upsertSiteQuotaOverride: vi.fn(),
+  };
+});
 
 vi.mock('@/lib/services/customDomainService', () => ({
   customDomainService: {
@@ -132,11 +136,6 @@ describe('GET /api/admin/sites', () => {
         storageMb: 5000,
         mediaPerProject: 50,
       },
-      quotaDefault: {
-        projectLimit: 50,
-        storageMb: 5000,
-        mediaPerProject: 50,
-      },
       quotaOverride: {
         projectLimit: null,
         storageMb: null,
@@ -156,7 +155,7 @@ describe('GET /api/admin/sites', () => {
     expect(getSiteStorageUsageSafeMock).toHaveBeenCalledWith('default-site');
   });
 
-  it('returns site with default quota when plan field is absent', async () => {
+  it('returns default quota for a site without quota override', async () => {
     queryD1Mock
       .mockResolvedValueOnce([
         {
@@ -242,7 +241,6 @@ describe('GET /api/admin/sites', () => {
         expect.stringMatching(/^site-/),
         'acme-studio',
         'Acme Studio',
-        'lite',
         'active',
         expect.any(String),
         expect.any(String),
@@ -364,7 +362,7 @@ describe('GET /api/admin/sites', () => {
     const body = await response.json();
 
     expect(response.status).toBe(409);
-    expect(body.errorCode).toBe('PLAN_QUOTA_VIOLATION');
+    expect(body.errorCode).toBe('QUOTA_VIOLATION');
     expect(body.details.violations[0]).toContain('Project usage 60 exceeds next limit 50');
   });
 

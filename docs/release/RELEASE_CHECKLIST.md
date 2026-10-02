@@ -103,15 +103,14 @@ After deploy:
 - [ ] Public site route loads.
 - [ ] Master admin login works.
 - [ ] Master can create/update/suspend/delete a site.
-- [ ] Master can set Lite/Pro plan and billing metadata.
+- [ ] Master can set site status and quota override.
 - [ ] Client login works.
 - [ ] Client password reset email is delivered and reset token can set a new password.
 - [ ] Client can create/edit projects within quota.
 - [ ] Cover/gallery/video upload works.
 - [ ] R2 media keys are under `sites/{siteId}/...`.
 - [ ] Browser video compression loads FFmpeg from `/r2/ffmpeg`.
-- [ ] Lite cannot access Pro-only testimonial manager.
-- [ ] Pro testimonial manager works after plan upgrade.
+- [ ] Optional features follow their `FEATURE_*` flags.
 - [ ] Data from one site does not appear in another site.
 
 ## Package Hygiene

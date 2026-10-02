@@ -117,13 +117,11 @@ After automated smoke passes:
 - [ ] Create a draft project.
 - [ ] Upload a cover image.
 - [ ] Upload gallery image.
-- [ ] Upload gallery video if Pro/video feature is enabled.
+- [ ] Upload gallery video if the video feature is enabled.
 - [ ] Confirm R2 keys are under `sites/{siteId}/...`.
 - [ ] Confirm storage usage changes after upload.
-- [ ] Confirm Lite quota blocks over-limit action.
-- [ ] Confirm Pro quota allows higher usage.
-- [ ] Confirm Lite cannot open Pro-only testimonial manager.
-- [ ] Upgrade the test site to Pro and confirm testimonial manager works.
+- [ ] Confirm quota blocks over-limit action.
+- [ ] Confirm a site quota override raises the limit.
 - [ ] Create a second test site and confirm data from site A does not appear in site B.
 
 ## Rollback

@@ -256,24 +256,22 @@ function readPositiveInt(name, fallback) {
   return Number.isInteger(value) && value >= 0 ? value : fallback;
 }
 
-function planStorageMb(plan) {
-  if (plan === 'pro') return readPositiveInt('PLAN_PRO_STORAGE_MB', 5000);
-  return readPositiveInt('PLAN_LITE_STORAGE_MB', 250);
+function defaultStorageMb() {
+  return readPositiveInt('STORAGE_MB', 5000);
 }
 
 async function loadSiteRows() {
-  const sites = await queryD1('SELECT id, slug, name, plan, status FROM sites ORDER BY created_at ASC');
+  const sites = await queryD1('SELECT id, slug, name, status FROM sites ORDER BY created_at ASC');
   const overrides = await queryD1('SELECT site_id, storage_mb FROM site_quota_overrides');
   const overrideBySiteId = new Map(overrides.map((row) => [row.site_id, row.storage_mb]));
 
   return sites.map((site) => {
-    const baseStorageMb = planStorageMb(site.plan === 'pro' ? 'pro' : 'lite');
+    const baseStorageMb = defaultStorageMb();
     const overrideStorageMb = Number(overrideBySiteId.get(site.id) || 0);
     return {
       id: site.id,
       slug: site.slug,
       name: site.name,
-      plan: site.plan === 'pro' ? 'pro' : 'lite',
       status: site.status,
       storageLimitMb:
         Number.isFinite(overrideStorageMb) && overrideStorageMb > baseStorageMb
@@ -347,7 +345,6 @@ async function runStorageChecks(options) {
       ok: ratio < options.storageWarnRatio,
       siteId: site.id,
       siteSlug: site.slug,
-      plan: site.plan,
       status: site.status,
       bytes: usage.bytes,
       objects: usage.objects,

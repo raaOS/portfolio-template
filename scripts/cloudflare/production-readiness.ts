@@ -35,14 +35,6 @@ type WranglerConfig = {
 
 const REQUIRED_FFMPEG_KEYS = ['ffmpeg/ffmpeg-core.js', 'ffmpeg/ffmpeg-core.wasm'] as const;
 const REQUIRED_FFMPEG_LOCAL_FILES = ['ffmpeg-core.js', 'ffmpeg-core.wasm'] as const;
-const PLAN_INTEGER_KEYS = [
-  'PLAN_LITE_PROJECT_LIMIT',
-  'PLAN_LITE_STORAGE_MB',
-  'PLAN_LITE_MEDIA_PER_PROJECT',
-  'PLAN_PRO_PROJECT_LIMIT',
-  'PLAN_PRO_STORAGE_MB',
-  'PLAN_PRO_MEDIA_PER_PROJECT',
-] as const;
 
 const results: CheckResult[] = [];
 
@@ -70,17 +62,6 @@ function readWranglerConfig(): WranglerConfig | null {
   return JSON.parse(stripJsonComments(fs.readFileSync(file, 'utf8'))) as WranglerConfig;
 }
 
-function readPositiveInteger(name: (typeof PLAN_INTEGER_KEYS)[number]) {
-  const value = Number(process.env[name]);
-  if (!Number.isInteger(value) || value < 0) {
-    fail(`${name} is a valid integer`, 'Set a non-negative integer in .env.local.');
-    return null;
-  }
-
-  pass(`${name} is a valid integer`);
-  return value;
-}
-
 function expectedD1Tables() {
   const relationalTables = D1_SCHEMA_QUERIES.flatMap((sql) => {
     const match = /CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+([a-zA-Z0-9_]+)/i.exec(sql);
@@ -103,42 +84,6 @@ function isNotFoundError(error: unknown) {
     candidate.Code === 'NoSuchKey' ||
     candidate.$metadata?.httpStatusCode === 404
   );
-}
-
-function checkPlanQuotas() {
-  const values = Object.fromEntries(
-    PLAN_INTEGER_KEYS.map((key) => [key, readPositiveInteger(key)])
-  ) as Record<(typeof PLAN_INTEGER_KEYS)[number], number | null>;
-
-  if (
-    values.PLAN_LITE_PROJECT_LIMIT !== null &&
-    values.PLAN_PRO_PROJECT_LIMIT !== null &&
-    values.PLAN_PRO_PROJECT_LIMIT < values.PLAN_LITE_PROJECT_LIMIT
-  ) {
-    fail('Pro project quota is not lower than Lite quota');
-  } else {
-    pass('Pro project quota is not lower than Lite quota');
-  }
-
-  if (
-    values.PLAN_LITE_STORAGE_MB !== null &&
-    values.PLAN_PRO_STORAGE_MB !== null &&
-    values.PLAN_PRO_STORAGE_MB < values.PLAN_LITE_STORAGE_MB
-  ) {
-    fail('Pro storage quota is not lower than Lite quota');
-  } else {
-    pass('Pro storage quota is not lower than Lite quota');
-  }
-
-  if (
-    values.PLAN_LITE_MEDIA_PER_PROJECT !== null &&
-    values.PLAN_PRO_MEDIA_PER_PROJECT !== null &&
-    values.PLAN_PRO_MEDIA_PER_PROJECT < values.PLAN_LITE_MEDIA_PER_PROJECT
-  ) {
-    fail('Pro media-per-project quota is not lower than Lite quota');
-  } else {
-    pass('Pro media-per-project quota is not lower than Lite quota');
-  }
 }
 
 function checkFfmpegLocalFiles() {
@@ -345,7 +290,6 @@ async function main() {
   if (report.confirmed) pass('Live Cloudflare write guard is confirmed');
   else fail('Live Cloudflare write guard is confirmed', 'Set PRODUCT_CLOUDFLARE_ENV_CONFIRMED=true.');
 
-  checkPlanQuotas();
   checkFfmpegLocalFiles();
   checkFfmpegBaseUrl();
   checkClientPasswordReset();

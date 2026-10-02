@@ -61,7 +61,6 @@ function parseArgs(argv) {
     confirmHost: process.env.LOAD_TEST_CONFIRM_HOST || '',
     allow25: false,
     allow50: false,
-    plan: 'lite',
     emailDomain: process.env.LOAD_TEST_EMAIL_DOMAIN || 'example.invalid',
     adminToken: process.env.LOAD_TEST_ADMIN_TOKEN || '',
     adminPassword: process.env.LOAD_TEST_ADMIN_PASSWORD || '',
@@ -127,11 +126,6 @@ function parseArgs(argv) {
       options.allow25 = true;
     } else if (arg === '--allow-50') {
       options.allow50 = true;
-    } else if (arg === '--plan') {
-      options.plan = next || options.plan;
-      index += 1;
-    } else if (arg.startsWith('--plan=')) {
-      options.plan = arg.slice('--plan='.length);
     } else if (arg === '--email-domain') {
       options.emailDomain = next || options.emailDomain;
       index += 1;
@@ -190,9 +184,6 @@ function parseArgs(argv) {
   if (!Number.isFinite(options.timeoutMs) || options.timeoutMs < 1000) {
     throw new Error('--timeout-ms must be at least 1000.');
   }
-  if (!['lite', 'pro'].includes(options.plan)) {
-    throw new Error('--plan must be lite or pro.');
-  }
   if (!['skip', 'request'].includes(options.passwordResetMode)) {
     throw new Error('--password-reset-mode must be skip or request.');
   }
@@ -226,7 +217,6 @@ Options:
   --confirm-host <host>        Required for non-local live target.
   --allow-25                   Required when tenants > 5.
   --allow-50                   Required when tenants > 25.
-  --plan <lite|pro>            Test site plan. Default lite.
   --email-domain <domain>      Test client email domain. Default example.invalid.
   --image-size-kb <n>          Cover/gallery payload size. Default 64.
   --video-size-mb <n>          Video direct-upload payload size. Default 1.
@@ -671,7 +661,6 @@ async function tenantFlow(tenant, admin, options, metrics) {
         json: {
           name: tenant.name,
           slug: tenant.slug,
-          plan: options.plan,
           status: 'active',
         },
       });

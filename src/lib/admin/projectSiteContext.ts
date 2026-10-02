@@ -3,16 +3,14 @@ import type { CreateProjectData, UpdateProjectData } from '@/types/projects';
 import { queryD1 } from '@/lib/cloudflareD1';
 import {
   countProjectMediaRefs,
-  normalizeProductPlan,
-  type PlanQuota,
-} from '@/lib/product/sitePlan';
-import { getEffectiveSiteQuotaById } from '@/lib/product/siteQuota';
+  getEffectiveSiteQuotaById,
+  type SiteQuota,
+} from '@/lib/product/siteQuota';
 import { SITE_ID } from '@/crud/shared/config';
 
 type SiteRow = {
   id: string;
   slug: string;
-  plan: string;
   status: string;
 };
 
@@ -23,9 +21,8 @@ type CountRow = {
 export type AdminSiteContext = {
   siteId: string;
   slug: string | null;
-  plan: 'lite' | 'pro';
   status: string;
-  quota: PlanQuota;
+  quota: SiteQuota;
 };
 
 export class ProjectQuotaError extends Error {
@@ -58,7 +55,7 @@ export function resolveProjectSiteId(request: NextRequest, body?: Record<string,
 
 export async function getAdminSiteContext(siteId: string): Promise<AdminSiteContext> {
   const rows = await queryD1<SiteRow>(
-    `SELECT id, slug, plan, status FROM sites WHERE id = ? LIMIT 1`,
+    `SELECT id, slug, status FROM sites WHERE id = ? LIMIT 1`,
     [siteId]
   );
   const site = rows[0];
@@ -67,14 +64,11 @@ export async function getAdminSiteContext(siteId: string): Promise<AdminSiteCont
     throw new ProjectQuotaError('Site not found', 'SITE_NOT_FOUND', { siteId });
   }
 
-  const plan = normalizeProductPlan(site.plan);
-
   return {
     siteId: site.id,
     slug: site.slug || null,
-    plan,
     status: site.status,
-    quota: await getEffectiveSiteQuotaById({ siteId: site.id, plan }),
+    quota: await getEffectiveSiteQuotaById({ siteId: site.id }),
   };
 }
 
@@ -99,7 +93,6 @@ export async function enforceProjectCreateQuota(
       {
         mediaCount,
         limit: context.quota.mediaPerProject,
-        plan: context.plan,
       }
     );
   }
@@ -117,7 +110,6 @@ export async function enforceProjectCreateQuota(
       {
         currentProjects,
         limit: context.quota.projectLimit,
-        plan: context.plan,
       }
     );
   }
@@ -153,7 +145,6 @@ export async function enforceProjectUpdateQuota(
         {
           mediaCount,
           limit: context.quota.mediaPerProject,
-          plan: context.plan,
         }
       );
     }

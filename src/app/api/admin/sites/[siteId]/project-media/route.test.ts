@@ -97,7 +97,6 @@ describe('POST /api/admin/sites/[siteId]/project-media', () => {
     getAdminSiteContextMock.mockResolvedValue({
       siteId: 'default-site',
       slug: 'demo-designer',
-      plan: 'lite',
       status: 'active',
       quota: {
         projectLimit: 5,
@@ -151,7 +150,6 @@ describe('POST /api/admin/sites/[siteId]/project-media', () => {
     getAdminSiteContextMock.mockResolvedValue({
       siteId: 'default-site',
       slug: 'demo-designer',
-      plan: 'lite',
       status: 'suspended',
       quota: {
         projectLimit: 5,

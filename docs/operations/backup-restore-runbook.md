@@ -16,7 +16,6 @@ D1:
 
 - `sites`
 - `client_access`
-- `site_subscriptions`
 - `client_password_resets`
 - `site_quota_overrides`
 - `projects`

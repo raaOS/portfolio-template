@@ -139,7 +139,6 @@ export async function getSiteById(siteId: string): Promise<{
   id: string;
   slug: string;
   name: string;
-  plan: string;
   status: string;
   active_template_key: string;
 } | null> {
@@ -148,11 +147,10 @@ export async function getSiteById(siteId: string): Promise<{
     id: string;
     slug: string;
     name: string;
-    plan: string;
     status: string;
     active_template_key: string;
   }>(
-    `SELECT id, slug, name, plan, status, active_template_key FROM sites WHERE id = ? LIMIT 1`,
+    `SELECT id, slug, name, status, active_template_key FROM sites WHERE id = ? LIMIT 1`,
     [siteId]
   );
   return rows[0] || null;
