@@ -25,5 +25,5 @@ Gunakan flag `FEATURE_*` (bukan tiers paket) untuk menyembunyikan/menampilkan fi
 ## Client UI Boundary
 - UI client/pembeli hanya boleh memanggil endpoint client/site-scoped atau endpoint content yang resolve `siteId`.
 - UI client tidak boleh memanggil endpoint master/platform seperti admin login, admin password/PIN, clear-cache, revalidate, health, settings platform, atau metrics internal.
-- Route pembeli memakai pola tenant: login di `/[siteSlug]/login`, public site di `/[siteSlug]`, dan public project di `/[siteSlug]/projects`.
+- Route pembeli memakai pola tenant: public site di `/[siteSlug]`, public project di `/[siteSlug]/projects`. Tidak ada route login per-site; login panel ada di `/admin/login`.
 - Jangan membuat UI yang mengarahkan tenant ke route global seperti `/projects` jika sedang berada di site tenant; gunakan path tenant seperti `/${siteSlug}/projects`.

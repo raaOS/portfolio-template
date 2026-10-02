@@ -25,7 +25,7 @@ npm run media:audit-projects
 
 ### Gejala
 
-Client melaporkan tidak bisa login di `/<siteSlug>/login` atau `/client/login`.
+Client melaporkan tidak bisa login di `/admin/login` (tidak ada halaman login per-site).
 
 ### Langkah Diagnosa
 
@@ -33,10 +33,11 @@ Client melaporkan tidak bisa login di `/<siteSlug>/login` atau `/client/login`.
    - Buka Master Dashboard → cari site client.
    - Jika status `suspended`, site tidak bisa diakses. Lihat bagian Suspend/Activate.
 
-2. **Cek client access terdaftar:**
-   - Buka Master Dashboard → klik site → bagian Client Access.
-   - Pastikan email client terdaftar dan status `active`.
-   - Jika belum ada, buat client access baru (lihat [buyer-onboarding-checklist.md](file:///c:/Users/USER/Documents/portfolio-template/docs/operations/buyer-onboarding-checklist.md)).
+2. **Cek akun panel client:**
+   - Pastikan pembeli sudah membuka `/setup` sehingga email + password admin terdaftar.
+   - Kalau belum yakin, reset password dari komputermu:
+     `npx tsx scripts/cloudflare/reset-customer-password.ts`
+     (lihat [buyer-onboarding-checklist.md](file:///c:/Users/USER/Documents/portfolio-template/docs/operations/buyer-onboarding-checklist.md)).
 
 3. **Cek rate limit:**
    - Login endpoint dilindungi rate limit.
@@ -265,10 +266,9 @@ Sementara, jika ada masalah pembayaran:
 
 | Masalah | Operator Tangani Sendiri | Eskalasi ke Developer |
 |---|---|---|
-| Login gagal (password salah) | ✅ Reset password | — |
+| Login gagal (password salah) | ✅ Reset manual via `reset-customer-password.ts` | — |
 | Login gagal (CSRF) | ✅ Clear cookies | — |
 | Login gagal (rate limit) | ✅ Tunggu cooldown | ❌ Jika cooldown tidak pulih |
-| Email reset tidak masuk | ✅ Cek spam, kirim ulang | ❌ Jika Resend API `sent=true` tapi email tidak pernah sampai |
 | Upload gagal (quota) | ✅ Upgrade/hapus media | — |
 | Upload gagal (R2 error) | — | ❌ Selalu eskalasi |
 | Site tidak tampil | ✅ Cek status + project | ❌ Jika health check gagal |

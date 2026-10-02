@@ -15,13 +15,13 @@ Produk yang dibangun adalah **Portfolio OS Template**: sistem portfolio multi-cl
 - Biaya operasional harus bisa dikontrol, Firebase dieliminasi karena potensi biaya yang tak terduga.
 
 ## Target User
-- **Client**: Self-service. Client bisa login, mengedit profil/site, membuat/mengedit/menghapus project sendiri dalam batas quota, upload/ganti media, reorder project, dan publish/draft project miliknya. Fitur opsional (custom domain, AI, analytics, testimonial manager) mengikuti flag `FEATURE_*`.
+- **Client (pembeli)**: Self-service lewat panel `/admin` (login `/admin/login`, dashboard `/admin/client-dashboard`). Bisa mengedit profil/site, membuat/mengedit/menghapus project sendiri dalam batas quota, upload/ganti media, reorder project, dan publish/draft project miliknya. Fitur opsional (custom domain, AI, analytics, testimonial manager) mengikuti flag `FEATURE_*`. Tidak ada login per-site dan tidak ada reset password self-service.
 - **Admin Master**: Mengelola banyak `site_id`, membuat site client, mengatur status site dan quota/feature flags, suspend/activate, reset akses, melihat usage storage, override data jika client minta bantuan, dan audit.
 - **Visitor**: Melihat desktop portfolio dengan project detail & narasi.
 
 ## MVP Definition (Minimum Viable Product)
 - 1 Dashboard Master -> Membuat 1 site client dan menentukan status serta quota-nya.
-- 1 Dashboard Client -> Client bisa self-service edit profil/site dan CRUD project sesuai quota.
+- 1 Dashboard Client -> pembeli self-service edit profil/site dan CRUD project sesuai quota lewat `/admin/client-dashboard`.
 - Upload media ke Cloudflare R2.
 - Membuat 2 project (draft -> publish).
 - Template OS menampilkan site + project dari public API berdasarkan `siteSlug`.

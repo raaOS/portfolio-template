@@ -35,7 +35,7 @@ Expected:
 
 - `release:audit` passes all checks.
 - `site-scope:audit` confirms tenant content routes/helpers are scoped.
-- `cf:readiness` shows all checks passed, including client password reset email delivery config.
+- `cf:readiness` shows all checks passed, including notification provider config for order and activation emails.
 - `cf:build` exits `0` without actionable warning/error output.
 - `wrangler.jsonc` keeps `minify: true` so the Worker stays below the Cloudflare Free 3 MiB limit.
 
@@ -52,7 +52,7 @@ Check:
 ```text
 http://localhost:8788/api/health
 http://localhost:8788/
-http://localhost:8788/client/login
+http://localhost:8788/admin/login
 http://localhost:8788/api/public/sites/demo-designer/projects
 ```
 

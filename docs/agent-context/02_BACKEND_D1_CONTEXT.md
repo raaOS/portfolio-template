@@ -8,7 +8,7 @@
 
 ## Skema Inti D1
 1. **sites:** `id`, `slug`, `name`, `status`.
-2. **client_access:** `id`, `site_id`, `email`, `password_hash`, `status`, `last_login_at`.
+2. **client_access:** `id`, `site_id`, `email`, `password_hash`, `status`, `last_login_at` — **tabel warisan** dari sistem login client yang dihapus; tidak ada kode yang membacanya lagi.
 3. **site_quota_overrides:** `id`, `site_id`, `project_limit`, `storage_mb`, `media_per_project`.
 4. **projects:** `id`, `site_id`, `slug`, `title`, `cover_media_id`, `status` (draft/published), `order_index`.
 5. **project_narratives:** `id`, `project_id`, `site_id`, `challenge`, `solution`, `impact`.

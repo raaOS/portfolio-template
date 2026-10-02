@@ -64,6 +64,8 @@ function parseArgs(argv) {
     emailDomain: process.env.LOAD_TEST_EMAIL_DOMAIN || 'example.invalid',
     adminToken: process.env.LOAD_TEST_ADMIN_TOKEN || '',
     adminPassword: process.env.LOAD_TEST_ADMIN_PASSWORD || '',
+    siteUserEmail: process.env.LOAD_TEST_SITE_USER_EMAIL || '',
+    siteUserPassword: process.env.LOAD_TEST_SITE_USER_PASSWORD || '',
     timeoutMs: Number(process.env.LOAD_TEST_TIMEOUT_MS || 30000),
     requestDelayMs: Number(process.env.LOAD_TEST_REQUEST_DELAY_MS || 1500),
     maxRetries: Number(process.env.LOAD_TEST_MAX_RETRIES || 3),
@@ -475,7 +477,7 @@ function buildAdminToken(options) {
   const jwtSecret = process.env.JWT_SECRET;
   if (!jwtSecret) return '';
   return sign(
-    { sub: 'admin', role: 'admin', iat: Math.floor(Date.now() / 1000) },
+    { sub: 'admin', role: 'admin', siteId: process.env.CUSTOMER_SITE_ID || 'default-site', iat: Math.floor(Date.now() / 1000) },
     jwtSecret,
     {
       expiresIn: '2h',
@@ -505,6 +507,37 @@ async function createAdminSession(baseUrl, options, metrics) {
     json: { password: options.adminPassword },
   });
   return admin;
+}
+
+/**
+ * Sesi pembeli untuk mutasi konten (project + upload).
+ *
+ * Sejak sistem login client dihapus, mutasi lewat `validateSiteMutationRequest`
+ * hanya menerima session `site_user_token` dari `POST /api/auth/login`
+ * (satu akun `site_users` per deployment). Endpoint `/api/client/*` sudah tidak ada.
+ */
+async function createSiteUserSession(baseUrl, options, metrics) {
+  const session = new Session({
+    baseUrl,
+    metrics,
+    label: 'site_user',
+    timeoutMs: options.timeoutMs,
+    maxRetries: options.maxRetries,
+  });
+  await session.refreshCsrf('/api/admin/login');
+
+  if (!options.siteUserEmail || !options.siteUserPassword) {
+    throw new Error(
+      'Live run needs LOAD_TEST_SITE_USER_EMAIL and LOAD_TEST_SITE_USER_PASSWORD (panel account from /setup or reset-customer-password.ts).'
+    );
+  }
+
+  await session.request('POST', '/api/auth/login', {
+    name: 'site_user.login',
+    expectedStatuses: [200],
+    json: { email: options.siteUserEmail, password: options.siteUserPassword },
+  });
+  return session;
 }
 
 function makeImagePayload(kb) {
@@ -574,7 +607,7 @@ async function uploadImage(session, tenant, siteId, endpoint, filename, name, op
 
 async function uploadVideo(session, tenant, siteId, options, metrics) {
   const videoBytes = Math.max(1, Math.floor(options.videoSizeMb * 1024 * 1024));
-  const presign = await session.request('POST', `/api/client/sites/${siteId}/project-video/presign`, {
+  const presign = await session.request('POST', `/api/admin/sites/${siteId}/project-video/presign`, {
     tenant: tenant.slug,
     name: 'video.presign',
     json: {
@@ -623,7 +656,7 @@ async function uploadVideo(session, tenant, siteId, options, metrics) {
   return presign.data;
 }
 
-async function tenantFlow(tenant, admin, options, metrics) {
+async function tenantFlow(tenant, admin, siteUser, options, metrics) {
   const result = {
     tenant: tenant.slug,
     siteId: null,
@@ -632,10 +665,11 @@ async function tenantFlow(tenant, admin, options, metrics) {
     skipped: [],
     error: null,
   };
-  const client = new Session({
+  // Sesi anonim khusus untuk request public (tanpa cookie login).
+  const visitor = new Session({
     baseUrl: admin.baseUrl,
     metrics,
-    label: `client.${tenant.slug}`,
+    label: `visitor.${tenant.slug}`,
     timeoutMs: options.timeoutMs,
     maxRetries: options.maxRetries,
   });
@@ -671,45 +705,19 @@ async function tenantFlow(tenant, admin, options, metrics) {
     result.siteId = site.id;
 
     await requestDelay(delay);
-    await admin.request('POST', `/api/admin/sites/${site.id}/client-access`, {
-      tenant: tenant.slug,
-      name: 'client_access.save',
-      expectedStatuses: [200],
-      json: {
-        email: tenant.email,
-        password: tenant.password,
-        status: 'active',
-      },
-    });
-
-    await requestDelay(delay);
-    await client.refreshCsrf('/api/client/login');
-    await requestDelay(delay);
-    await client.request('POST', '/api/client/login', {
-      tenant: tenant.slug,
-      name: 'client.login',
-      expectedStatuses: [200],
-      json: {
-        siteSlug: tenant.slug,
-        email: tenant.email,
-        password: tenant.password,
-      },
-    });
-
-    await requestDelay(delay);
-    await client.request('GET', `/${tenant.slug}`, {
+    await visitor.request('GET', `/${tenant.slug}`, {
       tenant: tenant.slug,
       name: 'public.visit',
       expectedStatuses: [200, 307, 308],
     });
     await requestDelay(delay);
-    await client.request('GET', `/api/public/sites/${tenant.slug}`, {
+    await visitor.request('GET', `/api/public/sites/${tenant.slug}`, {
       tenant: tenant.slug,
       name: 'public.site',
       expectedStatuses: [200],
     });
     await requestDelay(delay);
-    await client.request('GET', `/api/public/sites/${tenant.slug}/projects`, {
+    await visitor.request('GET', `/api/public/sites/${tenant.slug}/projects`, {
       tenant: tenant.slug,
       name: 'public.projects',
       expectedStatuses: [200],
@@ -720,10 +728,10 @@ async function tenantFlow(tenant, admin, options, metrics) {
     if (!options.skipMedia) {
       await requestDelay(delay);
       const cover = await uploadImage(
-        client,
+        siteUser,
         tenant,
         site.id,
-        `/api/client/sites/${site.id}/project-cover`,
+        `/api/admin/sites/${site.id}/project-cover`,
         `${tenant.slug}-cover.png`,
         'cover.upload',
         options,
@@ -731,17 +739,17 @@ async function tenantFlow(tenant, admin, options, metrics) {
       );
       await requestDelay(delay);
       const gallery = await uploadImage(
-        client,
+        siteUser,
         tenant,
         site.id,
-        `/api/client/sites/${site.id}/project-media`,
+        `/api/admin/sites/${site.id}/project-media`,
         `${tenant.slug}-gallery.png`,
         'gallery.upload',
         options,
         metrics
       );
       await requestDelay(delay);
-      const video = await uploadVideo(client, tenant, site.id, options, metrics);
+      const video = await uploadVideo(siteUser, tenant, site.id, options, metrics);
       coverUrl = cover.publicUrl;
       galleryItems.push({
         kind: 'image',
@@ -761,7 +769,7 @@ async function tenantFlow(tenant, admin, options, metrics) {
     }
 
     await requestDelay(delay);
-    const draftProject = await client.request('POST', '/api/projects', {
+    const draftProject = await siteUser.request('POST', '/api/projects', {
       tenant: tenant.slug,
       name: 'project.create_draft',
       expectedStatuses: [201],
@@ -779,7 +787,7 @@ async function tenantFlow(tenant, admin, options, metrics) {
     result.projectId = project.id;
 
     await requestDelay(delay);
-    await client.request('PUT', `/api/projects/${project.id}`, {
+    await siteUser.request('PUT', `/api/projects/${project.id}`, {
       tenant: tenant.slug,
       name: 'project.publish',
       expectedStatuses: [200],
@@ -796,100 +804,30 @@ async function tenantFlow(tenant, admin, options, metrics) {
     });
 
     result.ok = true;
-    result.client = client;
+    result.client = visitor;
     return result;
   } catch (error) {
     result.error = error instanceof Error ? error.message : String(error);
-    result.client = client;
+    result.client = visitor;
     return result;
   }
 }
 
-async function runIsolationChecks(results, options, metrics) {
-  const passed = [];
-  const failed = [];
-  const usable = results.filter((r) => r.ok && r.siteId && r.client);
-  if (usable.length < 2) {
-    return { skipped: true, passed, failed, reason: 'Need at least two successful tenants.' };
-  }
-
-  const delay = options.requestDelayMs;
-  const [a, b] = usable;
-  try {
-    await requestDelay(delay);
-    await a.client.request('POST', '/api/projects', {
-      tenant: a.tenant,
-      name: 'isolation.cross_site_mutation',
-      expectedStatuses: [401, 403],
-      json: projectPayload({
-        tenant: { index: 999, slug: a.tenant },
-        siteId: b.siteId,
-        coverUrl: 'https://example.invalid/isolation.png',
-        galleryItems: [],
-        status: 'draft',
-        suffix: 'Forbidden',
-      }),
-    });
-    passed.push('cross_site_mutation_rejected');
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    const is503 = /\b(503|502|504|429)\b/.test(msg);
-    failed.push({
-      check: 'cross_site_mutation_rejected',
-      error: msg,
-      infrastructure: is503,
-    });
-  }
-
-  try {
-    await requestDelay(delay);
-    const draft = await b.client.request('POST', '/api/projects', {
-      tenant: b.tenant,
-      name: 'isolation.seed_draft',
-      expectedStatuses: [201],
-      json: projectPayload({
-        tenant: { index: 998, slug: b.tenant },
-        siteId: b.siteId,
-        coverUrl: 'https://example.invalid/isolation-draft.png',
-        galleryItems: [],
-        status: 'draft',
-        suffix: 'Isolation Draft',
-      }),
-    });
-    const draftId = draft.data?.data?.id;
-    await requestDelay(delay);
-    const read = await a.client.request('GET', `/api/projects?siteId=${encodeURIComponent(b.siteId)}&status=draft`, {
-      tenant: a.tenant,
-      name: 'isolation.cross_site_draft_read',
-      expectedStatuses: [200],
-    });
-    const projects = read.data?.data?.projects || [];
-    const leaked = projects.some((project) => project.id === draftId);
-    if (leaked) {
-      failed.push({ check: 'cross_site_draft_read_blocked', error: 'Draft project leaked.', infrastructure: false });
-      metrics.record({
-        tenant: a.tenant,
-        name: 'isolation.cross_site_draft_leak',
-        method: 'GET',
-        path: '/api/projects?siteId=<other>&status=draft',
-        status: 200,
-        ok: false,
-        durationMs: 0,
-      });
-    } else {
-      passed.push('cross_site_draft_read_blocked');
-    }
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    const is503 = /\b(503|502|504|429)\b/.test(msg);
-    failed.push({
-      check: 'cross_site_draft_read_blocked',
-      error: msg,
-      infrastructure: is503,
-    });
-  }
-
-  return { skipped: false, passed, failed };
+async function runIsolationChecks() {
+  // Check isolation lintas-tenant sengaja di-retire (v1.3.16).
+  // Dulu check ini memakai dua sesi login client yang berbeda (satu per tenant)
+  // untuk membuktikan site A tidak bisa menulis/membaca site B. Sistem login
+  // client dihapus (v1.3.14) dan sekarang hanya ada satu akun panel per
+  // deployment, jadi tidak ada lagi sesi per tenant untuk dibandingkan;
+  // check-nya justru akan selalu lolos secara palsu.
+  // Kalau kelak ada isolation test baru, bangun di atas session site_user yang
+  // benar-benar berbeda per tenant, bukan dari sesi yang sama.
+  return {
+    skipped: true,
+    passed: [],
+    failed: [],
+    reason: "Per-tenant client sessions no longer exist; the client login system was removed.",
+  };
 }
 
 async function cleanupSites(admin, results, options, metrics) {
@@ -1078,10 +1016,11 @@ async function main() {
     });
   } else {
     const admin = await createAdminSession(baseUrl, options, metrics);
+    const siteUser = await createSiteUserSession(baseUrl, options, metrics);
     tenantResults = await runPool(tenants, options.concurrency, (tenant) =>
-      tenantFlow(tenant, admin, options, metrics)
+      tenantFlow(tenant, admin, siteUser, options, metrics)
     );
-    isolation = await runIsolationChecks(tenantResults, options, metrics);
+    isolation = await runIsolationChecks();
     if (options.cleanupAfter) cleanup = await cleanupSites(admin, tenantResults, options, metrics);
   }
 

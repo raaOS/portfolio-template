@@ -60,7 +60,9 @@ const requiredEnvKeys = [
 ];
 
 const forbiddenEnvPatterns = [
-  /^TELEGRAM_/,
+  // Catatan: TELEGRAM_* sengaja TIDAK dilarang. Bot notifikasi order adalah
+  // fitur produk opsional (lihat blok "Telegram Billing Admin Bot" di
+  // .env.example), bukan sisa automasi pribadi.
   /^FIREBASE_/,
   /^NEXT_PUBLIC_FIREBASE_/,
   /^VERCEL_/,

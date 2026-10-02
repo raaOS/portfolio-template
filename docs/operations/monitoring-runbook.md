@@ -106,11 +106,9 @@ Runtime sekarang menulis log JSON dengan `type=portfolio_os_operational_event`.
 Event yang dicakup:
 
 - `admin.login`
-- `client.login`
 - `site.create`
 - `site.update`
 - `site.delete`
-- `client_access.save`
 - `project.create`
 - `project.update`
 - `project.publish`

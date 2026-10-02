@@ -18,11 +18,11 @@ Harga dasar tersimpan di satu tempat: `BASE_PRICE` di `src/constants/pricing.ts`
 
 Semua pembeli mendapat paket yang sama:
 
-- Dashboard client self-service.
+- Dashboard kelola konten sendiri lewat `/admin/login`.
 - CRUD project.
 - Upload cover dan gallery sesuai quota.
 - Preview/public site dengan slug sendiri.
-- Reset password client self-service via email.
+- Reset password dibantu owner (tanpa self-service).
 - Quota default dari env:
   - `PROJECT_LIMIT`
   - `STORAGE_MB`
@@ -49,7 +49,7 @@ Aturan:
 
 Baseline paling praktis untuk awal:
 
-- Pembayaran manual (QRIS/transfer) lewat halaman order.
+- Pembayaran manual invoice (QRIS/transfer) lewat halaman order; tidak ada payment gateway otomatis.
 - Status order: `pending_payment` -> `waiting_verification` -> `activated` (atau `expired`/`canceled`).
 - Order yang tidak dibayar dalam 24 jam kedaluwarsa otomatis dan nominal dilepas.
 - Site bisa di-suspend oleh admin jika ada masalah pembayaran.
@@ -58,7 +58,7 @@ Baseline paling praktis untuk awal:
 
 ## Suggested Sales Copy
 
-Portfolio OS adalah template portfolio interaktif berbasis Cloudflare. Client bisa login, mengelola project sendiri, mengunggah media, melihat quota, dan membuka public site dengan slug masing-masing.
+Portfolio OS adalah template portfolio interaktif berbasis Cloudflare. Pembeli login ke panel `/admin` untuk mengelola project sendiri, mengunggah media, melihat quota, dan membuka public site dengan slug masing-masing.
 
 Cocok untuk portfolio kecil maupun client yang butuh quota lebih besar lewat add-on.
 
@@ -77,7 +77,7 @@ Cocok untuk portfolio kecil maupun client yang butuh quota lebih besar lewat add
 - Tentukan harga jual, harga setup, dan harga add-on quota.
 - Tentukan apakah domain custom termasuk harga atau add-on.
 - Tentukan SLA support.
-- Pastikan provider email reset password sudah aktif.
+- Pastikan jalur reset password owner-assisted (`scripts/cloudflare/reset-customer-password.ts`) dicoba sekali.
 - Siapkan demo site bersih.
 - Siapkan template invoice/manual payment.
 - Jelaskan bahwa client mengelola konten lewat dashboard, bukan lewat akses Cloudflare.

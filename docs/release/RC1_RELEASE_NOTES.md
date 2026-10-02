@@ -49,7 +49,7 @@ Latest validation from Sprint 22:
 - Production deploy through `docs/release/PRODUCTION_DEPLOY_RUNBOOK.md` is complete for the Workers URL above.
 - Automated production smoke is complete for `demo-designer`.
 - Validate Master admin login manually.
-- Validate client login manually.
+- Validate panel login manually (`/admin/login` as the buyer).
 - Validate real upload against production R2.
 - Confirm custom domain if used.
 - Record final release details in the release record template.

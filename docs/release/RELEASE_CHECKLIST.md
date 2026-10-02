@@ -57,7 +57,7 @@ npm run cf:build
 Recommended targeted regression:
 
 ```bash
-npx vitest run "src/app/api/admin/sites/route.test.ts" "src/app/api/admin/sites/[siteId]/client-access/route.test.ts" "src/app/api/admin/sites/[siteId]/project-cover/route.test.ts" "src/app/api/admin/sites/[siteId]/project-media/route.test.ts" "src/app/api/admin/sites/[siteId]/project-video/presign/route.test.ts" "src/app/api/r2/[...key]/route.test.ts" "src/lib/product/siteStorageUsage.test.ts" "src/lib/services/project/projectStorage.test.ts" "src/lib/services/project/projectSqlService.test.ts"
+npx vitest run "src/app/api/admin/sites/route.test.ts" "src/app/api/admin/sites/[siteId]/project-cover/route.test.ts" "src/app/api/admin/sites/[siteId]/project-media/route.test.ts" "src/app/api/admin/sites/[siteId]/project-video/presign/route.test.ts" "src/app/api/r2/[...key]/route.test.ts" "src/lib/product/siteStorageUsage.test.ts" "src/lib/services/project/projectStorage.test.ts" "src/lib/services/project/projectSqlService.test.ts"
 ```
 
 ## Worker Smoke Test
@@ -73,7 +73,7 @@ Check:
 
 - [ ] `GET /api/health` -> 200.
 - [ ] `GET /` -> 200.
-- [ ] `GET /client/login` -> 200.
+- [ ] `GET /admin/login` -> 200.
 - [ ] `GET /api/public/sites/demo-designer/projects` -> 200.
 
 Stop `wrangler dev` after testing.
@@ -103,9 +103,9 @@ After deploy:
 - [ ] Master admin login works.
 - [ ] Master can create/update/suspend/delete a site.
 - [ ] Master can set site status and quota override.
-- [ ] Client login works.
-- [ ] Client password reset email is delivered and reset token can set a new password.
-- [ ] Client can create/edit projects within quota.
+- [ ] Panel login works (`/admin/login` with the buyer's email + password).
+- [ ] Owner-assisted password reset works (`npx tsx scripts/cloudflare/reset-customer-password.ts`).
+- [ ] Buyer can create/edit projects within quota via `/admin/client-dashboard`.
 - [ ] Cover/gallery/video upload works.
 - [ ] R2 media keys are under `sites/{siteId}/...`.
 - [ ] Browser video compression loads FFmpeg from `/r2/ffmpeg`.
@@ -130,8 +130,8 @@ Give the buyer:
 - Repository or archive.
 - Cloudflare setup instructions.
 - Their generated admin password or reset process.
-- Their client login URL pattern: `https://domain.com/[siteSlug]/login`.
-- Their client password reset process.
+- Their panel login URL: `https://domain.com/admin/login` (there is no per-site login page).
+- Their password reset process (owner-assisted; no self-service reset).
 - Their Cloudflare resource naming convention.
 - The final production URL.
 - A reminder to rotate all generated secrets after ownership transfer.

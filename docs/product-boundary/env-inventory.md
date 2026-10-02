@@ -68,6 +68,8 @@ These are platform-owned product integrations, not personal portfolio integratio
 - `LOAD_TEST_TIMEOUT_MS` (optional load-test request timeout)
 - `LOAD_TEST_ADMIN_TOKEN` (optional admin bearer token for load-test tooling; do not log value)
 - `LOAD_TEST_ADMIN_PASSWORD` (optional admin password for load-test tooling; do not log value)
+- `LOAD_TEST_SITE_USER_EMAIL` (panel account email used by live load-test project/media mutations; do not log value)
+- `LOAD_TEST_SITE_USER_PASSWORD` (panel account password for the same session; do not log value)
 
 ## Removed Personal Defaults
 

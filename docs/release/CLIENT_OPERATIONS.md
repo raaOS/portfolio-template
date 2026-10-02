@@ -8,25 +8,21 @@ Untuk site dengan slug `urgent`:
 
 - Public site: `https://domain-kamu.com/urgent`
 - Public projects: `https://domain-kamu.com/urgent/projects`
-- Login client: `https://domain-kamu.com/urgent/login`
-- Dashboard client: `https://domain-kamu.com/client/dashboard`
+- Panel kelola konten: `https://domain-kamu.com/admin/login`
 
-Alias `/urgent/login` mengisi site slug otomatis lalu mengarah ke login client.
+Tidak ada halaman login per-site. Semua pembeli masuk lewat `/admin/login`
+(setup awal lewat `/setup` membuat email + password admin).
 
 ## Membuat Client Baru
 
-Di Master Dashboard:
-
-1. Buat `Client/Site Baru`.
-2. Isi site name dan public slug.
-3. Buat client access:
-   - email client
-   - password awal
-   - status `active`
-4. Kirim ke client:
-   - link login `/[siteSlug]/login`
-   - email akses
-   - password awal
+1. Order masuk lewat `/checkout` -> diverifikasi -> diaktifkan (site dibuat,
+   link website dikirim via email). Site juga bisa dibuat langsung dari panel admin.
+2. Pembeli membuka `/setup` sekali untuk membuat email + password panel.
+3. Kirim ke pembeli:
+   - link public site
+   - link panel `/admin/login`
+   - pengingat: kalau lupa password, minta owner reset
+     (`npx tsx scripts/cloudflare/reset-customer-password.ts`)
 
 ## Notifikasi Email ke Pembeli
 
@@ -44,7 +40,7 @@ Tanpa keempat nilai tersebut, pembeli tidak menerima email sama sekali.
 
 ## Flow Project Client
 
-Client bisa:
+Pembeli mengelola project sendiri lewat panel `/admin` (menu Content & Berkas):
 
 - membuat project baru;
 - mengedit title, slug, status, dan metadata;
@@ -53,7 +49,7 @@ Client bisa:
 - publish/unpublish project;
 - melihat preview public site setelah ada project published.
 
-Semua client self-service. Beda kapasitas hanya pada quota site masing-masing.
+Semua self-service lewat panel. Beda kapasitas hanya pada quota site masing-masing.
 
 ## Preview Site
 
@@ -73,10 +69,10 @@ Saat client melapor error:
 - cek site status (`active` atau `suspended`);
 - cek status site (active/suspended);
 - cek quota project/storage/media;
-- cek apakah client login dengan slug yang benar;
+- cek apakah pembeli masuk lewat `/admin/login` dengan email yang benar;
 - cek apakah media berada di prefix `sites/{siteId}/...`;
 - cek quota override site jika fitur tidak muncul;
-- cek provider email jika reset password tidak sampai.
+- reset password dari komputermu kalau pembeli lupa (tanpa self-service).
 
 ## Boundary
 

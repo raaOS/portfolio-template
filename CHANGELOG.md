@@ -3,6 +3,17 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.17] - 2026-10-03
+
+### 🧹 Dokumen & Audit Rilis: Sisa "Login Klien" Dihapus, Audit Rilis Kini Hijau
+
+- **Dokumen tidak lagi menjanjikan pintu yang sudah tidak ada.** Setelah sistem login klien dihapus, masih ada **15 dokumen** yang mengarahkan pembeli ke `/{slug}/login`, `/client/login`, `/client/dashboard`, membuat "client access", atau menjanjikan "reset password lewat email" — semuanya pintu yang sudah roboh (cek di kode: `src/app/api/client/` nol file). Semua diganti dengan kenyataannya: pembeli cuma punya satu pintu, **`/admin/login`** (dashboard kelola di `/admin/client-dashboard`), dan **reset password selalu dibantu owner** lewat `scripts/cloudflare/reset-customer-password.ts`. Dokumen yang tersentuh: panduan serah-terima pembeli, checklist rilis, checklist onboarding, panduan support, runbook backup/monitoring, PRD, kontrak endpoint, dan daftar env.
+- **Uji beban (`npm run load:multi-buyer`) akhirnya bisa jalan lagi.** Skrip itu ternyata memanggil 4 alamat yang sudah tidak ada, jadi sejak v1.3.14 uji beban mustahil jalan sampai titik itu. Diperbaiki ke jalur yang benar-benar ada (login panel + endpoint upload admin), plus satu bug nyata: token admin buatan skrip tidak membawa penanda `siteId` sehingga sejak audit keamanan 29 Sep token itu selalu ditolak. **Check "site A tidak bisa mengakses site B" sengaja dimatikan dan diberi alasan di kode** — check itu dulu butuh satu login per tenant, sedangkan sekarang hanya ada satu akun panel, jadi kalau dipertahankan ia akan selalu "lulus" palsu.
+- **Audit rilis kini hijau penuh: `npm run release:audit` 60/62 (gagal) → 62/62 (lolos).** Dua penyebabnya: (a) aturan lama melarang semua env berawalan `TELEGRAM_`, padahal bot Telegram itu kini **fitur produk** untuk notifikasi order & tiket bengkel — aturannya dilonggarkan, larangan Firebase/Vercel/job-bot pribadi tetap; (b) dokumen diwajibkan menyebut `manual invoice` tapi `SALES_PRICING.md` tidak pernah menulisnya — kalimatnya diluruskan jadi *"Pembayaran manual invoice (QRIS/transfer) lewat halaman order; tidak ada payment gateway otomatis."*
+- **Gate tetap hijau:** TypeScript 0 error, ESLint 0, **881 test lolos**, `release:sale-readiness` 13/13, uji beban mode kering (dry-run) exit 0.
+- **Yang BELUM (sengaja ditahan):** merge ke `main` dan deploy — repo utama sedang dikerjakan AI lain (10 file berubah + 3 file baru belum di-commit, termasuk `CHANGELOG.md`), jadi merge/deploy sekarang bisa mengcampur atau mengirim pekerjaan setengah jadi. Urutan tetap: AI lain selesai → merge → `pre-deploy` → `cf:deploy` → **baru** `npx tsx scripts/cloudflare/remove-plan-columns.ts --apply`.
+- **Butuh keputusanmu satu hal:** tabel lama `client_access` (berisi 4 baris email + password pembeli, **tidak dibaca kode mana pun**) adalah sisa sistem login klien yang sama, tapi belum ikut masuk daftar hapus karena menghapusnya = membuang daftar email pembeli selamanya. Mau ikut dihapus saat pembersihan database, atau disimpan?
+
 ## [1.3.16] - 2026-10-03
 
 ### 🔧 Tiket Kerja Otomatis: dari Kasir ke Bengkel + Pembersihan Sisa Fitur Lama
