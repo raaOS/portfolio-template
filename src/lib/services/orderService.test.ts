@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   createOrder,
   uploadPaymentProof,
@@ -381,6 +381,100 @@ describe('orderService', () => {
       const deleteSql = deleteCalls.map(([sql]) => String(sql));
       expect(deleteSql.some((sql) => sql.includes('DELETE FROM sites WHERE id = ?'))).toBe(true);
       expect(deleteSql.some((sql) => sql.includes('DELETE FROM site_subscriptions WHERE id = ?'))).toBe(true);
+    });
+  });
+
+  describe('activateOrder (email serah-terima)', () => {
+    const savedEmailEnv: Record<string, string | undefined> = {
+      NOTIFICATION_PROVIDER: process.env.NOTIFICATION_PROVIDER,
+      NOTIFICATION_API_KEY: process.env.NOTIFICATION_API_KEY,
+      NOTIFICATION_DEFAULT_FROM: process.env.NOTIFICATION_DEFAULT_FROM,
+    };
+
+    function enableResend(): void {
+      process.env.NOTIFICATION_PROVIDER = 'resend';
+      process.env.NOTIFICATION_API_KEY = 're_test_key';
+      process.env.NOTIFICATION_DEFAULT_FROM = 'halo@example.com';
+    }
+
+    function mockSuccessfulActivation(): void {
+      const order = {
+        id: 'ORD-123',
+        desired_slug: 'nanda-design',
+        buyer_name: 'Nanda',
+        buyer_email: 'newbuyer@test.com',
+        buyer_whatsapp: '628123456789',
+        plan: 'pro',
+        amount: 1500000,
+        payment_proof_url: 'https://proof.png',
+        status: 'waiting_verification',
+      };
+
+      vi.mocked(cloudflareD1.queryD1)
+        .mockResolvedValueOnce([order]) // lock order with UPDATE RETURNING
+        .mockResolvedValueOnce([]) // insert sites
+        .mockResolvedValueOnce([]) // insert site_subscriptions
+        .mockResolvedValueOnce([]) // update order activated
+        .mockResolvedValueOnce([]); // insert audit_log
+    }
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      for (const [key, value] of Object.entries(savedEmailEnv)) {
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
+    });
+
+    it('sends a handoff email containing the live site URL after activation', async () => {
+      enableResend();
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+      vi.stubGlobal('fetch', fetchMock);
+      mockSuccessfulActivation();
+
+      const res = await activateOrder('ORD-123');
+
+      expect(res.success).toBe(true);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe('https://api.resend.com/emails');
+
+      const payload = JSON.parse(String(init.body));
+      expect(payload.to).toBe('newbuyer@test.com');
+      expect(payload.subject).toContain('Sudah Aktif');
+      expect(payload.text).toMatch(/https?:\/\/\S+\/nanda-design/);
+      expect(payload.text).toContain('ORD-123');
+      expect(payload.text).toContain('Rp 1.500.000');
+      expect(payload.html).toContain('/nanda-design');
+      expect(payload.html).toContain('Buka Website Anda');
+    });
+
+    it('still reports activation as successful when the email provider fails', async () => {
+      enableResend();
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('resend down')));
+      mockSuccessfulActivation();
+
+      const res = await activateOrder('ORD-123');
+
+      expect(res.success).toBe(true);
+      expect(res.message).toContain('Berhasil mengaktifkan');
+      expect(res.siteId).toBeDefined();
+    });
+
+    it('does not call the provider when notifications are not configured', async () => {
+      delete process.env.NOTIFICATION_PROVIDER;
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+      vi.stubGlobal('fetch', fetchMock);
+      mockSuccessfulActivation();
+
+      const res = await activateOrder('ORD-123');
+
+      expect(res.success).toBe(true);
+      expect(fetchMock).not.toHaveBeenCalled();
     });
   });
 

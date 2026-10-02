@@ -3,6 +3,18 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.13] - 2026-10-02
+
+### ✉️ Pembeli Kini Langsung Dapat Email "Website Anda Sudah Aktif" Setelah Order Diaktifkan
+
+- **Masalahnya (ditemukan setelah audit keamanan selesai):** sebelumnya pembeli hanya menerima dua email — email struk saat **membuat pesanan**, dan email saat pesanan **kedaluwarsa**. Momen yang paling ditunggu, yaitu saat website-nya **sudah jadi dan bisa dibuka**, justru tidak pernah memberi kabar ke pembeli. Link website-nya hanya muncul sebagai pesan singkat di panel Telegram pemilik.
+- **Perbaikannya:** begitu pesanan diaktifkan (lewat tombol Telegram maupun panel admin), sistem otomatis mengirim email berisi **alamat website yang sudah hidup**, ringkasan pesanan (nomor order, paket, alamat, total bayar), langkah berikutnya, serta petunjuk cek status pesanan.
+- **Yang sengaja tidak dimasukkan:** tautan `/{slug}/login` tidak dicantumkan karena rute itu mengarah ke halaman yang sudah tidak ada (404), dan tautan `/admin` tidak dicantumkan karena panel tersebut milik pemilik situs, bukan milik pembeli — menyesatkan kalau dikirim ke pembeli.
+- **Pembeli tidak perlu khawatir email terkirim ganda:** kalau pesanan sudah pernah diaktifkan, email tidak dikirim ulang.
+- **Bukti pengujian:** 3 test otomatis baru — email benar-benar terkirim berisi URL website, aktivasi tetap dianggap berhasil walaupun layanan email sedang gangguan, dan tidak ada panggilan sama sekali bila notifikasi belum diaktifkan.
+- **Verifikasi:** `tsc --noEmit` 0 error, `eslint` 0 error, `vitest run` **114 file / 879 test PASS**.
+- **Catatan:** pengiriman email aktif otomatis karena konfigurasi layanan email sudah terpasang di produksi; baru teruji sampai ke kotak masuk begitu versi ini di-deploy.
+
 ## [1.3.12] - 2026-09-30
 
 ### 🧾 Tombol "Lihat Resi" di Panel Admin Kembali Berhasil Menampilkan Bukti Transfer

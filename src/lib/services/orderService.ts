@@ -479,6 +479,120 @@ async function sendOrderExpiredEmail({
 }
 
 // ---------------------------------------------------------------------------
+// Activation Handoff Email
+// ---------------------------------------------------------------------------
+
+/**
+ * Email serah-terima — dikirim satu kali saat order berhasil diaktifkan.
+ *
+ * Latar (audit fitur 2026-09-30): sebelumnya pembeli hanya dihubungi saat
+ * order DIBUAT (struk) dan saat order KEDALUWARSA. Momen serah-terima —
+ * website sudah aktif dan bisa dibuka — tidak pernah memberi kabar ke
+ * pembeli, padahal itulah momen yang paling mereka tunggu.
+ *
+ * Best-effort: kegagalan email tidak boleh membatalkan aktivasi yang sudah
+ * ter-commit ke D1, jadi pemanggilan dibungkus try/catch.
+ */
+async function sendActivationEmail({
+  to,
+  orderId,
+  buyerName,
+  plan,
+  amount,
+  siteSlug,
+  siteUrl,
+}: {
+  to: string;
+  orderId: string;
+  buyerName: string;
+  plan: string;
+  amount?: number;
+  siteSlug: string;
+  siteUrl: string;
+}): Promise<boolean> {
+  if (!to || !orderId || !siteUrl) return false;
+
+  const provider = (cleanEnvVar('NOTIFICATION_PROVIDER') || '').toLowerCase();
+  if (provider !== 'resend') return false;
+
+  const apiKey = cleanEnvVar('NOTIFICATION_API_KEY');
+  const from = cleanEnvVar('NOTIFICATION_DEFAULT_FROM');
+  if (!apiKey || !from) return false;
+
+  const nameText = buyerName.trim() || 'Pelanggan';
+  const amountValue = typeof amount === 'number' && amount > 0 ? amount : null;
+  const amountText = amountValue ? `• Total Bayar: Rp ${amountValue.toLocaleString('id-ID')}` : '';
+
+  // Versi HTML memakai nilai yang sudah di-escape (nama pembeli & slug adalah
+  // input pengguna) — teks polos tetap memakai nilai mentah.
+  const nameHtml = escapeTelegramHtml(nameText);
+  const slugHtml = escapeTelegramHtml(siteSlug);
+  const urlHtml = escapeTelegramHtml(siteUrl);
+  const amountHtml = amountValue
+    ? `<tr><td style="padding:6px 0;color:#64748b">Total Bayar</td><td style="padding:6px 0;text-align:right;font-weight:800;font-size:16px;color:#1e40af">Rp ${amountValue.toLocaleString('id-ID')}</td></tr>`
+    : '';
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from,
+        to,
+        subject: `🎉 Website Anda Sudah Aktif — Portfolio OS ${plan.toUpperCase()}`,
+        text: [
+          `Halo ${nameText},`,
+          '',
+          'Selamat! Website portofolio Anda sudah aktif dan bisa diakses siapa saja:',
+          siteUrl,
+          '',
+          'Ringkasan serah terima:',
+          `• Order ID: ${orderId}`,
+          `• Paket: ${plan.toUpperCase()}`,
+          `• Alamat: /${siteSlug}`,
+          amountText,
+          '',
+          'Langkah berikutnya:',
+          '1. Buka link di atas untuk melihat website Anda.',
+          '2. Butuh penyesuaian konten (judul, daftar proyek, foto, kontak)? Balas email ini atau hubungi kami — kami siap membantu.',
+          '3. Untuk cek status pesanan, gunakan link halaman pesanan dari email struk yang kami kirim sebelumnya.',
+          '',
+          'Simpan email ini sebagai bukti serah terima.',
+          '',
+          '— Portfolio OS',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+        html: [
+          `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">`,
+          `<h2 style="margin:0 0 4px">🎉 Website Anda Sudah Aktif</h2>`,
+          `<p style="color:#64748b;font-size:13px;margin:0 0 20px">Portfolio OS • ${escapeTelegramHtml(plan.toUpperCase())} Plan</p>`,
+          `<p style="font-size:13px;color:#334155">Halo <strong>${nameHtml}</strong>, website portofolio Anda sudah aktif dan bisa diakses siapa saja.</p>`,
+          `<table style="width:100%;font-size:13px;border-collapse:collapse">`,
+          `<tr><td style="padding:6px 0;color:#64748b">Order ID</td><td style="padding:6px 0;text-align:right;font-weight:700;font-family:monospace">${escapeTelegramHtml(orderId)}</td></tr>`,
+          `<tr><td style="padding:6px 0;color:#64748b">Alamat</td><td style="padding:6px 0;text-align:right;font-weight:700;font-family:monospace">/${slugHtml}</td></tr>`,
+          amountHtml,
+          `</table>`,
+          `<hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0">`,
+          `<a href="${urlHtml}" style="display:inline-block;background:#1e40af;color:#fff;padding:10px 24px;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none">Buka Website Anda</a>`,
+          `<p style="font-size:13px;color:#334155;margin:16px 0 0">Butuh penyesuaian konten (judul, daftar proyek, foto, kontak)? Balas email ini atau hubungi kami — kami siap membantu.</p>`,
+          `<p style="font-size:13px;color:#334155;margin:8px 0 0">Untuk cek status pesanan, gunakan link halaman pesanan dari email struk sebelumnya.</p>`,
+          `<p style="font-size:11px;color:#94a3b8;margin:16px 0 0">Simpan email ini sebagai bukti serah terima.</p>`,
+          `</div>`,
+        ].join(''),
+      }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.error('[sendActivationEmail] Failed:', err);
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Access Token Verification
 // ---------------------------------------------------------------------------
 
@@ -975,6 +1089,22 @@ export async function activateOrder(
 
   const baseUrl = env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://makeitbetter.my.id';
   const siteUrl = `${baseUrl}/${actualSlug}`;
+
+  // Email serah-terima ke pembeli. Dibungkus try/catch: aktivasi sudah
+  // ter-commit ke D1 di atas, kegagalan email tidak boleh menggagalkannya.
+  try {
+    await sendActivationEmail({
+      to: order.buyer_email,
+      orderId,
+      buyerName: order.buyer_name,
+      plan: order.plan,
+      amount: order.amount,
+      siteSlug: actualSlug,
+      siteUrl,
+    });
+  } catch (err) {
+    console.error(`[activateOrder] Handoff email failed for order ${orderId}:`, err);
+  }
 
   const message = `Berhasil mengaktifkan pesanan ${order.id}. Site URL: ${siteUrl}`;
 
