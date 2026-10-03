@@ -24,8 +24,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Webhook not configured' }, { status: 403 });
     }
 
-    const headerSecret = request.headers.get('x-telegram-bot-api-secret-token');
-    if (headerSecret !== secret) {
+    const headerSecret = request.headers.get('x-telegram-bot-api-secret-token') || '';
+    // Timing-safe compare — cegah timing attack yang bisa membocorkan secret karakter per karakter.
+    // Panjang dibandingkan lebih dulu (length bukan rahasia); isi dibandingkan byte-per-byte tanpa short-circuit.
+    const encoder = new TextEncoder();
+    const a = encoder.encode(headerSecret);
+    const b = encoder.encode(secret);
+    if (a.length !== b.length) {
+      return NextResponse.json({ error: 'Unauthorized secret token' }, { status: 401 });
+    }
+    let diff = 0;
+    for (let i = 0; i < a.length; i++) {
+      diff |= a[i] ^ b[i];
+    }
+    if (diff !== 0) {
       return NextResponse.json({ error: 'Unauthorized secret token' }, { status: 401 });
     }
 

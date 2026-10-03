@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createOrder } from '@/lib/services/orderService';
 import { isSlugAvailable, validateSlugFormat } from '@/lib/services/slugService';
 import { enforceRequestRateLimit } from '@/lib/security/request';
+import { checkDataRateLimit } from '@/lib/dataRateLimit';
 
 /**
  * GET /api/billing/checkout?slug=xxx
@@ -40,6 +41,25 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Same-Origin guard untuk endpoint publik tanpa cookie CSRF (lihat checkCSRF
+    // di src/middleware/csrf.ts). Diulang di handler sebagai defense-in-depth:
+    // kalau middleware dilewati (mis. route di luar pipeline), request cross-origin
+    // tetap ditolak sebelum createOrder jalan.
+    const host = request.headers.get('host');
+    const origin = request.headers.get('origin');
+    if (origin && host) {
+      let sameOrigin = false;
+      try {
+        sameOrigin = new URL(origin).host === host;
+      } catch {
+        sameOrigin = false;
+      }
+      if (!sameOrigin) {
+        console.warn('[Security] Cross-origin billing checkout POST blocked.');
+        return NextResponse.json({ error: 'Cross-origin request not allowed' }, { status: 403 });
+      }
+    }
+
     const rateLimit = await enforceRequestRateLimit(request, 'billing_checkout', 10, 60_000, 300_000);
     if (!rateLimit.allowed) {
       return NextResponse.json(
@@ -53,6 +73,16 @@ export async function POST(request: NextRequest) {
 
     if (!buyerName || !buyerEmail || !buyerWhatsapp) {
       return NextResponse.json({ error: 'Data form checkout tidak lengkap' }, { status: 400 });
+    }
+
+    // Rate-limit per email — cegah spam order pakai identitas berbeda tapi inbox sama.
+    const emailNormalized = String(buyerEmail).trim().toLowerCase();
+    const emailLimit = await checkDataRateLimit(`billing_checkout_email:${emailNormalized}`, 5, 3_600_000, 86_400_000);
+    if (!emailLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Terlalu banyak pesanan dari email ini. Tunggu sebelum membuat pesanan baru.', retryAfter: emailLimit.retryAfter },
+        { status: 429 }
+      );
     }
 
     // Auto-generate slug dari nama buyer jika tidak disediakan

@@ -4,6 +4,7 @@ import { cleanEnvVar } from '@/lib/utils/env';
 import { isSlugAvailable } from './slugService';
 import { getPaymentConfig, type PaymentConfig } from './paymentConfigService';
 import { PLAN_BASE_PRICES } from '@/constants/plans';
+import { logActivity } from '@/lib/services/auditLogger';
 
 export interface OrderRecord {
   id: string;
@@ -245,7 +246,32 @@ function normalizePaymentProofUrl(proofUrl: string): string | null {
 
   try {
     const url = new URL(trimmed);
-    return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : null;
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+
+    // SSRF guard — tolak host yang menunjuk ke jaringan internal/metadata.
+    // Bukti bayar berasal dari input pembeli; tanpa guard ini attacker bisa
+    // memaksa server fetch ke localhost / RFC1918 / link-local metadata
+    // (mis. 169.254.169.254) lewat domain bukti palsu.
+    const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    if (hostname === 'localhost' || hostname.endsWith('.localhost') || hostname.endsWith('.internal')) {
+      return null;
+    }
+    if (/^127\./.test(hostname) || hostname === '::1' || hostname === '0.0.0.0') {
+      return null;
+    }
+    // IPv4 literal private/link-local/loopback ranges (RFC1918 + 169.254 + 100.64 CGNAT).
+    const ipv4 = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (ipv4) {
+      const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
+      if (a === 10 || a === 127 || a === 0 ||
+          (a === 172 && b >= 16 && b <= 31) ||
+          (a === 192 && b === 168) ||
+          (a === 169 && b === 254) ||
+          (a === 100 && b >= 64 && b <= 127)) {
+        return null;
+      }
+    }
+    return url.toString();
   } catch {
     return null;
   }
@@ -1017,6 +1043,12 @@ export async function cancelOrder(
     cancel_reason: cancelReason,
     payment_proof_url: null,
   };
+
+  await logActivity('billing.order_cancel', {
+    category: 'billing',
+    orderId,
+    reason: cancelReason,
+  });
 
   return {
     success: true,

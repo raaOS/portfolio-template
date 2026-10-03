@@ -17,6 +17,7 @@ import {
   Image as ImageIcon,
   Sparkles,
   BarChart3,
+  ScrollText,
 } from 'lucide-react';
 import type { AdminZone } from './types';
 
@@ -167,6 +168,15 @@ export const ADMIN_ZONES: AdminZone[] = [
         defaultWidth: 950,
         defaultHeight: 680,
       },
+      {
+        id: 'activityLog',
+        label: 'Log Aktivitas',
+        icon: ScrollText,
+        iconColor: 'text-slate-600',
+        iconBg: 'bg-slate-100',
+        defaultWidth: 900,
+        defaultHeight: 650,
+      },
     ],
   },
   {
@@ -237,6 +247,7 @@ export const APP_ROUTE_MAP: Record<string, string> = {
   sounds: '/admin/system/sounds',
   ai: '/admin/system/ai',
   analytics: '/admin/system/analytics',
+  activityLog: '/admin/system/activity-log',
   notifications: '/admin/communications/notifications',
   messages: '/admin/communications/messages',
   feedback: '/admin/communications/feedback',

@@ -3,6 +3,7 @@ import { queryD1 } from '@/lib/cloudflareD1';
 import { expireOrderIfStale, uploadPaymentProof, verifyOrderAccessToken } from '@/lib/services/orderService';
 import { checkAdminAuth } from '@/lib/auth';
 import { enforceRequestRateLimit } from '@/lib/security/request';
+import { logActivity } from '@/lib/services/auditLogger';
 
 /**
  * Masks PII fields for public display.
@@ -111,6 +112,12 @@ export async function POST(
     if (!result.success) {
       return NextResponse.json({ error: result.error || 'Gagal memproses bukti bayar' }, { status: 400 });
     }
+
+    await logActivity('billing.proof_upload', {
+      category: 'billing',
+      orderId,
+      actor: isAdmin ? 'admin' : 'buyer',
+    });
 
     return NextResponse.json({
       success: true,

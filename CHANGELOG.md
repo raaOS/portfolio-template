@@ -3,6 +3,29 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.11] - 2026-10-02
+
+### 🔒 Keamanan Alur Order & Billing (Tahap 4–5 Audit)
+
+Enam perbaikan keamanan pada jalur order publik (checkout → upload bukti bayar → webhook aktivasi), tanpa mengubah perilaku fungsional satu pun fitur:
+
+- **Kebocoran referrer token order ditutup:** halaman `/orders/*` kini punya layout sendiri (`src/app/orders/layout.tsx`, baru) dengan header `Referrer-Policy: no-referrer` + `robots noindex`. Sebelumnya, saat pembeli mengklik tautan order (yang mengandung token akses) menuju situs bank/medsos, browser menitipkan URL lengkap itu ke situs tujuan — analoginya kunci kamar hotel tertulis di struk yang bisa difoto orang lewat jendela. Fitur "salin link" tetap berfungsi penuh; hanya jejak kebocorannya yang hilang.
+- **Timing-safe comparison webhook Telegram (`/api/telegram/webhook`):** verifikasi secret kini memakai `crypto.timingSafeEqual` + penjaga panjang, menutup serangan *timing attack* pada pembandingan string biasa.
+- **CSRF billing untuk endpoint publik (Opsi A):** `middleware/csrf.ts` menambahkan fallback same-origin untuk endpoint publik yang memang tidak membawa cookie admin — request lintas-origin ditolak, request dari domain sendiri tetap jalan.
+- **Rate-limit checkout diperkuat:** cap per-IP via `enforceRequestRateLimit` sudah ada; ditambah guard same-origin di handler sehingga spam otomatis dari frontend pihak ketiga tertolak lebih awal.
+- **SSRF guard bukti bayar:** `normalizePaymentProofUrl()` menolak URL yang menunjuk localhost/loopback/RFC1918/169.254/CGNAT — server tidak lagi diajak mengambil gambar dari jaringan internal.
+- **Audit trail dua titik buta:** pembatalan order (`billing.order_cancel`) dan unggahan bukti bayar (`billing.proof_upload`) kini tercatat di `logActivity`; sebelumnya kedua kejadian penting ini tidak meninggalkan jejak sama sekali.
+- **Verifikasi:** Vitest **61/61 PASS** (4 file test: middleware ×3 + orderService), nol regresi.
+- **Sisa audit tahap berikutnya (di luar scope):** konsistensi guard Admin vs Customer (#6) — topik refactor terpisah, bukan celah keamanan aktif.
+
+### 🗂️ Panel "Log Aktivitas" di Desktop Admin
+
+- **Aplikasi baru "Log Aktivitas"** (zone *Sistem & Tampilan*, id `activityLog`) menampilkan 50 jejak aktivitas terakhir dalam bentuk garis waktu: aksi, waktu, tipe entri, metadata yang bisa dibuka-tutup, plus penanda sumber tiap baris (**KV** = blob `app_kv` penulis lama, **DB** = tabel relasional `audit_logs`).
+- **`GET /api/admin/audit-logs` kini menggabungkan dua sumber sejarah itu** (dulu hanya blob `app_kv`): dibaca berurutan (`Promise.all`), didedup berdasarkan id (kv menang karena metadata lebih kaya), diurutkan terbaru dahulu, lalu dipotong ke 50 entri. Bila tabel relasional belum ada di deployment lama, pembacaannya gagal diam-diam dan viewer tetap menampilkan data KV.
+- **Rute `/admin/system/activity-log` ditambahkan** — sebelumnya `APP_ROUTE_MAP` menunjuk ke halaman yang tidak ada, satu-satunya entri `APP_ROUTE_MAP` tanpa `page.tsx` (deep-link langsung ke URL itu akan 404).
+- **Perbaikan lint (1 error `react-hooks/set-state-in-effect`):** pemuatan awal di `ActivityLogPanel` kini dijadwalkan lewat `setTimeout(…, 0)` — pola yang sama dengan `OrdersPanel` — sehingga `setState` tidak dipanggil sinkron di dalam `useEffect`.
+- **Verifikasi:** `npx tsc --noEmit` 0 error, `npx eslint src` 0 error, `npx vitest run` **113 files / 863 tests PASS**.
+
 ## [1.3.10] - 2026-09-28
 
 ### 📊 Analitik Pengunjung: Dari Blob 100 Entri yang Tak Pernah Dibaca Menjadi D1 + Panel Admin

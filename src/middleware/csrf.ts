@@ -12,11 +12,61 @@ import { validateCSRFToken } from '@/lib/security/token';
 import { isAPIRoute } from './utils';
 import { CSRF_TOKEN_COOKIE, CSRF_TOKEN_HEADER } from '@/lib/security/constants';
 
+/**
+ * Endpoint publik yang TIDAK punya sesi admin/cookie CSRF (visitor fresh),
+ * tapi tetap perlu proteksi anti-CSRF lewat SAME-ORIGIN check (Origin/Referer).
+ * Ini pengganti double-submit cookie untuk form checkout & order-status publik:
+ * attacker page di domain lain tidak bisa submit fetch cross-origin ke sini
+ * tanpa header Origin yang sah. Tetap loloskan kalau header hilang (mis.
+ * curl/no-JS client) supaya tidak break integrasi lama — proteksi utama
+ * endpoint ini adalah rate-limit + token akses per-order.
+ */
+const PUBLIC_SAME_ORIGIN_PATHS = ['/api/billing/checkout', '/api/billing/orders'];
+
+function hasSameOriginHeader(request: NextRequest): boolean {
+  const host = request.headers.get('host');
+  if (!host) return true; // no host header — trust upstream routing
+  const origin = request.headers.get('origin');
+  if (origin) {
+    try {
+      return new URL(origin).host === host;
+    } catch {
+      return false;
+    }
+  }
+  const referer = request.headers.get('referer');
+  if (referer) {
+    try {
+      return new URL(referer).host === host;
+    } catch {
+      return false;
+    }
+  }
+  // Neither Origin nor Referer present — likely non-browser client; let
+  // rate-limit + token checks handle it instead of hard-blocking.
+  return true;
+}
+
 export function checkCSRF(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const mutationMethods = ['POST', 'PUT', 'DELETE', 'PATCH'];
 
   if (isAPIRoute(pathname) && mutationMethods.includes(request.method)) {
+    // Same-Origin fallback untuk endpoint billing publik (tanpa cookie CSRF).
+    if (PUBLIC_SAME_ORIGIN_PATHS.some((p) => pathname.startsWith(p))) {
+      if (!hasSameOriginHeader(request)) {
+        console.warn(`[Security] Cross-origin billing POST blocked for ${pathname}.`);
+        return {
+          isValid: false,
+          response: NextResponse.json(
+            { error: 'Cross-origin request not allowed' },
+            { status: 403 }
+          ),
+        };
+      }
+      return { isValid: true };
+    }
+
     const allowlistPaths = [
       '/api/admin/login',
       '/api/admin/logout',
@@ -34,8 +84,6 @@ export function checkCSRF(request: NextRequest) {
       '/api/comments',
       '/api/analytics',
       '/api/feedback',
-      '/api/billing/checkout',
-      '/api/billing/orders',
       '/api/telegram/webhook',
       // Webhook eksternal (GitHub push) — diproteksi HMAC signature
       // `x-hub-signature-256` di handler, bukan cookie CSRF.
