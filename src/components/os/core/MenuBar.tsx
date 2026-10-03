@@ -6,7 +6,6 @@ import { Check, ChevronDown, Search, Wifi, LogOut, Users } from 'lucide-react';
 import { useOSOverlays } from '../context/OSSystemContext';
 import { Z_LAYERS } from '../utils/zIndexLayers';
 import { useReducedMotion } from 'motion/react';
-import { Link } from 'next-view-transitions';
 import type { LottieRefCurrentProps } from 'lottie-react';
 import logoAnimationData from '../../../../public/lottie/mata.json';
 import LanguageSwitch from '@/components/shared/LanguageSwitch';
@@ -16,9 +15,6 @@ import MusicPlayerWidget from '../ui/MusicWidget';
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
 interface MenuBarProps {
-  siteId?: string;
-  siteSlug?: string;
-  loginUrl?: string;
   onSearch?: () => void;
   activeWindow?: string;
   onAbout?: () => void;
@@ -32,9 +28,6 @@ interface MenuBarProps {
 }
 
 export default function MenuBar({
-  siteId,
-  siteSlug,
-  loginUrl,
   onSearch,
   activeWindow = 'Finder',
   onAbout,
@@ -43,13 +36,9 @@ export default function MenuBar({
   onLogout,
   onToggleControlCenter,
 }: MenuBarProps) {
-  const effectiveLoginUrl =
-    loginUrl ||
-    (siteSlug && siteSlug !== 'default-site'
-      ? `/${siteSlug}/login`
-      : siteId && siteId !== 'default-site'
-      ? `/${siteId}/login`
-      : '/client/login');
+  // Ikon mata hanyalah branding/penanda identitas — tautan login klien
+  // (`/{slug}/login` -> `/client/login`) sudah dihapus karena sistem login
+  // klien itu sendiri sudah dibuang (commit 686f762) dan seluruh rutenya 404.
   const { showCalendar, setShowCalendar, showGhostCursors, toggleGhostCursors } = useOSOverlays();
   const { dictionary: t, meta } = useLanguage();
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
@@ -140,8 +129,8 @@ export default function MenuBar({
     >
       {/* Left Side */}
       <div className="flex min-w-0 flex-1 items-center gap-1 sm:gap-2 lg:gap-4">
-        <Link
-          href={effectiveLoginUrl}
+        <div
+          role="img"
           className="relative flex h-8 w-12 shrink-0 cursor-pointer items-center justify-center"
           aria-label={t.menuBar.portfolioOS}
         >
@@ -156,7 +145,7 @@ export default function MenuBar({
               aria-hidden="true"
             />
           </div>
-        </Link>
+        </div>
         <div
           className="hidden max-w-[clamp(5rem,22vw,12rem)] cursor-pointer truncate whitespace-nowrap rounded px-2 py-1 font-bold transition-colors hover:bg-black/5 sm:block"
           onClick={onAbout}

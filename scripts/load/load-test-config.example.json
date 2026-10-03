@@ -6,12 +6,10 @@
   "outDir": ".audit-reports/load",
   "runLive": false,
   "confirmHost": "makeitbetter.my.id",
-  "plan": "lite",
   "emailDomain": "example.invalid",
   "imageSizeKb": 64,
   "videoSizeMb": 1,
   "skipMedia": false,
   "skipVideoPut": false,
-  "passwordResetMode": "skip",
   "cleanupAfter": false
 }

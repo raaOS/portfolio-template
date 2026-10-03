@@ -69,7 +69,11 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isStaticAsset(pathname)) {
-    return NextResponse.next();
+    // SECURITY FIX (audit 2026-09-29): jalur aset statis (termasuk
+    // `/api/r2/*.svg` yang menyajikan unggahan) sebelumnya keluar tanpa
+    // nosniff/CSP sama sekali. Tetap lewati CSRF/auth, tapi header keamanan
+    // wajib terpasang.
+    return addSecurityHeaders(NextResponse.next());
   }
 
   if (

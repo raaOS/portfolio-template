@@ -45,6 +45,8 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
+          // SECURITY FIX (audit 2026-09-29): escape `<` cegah stored XSS
+          // via judul/deskripsi project di dalam blok JSON-LD.
           __html: JSON.stringify(
             generateStructuredData('project', {
               title: project.title,
@@ -55,7 +57,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
               year: project.year,
               slug: project.slug,
             })
-          ),
+          ).replace(/</g, '\\u003c'),
         }}
       />
       <ProjectDetailTwoColumn

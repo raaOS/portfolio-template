@@ -72,6 +72,16 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid icon path/URL structure' }, { status: 400 });
     }
 
+    // SECURITY FIX (audit 2026-09-29): path wajib berada di folder icon.
+    // Tanpa guard ini, URL dengan path storage apa pun (mis. wallpaper
+    // admin/visitor lain) bisa ikut terhapus lewat loop variant di bawah.
+    if (storagePath !== FOLDER_PATH && !storagePath.startsWith(`${FOLDER_PATH}/`)) {
+      return NextResponse.json(
+        { error: 'Only files inside the icon library folder can be deleted' },
+        { status: 400 }
+      );
+    }
+
     const dirName = storagePath.split('/').slice(0, -1).join('/'); // assets/icons-library
     const fileName = storagePath.split('/').pop() || '';
     const ext = fileName.includes('.') ? fileName.substring(fileName.lastIndexOf('.')) : '';

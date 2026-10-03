@@ -13,7 +13,6 @@ export interface SiteInfo {
   id: string;
   slug: string;
   name: string;
-  plan?: string;
   status: string;
   active_template_key?: string;
 }

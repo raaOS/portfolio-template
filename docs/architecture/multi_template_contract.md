@@ -50,7 +50,7 @@ Objek `data` membawa seluruh profil tenant:
 - **`experiences`**: Riwayat kerja dan event/penghargaan.
 - **`hardSkills`**: Daftar grup keahlian teknis dan ikon.
 - **`contact`**: Email, WhatsApp, LinkedIn.
-- **`testimonials`**: Testimoni terverifikasi (Pro only).
+- **`testimonials`**: Testimoni terverifikasi.
 - **`settings`**: Dynamic settings per template (pilihan warna, theme mode, options).
 
 ---

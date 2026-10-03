@@ -146,9 +146,9 @@ async function seedDemoData() {
   ]);
 
   await queryD1(
-    `INSERT OR IGNORE INTO sites (id, slug, name, plan, status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [siteId, 'demo-designer', 'Demo Designer', 'pro', 'active', now, now]
+    `INSERT OR IGNORE INTO sites (id, slug, name, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [siteId, 'demo-designer', 'Demo Designer', 'active', now, now]
   );
 
   await queryD1(
@@ -244,7 +244,7 @@ async function seedDemoData() {
       siteId,
       projectTwoId,
       'Show a second project so layouts can be tested with realistic lists.',
-      'Keep the data generic and plan-safe.',
+      'Keep the data generic and safe.',
       'Template buyers start from clean demo content.',
       now,
       now,

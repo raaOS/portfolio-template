@@ -17,16 +17,15 @@ export async function GET(request: NextRequest, props: { params: Promise<{ siteS
       );
     }
 
-    const quota = await getEffectiveSiteQuotaById({ siteId: site.id, plan: site.plan });
+    const quota = await getEffectiveSiteQuotaById({ siteId: site.id });
     const config = {
-      plan: site.plan,
       features: {
         clientDashboard: process.env.FEATURE_CLIENT_DASHBOARD === 'true',
         masterDashboard: process.env.FEATURE_MASTER_DASHBOARD === 'true',
-        ai: process.env.FEATURE_AI === 'true' && site.plan === 'pro',
-        notifications: process.env.FEATURE_NOTIFICATIONS === 'true' && site.plan === 'pro',
-        customDomain: process.env.FEATURE_CUSTOM_DOMAIN === 'true' && site.plan === 'pro',
-        analytics: process.env.FEATURE_ANALYTICS === 'true' && site.plan === 'pro',
+        ai: process.env.FEATURE_AI === 'true',
+        notifications: process.env.FEATURE_NOTIFICATIONS === 'true',
+        customDomain: process.env.FEATURE_CUSTOM_DOMAIN === 'true',
+        analytics: process.env.FEATURE_ANALYTICS === 'true',
       },
       quota,
     };

@@ -310,26 +310,14 @@ async function seedD1() {
   };
 
   await queryD1(
-    `INSERT INTO sites (id, slug, name, plan, status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO sites (id, slug, name, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        slug = excluded.slug,
        name = excluded.name,
-       plan = excluded.plan,
        status = excluded.status,
        updated_at = excluded.updated_at`,
-    [SITE_ID, SITE_SLUG, SITE_NAME, 'pro', 'active', now, now]
-  );
-
-  await queryD1(
-    `INSERT INTO site_subscriptions
-       (id, site_id, plan, status, current_period_end, external_customer_id, external_subscription_id, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(site_id) DO UPDATE SET
-       plan = excluded.plan,
-       status = excluded.status,
-       updated_at = excluded.updated_at`,
-    [`subscription-${SITE_ID}`, SITE_ID, 'pro', 'trialing', null, null, null, now, now]
+    [SITE_ID, SITE_SLUG, SITE_NAME, 'active', now, now]
   );
 
   await queryD1(
@@ -444,7 +432,7 @@ async function main() {
     console.log('Restore drill seed dry-run');
     console.log(`Site       : ${SITE_ID} (${SITE_SLUG})`);
     console.log(`Project    : ${PROJECT_ID} (${PROJECT_SLUG})`);
-    console.log('D1 rows    : site, subscription, client_access, project, narrative, 3 media_assets');
+    console.log('D1 rows    : site, client_access, project, narrative, 3 media_assets');
     console.log('R2 objects : cover, gallery image, video, video preview, jpg poster, webp poster');
     console.log('No writes performed. Re-run with --apply to seed.');
     return;

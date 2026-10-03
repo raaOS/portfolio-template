@@ -3,17 +3,38 @@
  * Seeds the database with initial site, admin user, and content data.
  * Only works if no admin user exists yet (first-time setup).
  */
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { seedDeployment, verifyDeployment } from '@/crud/shared/db/seed';
-import { SITE_ID } from '@/crud/shared/config';
+import { checkDataRateLimit } from '@/lib/dataRateLimit';
+import { getClientIP } from '@/lib/security/request';
 
-export async function GET() {
+// SECURITY FIX (audit 2026-09-29): /api/setup harus tetap publik (first-time
+// onboarding), tapi tanpa limit endpoint ini bisa dipakai membanjiri scrypt
+// (DoS CPU) dan mempercepat brute-force upaya seeding. Key IP-only.
+const RATE_MAX = 5;
+const RATE_WINDOW_MS = 10 * 60 * 1000;
+const RATE_BLOCK_MS = 30 * 60 * 1000;
+const GET_RATE_MAX = 30;
+
+export async function GET(request: NextRequest) {
   try {
+    const rateLimit = await checkDataRateLimit(
+      `setup_status:${getClientIP(request)}`,
+      GET_RATE_MAX,
+      RATE_WINDOW_MS,
+      RATE_BLOCK_MS
+    );
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.', retryAfter: rateLimit.retryAfter },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfter) } }
+      );
+    }
+
     const status = await verifyDeployment();
     return NextResponse.json({
-      siteId: SITE_ID,
-      ...status,
       isSetupComplete: status.hasSite && status.hasAdmin,
+      ...status,
     });
   } catch {
     return NextResponse.json(
@@ -25,6 +46,19 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const rateLimit = await checkDataRateLimit(
+      `setup_post:${getClientIP(request)}`,
+      RATE_MAX,
+      RATE_WINDOW_MS,
+      RATE_BLOCK_MS
+    );
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.', retryAfter: rateLimit.retryAfter },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfter) } }
+      );
+    }
+
     // Check if already set up
     const status = await verifyDeployment();
     if (status.hasAdmin) {

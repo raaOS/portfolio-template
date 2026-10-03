@@ -1,6 +1,6 @@
 import { ProjectQuotaError } from '@/lib/admin/projectSiteContext';
 import { isR2StorageConfigured, listR2Objects } from '@/lib/r2Storage';
-import type { PlanQuota } from './sitePlan';
+import type { SiteQuota } from './siteQuota';
 
 const BYTES_PER_MB = 1024 * 1024;
 
@@ -21,7 +21,7 @@ export function bytesToMb(bytes: number) {
   return Number((bytes / BYTES_PER_MB).toFixed(2));
 }
 
-export function getStorageQuotaBytes(quota: Pick<PlanQuota, 'storageMb'>) {
+export function getStorageQuotaBytes(quota: Pick<SiteQuota, 'storageMb'>) {
   return quota.storageMb * BYTES_PER_MB;
 }
 
@@ -92,7 +92,7 @@ export async function withSiteQuotaLock<T>(siteId: string, fn: () => Promise<T>)
 export async function enforceSiteStorageQuota(
   siteId: string,
   incomingBytes: number,
-  quota: Pick<PlanQuota, 'storageMb'>
+  quota: Pick<SiteQuota, 'storageMb'>
 ) {
   return withSiteQuotaLock(siteId, () => enforceSiteStorageQuotaUnlocked(siteId, incomingBytes, quota));
 }
@@ -105,7 +105,7 @@ export async function enforceSiteStorageQuota(
 export async function enforceSiteStorageQuotaUnlocked(
   siteId: string,
   incomingBytes: number,
-  quota: Pick<PlanQuota, 'storageMb'>
+  quota: Pick<SiteQuota, 'storageMb'>
 ) {
   const usage = await getSiteStorageUsage(siteId);
   const limitBytes = getStorageQuotaBytes(quota);

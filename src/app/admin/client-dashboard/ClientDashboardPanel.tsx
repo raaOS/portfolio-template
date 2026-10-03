@@ -86,10 +86,7 @@ export type SiteMasterDraft = {
   id?: string;
   name: string;
   slug: string;
-  plan: 'lite' | 'pro';
   status: 'active' | 'suspended';
-  billingStatus: 'trialing' | 'active' | 'past_due' | 'canceled';
-  currentPeriodEnd: string;
   quotaOverride: SiteQuotaOverrideDraft;
   customDomain?: string;
 };
@@ -124,10 +121,7 @@ const emptyDraft: ProjectDraft = {
 const emptySiteDraft: SiteMasterDraft = {
   name: '',
   slug: '',
-  plan: 'lite',
   status: 'active',
-  billingStatus: 'trialing',
-  currentPeriodEnd: '',
   quotaOverride: {
     projectLimit: '',
     storageMb: '',
@@ -165,15 +159,7 @@ function siteDraftFromSummary(site: AdminSiteSummary): SiteMasterDraft {
     id: site.id,
     name: site.name,
     slug: site.slug,
-    plan: site.plan,
     status: site.status === 'suspended' ? 'suspended' : 'active',
-    billingStatus:
-      site.billing?.status === 'active' ||
-      site.billing?.status === 'past_due' ||
-      site.billing?.status === 'canceled'
-        ? site.billing.status
-        : 'trialing',
-    currentPeriodEnd: site.billing?.currentPeriodEnd ?? '',
     quotaOverride: {
       projectLimit: site.quotaOverride.projectLimit ? String(site.quotaOverride.projectLimit) : '',
       storageMb: site.quotaOverride.storageMb ? String(site.quotaOverride.storageMb) : '',
@@ -903,12 +889,12 @@ export default function ClientDashboardPanel() {
       const maxGalleryItems = Math.max(0, selectedSite.quota.mediaPerProject - 1);
       const remainingSlots = maxGalleryItems - draft.gallery.length;
       if (remainingSlots <= 0) {
-        throw new Error(`Slot gallery ${selectedSite.plan} sudah penuh`);
+        throw new Error(`Slot gallery sudah penuh`);
       }
 
       const selectedFiles = files.slice(0, remainingSlots);
       if (selectedFiles.length < files.length) {
-        throw new Error(`Maksimal tambah ${remainingSlots} image lagi untuk plan ini`);
+        throw new Error(`Maksimal tambah ${remainingSlots} image lagi untuk limit ini`);
       }
 
       selectedFiles.forEach(validateProjectGalleryFile);
@@ -950,7 +936,7 @@ export default function ClientDashboardPanel() {
         Math.max(0, selectedSite.quota.mediaPerProject - 1) - draft.gallery.length
       );
       if (remainingSlots <= 0) {
-        throw new Error(`Slot gallery ${selectedSite.plan} sudah penuh`);
+        throw new Error(`Slot gallery sudah penuh`);
       }
 
       validateProjectGalleryVideoFile(file);
@@ -993,14 +979,13 @@ export default function ClientDashboardPanel() {
     : !isSiteActive
       ? 'Site sedang suspended. Aktifkan site sebelum menambah project.'
       : isProjectLimitReached
-        ? `Quota project ${selectedSite.quota.projectLimit} sudah penuh. Naikkan quota add-on atau upgrade plan.`
+        ? `Quota project ${selectedSite.quota.projectLimit} sudah penuh. Naikkan quota add-on.`
         : !csrfToken
           ? 'Sesi admin belum siap. Refresh dashboard lalu coba lagi.'
           : '';
   const canUploadCover = canMutate && !coverUploadMutation.isPending;
   const maxGalleryItems = selectedSite ? Math.max(0, selectedSite.quota.mediaPerProject - 1) : 0;
   const remainingGallerySlots = Math.max(0, maxGalleryItems - draft.gallery.length);
-  const clientLoginPath = activePublicSlug ? `/${activePublicSlug}/login` : '';
   const canUploadGallery =
     canMutate &&
     !galleryUploadMutation.isPending &&
@@ -1078,7 +1063,7 @@ export default function ClientDashboardPanel() {
     }
 
     if (!draft.id && isProjectLimitReached) {
-      showError(`Quota project ${selectedSite.plan} sudah penuh`);
+      showError(`Quota project sudah penuh`);
       return;
     }
 
@@ -1243,7 +1228,7 @@ export default function ClientDashboardPanel() {
           <h1 className="text-lg font-semibold text-zinc-950">Master Client CRUD</h1>
           <p className="mt-0.5 text-xs text-zinc-500">
             {selectedSite
-              ? `${selectedSite.name} / ${selectedSite.slug} / ${selectedSite.plan.toUpperCase()}`
+              ? `${selectedSite.name} / ${selectedSite.slug}`
               : 'Buat atau pilih client/site untuk mulai'}
           </p>
         </div>
@@ -1457,7 +1442,6 @@ export default function ClientDashboardPanel() {
           activeClientAccessDraft={activeClientAccessDraft}
           activePublicUrl={activePublicUrl}
           activePublicSlug={activePublicSlug}
-          clientLoginPath={clientLoginPath}
           deleteConfirmSlug={deleteConfirmSlug}
           canSaveSite={canSaveSite}
           isSiteDraftValid={isSiteDraftValid}

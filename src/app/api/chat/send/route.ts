@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { chatStore } from '@/lib/chatStore';
 import { aiChatService } from '@/lib/services/aiChatService';
 import { checkDataRateLimit } from '@/lib/dataRateLimit';
-import { getClientIdentifier } from '@/lib/security/request';
+import { getClientIP } from '@/lib/security/request';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,9 +24,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const clientId = getClientIdentifier(request);
+    // SECURITY FIX (audit 2026-09-29): key rate limit IP-only — identifier
+    // lama `ip|userAgent` bisa di-reset pelaku dengan mengganti User-Agent.
     const rateCheck = await checkDataRateLimit(
-      `chat_${clientId}`,
+      `chat:${getClientIP(request)}`,
       CHAT_MAX_MESSAGES,
       CHAT_WINDOW_MS,
       CHAT_BLOCK_MS

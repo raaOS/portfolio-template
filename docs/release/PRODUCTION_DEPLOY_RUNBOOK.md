@@ -35,7 +35,7 @@ Expected:
 
 - `release:audit` passes all checks.
 - `site-scope:audit` confirms tenant content routes/helpers are scoped.
-- `cf:readiness` shows all checks passed, including client password reset email delivery config.
+- `cf:readiness` shows all checks passed, including notification provider config for order and activation emails.
 - `cf:build` exits `0` without actionable warning/error output.
 - `wrangler.jsonc` keeps `minify: true` so the Worker stays below the Cloudflare Free 3 MiB limit.
 
@@ -52,7 +52,7 @@ Check:
 ```text
 http://localhost:8788/api/health
 http://localhost:8788/
-http://localhost:8788/client/login
+http://localhost:8788/admin/login
 http://localhost:8788/api/public/sites/demo-designer/projects
 ```
 
@@ -87,10 +87,6 @@ The smoke script checks:
 
 - `/api/health`
 - `/`
-- `/client/login`
-- `/{siteSlug}/login`
-- `/client/reset-password`
-- `/client/dashboard`
 - `/api/public/sites/{siteSlug}`
 - `/api/public/sites/{siteSlug}/projects`
 - `/r2/ffmpeg/ffmpeg-core.js`
@@ -111,19 +107,14 @@ After automated smoke passes:
 - [ ] Login as master admin.
 - [ ] Create a test site.
 - [ ] Create a test client access user.
-- [ ] Login through `/[siteSlug]/login`.
-- [ ] Request client password reset and confirm the reset email arrives.
-- [ ] Set a new client password through `/client/reset-password?token=...`.
 - [ ] Create a draft project.
 - [ ] Upload a cover image.
 - [ ] Upload gallery image.
-- [ ] Upload gallery video if Pro/video feature is enabled.
+- [ ] Upload gallery video if the video feature is enabled.
 - [ ] Confirm R2 keys are under `sites/{siteId}/...`.
 - [ ] Confirm storage usage changes after upload.
-- [ ] Confirm Lite quota blocks over-limit action.
-- [ ] Confirm Pro quota allows higher usage.
-- [ ] Confirm Lite cannot open Pro-only testimonial manager.
-- [ ] Upgrade the test site to Pro and confirm testimonial manager works.
+- [ ] Confirm quota blocks over-limit action.
+- [ ] Confirm a site quota override raises the limit.
 - [ ] Create a second test site and confirm data from site A does not appear in site B.
 
 ## Rollback

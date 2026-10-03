@@ -35,14 +35,6 @@ type WranglerConfig = {
 
 const REQUIRED_FFMPEG_KEYS = ['ffmpeg/ffmpeg-core.js', 'ffmpeg/ffmpeg-core.wasm'] as const;
 const REQUIRED_FFMPEG_LOCAL_FILES = ['ffmpeg-core.js', 'ffmpeg-core.wasm'] as const;
-const PLAN_INTEGER_KEYS = [
-  'PLAN_LITE_PROJECT_LIMIT',
-  'PLAN_LITE_STORAGE_MB',
-  'PLAN_LITE_MEDIA_PER_PROJECT',
-  'PLAN_PRO_PROJECT_LIMIT',
-  'PLAN_PRO_STORAGE_MB',
-  'PLAN_PRO_MEDIA_PER_PROJECT',
-] as const;
 
 const results: CheckResult[] = [];
 
@@ -70,17 +62,6 @@ function readWranglerConfig(): WranglerConfig | null {
   return JSON.parse(stripJsonComments(fs.readFileSync(file, 'utf8'))) as WranglerConfig;
 }
 
-function readPositiveInteger(name: (typeof PLAN_INTEGER_KEYS)[number]) {
-  const value = Number(process.env[name]);
-  if (!Number.isInteger(value) || value < 0) {
-    fail(`${name} is a valid integer`, 'Set a non-negative integer in .env.local.');
-    return null;
-  }
-
-  pass(`${name} is a valid integer`);
-  return value;
-}
-
 function expectedD1Tables() {
   const relationalTables = D1_SCHEMA_QUERIES.flatMap((sql) => {
     const match = /CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+([a-zA-Z0-9_]+)/i.exec(sql);
@@ -103,42 +84,6 @@ function isNotFoundError(error: unknown) {
     candidate.Code === 'NoSuchKey' ||
     candidate.$metadata?.httpStatusCode === 404
   );
-}
-
-function checkPlanQuotas() {
-  const values = Object.fromEntries(
-    PLAN_INTEGER_KEYS.map((key) => [key, readPositiveInteger(key)])
-  ) as Record<(typeof PLAN_INTEGER_KEYS)[number], number | null>;
-
-  if (
-    values.PLAN_LITE_PROJECT_LIMIT !== null &&
-    values.PLAN_PRO_PROJECT_LIMIT !== null &&
-    values.PLAN_PRO_PROJECT_LIMIT < values.PLAN_LITE_PROJECT_LIMIT
-  ) {
-    fail('Pro project quota is not lower than Lite quota');
-  } else {
-    pass('Pro project quota is not lower than Lite quota');
-  }
-
-  if (
-    values.PLAN_LITE_STORAGE_MB !== null &&
-    values.PLAN_PRO_STORAGE_MB !== null &&
-    values.PLAN_PRO_STORAGE_MB < values.PLAN_LITE_STORAGE_MB
-  ) {
-    fail('Pro storage quota is not lower than Lite quota');
-  } else {
-    pass('Pro storage quota is not lower than Lite quota');
-  }
-
-  if (
-    values.PLAN_LITE_MEDIA_PER_PROJECT !== null &&
-    values.PLAN_PRO_MEDIA_PER_PROJECT !== null &&
-    values.PLAN_PRO_MEDIA_PER_PROJECT < values.PLAN_LITE_MEDIA_PER_PROJECT
-  ) {
-    fail('Pro media-per-project quota is not lower than Lite quota');
-  } else {
-    pass('Pro media-per-project quota is not lower than Lite quota');
-  }
 }
 
 function checkFfmpegLocalFiles() {
@@ -173,53 +118,29 @@ function checkFfmpegBaseUrl() {
   pass('NEXT_PUBLIC_FFMPEG_BASE_URL is production-safe');
 }
 
-function checkClientPasswordReset() {
-  const resetEnabled = process.env.FEATURE_CLIENT_PASSWORD_RESET !== 'false';
-  if (!resetEnabled) {
-    fail(
-      'Client password reset is enabled',
-      'Set FEATURE_CLIENT_PASSWORD_RESET=true for sale-ready production.'
-    );
-    return;
-  }
-
-  pass('Client password reset is enabled');
-
-  const ttl = Number(process.env.CLIENT_PASSWORD_RESET_TOKEN_TTL_MINUTES);
-  if (!Number.isInteger(ttl) || ttl < 5 || ttl > 120) {
-    fail(
-      'Client password reset TTL is valid',
-      'Set CLIENT_PASSWORD_RESET_TOKEN_TTL_MINUTES between 5 and 120.'
-    );
-  } else {
-    pass('Client password reset TTL is valid');
-  }
-
+function checkNotificationProvider() {
   const provider = process.env.NOTIFICATION_PROVIDER?.trim().toLowerCase() || '';
   if (provider === 'resend') {
-    pass('Client password reset email provider is supported');
+    pass('Notification provider is supported');
   } else {
-    fail(
-      'Client password reset email provider is supported',
-      'Set NOTIFICATION_PROVIDER=resend.'
-    );
+    fail('Notification provider is supported', 'Set NOTIFICATION_PROVIDER=resend.');
   }
 
   if (process.env.NOTIFICATION_API_KEY?.trim()) {
-    pass('Client password reset email API key is configured');
+    pass('Notification email API key is configured');
   } else {
-    fail('Client password reset email API key is configured');
+    fail('Notification email API key is configured');
   }
 
   if (process.env.NOTIFICATION_DEFAULT_FROM?.trim()) {
-    pass('Client password reset email sender is configured');
+    pass('Notification email sender is configured');
   } else {
-    fail('Client password reset email sender is configured');
+    fail('Notification email sender is configured');
   }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || '';
   if (!siteUrl) {
-    fail('NEXT_PUBLIC_SITE_URL is configured for reset links');
+    fail('NEXT_PUBLIC_SITE_URL is configured');
     return;
   }
 
@@ -345,10 +266,9 @@ async function main() {
   if (report.confirmed) pass('Live Cloudflare write guard is confirmed');
   else fail('Live Cloudflare write guard is confirmed', 'Set PRODUCT_CLOUDFLARE_ENV_CONFIRMED=true.');
 
-  checkPlanQuotas();
   checkFfmpegLocalFiles();
   checkFfmpegBaseUrl();
-  checkClientPasswordReset();
+  checkNotificationProvider();
   checkWranglerR2Binding();
 
   if (report.missingRequired.length === 0 && report.backendIssues.length === 0 && report.confirmed) {

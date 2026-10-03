@@ -9,8 +9,7 @@ Use this checklist before packaging, selling, or deploying a buyer instance.
 - [ ] Confirm `PRODUCT_CLOUDFLARE_ENV_CONFIRMED="true"` only after product Cloudflare values are set.
 - [ ] Confirm `wrangler.jsonc` R2 bucket name matches `CLOUDFLARE_R2_BUCKET`.
 - [ ] Confirm `NEXT_PUBLIC_FFMPEG_BASE_URL="/r2/ffmpeg"`.
-- [ ] Confirm `FEATURE_CLIENT_PASSWORD_RESET="true"` for sale-ready builds.
-- [ ] Confirm password reset email env is configured: `NOTIFICATION_PROVIDER`, `NOTIFICATION_API_KEY`, `NOTIFICATION_DEFAULT_FROM`, and `NEXT_PUBLIC_SITE_URL`.
+- [ ] Confirm notification email env is configured: `NOTIFICATION_PROVIDER`, `NOTIFICATION_API_KEY`, `NOTIFICATION_DEFAULT_FROM`, and `NEXT_PUBLIC_SITE_URL`.
 
 ## Cloudflare Resources
 
@@ -58,7 +57,7 @@ npm run cf:build
 Recommended targeted regression:
 
 ```bash
-npx vitest run "src/app/api/admin/sites/route.test.ts" "src/app/api/admin/sites/[siteId]/client-access/route.test.ts" "src/app/api/admin/sites/[siteId]/project-cover/route.test.ts" "src/app/api/admin/sites/[siteId]/project-media/route.test.ts" "src/app/api/admin/sites/[siteId]/project-video/presign/route.test.ts" "src/app/api/r2/[...key]/route.test.ts" "src/lib/product/siteStorageUsage.test.ts" "src/lib/services/project/projectStorage.test.ts" "src/lib/services/project/projectSqlService.test.ts"
+npx vitest run "src/app/api/admin/sites/route.test.ts" "src/app/api/admin/sites/[siteId]/project-cover/route.test.ts" "src/app/api/admin/sites/[siteId]/project-media/route.test.ts" "src/app/api/admin/sites/[siteId]/project-video/presign/route.test.ts" "src/app/api/r2/[...key]/route.test.ts" "src/lib/product/siteStorageUsage.test.ts" "src/lib/services/project/projectStorage.test.ts" "src/lib/services/project/projectSqlService.test.ts"
 ```
 
 ## Worker Smoke Test
@@ -74,7 +73,7 @@ Check:
 
 - [ ] `GET /api/health` -> 200.
 - [ ] `GET /` -> 200.
-- [ ] `GET /client/login` -> 200.
+- [ ] `GET /admin/login` -> 200.
 - [ ] `GET /api/public/sites/demo-designer/projects` -> 200.
 
 Stop `wrangler dev` after testing.
@@ -103,15 +102,14 @@ After deploy:
 - [ ] Public site route loads.
 - [ ] Master admin login works.
 - [ ] Master can create/update/suspend/delete a site.
-- [ ] Master can set Lite/Pro plan and billing metadata.
-- [ ] Client login works.
-- [ ] Client password reset email is delivered and reset token can set a new password.
-- [ ] Client can create/edit projects within quota.
+- [ ] Master can set site status and quota override.
+- [ ] Panel login works (`/admin/login` with the buyer's email + password).
+- [ ] Owner-assisted password reset works (`npx tsx scripts/cloudflare/reset-customer-password.ts`).
+- [ ] Buyer can create/edit projects within quota via `/admin/client-dashboard`.
 - [ ] Cover/gallery/video upload works.
 - [ ] R2 media keys are under `sites/{siteId}/...`.
 - [ ] Browser video compression loads FFmpeg from `/r2/ffmpeg`.
-- [ ] Lite cannot access Pro-only testimonial manager.
-- [ ] Pro testimonial manager works after plan upgrade.
+- [ ] Optional features follow their `FEATURE_*` flags.
 - [ ] Data from one site does not appear in another site.
 
 ## Package Hygiene
@@ -132,8 +130,8 @@ Give the buyer:
 - Repository or archive.
 - Cloudflare setup instructions.
 - Their generated admin password or reset process.
-- Their client login URL pattern: `https://domain.com/[siteSlug]/login`.
-- Their client password reset process.
+- Their panel login URL: `https://domain.com/admin/login` (there is no per-site login page).
+- Their password reset process (owner-assisted; no self-service reset).
 - Their Cloudflare resource naming convention.
 - The final production URL.
 - A reminder to rotate all generated secrets after ownership transfer.

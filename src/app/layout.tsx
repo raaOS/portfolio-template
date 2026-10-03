@@ -88,7 +88,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{
-              __html: JSON.stringify(generateStructuredData('website')),
+              __html: JSON.stringify(generateStructuredData('website')).replace(/</g, '\\u003c'),
             }}
           />
           {/*

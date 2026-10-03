@@ -41,7 +41,7 @@ describe('POST /api/settings', () => {
   });
 
   it('rejects bannedWords non-array', async () => {
-    // updateSettingsSchema mengizinkan passthrough tapi bannedWords harus array
+    // updateSettingsSchema kini strict: hanya bannedWords (array) + flag boolean
     const response = await POST(buildPost({ bannedWords: 'word' }) as never);
     expect(response.status).toBe(400);
   });

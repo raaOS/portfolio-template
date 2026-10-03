@@ -24,7 +24,6 @@ interface MasterSiteEditorSidebarProps {
   activeClientAccessDraft: ClientAccessDraft;
   activePublicUrl: string;
   activePublicSlug: string;
-  clientLoginPath: string;
   deleteConfirmSlug: string;
   canSaveSite: boolean;
   isSiteDraftValid: boolean;
@@ -54,7 +53,6 @@ export function MasterSiteEditorSidebar({
   activeClientAccessDraft,
   activePublicUrl,
   activePublicSlug,
-  clientLoginPath,
   deleteConfirmSlug,
   canSaveSite,
   isSiteDraftValid,
@@ -206,54 +204,25 @@ export function MasterSiteEditorSidebar({
                       </a>
                     </div>
                   </div>
-                  {clientLoginPath && (
+                  {activeSiteDraft.customDomain?.trim() && (
                     <div className="mt-2 border-t border-zinc-200 pt-2 text-[11px] text-zinc-500 space-y-1">
-                      <div>
-                        Login client:{' '}
+                      <div className="text-[11px] font-medium text-emerald-700">
+                        Custom Domain:{' '}
                         <a
-                          href={clientLoginPath}
+                          href={`https://${activeSiteDraft.customDomain.trim().replace(/^https?:\/\//, '')}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="font-mono text-zinc-900 underline hover:text-zinc-950"
+                          className="font-mono underline hover:text-emerald-900"
                         >
-                          {clientLoginPath}
+                          https://{activeSiteDraft.customDomain.trim().replace(/^https?:\/\//, '')}
                         </a>
                       </div>
-                      {activeSiteDraft.customDomain?.trim() && (
-                        <div className="text-[11px] font-medium text-emerald-700">
-                          Custom Domain:{' '}
-                          <a
-                            href={`https://${activeSiteDraft.customDomain.trim().replace(/^https?:\/\//, '')}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="font-mono underline hover:text-emerald-900"
-                          >
-                            https://{activeSiteDraft.customDomain.trim().replace(/^https?:\/\//, '')}
-                          </a>
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <label className="block">
-                  <span className="text-xs font-medium text-zinc-600">Plan</span>
-                  <select
-                    value={activeSiteDraft.plan}
-                    onChange={(event) =>
-                      setSiteDraft((prev) => ({
-                        ...prev,
-                        plan: event.target.value as SiteMasterDraft['plan'],
-                      }))
-                    }
-                    className="mt-1 h-9 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-zinc-400"
-                  >
-                    <option value="lite">lite</option>
-                    <option value="pro">pro</option>
-                  </select>
-                </label>
+              <div className="grid grid-cols-1 gap-3">
                 <label className="block">
                   <span className="text-xs font-medium text-zinc-600">Status</span>
                   <select
@@ -342,7 +311,7 @@ export function MasterSiteEditorSidebar({
                         }))
                       }
                       className="mt-1 h-8.5 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-zinc-400"
-                      placeholder="Kosongkan untuk bawaan plan"
+                      placeholder="Kosongkan untuk bawaan sistem"
                     />
                   </label>
                   <label className="block">
@@ -356,7 +325,7 @@ export function MasterSiteEditorSidebar({
                         }))
                       }
                       className="mt-1 h-8.5 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-zinc-400"
-                      placeholder="Kosongkan untuk bawaan plan"
+                      placeholder="Kosongkan untuk bawaan sistem"
                     />
                   </label>
                   <label className="block">
@@ -370,7 +339,7 @@ export function MasterSiteEditorSidebar({
                         }))
                       }
                       className="mt-1 h-8.5 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-zinc-400"
-                      placeholder="Kosongkan untuk bawaan plan"
+                      placeholder="Kosongkan untuk bawaan sistem"
                     />
                   </label>
                 </div>

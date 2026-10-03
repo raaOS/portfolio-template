@@ -4,15 +4,6 @@
  */
 export const BASE_PRICE = 199000;
 
-/** @deprecated Use BASE_PRICE instead */
-export const PLAN_BASE_PRICES = {
-  lite: BASE_PRICE,
-  pro: BASE_PRICE,
-} as const;
-
-/** @deprecated */
-export type PlanKey = keyof typeof PLAN_BASE_PRICES;
-
 export function formatIdr(amount: number): string {
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',

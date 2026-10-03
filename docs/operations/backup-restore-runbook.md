@@ -16,8 +16,6 @@ D1:
 
 - `sites`
 - `client_access`
-- `site_subscriptions`
-- `client_password_resets`
 - `site_quota_overrides`
 - `projects`
 - `project_narratives`
@@ -71,7 +69,7 @@ Output utama:
 - `d1-backup.json`
 - `manifest.json`
 
-Catatan: file backup bisa berisi email buyer, password hash, token hash reset password, dan audit log. Folder `backups/` sudah di-ignore git.
+Catatan: file backup bisa berisi email buyer, password hash, dan audit log. Folder `backups/` sudah di-ignore git.
 
 ## Backup R2
 
@@ -159,10 +157,10 @@ npm run release:smoke -- --url <staging-url> --site-slug <restored-site-slug>
 Manual check:
 
 - buka public site staging
-- login client staging
+- login panel `/admin` di staging
 - cek minimal 1 project published muncul
 - cek cover/gallery/video dapat dimuat
-- cek client access masih bisa login setelah reset password flow diuji ulang di staging
+- cek login panel masih bisa setelah reset password owner-assisted diuji di staging
 
 ## Pass Criteria Sprint 44
 

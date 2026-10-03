@@ -13,7 +13,6 @@ export const SHARED_SCHEMA_QUERIES = [
     id TEXT PRIMARY KEY,
     slug TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL DEFAULT '',
-    plan TEXT NOT NULL DEFAULT 'pro',
     status TEXT NOT NULL DEFAULT 'active',
     active_template_key TEXT DEFAULT 'os-desktop',
     client_slug_change_count INTEGER NOT NULL DEFAULT 0,

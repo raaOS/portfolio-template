@@ -3,8 +3,9 @@ import { queryD1 } from '@/lib/cloudflareD1';
 import { cleanEnvVar } from '@/lib/utils/env';
 import { isSlugAvailable } from './slugService';
 import { getPaymentConfig, type PaymentConfig } from './paymentConfigService';
-import { PLAN_BASE_PRICES } from '@/constants/plans';
 import { logActivity } from '@/lib/services/auditLogger';
+import { deleteFromR2, isR2StorageConfigured, listR2ObjectKeys } from '@/lib/r2Storage';
+import { BASE_PRICE } from '@/constants/pricing';
 
 export interface OrderRecord {
   id: string;
@@ -14,7 +15,6 @@ export interface OrderRecord {
   buyer_name: string;
   buyer_email: string;
   buyer_whatsapp: string;
-  plan: string;
   amount: number;
   payment_method: string;
   payment_proof_url?: string | null;
@@ -29,7 +29,6 @@ export interface CreateOrderInput {
   buyerName: string;
   buyerEmail: string;
   buyerWhatsapp: string;
-  plan: 'lite' | 'pro';
   desiredSlug: string;
   templateId?: string;
   amount?: number;
@@ -80,25 +79,31 @@ async function expireStalePendingOrders(nowIso: string): Promise<void> {
   // bukti palsu dan admin lupa cancel): dibatalkan otomatis setelah 7 hari agar
   // reservasi slug & nominal unik tidak terkunci selamanya (index unik partial
   // hanya melindungi pending/waiting/activating, bukan canceled).
-  await queryD1(
+  // RETURNING id dipakai (sekali jalan) agar file bukti di R2 ikut dibersihkan.
+  const staleWaitingIds = await queryD1<{ id: string }>(
     `UPDATE orders
      SET status = 'canceled',
          cancel_reason = ?,
          payment_proof_url = NULL,
          updated_at = ?
      WHERE status = 'waiting_verification'
-       AND datetime(updated_at) <= datetime(?, '-7 days')`,
+       AND datetime(updated_at) <= datetime(?, '-7 days')
+     RETURNING id`,
     ['Dibatalkan otomatis: bukti pembayaran tidak selesai diverifikasi dalam 7 hari.', nowIso, nowIso]
   );
+
+  // Bersihkan juga file bukti bayarnya di R2 (DB sudah tidak merujuknya).
+  for (const row of staleWaitingIds || []) {
+    if (row?.id) await cleanupOrderProofObjects(row.id);
+  }
 
   const staleOrders = await queryD1<{
     id: string;
     buyer_name: string;
     buyer_email: string;
     desired_slug: string;
-    plan: string;
   }>(
-    `SELECT id, buyer_name, buyer_email, desired_slug, plan
+    `SELECT id, buyer_name, buyer_email, desired_slug
      FROM orders
      WHERE status = 'pending_payment'
        AND datetime(expires_at) <= datetime(?)`,
@@ -131,7 +136,6 @@ async function expireStalePendingOrders(nowIso: string): Promise<void> {
       orderId: order.id,
       buyerName: order.buyer_name,
       desiredSlug: order.desired_slug,
-      plan: order.plan,
       checkoutUrl,
     }).catch((err) => console.error(`[expireStaleOrders] Email failed for ${order.id}:`, err));
   }
@@ -150,14 +154,13 @@ export async function expireOrderIfStale(orderId: string): Promise<void> {
     buyer_name: string;
     buyer_email: string;
     desired_slug: string;
-    plan: string;
   }>(
     `UPDATE orders
      SET status = 'expired', updated_at = ?
      WHERE id = ?
        AND status = 'pending_payment'
        AND datetime(expires_at) <= datetime(?)
-     RETURNING id, buyer_name, buyer_email, desired_slug, plan`,
+     RETURNING id, buyer_name, buyer_email, desired_slug`,
     [nowIso, orderId, nowIso]
   );
 
@@ -170,7 +173,6 @@ export async function expireOrderIfStale(orderId: string): Promise<void> {
       orderId: order.id,
       buyerName: order.buyer_name,
       desiredSlug: order.desired_slug,
-      plan: order.plan,
       checkoutUrl,
     }).catch((err) => console.error(`[expireOrderIfStale] Email failed for ${order.id}:`, err));
   }
@@ -221,10 +223,6 @@ export async function sweepExpiredOrders(): Promise<void> {
   } catch (err) {
     console.error('[sweepExpiredOrders] Failed:', err);
   }
-}
-
-function getBasePlanAmount(plan: 'lite' | 'pro') {
-  return PLAN_BASE_PRICES[plan];
 }
 
 function isUniqueConstraintError(error: unknown, field: 'desired_slug' | 'amount' | 'id') {
@@ -358,14 +356,12 @@ async function sendOrderEmail({
   to,
   orderId,
   buyerName,
-  plan,
   amount,
   orderUrl,
 }: {
   to: string;
   orderId: string;
   buyerName: string;
-  plan: string;
   amount: number;
   orderUrl: string;
 }): Promise<boolean> {
@@ -388,13 +384,12 @@ async function sendOrderEmail({
       body: JSON.stringify({
         from,
         to,
-        subject: `Struk Pesanan ${orderId} — Portfolio OS ${plan.toUpperCase()}`,
+        subject: `Struk Pesanan ${orderId} — Portfolio OS`,
         text: [
           `Halo ${buyerName},`,
           '',
           `Pesanan Anda telah dibuat:`,
           `• Order ID: ${orderId}`,
-          `• Paket: ${plan.toUpperCase()}`,
           `• Total Bayar: ${formattedAmount}`,
           '',
           'Silakan selesaikan pembayaran melalui QRIS atau Transfer Bank sesuai nominal di atas.',
@@ -409,7 +404,7 @@ async function sendOrderEmail({
         html: [
           `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">`,
           `<h2 style="margin:0 0 4px">Struk Pesanan</h2>`,
-          `<p style="color:#64748b;font-size:13px;margin:0 0 20px">Portfolio OS • ${plan.toUpperCase()} Plan</p>`,
+          `<p style="color:#64748b;font-size:13px;margin:0 0 20px">Portfolio OS</p>`,
           `<table style="width:100%;font-size:13px;border-collapse:collapse">`,
           `<tr><td style="padding:6px 0;color:#64748b">Order ID</td><td style="padding:6px 0;text-align:right;font-weight:700;font-family:monospace">${orderId}</td></tr>`,
           `<tr><td style="padding:6px 0;color:#64748b">Nama</td><td style="padding:6px 0;text-align:right;font-weight:600">${buyerName}</td></tr>`,
@@ -435,14 +430,12 @@ async function sendOrderExpiredEmail({
   orderId,
   buyerName,
   desiredSlug,
-  plan,
   checkoutUrl,
 }: {
   to: string;
   orderId: string;
   buyerName: string;
   desiredSlug: string;
-  plan: string;
   checkoutUrl: string;
 }): Promise<boolean> {
   const provider = (cleanEnvVar('NOTIFICATION_PROVIDER') || '').toLowerCase();
@@ -466,7 +459,7 @@ async function sendOrderExpiredEmail({
         text: [
           `Halo ${buyerName},`,
           '',
-          `Batas waktu pembayaran 24 jam untuk pesanan ${orderId} (${plan.toUpperCase()} Plan) telah berakhir.`,
+          `Batas waktu pembayaran 24 jam untuk pesanan ${orderId} telah berakhir.`,
           `Nominal unik dan reservasi slug '${desiredSlug}' telah dilepas oleh sistem.`,
           '',
           'Jika Anda masih berminat untuk membuat website portofolio, silakan buat pesanan baru:',
@@ -477,7 +470,7 @@ async function sendOrderExpiredEmail({
         html: [
           `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">`,
           `<h2 style="margin:0 0 4px;color:#d97706">Pesanan Kedaluwarsa</h2>`,
-          `<p style="color:#64748b;font-size:13px;margin:0 0 20px">Portfolio OS • ${plan.toUpperCase()} Plan</p>`,
+          `<p style="color:#64748b;font-size:13px;margin:0 0 20px">Portfolio OS</p>`,
           `<p style="font-size:13px;color:#334155">Halo <strong>${buyerName}</strong>,</p>`,
           `<p style="font-size:13px;color:#334155">Batas waktu pembayaran 24 jam untuk pesanan <code style="font-family:monospace;font-weight:bold">${orderId}</code> telah berakhir.</p>`,
           `<div style="background:#fffbeb;border:1px solid #fef3c7;border-radius:8px;padding:12px;margin:16px 0;font-size:12px;color:#92400e">`,
@@ -497,21 +490,143 @@ async function sendOrderExpiredEmail({
 }
 
 // ---------------------------------------------------------------------------
+// Activation Handoff Email
+// ---------------------------------------------------------------------------
+
+/**
+ * Email serah-terima — dikirim satu kali saat order berhasil diaktifkan.
+ *
+ * Latar (audit fitur 2026-09-30): sebelumnya pembeli hanya dihubungi saat
+ * order DIBUAT (struk) dan saat order KEDALUWARSA. Momen serah-terima —
+ * website sudah aktif dan bisa dibuka — tidak pernah memberi kabar ke
+ * pembeli, padahal itulah momen yang paling mereka tunggu.
+ *
+ * Best-effort: kegagalan email tidak boleh membatalkan aktivasi yang sudah
+ * ter-commit ke D1, jadi pemanggilan dibungkus try/catch.
+ */
+async function sendActivationEmail({
+  to,
+  orderId,
+  buyerName,
+  amount,
+  siteSlug,
+  siteUrl,
+}: {
+  to: string;
+  orderId: string;
+  buyerName: string;
+  amount?: number;
+  siteSlug: string;
+  siteUrl: string;
+}): Promise<boolean> {
+  if (!to || !orderId || !siteUrl) return false;
+
+  const provider = (cleanEnvVar('NOTIFICATION_PROVIDER') || '').toLowerCase();
+  if (provider !== 'resend') return false;
+
+  const apiKey = cleanEnvVar('NOTIFICATION_API_KEY');
+  const from = cleanEnvVar('NOTIFICATION_DEFAULT_FROM');
+  if (!apiKey || !from) return false;
+
+  const nameText = buyerName.trim() || 'Pelanggan';
+  const amountValue = typeof amount === 'number' && amount > 0 ? amount : null;
+  const amountText = amountValue ? `• Total Bayar: Rp ${amountValue.toLocaleString('id-ID')}` : '';
+
+  // Versi HTML memakai nilai yang sudah di-escape (nama pembeli & slug adalah
+  // input pengguna) — teks polos tetap memakai nilai mentah.
+  const nameHtml = escapeTelegramHtml(nameText);
+  const slugHtml = escapeTelegramHtml(siteSlug);
+  const urlHtml = escapeTelegramHtml(siteUrl);
+  const amountHtml = amountValue
+    ? `<tr><td style="padding:6px 0;color:#64748b">Total Bayar</td><td style="padding:6px 0;text-align:right;font-weight:800;font-size:16px;color:#1e40af">Rp ${amountValue.toLocaleString('id-ID')}</td></tr>`
+    : '';
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from,
+        to,
+        subject: `🎉 Website Anda Sudah Aktif — Portfolio OS`,
+        text: [
+          `Halo ${nameText},`,
+          '',
+          'Selamat! Website portofolio Anda sudah aktif dan bisa diakses siapa saja:',
+          siteUrl,
+          '',
+          'Ringkasan serah terima:',
+          `• Order ID: ${orderId}`,
+          `• Alamat: /${siteSlug}`,
+          amountText,
+          '',
+          'Langkah berikutnya:',
+          '1. Buka link di atas untuk melihat website Anda.',
+          '2. Butuh penyesuaian konten (judul, daftar proyek, foto, kontak)? Balas email ini atau hubungi kami — kami siap membantu.',
+          '3. Untuk cek status pesanan, gunakan link halaman pesanan dari email struk yang kami kirim sebelumnya.',
+          '',
+          'Simpan email ini sebagai bukti serah terima.',
+          '',
+          '— Portfolio OS',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+        html: [
+          `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">`,
+          `<h2 style="margin:0 0 4px">🎉 Website Anda Sudah Aktif</h2>`,
+          `<p style="color:#64748b;font-size:13px;margin:0 0 20px">Portfolio OS</p>`,
+          `<p style="font-size:13px;color:#334155">Halo <strong>${nameHtml}</strong>, website portofolio Anda sudah aktif dan bisa diakses siapa saja.</p>`,
+          `<table style="width:100%;font-size:13px;border-collapse:collapse">`,
+          `<tr><td style="padding:6px 0;color:#64748b">Order ID</td><td style="padding:6px 0;text-align:right;font-weight:700;font-family:monospace">${escapeTelegramHtml(orderId)}</td></tr>`,
+          `<tr><td style="padding:6px 0;color:#64748b">Alamat</td><td style="padding:6px 0;text-align:right;font-weight:700;font-family:monospace">/${slugHtml}</td></tr>`,
+          amountHtml,
+          `</table>`,
+          `<hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0">`,
+          `<a href="${urlHtml}" style="display:inline-block;background:#1e40af;color:#fff;padding:10px 24px;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none">Buka Website Anda</a>`,
+          `<p style="font-size:13px;color:#334155;margin:16px 0 0">Butuh penyesuaian konten (judul, daftar proyek, foto, kontak)? Balas email ini atau hubungi kami — kami siap membantu.</p>`,
+          `<p style="font-size:13px;color:#334155;margin:8px 0 0">Untuk cek status pesanan, gunakan link halaman pesanan dari email struk sebelumnya.</p>`,
+          `<p style="font-size:11px;color:#94a3b8;margin:16px 0 0">Simpan email ini sebagai bukti serah terima.</p>`,
+          `</div>`,
+        ].join(''),
+      }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.error('[sendActivationEmail] Failed:', err);
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Access Token Verification
 // ---------------------------------------------------------------------------
 
 /**
  * Verifies a plaintext access token against the stored hash for an order.
  * Returns true if the token matches, false otherwise.
+ *
+ * SECURITY FIX (audit 2026-09-29): token juga kadaluarsa berdasarkan umur
+ * order — tautan `?token=` yang bocor (riwayat browser, log) tidak berlaku
+ * selamanya. Order aktif (status aktif) tetap memakai jendela alaminya;
+ * order terminal ditutup 90 hari setelah `created_at`.
  */
+const ORDER_TOKEN_MAX_AGE_DAYS = 90;
+
 export async function verifyOrderAccessToken(orderId: string, token: string): Promise<boolean> {
   if (!orderId || !token) return false;
-  const rows = await queryD1<{ access_token_hash: string | null }>(
-    'SELECT access_token_hash FROM orders WHERE id = ?',
+  const rows = await queryD1<{ access_token_hash: string | null; created_at?: string }>(
+    'SELECT access_token_hash, created_at FROM orders WHERE id = ?',
     [orderId]
   );
   const row = rows[0];
   if (!row?.access_token_hash) return false;
+  if (row.created_at) {
+    const ageMs = Date.now() - new Date(row.created_at).getTime();
+    if (ageMs > ORDER_TOKEN_MAX_AGE_DAYS * 24 * 60 * 60 * 1000) return false;
+  }
   const inputHash = hashAccessToken(token);
   if (inputHash.length !== row.access_token_hash.length) return false;
   return crypto.timingSafeEqual(
@@ -565,11 +680,11 @@ export async function createOrder(
   if (duplicateRows.length > 0) {
     return {
       success: false,
-      error: `Anda sudah memiliki pesanan aktif dengan slug ini (${duplicateRows[0].id}). Gunakan tautan dari email Anda, atau hubungi admin bila ingin mengganti paket.`,
+      error: `Anda sudah memiliki pesanan aktif dengan slug ini (${duplicateRows[0].id}). Gunakan tautan dari email Anda, atau hubungi admin bila ingin mengganti slug.`,
     };
   }
 
-  const baseAmount = input.amount ?? getBasePlanAmount(input.plan);
+  const baseAmount = input.amount ?? BASE_PRICE;
   let amount = baseAmount;
   let forceUniqueAmount = false;
 
@@ -589,23 +704,26 @@ export async function createOrder(
     }
 
     try {
+      // SECURITY FIX (audit 2026-09-29): templateId diterima route checkout
+      // tapi sebelumnya tidak pernah ikut INSERT — pilihan template buyer
+      // hilang diam-diam. Kolom `template_id` sudah ada di schema orders.
       await queryD1(
         `INSERT INTO orders (
           id, desired_slug, buyer_name, buyer_email, buyer_whatsapp,
-          plan, amount, payment_method, access_token_hash, status, expires_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'manual_qris', ?, 'pending_payment', ?, ?, ?)`,
+          amount, payment_method, access_token_hash, status, expires_at, created_at, updated_at, template_id
+        ) VALUES (?, ?, ?, ?, ?, ?, 'manual_qris', ?, 'pending_payment', ?, ?, ?, ?)`,
         [
           attemptOrderId,
           slugLower,
           input.buyerName.trim(),
           input.buyerEmail.trim().toLowerCase(),
           input.buyerWhatsapp.trim(),
-          input.plan,
           amount,
           hashAccessToken(attemptAccessToken),
           expiresAt,
           createdAt,
-          updatedAt
+          updatedAt,
+          input.templateId ?? null
         ]
       );
       orderId = attemptOrderId;
@@ -631,12 +749,11 @@ export async function createOrder(
 
   const newOrder: OrderRecord = {
     id: orderId,
-    template_id: null,
+    template_id: input.templateId ?? null,
     desired_slug: slugLower,
     buyer_name: input.buyerName.trim(),
     buyer_email: input.buyerEmail.trim().toLowerCase(),
     buyer_whatsapp: input.buyerWhatsapp.trim(),
-    plan: input.plan,
     amount,
     payment_method: 'manual_qris',
     status: 'pending_payment',
@@ -648,7 +765,6 @@ export async function createOrder(
   // Notify Telegram Admin (Information only)
   const tgMsg = `🛒 <b>ORDER BARU (BELUM DIBAYAR)</b>\n\n` +
     `ID: <code>${escapeTelegramHtml(orderId)}</code>\n` +
-    `Paket: <b>${escapeTelegramHtml(input.plan.toUpperCase())}</b>\n` +
     `Slug: <code>${escapeTelegramHtml(slugLower)}</code>\n` +
     `Buyer: ${escapeTelegramHtml(input.buyerName)}\n` +
     `WA: ${escapeTelegramHtml(input.buyerWhatsapp)}\n` +
@@ -665,7 +781,6 @@ export async function createOrder(
     to: input.buyerEmail.trim().toLowerCase(),
     orderId,
     buyerName: input.buyerName.trim(),
-    plan: input.plan,
     amount,
     orderUrl,
   });
@@ -749,14 +864,27 @@ export async function uploadPaymentProof(
   }
 
   try {
+    // SECURITY FIX (audit 2026-09-29): re-upload dari status
+    // `waiting_verification` TIDAK me-reset `updated_at`, sehingga timer
+    // auto-cancel 7 hari tetap dihitung dari bukti pertama — upload ulang
+    // berulang tidak lagi bisa mengunci slug & nominal unik tanpa bayar.
+    // First upload (pending_payment) dan late payment (expired) tetap
+    // memulai jendela 7 hari baru.
     await queryD1(
       `UPDATE orders
        SET payment_proof_url = ?,
            status = 'waiting_verification',
            expires_at = CASE WHEN ? THEN ? ELSE expires_at END,
-           updated_at = ?
+           updated_at = CASE WHEN ? THEN updated_at ELSE ? END
        WHERE id = ?`,
-      [normalizedProofUrl, isLatePayment ? 1 : 0, lateExpiresAt, updatedAt, orderId]
+      [
+        normalizedProofUrl,
+        isLatePayment ? 1 : 0,
+        lateExpiresAt,
+        wasWaitingVerification ? 1 : 0,
+        updatedAt,
+        orderId,
+      ]
     );
   } catch (err) {
     if (isUniqueConstraintError(err, 'amount')) {
@@ -791,7 +919,6 @@ export async function uploadPaymentProof(
     })();
     const tgMsg = `${headerTitle}\n\n` +
       `ID: <code>${escapeTelegramHtml(order.id)}</code>\n` +
-      `Paket: <b>${escapeTelegramHtml(order.plan.toUpperCase())}</b>\n` +
       `Slug: <code>${escapeTelegramHtml(order.desired_slug)}</code>\n` +
       `Buyer: ${escapeTelegramHtml(order.buyer_name)}\n` +
       `WA: ${escapeTelegramHtml(order.buyer_whatsapp)}\n` +
@@ -819,6 +946,41 @@ export async function uploadPaymentProof(
   }
 
   return { success: true };
+}
+
+/**
+ * Tiket kerja "kasir → bengkel".
+ *
+ * Order sudah `activated` berarti pembayaran sudah masuk, jadi pekerjaan
+ * berikutnya di tangan owner (di luar sistem): siapkan Gmail klien, akun
+ * Cloudflare, provisioning lewat PENGELOLA_KLIEN.bat, deploy, lalu
+ * serah-terima. Tiket ini dikirim ke chat Telegram admin sebagai pengingat
+ * langkah kerja. Best-effort: kegagalan kirim tidak boleh memengaruhi
+ * hasil aktivasi.
+ */
+async function sendWorkshopTicket(order: OrderRecord, siteUrl: string): Promise<void> {
+  const steps = [
+    '1. Buat Gmail untuk klien.',
+    '2. Buat akun Cloudflare klien (Account ID + API Token izin D1, Pages, R2).',
+    '3. Jalankan PENGELOLA_KLIEN.bat → menu [1] Pendaftaran Klien Baru.',
+    '4. Deploy lewat portal yang sama.',
+    '5. Kirim akses ke klien (URL + login /admin).',
+    '6. Tandai order selesai dan simpan datanya di arsip-klien/.',
+  ];
+
+  const text =
+    `🔧 <b>TIKET KERJA — ORDER AKTIF</b>\n\n` +
+    `ID: <code>${escapeTelegramHtml(order.id)}</code>\n` +
+    `Slug: <code>${escapeTelegramHtml(order.desired_slug)}</code>\n` +
+    `Pembeli: ${escapeTelegramHtml(order.buyer_name)}\n` +
+    `WA: ${escapeTelegramHtml(order.buyer_whatsapp)}\n` +
+    `Email: ${escapeTelegramHtml(order.buyer_email)}\n` +
+    `URL: <a href="${escapeTelegramHtml(siteUrl)}">${escapeTelegramHtml(siteUrl)}</a>\n\n` +
+    `☑️ <b>Langkah bengkel:</b>\n` +
+    steps.map((step) => `   ${escapeTelegramHtml(step)}`).join('\n') +
+    `\n\n📖 Panduan lengkap: docs/operations/BENGKEL_HANDOFF.md`;
+
+  await sendTelegramMessage({}, text);
 }
 
 // ---------------------------------------------------------------------------
@@ -891,9 +1053,7 @@ export async function activateOrder(
   const actualSlug = order.desired_slug;
 
   // Wrap provisioning in try/catch with compensating cleanup (no orphan rows)
-  type CreatedRow =
-    | { kind: 'site'; id: string }
-    | { kind: 'site_subscription'; id: string };
+  type CreatedRow = { kind: 'site'; id: string };
 
   const createdRows: CreatedRow[] = [];
 
@@ -902,21 +1062,16 @@ export async function activateOrder(
     siteId = `site_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
     await queryD1(
-      `INSERT INTO sites (id, slug, name, plan, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'active', ?, ?)`,
-      [siteId, order.desired_slug, `${order.buyer_name}'s Portfolio`, order.plan, now, now]
+      `INSERT INTO sites (id, slug, name, status, created_at, updated_at)
+       VALUES (?, ?, ?, 'active', ?, ?)`,
+      [siteId, order.desired_slug, `${order.buyer_name}'s Portfolio`, now, now]
     );
     createdRows.push({ kind: 'site', id: siteId });
 
-    await queryD1(
-      `INSERT INTO site_subscriptions (id, site_id, plan, status, created_at, updated_at)
-       VALUES (?, ?, ?, 'active', ?, ?)`,
-      [`sub_${siteId}`, siteId, order.plan, now, now]
-    );
-    createdRows.push({ kind: 'site_subscription', id: `sub_${siteId}` });
-
     // Update Order status to activated
-    await queryD1('UPDATE orders SET status = "activated", site_id = ?, updated_at = ? WHERE id = ?', [
+    // SQL literal: pakai quote tunggal ('activated') — D1 menolak identifer
+    // quoted double-quote bila SQLITE_DQS=0 (temuan audit 2026-09-29).
+    await queryD1("UPDATE orders SET status = 'activated', site_id = ?, updated_at = ? WHERE id = ?", [
       siteId,
       now,
       orderId
@@ -936,8 +1091,6 @@ export async function activateOrder(
       try {
         if (row.kind === 'site') {
           await queryD1('DELETE FROM sites WHERE id = ?', [row.id]);
-        } else if (row.kind === 'site_subscription') {
-          await queryD1('DELETE FROM site_subscriptions WHERE id = ?', [row.id]);
         }
       } catch (cleanupErr) {
         console.error(`[activateOrder] Cleanup failed for ${row.kind} ${JSON.stringify(row)}:`, cleanupErr);
@@ -964,6 +1117,24 @@ export async function activateOrder(
   const baseUrl = env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://makeitbetter.my.id';
   const siteUrl = `${baseUrl}/${actualSlug}`;
 
+  // Email serah-terima ke pembeli. Dibungkus try/catch: aktivasi sudah
+  // ter-commit ke D1 di atas, kegagalan email tidak boleh menggagalkannya.
+  try {
+    await sendActivationEmail({
+      to: order.buyer_email,
+      orderId,
+      buyerName: order.buyer_name,
+      amount: order.amount,
+      siteSlug: actualSlug,
+      siteUrl,
+    });
+  } catch (err) {
+    console.error(`[activateOrder] Handoff email failed for order ${orderId}:`, err);
+  }
+
+  // Tiket kerja kasir → bengkel (lihat sendWorkshopTicket).
+  await sendWorkshopTicket(order, siteUrl);
+
   const message = `Berhasil mengaktifkan pesanan ${order.id}. Site URL: ${siteUrl}`;
 
   return { success: true, message, siteId };
@@ -972,6 +1143,20 @@ export async function activateOrder(
 // ---------------------------------------------------------------------------
 // Cancel / Refund Order
 // ---------------------------------------------------------------------------
+
+/**
+ * Hapus semua objek bukti bayar milik order di R2 (prefix `orders/{id}/`).
+ * Best-effort: kegagalan cleanup tidak boleh menggagalkan pembatalan order.
+ */
+async function cleanupOrderProofObjects(orderId: string): Promise<void> {
+  if (!isR2StorageConfigured()) return;
+  try {
+    const keys = await listR2ObjectKeys({ prefix: `orders/${orderId}/` });
+    await Promise.all(keys.map((key) => deleteFromR2(key)));
+  } catch (error) {
+    console.warn('[OrderService] Gagal membersihkan bukti bayar di R2:', error);
+  }
+}
 
 export async function cancelOrder(
   orderId: string,
@@ -1011,6 +1196,12 @@ export async function cancelOrder(
   }
 
   const cancelReason = reason?.trim() || 'Dibatalkan oleh Admin (Bukti bayar tidak valid / mutasi tidak ditemukan)';
+
+  // SECURITY FIX (audit 2026-09-29): bersihkan objek bukti bayar di R2.
+  // Sebelumnya DB dibersihkan (payment_proof_url = NULL) tapi file di prefix
+  // `orders/{orderId}/` tetap tertinggal selamanya — PII bukti transfer
+  // masih bisa diakses siapa pun yang punya URL-nya.
+  await cleanupOrderProofObjects(orderId);
 
   // Cleanup: clear sensitive payment proof URL.
   // Keep `amount` intact for late-payment reconciliation and keep `access_token_hash`

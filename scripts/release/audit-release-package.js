@@ -13,7 +13,6 @@ const requiredFiles = [
   'docs/release/BUYER_ONBOARDING.md',
   'docs/release/CLIENT_OPERATIONS.md',
   'docs/release/RELEASE_CHECKLIST.md',
-  'docs/release/LITE_PRO_SCOPE.md',
   'docs/release/PRODUCTION_DEPLOY_RUNBOOK.md',
   'docs/release/RC1_RELEASE_NOTES.md',
   'docs/release/SALES_PRICING.md',
@@ -54,19 +53,16 @@ const requiredEnvKeys = [
   'FEATURE_MASTER_DASHBOARD',
   'FEATURE_AI',
   'FEATURE_NOTIFICATIONS',
-  'PLAN_LITE_PROJECT_LIMIT',
-  'PLAN_LITE_STORAGE_MB',
-  'PLAN_LITE_MEDIA_PER_PROJECT',
-  'PLAN_PRO_PROJECT_LIMIT',
-  'PLAN_PRO_STORAGE_MB',
-  'PLAN_PRO_MEDIA_PER_PROJECT',
+  'PROJECT_LIMIT',
+  'STORAGE_MB',
+  'MEDIA_PER_PROJECT',
   'NEXT_PUBLIC_FFMPEG_BASE_URL',
-  'FEATURE_CLIENT_PASSWORD_RESET',
-  'CLIENT_PASSWORD_RESET_TOKEN_TTL_MINUTES',
 ];
 
 const forbiddenEnvPatterns = [
-  /^TELEGRAM_/,
+  // Catatan: TELEGRAM_* sengaja TIDAK dilarang. Bot notifikasi order adalah
+  // fitur produk opsional (lihat blok "Telegram Billing Admin Bot" di
+  // .env.example), bukan sisa automasi pribadi.
   /^FIREBASE_/,
   /^NEXT_PUBLIC_FIREBASE_/,
   /^VERCEL_/,
@@ -198,8 +194,6 @@ function checkCloudflareDocs() {
     'RC1',
     'sites/{siteId}/',
     'PRODUCT_CLOUDFLARE_ENV_CONFIRMED',
-    '/[siteSlug]/login',
-    'Client password reset',
     'NOTIFICATION_PROVIDER="resend"',
     'SALES_PRICING',
     'manual invoice',

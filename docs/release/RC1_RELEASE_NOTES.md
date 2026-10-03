@@ -14,7 +14,7 @@ This is not a Vercel release. The intended runtime is Cloudflare Workers/OpenNex
 
 - Multi-site / multi-tenant data model.
 - Master site management.
-- Lite/Pro plan metadata and quota guard.
+- Site quota guard (project/storage/media).
 - Client login and self-service dashboard.
 - Project CRUD scoped by site.
 - Cover, gallery image, and gallery video upload flows.
@@ -49,16 +49,16 @@ Latest validation from Sprint 22:
 - Production deploy through `docs/release/PRODUCTION_DEPLOY_RUNBOOK.md` is complete for the Workers URL above.
 - Automated production smoke is complete for `demo-designer`.
 - Validate Master admin login manually.
-- Validate client login manually.
+- Validate panel login manually (`/admin/login` as the buyer).
 - Validate real upload against production R2.
 - Confirm custom domain if used.
 - Record final release details in the release record template.
 
 ## Known Limitations
 
-- Billing is metadata only; no payment provider integration is active.
+- Payment is manual (QRIS/transfer + admin verification); no payment provider integration is active.
 - AI and notification providers are feature-flagged optional integrations and should remain disabled unless product-owned credentials are configured.
-- Custom domain and analytics are product flags/docs level; final implementation should be verified before selling those as active Pro features.
+- Custom domain and analytics are product flags/docs level; final implementation should be verified before selling them as active features.
 - Browser video compression depends on FFmpeg assets in R2 under `ffmpeg/*`.
 
 ## Upgrade Notes For Buyers

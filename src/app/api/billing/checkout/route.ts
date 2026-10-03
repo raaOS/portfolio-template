@@ -10,6 +10,16 @@ import { checkDataRateLimit } from '@/lib/dataRateLimit';
  */
 export async function GET(request: NextRequest) {
   try {
+    // SECURITY FIX (audit 2026-09-29): cek slug juga membaca D1 — beri limit
+    // IP-only agar tidak bisa dijadikan pembanjiran query.
+    const rateLimit = await enforceRequestRateLimit(request, 'billing_slug_check', 30, 60_000, 300_000);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Terlalu banyak permintaan. Silakan coba lagi beberapa saat.', retryAfter: rateLimit.retryAfter },
+        { status: 429 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const slug = searchParams.get('slug');
 
@@ -37,7 +47,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/billing/checkout
- * Buat order baru. Plan dan slug sekarang opsional — default 'pro' dan auto-generate.
+ * Buat order baru. Slug opsional — auto-generate dari nama buyer.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -60,7 +70,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const rateLimit = await enforceRequestRateLimit(request, 'billing_checkout', 10, 60_000, 300_000);
+    // SECURITY FIX (audit 2026-09-29): pool nominal unik hanya 999 slot yang
+    // dikunci 24 jam per order — limit diperketat (5/menit, block 10 menit)
+    // dan key-nya sudah IP-only sejak perbaikan rate limiter.
+    const rateLimit = await enforceRequestRateLimit(request, 'billing_checkout', 5, 60_000, 600_000);
     if (!rateLimit.allowed) {
       return NextResponse.json(
         { error: 'Terlalu banyak permintaan. Silakan coba lagi beberapa saat.', retryAfter: rateLimit.retryAfter },
@@ -69,7 +82,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { buyerName, buyerEmail, buyerWhatsapp, plan, desiredSlug, templateId } = body;
+    const { buyerName, buyerEmail, buyerWhatsapp, desiredSlug, templateId } = body;
 
     if (!buyerName || !buyerEmail || !buyerWhatsapp) {
       return NextResponse.json({ error: 'Data form checkout tidak lengkap' }, { status: 400 });
@@ -95,14 +108,11 @@ export async function POST(request: NextRequest) {
           .replace(/^-|-$/g, '')
           .slice(0, 30) || 'portfolio';
 
-    const selectedPlan = plan === 'lite' ? 'lite' : 'pro';
-
     const result = await createOrder(
       {
         buyerName,
         buyerEmail,
         buyerWhatsapp,
-        plan: selectedPlan,
         desiredSlug: slug,
         templateId: typeof templateId === 'string' && templateId.trim() ? templateId.trim() : undefined,
       },

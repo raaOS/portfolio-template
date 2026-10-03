@@ -3,7 +3,7 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
-## [1.3.11] - 2026-10-02
+## [1.3.18] - 2026-10-03
 
 ### 🔒 Keamanan Alur Order & Billing (Tahap 4–5 Audit)
 
@@ -25,6 +25,95 @@ Enam perbaikan keamanan pada jalur order publik (checkout → upload bukti bayar
 - **Rute `/admin/system/activity-log` ditambahkan** — sebelumnya `APP_ROUTE_MAP` menunjuk ke halaman yang tidak ada, satu-satunya entri `APP_ROUTE_MAP` tanpa `page.tsx` (deep-link langsung ke URL itu akan 404).
 - **Perbaikan lint (1 error `react-hooks/set-state-in-effect`):** pemuatan awal di `ActivityLogPanel` kini dijadwalkan lewat `setTimeout(…, 0)` — pola yang sama dengan `OrdersPanel` — sehingga `setState` tidak dipanggil sinkron di dalam `useEffect`.
 - **Verifikasi:** `npx tsc --noEmit` 0 error, `npx eslint src` 0 error, `npx vitest run` **113 files / 863 tests PASS**.
+
+## [1.3.17] - 2026-10-03
+
+### 🧹 Dokumen & Audit Rilis: Sisa "Login Klien" Dihapus, Audit Rilis Kini Hijau
+
+- **Dokumen tidak lagi menjanjikan pintu yang sudah tidak ada.** Setelah sistem login klien dihapus, masih ada **15 dokumen** yang mengarahkan pembeli ke `/{slug}/login`, `/client/login`, `/client/dashboard`, membuat "client access", atau menjanjikan "reset password lewat email" — semuanya pintu yang sudah roboh (cek di kode: `src/app/api/client/` nol file). Semua diganti dengan kenyataannya: pembeli cuma punya satu pintu, **`/admin/login`** (dashboard kelola di `/admin/client-dashboard`), dan **reset password selalu dibantu owner** lewat `scripts/cloudflare/reset-customer-password.ts`. Dokumen yang tersentuh: panduan serah-terima pembeli, checklist rilis, checklist onboarding, panduan support, runbook backup/monitoring, PRD, kontrak endpoint, dan daftar env.
+- **Uji beban (`npm run load:multi-buyer`) akhirnya bisa jalan lagi.** Skrip itu ternyata memanggil 4 alamat yang sudah tidak ada, jadi sejak v1.3.14 uji beban mustahil jalan sampai titik itu. Diperbaiki ke jalur yang benar-benar ada (login panel + endpoint upload admin), plus satu bug nyata: token admin buatan skrip tidak membawa penanda `siteId` sehingga sejak audit keamanan 29 Sep token itu selalu ditolak. **Check "site A tidak bisa mengakses site B" sengaja dimatikan dan diberi alasan di kode** — check itu dulu butuh satu login per tenant, sedangkan sekarang hanya ada satu akun panel, jadi kalau dipertahankan ia akan selalu "lulus" palsu.
+- **Audit rilis kini hijau penuh: `npm run release:audit` 60/62 (gagal) → 62/62 (lolos).** Dua penyebabnya: (a) aturan lama melarang semua env berawalan `TELEGRAM_`, padahal bot Telegram itu kini **fitur produk** untuk notifikasi order & tiket bengkel — aturannya dilonggarkan, larangan Firebase/Vercel/job-bot pribadi tetap; (b) dokumen diwajibkan menyebut `manual invoice` tapi `SALES_PRICING.md` tidak pernah menulisnya — kalimatnya diluruskan jadi *"Pembayaran manual invoice (QRIS/transfer) lewat halaman order; tidak ada payment gateway otomatis."*
+- **Gate tetap hijau:** TypeScript 0 error, ESLint 0, **881 test lolos**, `release:sale-readiness` 13/13, uji beban mode kering (dry-run) exit 0.
+- **Merge ke `main` kini dijalankan.** Repo utama sudah beres dikerjakan AI lain (14 file, +579/−23, commit `eb5bfeb`) sehingga cabang rilis ini bisa digabung tanpa mengirim pekerjaan setengah jadi. Urutan sisanya: `pre-deploy` → `cf:deploy` → **baru** `npx tsx scripts/cloudflare/remove-plan-columns.ts --apply`.
+- **Keputusan owner: tabel lama `client_access` ikut dihapus.** Tabel itu (4 baris email + hash pembeli, **tidak dibaca kode mana pun**) adalah sisa sistem login klien; pemilik memilih hapus agar database bersih total, jadi **4 email itu hilang permanen** — sengaja tanpa ekspor. `DROP TABLE client_access` ditambahkan ke skrip pembersih dan hanya dijalankan setelah versi ini ter-deploy.
+
+## [1.3.16] - 2026-10-03
+
+### 🔧 Tiket Kerja Otomatis: dari Kasir ke Bengkel + Pembersihan Sisa Fitur Lama
+
+- **Tiket kerja Telegram.** Begitu kamu menekan **✅ Verifikasi & Aktifkan** pada pesan Telegram, pembeli menerima email serah-terima **dan kamu sekarang menerima tiket kerja** berisi 6 langkah bengkel: (1) order aktif, (2) siapkan Gmail klien, (3) buat akun Cloudflare klien, (4) jalankan `PENGELOLA_KLIEN.bat`, (5) deploy, (6) serah-terima akses + tandai selesai — lengkap dengan ID order, slug, nama/WA/email pembeli, dan URL website. Sebelumnya pesan itu hanya berubah jadi "STATUS: ACTIVATED" tanpa panduan langkah, sehingga pekerjaan setelah bayar murni mengandalkan ingatan.
+- **Panduan bengkel baru:** `docs/operations/BENGKEL_HANDOFF.md` menjelaskan keenam langkah itu langkah demi langkah, termasuk menu portal yang benar-benar dipakai, cara menyimpan data klien di `arsip-klien/`, dan cara mereset password klien kalau mereka lupa.
+- **Fitur "Lupa Password" lama dibersihkan sampai tuntas.** Tombol dan halaman reset password sudah lama dihapus dari website, tapi sisa-sisanya masih tersebar: 5 pengecekan rilis yang membuat audit gagal, script monitoring yang mengecek halaman sudah-404, contoh environment variable, script backup, script uji beban, dan 13 dokumen (termasuk FAQ owner yang menjanjikan fitur yang tidak ada). Semua dibersihkan. **Cara beli dan cara login tidak berubah sama sekali** — password klien tetap di-reset manual lewat `scripts/cloudflare/reset-customer-password.ts`.
+- **Audit kesiapan jualan kini hijau:** `npm run release:sale-readiness` naik dari 17/22 (gagal) menjadi **13/13 lolos**.
+- **Pembersihan database (menunggu deploy).** `npx tsx scripts/cloudflare/remove-plan-columns.ts` kini juga menghapus tabel lama `client_password_resets`, di samping kolom `plan` dan tabel `site_subscriptions`. Dry-run sudah dijalankan dan **kelima perintah terkonfirmasi masih ada** di database produksi. **Jangan jalankan `--apply` sebelum versi ini ter-deploy** — panel admin dan kasir yang tayang sekarang masih membaca kolom `plan`.
+- **Gate:** `tsc` 0 error, `eslint` 0 error, **114 file / 881 test lolos**.
+
+## [1.3.15] - 2026-10-03
+
+### 🗑️ Konsep Paket Lite/Pro dan Langganan Dihapus — Cara Beli Tetap Sama
+
+- **Apa yang berubah:** istilah **"paket Lite"**, **"paket Pro"**, serta sistem **langganan/billing bulanan** kini **tidak ada lagi** di mana pun — tidak di halaman pesan, tidak di panel admin, tidak di database, tidak di dokumen. Sekarang hanya ada **satu penawaran dengan satu harga** (`Rp199.000`), sama untuk semua pembeli.
+- **Yang TIDAK berubah (penting):** **cara pembeli memesan tetap persis seperti sebelumnya** — isi form di `/checkout`, pilih alamat website (slug), bayar lewat QRIS/transfer, upload bukti bayar, lalu website dibuat setelah pembayaran diverifikasi. Tombol, halaman, dan email pesanan tetap berfungsi.
+- **Konsekuensi kecil yang perlu diketahui:**
+  - Label **"Paket & Slug"** di panel pesanan kini hanya **"Slug"**; baris **"Paket Terpilih"** di halaman status pesanan dihapus.
+  - Badge nama paket di daftar site admin kini menampilkan **status site (active/suspended)**.
+  - **Dropdown pemilihan Plan** di editor site admin **dihapus** (sebelumnya hanya muncul kalau `FEATURE_MASTER_DASHBOARD=true`).
+  - **Email & pesan Telegram** pesanan/aktivasi tidak lagi menyebut kata "Paket" (struk, kadaluarsa, serah terima).
+  - **Opsi `--plan`** pada script uji beban (`multi-buyer-load-test.js`) dihapus.
+  - Enviroment variable `PLAN_LITE_*` / `PLAN_PRO_*` / `AI_MONTHLY_TOKEN_LIMIT_LITE|PRO` diganti jadi `PROJECT_LIMIT`, `STORAGE_MB`, `MEDIA_PER_PROJECT` (nilai bawaan tetap 50 / 5000 / 50).
+- **Berkas ikut dibersihkan:** `src/lib/product/sitePlan.ts` dihapus (digabung ke `siteQuota.ts`), `src/constants/plans.ts` diganti nama jadi `src/constants/pricing.ts`, `docs/release/LITE_PRO_SCOPE.md` dihapus, dan `docs/release/SALES_PRICING.md` ditulis ulang jadi satu harga tanpa langganan.
+- **Database: kode dulu, data belakangan.** Skrip pembersih sudah disiapkan **tetapi BELUM dijalankan** ke database produksi. Jalankan setelah versi ini ter-deploy:
+  ```bash
+  npx tsx scripts/cloudflare/remove-plan-columns.ts          # lihat rencana (aman)
+  npx tsx scripts/cloudflare/remove-plan-columns.ts --apply  # eksekusi
+  ```
+  Skrip ini menghapus kolom `plan` di tabel `sites` dan `orders`, plus tabel `site_subscriptions`.
+- **Verifikasi:** `tsc --noEmit` 0 error, `eslint src` 0 error, `vitest run` **114 file / 879 test PASS**, sisa rujukan "Lite/Pro/plan/langganan" di kode & dokumen aktif **0** (catatan riwayat di log tracker sengaja dibiarkan).
+
+## [1.3.14] - 2026-10-02
+
+### 🧹 Pembersihan Rute Login Klien yang Sudah Mati + Penghapusan Alias Admin `/portal`
+
+- **Latar:** sistem "login klien" lama sudah dihapus sengaja pada refactor sebelumnya, tapi **sisa-sisanya masih tertinggal** dan semuanya sudah mengarah ke halaman yang tidak ada (404).
+- **Yang dihapus:** rute `/{slug}/login`, tombol **"Login Client"** dan **"Atur Password"** di halaman status pesanan (keduanya 404), blok **"Login client:"** di sidebar admin, serta alias admin tersembunyi **`/portal`** (3 rewrite) beserta daftar rute middleware-nya.
+- **Konsekuensi yang perlu diketahui:** setelah ini **panel admin hanya bisa dibuka lewat `/admin` dan `/admin/login`**. Jika ada bookmark `/portal`, tolong diperbarui. Login admin sendiri **tidak terpengaruh** — sudah diverifikasi sebelum penghapusan.
+- **Logo mata di pojok kiri atas tetap ada** (sesuai permintaan), hanya **tidak mengarah ke mana pun lagi** saat diklik — sebelumnya ia menuju tautan 404.
+- **Yang tidak disentuh:** preview template dan jalur admin lain tetap utuh; tombol **"Custom Domain"** di sidebar admin tetap tampil seperti biasa.
+- **Verifikasi:** `tsc --noEmit` 0 error, `eslint src` 0 error, `vitest run` **114 file / 879 test PASS**, sisa rujukan ke rute yang dihapus **0**.
+
+## [1.3.13] - 2026-10-02
+
+### ✉️ Pembeli Kini Langsung Dapat Email "Website Anda Sudah Aktif" Setelah Order Diaktifkan
+
+- **Masalahnya (ditemukan setelah audit keamanan selesai):** sebelumnya pembeli hanya menerima dua email — email struk saat **membuat pesanan**, dan email saat pesanan **kedaluwarsa**. Momen yang paling ditunggu, yaitu saat website-nya **sudah jadi dan bisa dibuka**, justru tidak pernah memberi kabar ke pembeli. Link website-nya hanya muncul sebagai pesan singkat di panel Telegram pemilik.
+- **Perbaikannya:** begitu pesanan diaktifkan (lewat tombol Telegram maupun panel admin), sistem otomatis mengirim email berisi **alamat website yang sudah hidup**, ringkasan pesanan (nomor order, paket, alamat, total bayar), langkah berikutnya, serta petunjuk cek status pesanan.
+- **Yang sengaja tidak dimasukkan:** tautan `/{slug}/login` tidak dicantumkan karena rute itu mengarah ke halaman yang sudah tidak ada (404), dan tautan `/admin` tidak dicantumkan karena panel tersebut milik pemilik situs, bukan milik pembeli — menyesatkan kalau dikirim ke pembeli.
+- **Pembeli tidak perlu khawatir email terkirim ganda:** kalau pesanan sudah pernah diaktifkan, email tidak dikirim ulang.
+- **Bukti pengujian:** 3 test otomatis baru — email benar-benar terkirim berisi URL website, aktivasi tetap dianggap berhasil walaupun layanan email sedang gangguan, dan tidak ada panggilan sama sekali bila notifikasi belum diaktifkan.
+- **Verifikasi:** `tsc --noEmit` 0 error, `eslint` 0 error, `vitest run` **114 file / 879 test PASS**.
+- **Catatan:** pengiriman email aktif otomatis karena konfigurasi layanan email sudah terpasang di produksi; baru teruji sampai ke kotak masuk begitu versi ini di-deploy.
+
+## [1.3.12] - 2026-09-30
+
+### 🧾 Tombol "Lihat Resi" di Panel Admin Kembali Berhasil Menampilkan Bukti Transfer
+
+- **Masalahnya (ditemukan saat verifikasi produksi, bukan dari audit awal):** file bukti bayar disimpan di bucket R2 dengan path `orders/{id}/…`, sedangkan route publik `/r2/…` **sengaja menolak** path `orders/` agar bukti transfer (berisi nama, nominal, dan tangkapan layar rekening) tidak bisa diakses siapa pun. Akibatnya URL gambar yang tersimpan selalu menjawab **404** — begitu ada pembeli yang mengunggah bukti lewat file, admin menekan "Lihat Resi" dan melihat gambar rusak.
+- **Perbaikannya:** endpoint baru `GET /api/billing/orders/{id}/proof` yang menjadi **satu-satunya jendela akses** bukti bayar — memverifikasi sesi login admin *atau* tautan akses pembeli dulu, baru mengirimkan filenya dengan header `cache-control: private` (tidak boleh disimpan bersama/CDN) dan `nosniff`. Tombol "Lihat Resi" kini menunjuk ke endpoint ini.
+- **Yang sengaja tidak dilakukan:** menambahkan `orders/` ke daftar path publik. Cara itu memang lebih cepat, tapi akan membuka bukti transfer ke publik dan justru membatalkan perlindungan yang sudah ada.
+- **Dijamin lewat 13 test otomatis:** penolakan tanpa token, token tidak cocok, batas laju, alih order (order A tidak bisa membaca berkas order B), penolakan `javascript:`, URL asing dialihkan — bukan ikut diperambat, dan kembalinya 404 bila berkas sudah lenyap dari bucket.
+- **Tidak ada perubahan lain:** lapisan pengeras CSP (`object-src 'none'`, `base-uri 'self'`, `form-action 'self'`, `frame-ancestors 'self'`) sudah terpasang sejak sebelumnya dan sudah diverifikasi tidak perlu ditambah. Pengetatan `script-src` (nonce) tetap ditunda karena berisiko mematikan suara, kompresi video, dan model 3D.
+- **Verifikasi:** `tsc --noEmit` 0 error, `eslint src` 0 error, `vitest run` **114 file / 876 test PASS**.
+
+## [1.3.11] - 2026-09-29
+
+### 🔒 Pembersihan Keamanan Menyeluruh: 19 Temuan Audit Alur Login, Pembayaran & API (4 High / 8 Medium / 7 Low)
+
+- **Latar:** audit keamanan 3 lapis (autentikasi, billing, attack surface API) menemukan 4 temuan High, 8 Medium, 7 Low. Semua sudah diperbaiki bertahap High → Medium → Low dalam satu rilis, lalu diverifikasi penuh.
+- **High — kebocoran & pembypassan:** `GET /api/settings` untuk pengunjung kini hanya mengembalikan 2 field publik (`maintenanceMode`, `allowComments`) — hash `settings/adminPassword`/`adminPin` tidak lagi ikut terkirim; semua rate limit route-level kini mengunci per **IP** (sebelumnya `IP + User-Agent`, jadi rotasi UA bisa me-reset hitungan di 19 route termasuk verifikasi PIN & login); `/api/translate` (memakai API key pemilik) mendapat **kuota harian 200 request per IP** sebagai plafon biaya; `/api/setup` kini punya rate limit untuk GET & POST (menutup banjir scrypt/DoS CPU) dan `siteId` tidak lagi dibocorkan di response-nya.
+- **Medium — webhook, XSS, CSRF, billing:** webhook Telegram kini memverifikasi secret secara *timing-safe*, mengabaikan callback dari luar chat admin (`TELEGRAM_ADMIN_CHAT_ID`), membersihkan nomor WhatsApp dari karakter berbahaya, dan dibatasi 30 request/menit; JSON-LD di 3 halaman kini meng-escape `<` (menutup stored XSS via judul/deskripsi project yang mengandung `</script>`); allowlist CSRF dipadukan **per segmen path** (path baru yang kebetulan berawalan sama tidak lolos); jalur file statis (`/api/r2`, gambar) kini ikut mendapat header keamanan `nosniff`/CSP/`X-Frame-Options` — sebelumnya keluar dari middleware tanpa proteksi; nilai HSTS & Referrer-Policy di `next.config` disamakan dengan middleware (sebelumnya konflik); hapus ikon kini menolak path di luar folder `icons-library` (menutup penghapusan wallpaper/temp oleh sesi admin mana pun); schema update settings kini `.strict()` — tidak bisa lagi menulis key sembarangan ke row `settings`; **upload ulang bukti bayar tidak lagi me-reset hitung mundur pembatalan otomatis 7 hari** (slug & nominal unik tidak bisa dikunci tanpa bayar); checkout dibatasi 5 request/menit dan pengecekan slug juga kini dibatasi — pool 999 nominal unik tidak mudah dikuras.
+- **Low — detail yang dirapikan:** SQL literal `"activated"` diganti `'activated'` (kompatibel dengan mode SQL ketat D1); `templateId` yang dipilih pembeli kini benar-benar tersimpan di order (sebelumnya hilang diam-diam); file bukti bayar di R2 ikut dihapus saat order dibatalkan (sebelumnya hanya referensi database yang dibersihkan); **tautan akses order `?token=` kini kadaluarsa 90 hari** (tautan lama yang bocor tidak berlaku selamanya); token `admin_token` kini membawa klaim `siteId` dan ditolak bila tidak cocok dengan deployment (logout sekali saat pertama kali deploy); pesan error `music/search` tidak lagi membocorkan detail internal.
+- **Perubahan perilaku yang perlu diketahui:** sesi admin aktif akan logout satu kali setelah update ini (token lama tanpa klaim `siteId` ditolak — cukup login ulang); pengunjung yang melebihi 200 translasi/hari akan menerima pesan "kuota harian tercapai"; pembeli yang mengakses tautan pesanan lebih tua dari 90 hari perlu membuat pesanan baru.
+- **Verifikasi:** `tsc --noEmit` 0 error, `eslint src` 0 error, `vitest run` (seluruh suite) **PASS**.
 
 ## [1.3.10] - 2026-09-28
 

@@ -245,7 +245,7 @@ describe('POST /api/projects', () => {
     expect(callArg.year).toBe(2025);
   });
 
-  it('returns quota errors from plan guard', async () => {
+  it('returns quota errors from the site quota guard', async () => {
     const { ProjectQuotaError } = await import('@/lib/admin/projectSiteContext');
     enforceProjectCreateQuotaMock.mockRejectedValue(
       new ProjectQuotaError('Project quota exceeded. Limit: 5', 'PROJECT_LIMIT_EXCEEDED', {

@@ -11,8 +11,8 @@ Tujuan MVP bukan membangun SaaS besar otomatis, melainkan membuktikan bahwa sist
    - Pastikan profil OS UI berubah sesuai data site.
    - Pastikan hanya 2 project `published` yang tampil di Window Explorer.
    - Buka project, pastikan narasi dan media termuat sempurna.
-5. **Validasi Client Lite Self-Service:**
-   - Login sebagai user client Lite.
+5. **Validasi Client Self-Service:**
+   - Login sebagai user client.
    - Edit profil/site miliknya.
    - Tambah/edit/hapus project dalam batas quota.
    - Upload/ganti media scoped ke R2 path `sites/{siteId}/...`.

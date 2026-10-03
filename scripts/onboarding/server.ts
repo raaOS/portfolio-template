@@ -178,8 +178,8 @@ async function provisionClient(
 
   // Seed site row
   const seedSiteSql = `
-    INSERT INTO sites (id, slug, name, plan, status, active_template_key, created_at, updated_at)
-    VALUES ('${siteId}', '${clientSlug}', '${clientName.replace(/'/g, "''")}', 'pro', 'active', '${templateKey}', datetime('now'), datetime('now'))
+    INSERT INTO sites (id, slug, name, status, active_template_key, created_at, updated_at)
+    VALUES ('${siteId}', '${clientSlug}', '${clientName.replace(/'/g, "''")}', 'active', '${templateKey}', datetime('now'), datetime('now'))
     ON CONFLICT(id) DO UPDATE SET
       name = excluded.name,
       active_template_key = excluded.active_template_key,

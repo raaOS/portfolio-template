@@ -10,9 +10,8 @@ Endpoint adalah kontrak baku. Frontend tidak boleh "menebak" shape data.
 
 ## Admin API (Auth Required)
 - `POST /admin/sites` -> Buat site baru (Master only).
-- `PUT /admin/sites/:id` -> Edit data site, plan, billing metadata, dan custom quota add-on.
+- `PUT /admin/sites/:id` -> Edit data site, status, dan custom quota add-on.
 - `PUT /admin/sites/:id/quota` -> Legacy contract; quota custom sekarang masuk payload `PUT /admin/sites` sebagai `quotaOverride`.
-- `PUT /admin/sites/:id/features` -> Atur feature flags Lite/Pro.
 - `POST /admin/projects` -> Buat project scoped `site_id` sebagai admin/master override.
 - `PUT /admin/projects/:id` -> Edit project scoped `site_id`.
 - `DELETE /admin/projects/:id` -> Soft delete project.
@@ -20,20 +19,15 @@ Endpoint adalah kontrak baku. Frontend tidak boleh "menebak" shape data.
 - `POST /admin/upload` -> Upload/override media R2.
 
 ## Client API (Auth Required, Scoped by Site Membership)
-- `GET /client/me/site` -> Ambil site milik client login.
-- `PUT /client/sites/:siteId/profile` -> Client edit profil/site miliknya.
-- `GET /client/sites/:siteId/projects` -> Client melihat project miliknya termasuk draft.
-- `POST /client/sites/:siteId/projects` -> Client membuat project sesuai quota plan.
-- `PUT /client/sites/:siteId/projects/:projectId` -> Client edit project miliknya.
-- `DELETE /client/sites/:siteId/projects/:projectId` -> Client soft delete project miliknya.
-- `POST /client/sites/:siteId/projects/reorder` -> Client reorder project miliknya.
-- `POST /client/sites/:siteId/upload` -> Upload media scoped ke `sites/{siteId}/...` sesuai quota.
-
-## Client Password Reset API (Public, Account-Safe)
-- `POST /client/password-reset/request` -> Minta link reset untuk `siteSlug + email`. Wajib CSRF, rate limit, dan response generic agar tidak membocorkan akun.
-- `POST /client/password-reset/confirm` -> Ganti password dengan reset token sekali pakai. Token disimpan sebagai hash di D1 dan scoped ke `site_id`.
-- Reset self-service produksi wajib punya provider email generic, saat ini `NOTIFICATION_PROVIDER="resend"` dengan `NOTIFICATION_API_KEY` dan `NOTIFICATION_DEFAULT_FROM`.
-- Jangan mengirim token reset lewat response API production dan jangan memakai endpoint master untuk reset self-service client.
+- Tidak ada lagi endpoint `/client/*`. Sistem login client dihapus; pembeli memakai panel `/admin` (session `site_user_token` dari `POST /api/auth/login`).
+- `GET /projects?siteId=...` -> Daftar project (termasuk draft untuk site yang dituju).
+- `POST /projects` -> Buat project (wajib `validateSiteMutationRequest`, cek quota).
+- `PUT /projects/:projectId` -> Edit project.
+- `DELETE /projects/:projectId` -> Soft delete project.
+- `POST /admin/sites/:siteId/project-cover` -> Upload cover (multipart `file`).
+- `POST /admin/sites/:siteId/project-media` -> Upload gallery image (multipart `file`).
+- `POST /admin/sites/:siteId/project-video/presign` -> Presign upload video.
+- Reset password: tidak ada endpoint; owner-assisted lewat `scripts/cloudflare/reset-customer-password.ts`.
 
 ## Site Scope Boundary
 - Tidak semua endpoint harus diberi `siteId`.
@@ -43,16 +37,16 @@ Endpoint adalah kontrak baku. Frontend tidak boleh "menebak" shape data.
 - Jika endpoint mutasi bisa dipakai admin dan client, wajib resolve `siteId`, validasi actor terhadap site, cek plan/quota/feature flag bila relevan, dan revalidate path tenant.
 - Jangan menjadikan `default-site` sebagai fallback data untuk tenant non-default. Tenant non-default harus membaca data sendiri atau fallback template statis yang aman.
 
-## Plan Rules
-- Semua endpoint mutasi wajib memvalidasi `site_id`, membership, quota, dan feature flags.
-- Lite dan Pro sama-sama self-service. Lite dibatasi quota dan fitur; Pro membuka fitur lanjutan.
-- Default quota berasal dari env `PLAN_*`; custom quota per site disimpan di D1 `site_quota_overrides` dan hanya menaikkan limit di atas default plan.
+## Quota Rules
+- Semua endpoint mutasi wajib memvalidasi `site_id`, membership, dan quota.
+- Setiap pembeli mengelola site miliknya sendiri lewat panel `/admin` (satu akun `site_users` per deployment).
+- Default quota berasal dari env `PROJECT_LIMIT`, `STORAGE_MB`, `MEDIA_PER_PROJECT`; custom quota per site disimpan di D1 `site_quota_overrides` dan hanya menaikkan limit di atas default.
 - Jangan membuat endpoint baru yang mengasumsikan Vercel atau 1 deployment per client.
 
 ## Standar Response Sukses
 ```json
 {
-  "site": { "id": "...", "slug": "...", "plan": "lite" },
+  "site": { "id": "...", "slug": "...", "status": "active" },
   "projects": [
     { "id": "...", "title": "...", "status": "published", "narrative": {...}, "galleryItems": [...] }
   ]

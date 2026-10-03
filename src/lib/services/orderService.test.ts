@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   createOrder,
   uploadPaymentProof,
@@ -10,6 +10,16 @@ import {
 } from './orderService';
 import * as cloudflareD1 from '@/lib/cloudflareD1';
 import * as slugService from './slugService';
+
+/**
+ * Set env jadi "tidak dikonfigurasi".
+ * Sengaja lewat cast: `cloudflare-env.d.ts` (hasil `wrangler types`, gitignored)
+ * mendeklarasikan `NOTIFICATION_PROVIDER` properti wajib, jadi
+ * `delete process.env.NOTIFICATION_PROVIDER` gagal type-check (TS2790).
+ */
+function unsetEnv(name: string): void {
+  delete (process.env as Record<string, string | undefined>)[name];
+}
 
 vi.mock('@/lib/cloudflareD1', () => ({
   queryD1: vi.fn()
@@ -42,7 +52,6 @@ describe('orderService', () => {
         buyerName: 'Nanda',
         buyerEmail: 'nanda@test.com',
         buyerWhatsapp: '628123456789',
-        plan: 'pro',
         desiredSlug: 'nanda-design'
       });
 
@@ -65,7 +74,6 @@ describe('orderService', () => {
         buyerName: 'Nanda',
         buyerEmail: 'nanda@test.com',
         buyerWhatsapp: '628123456789',
-        plan: 'pro',
         desiredSlug: 'nanda-design'
       });
 
@@ -91,7 +99,6 @@ describe('orderService', () => {
         buyerName: 'Nanda',
         buyerEmail: 'nanda@test.com',
         buyerWhatsapp: '628123456789',
-        plan: 'pro',
         desiredSlug: 'nanda-design'
       });
 
@@ -135,7 +142,6 @@ describe('orderService', () => {
         buyerName: 'Nanda',
         buyerEmail: 'nanda@test.com',
         buyerWhatsapp: '628123456789',
-        plan: 'pro',
         desiredSlug: 'nanda-design'
       });
 
@@ -164,7 +170,6 @@ describe('orderService', () => {
         buyerName: 'Nanda',
         buyerEmail: 'nanda@test.com',
         buyerWhatsapp: '628123456789',
-        plan: 'pro',
         desiredSlug: 'nanda-design'
       });
 
@@ -179,7 +184,6 @@ describe('orderService', () => {
         buyerName: 'Orang Lain',
         buyerEmail: 'other@test.com',
         buyerWhatsapp: '628123456789',
-        plan: 'pro',
         desiredSlug: 'nanda-design'
       });
 
@@ -200,7 +204,6 @@ describe('orderService', () => {
         buyerName: 'Nanda',
         buyerEmail: 'dup@test.com',
         buyerWhatsapp: '628123456789',
-        plan: 'lite',
         desiredSlug: 'dup-site'
       });
 
@@ -232,7 +235,6 @@ describe('orderService', () => {
           {
             id: 'ORD-123',
             status: 'pending_payment',
-            plan: 'pro',
             desired_slug: 'nanda-design',
             buyer_name: 'Nanda',
             buyer_whatsapp: '62812345'
@@ -252,7 +254,6 @@ describe('orderService', () => {
             id: 'ORD-124',
             status: 'expired',
             amount: 299001,
-            plan: 'pro',
             desired_slug: 'late-design',
             buyer_name: 'Nanda Late',
             buyer_whatsapp: '62812345'
@@ -273,7 +274,6 @@ describe('orderService', () => {
             id: 'ORD-124',
             status: 'expired',
             amount: 299001,
-            plan: 'pro',
             desired_slug: 'late-design',
             buyer_name: 'Nanda Late',
             buyer_whatsapp: '62812345'
@@ -293,7 +293,6 @@ describe('orderService', () => {
             id: 'ORD-124',
             status: 'expired',
             amount: 299001,
-            plan: 'pro',
             desired_slug: 'late-design',
             buyer_name: 'Nanda Late',
             buyer_whatsapp: '62812345'
@@ -325,7 +324,6 @@ describe('orderService', () => {
         buyer_name: 'Nanda',
         buyer_email: 'newbuyer@test.com',
         buyer_whatsapp: '628123456789',
-        plan: 'pro',
         payment_proof_url: 'https://proof.png',
         status: 'waiting_verification'
       };
@@ -333,7 +331,6 @@ describe('orderService', () => {
       vi.mocked(cloudflareD1.queryD1)
         .mockResolvedValueOnce([order]) // lock order with UPDATE RETURNING
         .mockResolvedValueOnce([]) // insert sites
-        .mockResolvedValueOnce([]) // insert site_subscriptions
         .mockResolvedValueOnce([]) // update order activated
         .mockResolvedValueOnce([]); // insert audit_log
 
@@ -360,7 +357,6 @@ describe('orderService', () => {
         buyer_name: 'Nanda',
         buyer_email: 'cleanup@test.com',
         buyer_whatsapp: '628123456789',
-        plan: 'pro',
         payment_proof_url: 'https://proof.png',
         status: 'waiting_verification'
       };
@@ -368,7 +364,6 @@ describe('orderService', () => {
       vi.mocked(cloudflareD1.queryD1)
         .mockResolvedValueOnce([order]) // lock order
         .mockResolvedValueOnce([]) // insert sites
-        .mockResolvedValueOnce([]) // insert site_subscriptions
         .mockRejectedValueOnce(new Error('UPDATE orders activated failed')); // fail after inserts
 
       const res = await activateOrder('ORD-777');
@@ -380,7 +375,187 @@ describe('orderService', () => {
       );
       const deleteSql = deleteCalls.map(([sql]) => String(sql));
       expect(deleteSql.some((sql) => sql.includes('DELETE FROM sites WHERE id = ?'))).toBe(true);
-      expect(deleteSql.some((sql) => sql.includes('DELETE FROM site_subscriptions WHERE id = ?'))).toBe(true);
+    });
+  });
+
+  describe('activateOrder (email serah-terima)', () => {
+    const savedEmailEnv: Record<string, string | undefined> = {
+      NOTIFICATION_PROVIDER: process.env.NOTIFICATION_PROVIDER,
+      NOTIFICATION_API_KEY: process.env.NOTIFICATION_API_KEY,
+      NOTIFICATION_DEFAULT_FROM: process.env.NOTIFICATION_DEFAULT_FROM,
+    };
+
+    function enableResend(): void {
+      process.env.NOTIFICATION_PROVIDER = 'resend';
+      process.env.NOTIFICATION_API_KEY = 're_test_key';
+      process.env.NOTIFICATION_DEFAULT_FROM = 'halo@example.com';
+    }
+
+    function mockSuccessfulActivation(): void {
+      const order = {
+        id: 'ORD-123',
+        desired_slug: 'nanda-design',
+        buyer_name: 'Nanda',
+        buyer_email: 'newbuyer@test.com',
+        buyer_whatsapp: '628123456789',
+        amount: 1500000,
+        payment_proof_url: 'https://proof.png',
+        status: 'waiting_verification',
+      };
+
+      vi.mocked(cloudflareD1.queryD1)
+        .mockResolvedValueOnce([order]) // lock order with UPDATE RETURNING
+        .mockResolvedValueOnce([]) // insert sites
+        .mockResolvedValueOnce([]) // update order activated
+        .mockResolvedValueOnce([]); // insert audit_log
+    }
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      for (const [key, value] of Object.entries(savedEmailEnv)) {
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
+    });
+
+    it('sends a handoff email containing the live site URL after activation', async () => {
+      enableResend();
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+      vi.stubGlobal('fetch', fetchMock);
+      mockSuccessfulActivation();
+
+      const res = await activateOrder('ORD-123');
+
+      expect(res.success).toBe(true);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe('https://api.resend.com/emails');
+
+      const payload = JSON.parse(String(init.body));
+      expect(payload.to).toBe('newbuyer@test.com');
+      expect(payload.subject).toContain('Sudah Aktif');
+      expect(payload.text).toMatch(/https?:\/\/\S+\/nanda-design/);
+      expect(payload.text).toContain('ORD-123');
+      expect(payload.text).toContain('Rp 1.500.000');
+      expect(payload.html).toContain('/nanda-design');
+      expect(payload.html).toContain('Buka Website Anda');
+    });
+
+    it('still reports activation as successful when the email provider fails', async () => {
+      enableResend();
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('resend down')));
+      mockSuccessfulActivation();
+
+      const res = await activateOrder('ORD-123');
+
+      expect(res.success).toBe(true);
+      expect(res.message).toContain('Berhasil mengaktifkan');
+      expect(res.siteId).toBeDefined();
+    });
+
+    it('does not call the provider when notifications are not configured', async () => {
+      unsetEnv('NOTIFICATION_PROVIDER');
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+      vi.stubGlobal('fetch', fetchMock);
+      mockSuccessfulActivation();
+
+      const res = await activateOrder('ORD-123');
+
+      expect(res.success).toBe(true);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('activateOrder (tiket kerja bengkel)', () => {
+    const savedEnv: Record<string, string | undefined> = {
+      TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
+      TELEGRAM_ADMIN_CHAT_ID: process.env.TELEGRAM_ADMIN_CHAT_ID,
+      NOTIFICATION_PROVIDER: process.env.NOTIFICATION_PROVIDER,
+      NOTIFICATION_API_KEY: process.env.NOTIFICATION_API_KEY,
+      NOTIFICATION_DEFAULT_FROM: process.env.NOTIFICATION_DEFAULT_FROM,
+    };
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      for (const [key, value] of Object.entries(savedEnv)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    });
+
+    it('sends a workshop ticket to Telegram after activation', async () => {
+      process.env.TELEGRAM_BOT_TOKEN = 'tg_test_token';
+      process.env.TELEGRAM_ADMIN_CHAT_ID = '12345';
+      unsetEnv('NOTIFICATION_PROVIDER');
+
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const order = {
+        id: 'ORD-TKT',
+        desired_slug: 'tiket-site',
+        buyer_name: 'Nanda',
+        buyer_email: 'nanda@test.com',
+        buyer_whatsapp: '628123456789',
+        payment_proof_url: 'https://proof.png',
+        status: 'waiting_verification',
+      };
+
+      vi.mocked(cloudflareD1.queryD1)
+        .mockResolvedValueOnce([order]) // lock order with UPDATE RETURNING
+        .mockResolvedValueOnce([]) // insert sites
+        .mockResolvedValueOnce([]) // update order activated
+        .mockResolvedValueOnce([]); // insert audit_log
+
+      const res = await activateOrder('ORD-TKT');
+
+      expect(res.success).toBe(true);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe('https://api.telegram.org/bottg_test_token/sendMessage');
+
+      const payload = JSON.parse(String(init.body));
+      expect(payload.chat_id).toBe('12345');
+      expect(payload.parse_mode).toBe('HTML');
+      expect(payload.text).toContain('TIKET KERJA');
+      expect(payload.text).toContain('PENGELOLA_KLIEN.bat');
+      expect(payload.text).toContain('/tiket-site');
+      expect(payload.text).toContain('nanda@test.com');
+    });
+
+    it('still succeeds when Telegram is not configured', async () => {
+      delete process.env.TELEGRAM_BOT_TOKEN;
+      delete process.env.TELEGRAM_ADMIN_CHAT_ID;
+      unsetEnv('NOTIFICATION_PROVIDER');
+
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const order = {
+        id: 'ORD-NTG',
+        desired_slug: 'tanpa-telegram',
+        buyer_name: 'Nanda',
+        buyer_email: 'nanda@test.com',
+        buyer_whatsapp: '628123456789',
+        payment_proof_url: 'https://proof.png',
+        status: 'waiting_verification',
+      };
+
+      vi.mocked(cloudflareD1.queryD1)
+        .mockResolvedValueOnce([order])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      const res = await activateOrder('ORD-NTG');
+
+      expect(res.success).toBe(true);
+      expect(fetchMock).not.toHaveBeenCalled();
     });
   });
 
@@ -409,7 +584,6 @@ describe('orderService', () => {
             buyer_email: 'a@b.com',
             buyer_name: 'A',
             desired_slug: 'stale-site',
-            plan: 'pro',
           },
         ]) // UPDATE ... RETURNING (expired)
         .mockResolvedValueOnce([]); // activating recovery update
@@ -457,7 +631,6 @@ describe('orderService', () => {
         buyer_name: 'L',
         buyer_email: 'late@test.com',
         buyer_whatsapp: '628',
-        plan: 'pro',
         payment_proof_url: null,
         status: 'waiting_verification',
       };
@@ -468,7 +641,6 @@ describe('orderService', () => {
         .mockResolvedValueOnce([]) // existingClients check (empty)
         .mockResolvedValueOnce([]) // insert sites
         .mockResolvedValueOnce([]) // insert client_access
-        .mockResolvedValueOnce([]) // insert site_subscriptions
         .mockResolvedValueOnce([]) // update order activated
         .mockResolvedValueOnce([]); // insert audit_log
 

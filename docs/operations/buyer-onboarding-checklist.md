@@ -8,7 +8,8 @@ Checklist ini untuk operator yang meng-onboard buyer baru ke Portfolio OS Templa
 
 - Akses admin aktif (sudah login ke `/admin`).
 - Master Dashboard tersedia (`FEATURE_MASTER_DASHBOARD=true`).
-- Notification provider sudah dikonfigurasi jika ingin mengirim email reset password otomatis.
+- Notification provider sudah dikonfigurasi untuk email struk & serah-terima
+  (reset password tidak memakai email).
 
 ## Checklist
 
@@ -18,25 +19,23 @@ Checklist ini untuk operator yang meng-onboard buyer baru ke Portfolio OS Templa
 - [ ] Isi:
   - **Nama site**: nama bisnis/portfolio buyer.
   - **Slug**: URL-friendly identifier (contoh: `studio-andi`). Akan menjadi `<domain>/<slug>`.
-  - **Plan**: pilih `lite` atau `pro` sesuai paket yang dibeli.
 - [ ] Klik **Simpan**.
 - [ ] Catat **Site ID** dan **Slug** yang sudah terbuat.
 
-### 2. Set Client Access
+### 2. Siapkan Akses Panel Buyer
 
-- [ ] Di Master Dashboard → klik site yang baru dibuat → bagian **Client Access**.
-- [ ] Isi:
-  - **Email**: email buyer yang akan dipakai login.
-  - **Password**: password sementara yang kuat (minimal 8 karakter).
-- [ ] Klik **Simpan**.
+- [ ] Buyer membuka `<domain>/setup` sekali untuk membuat email + password panel.
+      (Untuk deployment yang sudah terisi, reset dari komputermu:
+      `npx tsx scripts/cloudflare/reset-customer-password.ts`.)
+- [ ] Catat email panel yang dipakai buyer.
 
 ### 3. Kirim Kredensial ke Buyer
 
 - [ ] Kirim informasi berikut ke buyer (via email/chat pribadi, BUKAN publik):
-  - URL login: `<domain>/<slug>/login`
-  - Email: (yang sudah didaftarkan)
-  - Password sementara: (yang sudah di-set)
-  - Instruksi: "Silakan login, lalu segera ubah password Anda melalui menu reset password."
+  - URL login: `<domain>/admin/login` (tidak ada halaman login per-site)
+  - Email panel: (yang dibuat saat `/setup`)
+  - Password: (dibuat buyer sendiri, atau direset owner)
+  - Instruksi: "Simpan password Anda. Kalau lupa, hubungi kami untuk direset — tidak ada reset password otomatis."
 - [ ] Jangan kirim password via channel yang bisa diakses publik.
 
 ### 4. Verifikasi Buyer Bisa Login
@@ -46,13 +45,13 @@ Checklist ini untuk operator yang meng-onboard buyer baru ke Portfolio OS Templa
 
 ### 5. Buyer Isi Profil
 
-- [ ] Buyer membuka Client Dashboard setelah login.
+- [ ] Buyer membuka `/admin/client-dashboard` setelah login.
 - [ ] Buyer mengisi konten profil melalui modul yang tersedia:
-  - Profil / About (Lite & Pro)
-  - Kontak (Lite & Pro)
-  - Pengalaman / Hard Skills (Lite & Pro)
-  - Pengaturan Sistem / Tampilan (Pro only)
-  - Testimoni (Pro only)
+  - Profil / About
+  - Kontak
+  - Pengalaman / Hard Skills
+  - Pengaturan Sistem / Tampilan (jika `FEATURE_*` terkait aktif)
+  - Testimoni (jika `FEATURE_*` terkait aktif)
 
 ### 6. Buyer Buat Project Pertama
 
@@ -90,5 +89,5 @@ Jika buyer memerlukan quota di luar default plan:
 ## Catatan
 
 - Jangan buat lebih dari satu client access per site kecuali memang dibutuhkan.
-- Jika buyer membeli plan Pro, pastikan plan di Master Dashboard sudah benar sebelum mengirim kredensial.
-- Reset password self-service hanya tersedia jika `FEATURE_CLIENT_PASSWORD_RESET=true` dan notification provider aktif.
+- Pastikan status site dan quota-nya benar sebelum mengirim kredensial.
+- Tidak ada reset password self-service; perubahan password klien dilakukan manual oleh owner.

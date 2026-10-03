@@ -122,13 +122,11 @@ JWT_SECRET=""
 PASSWORD_SALT=""
 ADMIN_PASSWORD_SCRYPT=""
 REVALIDATION_TOKEN=""
-FEATURE_CLIENT_PASSWORD_RESET="true"
-CLIENT_PASSWORD_RESET_TOKEN_TTL_MINUTES="30"
 ```
 
 Generate fresh secrets per product install. Do not reuse personal portfolio secrets.
 
-For production client password reset, configure email delivery:
+For order emails (payment receipt and handoff), configure email delivery:
 
 ```env
 NOTIFICATION_PROVIDER="resend"
@@ -137,7 +135,9 @@ NOTIFICATION_DEFAULT_FROM=""
 NEXT_PUBLIC_SITE_URL="https://your-production-domain.example"
 ```
 
-Without those values, client reset password cannot be considered self-service in production.
+Without those values, buyers receive no order or activation email at all.
+Password resets do not use email: they are owner-assisted via
+`scripts/cloudflare/reset-customer-password.ts`.
 
 ## 5. Bootstrap Product Data
 
@@ -183,8 +183,8 @@ Open:
 
 ```text
 http://localhost:3000
-http://localhost:3000/client/login
-http://localhost:3000/client/dashboard
+http://localhost:3000/admin/login
+http://localhost:3000/admin/client-dashboard
 ```
 
 For Cloudflare Worker local runtime:
@@ -198,7 +198,7 @@ Smoke URLs:
 
 ```text
 http://localhost:8788/api/health
-http://localhost:8788/client/login
+http://localhost:8788/admin/login
 http://localhost:8788/api/public/sites/demo-designer/projects
 ```
 
@@ -225,21 +225,20 @@ After deploy:
 4. Check public site route.
 5. Login to Master admin.
 6. Create a new site.
-7. Create a client access account.
-8. Send the client `/[siteSlug]/login`, email, and initial password.
-9. Login as client at `/[siteSlug]/login`.
-10. Test `Lupa Password` and confirm the reset email is delivered.
-11. Upload a cover/gallery media file.
-12. Verify media appears and R2 usage updates.
+7. Send the client the public site URL and the panel URL `/admin/login`.
+8. Login as the buyer at `/admin/login` (account created during `/setup`).
+9. Test the order confirmation email and the handoff email after activation.
+10. Upload a cover/gallery media file.
+11. Verify media appears and R2 usage updates.
 
 ## 8. Operating Model
 
 - Master admin creates and manages sites.
-- Master admin sets Lite/Pro plan and billing metadata.
-- Client dashboard is self-service per site.
-- Client password reset is self-service only when email delivery is configured.
-- Lite clients are limited by project, storage, and media-per-project quota.
-- Pro clients get higher quota and optional integrations.
+- Master admin sets site status and optional quota overrides.
+- Buyers manage their own content in the `/admin` panel (self-service, one account per deployment).
+- Password reset is owner-assisted only; there is no self-service reset.
+- All clients are limited by project, storage, and media-per-project quota.
+- Higher quota is sold as an add-on when needed.
 
 ## 9. Do Not Do
 
@@ -248,4 +247,4 @@ After deploy:
 - Do not store media outside `sites/{siteId}/...` unless it is shared product asset such as `ffmpeg/*`.
 - Do not paste secret values into docs, tracker logs, or issue comments.
 - Do not reintroduce personal Telegram/job-hunter/contact credentials into the product template.
-- Do not sell reset password as self-service until `NOTIFICATION_PROVIDER`, `NOTIFICATION_API_KEY`, `NOTIFICATION_DEFAULT_FROM`, and `NEXT_PUBLIC_SITE_URL` are configured.
+- Do not sell or promise self-service password reset; it does not exist in this product.

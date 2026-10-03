@@ -9,8 +9,8 @@
 
 ## Alur Upload
 1. **Upload Admin Master:** Admin dapat upload/override media semua site via Worker endpoint atau *signed URL* untuk kebutuhan support.
-2. **Upload Client Lite:** Client boleh upload/ganti media project sendiri dengan quota ketat, ukuran file terbatas, dan path selalu scoped ke `siteId`.
-3. **Upload Client Pro:** Client mendapat quota lebih besar, opsi media lebih banyak, dan fitur tambahan seperti submission/approval workflow jika diaktifkan.
+2. **Upload Client:** Client boleh upload/ganti media project sendiri dengan batas quota site, ukuran file terbatas, dan path selalu scoped ke `siteId`.
+3. **Opsi lanjutan:** Submission/approval workflow dan fitur tambahan lain aktif jika feature flag terkait diaktifkan.
 
 ## Optimasi & Quota
 - Lakukan kompresi (WASM FFmpeg / Sharp) sebelum atau saat upload.

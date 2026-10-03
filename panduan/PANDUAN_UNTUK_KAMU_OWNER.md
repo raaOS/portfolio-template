@@ -89,7 +89,7 @@ Jika ada kendala saat aktivasi, kabari kami ya Kak. Selamat berkarya! 🚀
 ## ❓ Tanya Jawab Umum (FAQ untuk Kamu)
 
 ### 1. Bagaimana jika klien lupa password akun mereka?
-Klien tidak bisa mengulang `/setup` jika database sudah terkunci. Kamu bisa bantu me-reset password mereka melalui database D1 dengan perintah terminal atau men-generate token baru via script admin.
+Klien tidak bisa mengulang `/setup` karena database sudah terkunci. Reset dilakukan manual dari komputermu dengan perintah: `npx tsx scripts/cloudflare/reset-customer-password.ts <folder-arsip> --email admin@klien.com --generate` (ganti `<folder-arsip>` dengan nama folder klien di `arsip-klien/`, dan `--generate` akan membuat password baru yang tinggal kamu kirimkan ke klien).
 
 ### 2. Apakah ada biaya bulanan yang harus saya bayar?
 Tidak ada untuk skala normal. Cloudflare memberikan kuota gratis yang sangat besar (jutaan request per bulan dan penyimpanan database D1 yang cukup untuk ratusan portofolio standar).

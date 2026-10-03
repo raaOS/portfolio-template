@@ -5,13 +5,12 @@ import { queryD1 } from '@/lib/cloudflareD1';
 import {
   countProjectMediaRefs,
   getEffectiveSiteQuota,
-  getPlanQuota,
-  normalizeProductPlan,
+  loadSiteQuotaOverrideMap,
   normalizeSiteQuotaOverride,
-  sanitizeSiteQuotaOverrideForPlan,
+  upsertSiteQuotaOverride,
+  type SiteQuota,
   type SiteQuotaOverride,
-} from '@/lib/product/sitePlan';
-import { loadSiteQuotaOverrideMap, upsertSiteQuotaOverride } from '@/lib/product/siteQuota';
+} from '@/lib/product/siteQuota';
 import {
   getStorageQuotaBytes,
   getSiteStoragePrefix,
@@ -29,21 +28,10 @@ type SiteSummaryRow = {
   id: string;
   slug: string;
   name: string;
-  plan: string;
   status: string;
   created_at: string;
   updated_at: string;
   project_count: number;
-};
-
-type SiteSubscriptionSummaryRow = {
-  site_id: string;
-  plan: string;
-  status: string;
-  current_period_end: string | null;
-  external_customer_id: string | null;
-  external_subscription_id: string | null;
-  updated_at: string;
 };
 
 type ProjectMediaUsageRow = {
@@ -53,9 +41,7 @@ type ProjectMediaUsageRow = {
   media_count: number;
 };
 
-const sitePlanSchema = z.enum(['lite', 'pro']);
 const siteStatusSchema = z.enum(['active', 'suspended']);
-const billingStatusSchema = z.enum(['trialing', 'active', 'past_due', 'canceled']);
 const quotaOverrideSchema = z
   .object({
     projectLimit: z.number().int().positive().nullable().optional(),
@@ -67,7 +53,6 @@ const quotaOverrideSchema = z
 const createSiteSchema = z.object({
   name: z.string().trim().min(2).max(80),
   slug: z.string().trim().max(80).optional(),
-  plan: sitePlanSchema.default('lite'),
   status: siteStatusSchema.default('active'),
   quotaOverride: quotaOverrideSchema.optional(),
 });
@@ -77,10 +62,7 @@ const updateSiteSchema = z
     id: z.string().trim().min(1),
     name: z.string().trim().min(2).max(80).optional(),
     slug: z.string().trim().max(80).optional(),
-    plan: sitePlanSchema.optional(),
     status: siteStatusSchema.optional(),
-    billingStatus: billingStatusSchema.optional(),
-    currentPeriodEnd: z.string().trim().max(80).optional().nullable(),
     quotaOverride: quotaOverrideSchema.optional(),
     customDomain: z.string().trim().max(120).nullable().optional(),
   })
@@ -88,10 +70,7 @@ const updateSiteSchema = z
     (data) =>
       data.name ||
       data.slug ||
-      data.plan ||
       data.status ||
-      data.billingStatus ||
-      data.currentPeriodEnd !== undefined ||
       data.quotaOverride !== undefined ||
       data.customDomain !== undefined,
     {
@@ -139,19 +118,7 @@ function databaseMutationErrorResponse(error: unknown) {
   return null;
 }
 
-function placeholders(values: unknown[]) {
-  return values.map(() => '?').join(', ');
-}
-
-function mapSubscriptionRows(rows: SiteSubscriptionSummaryRow[]) {
-  const bySiteId = new Map<string, SiteSubscriptionSummaryRow>();
-  rows.forEach((row) => {
-    bySiteId.set(row.site_id, row);
-  });
-  return bySiteId;
-}
-
-function hasQuotaReduction(currentQuota: ReturnType<typeof getPlanQuota>, nextQuota: ReturnType<typeof getPlanQuota>) {
+function hasQuotaReduction(currentQuota: SiteQuota, nextQuota: SiteQuota) {
   return (
     nextQuota.projectLimit < currentQuota.projectLimit ||
     nextQuota.storageMb < currentQuota.storageMb ||
@@ -202,7 +169,6 @@ async function loadSiteSummaries(
         s.id,
         s.slug,
         s.name,
-        s.plan,
         s.status,
         s.created_at,
         s.updated_at,
@@ -210,66 +176,41 @@ async function loadSiteSummaries(
       FROM sites s
       LEFT JOIN projects p ON p.site_id = s.id
       ${whereSql}
-      GROUP BY s.id, s.slug, s.name, s.plan, s.status, s.created_at, s.updated_at
+      GROUP BY s.id, s.slug, s.name, s.status, s.created_at, s.updated_at
       ORDER BY s.created_at ASC`,
     params
   );
 
   const siteIds = rows.map((row) => row.id);
   const storageUsages = await Promise.all(siteIds.map((siteId) => getSiteStorageUsageSafe(siteId)));
-  const relationParams = placeholders(siteIds);
-  const [subscriptionRows, quotaOverrides, customDomainStatuses] =
+  const [quotaOverrides, customDomainStatuses] =
     siteIds.length > 0
       ? await Promise.all([
-          queryD1<SiteSubscriptionSummaryRow>(
-            `SELECT site_id, plan, status, current_period_end, external_customer_id, external_subscription_id, updated_at
-             FROM site_subscriptions
-             WHERE site_id IN (${relationParams})`,
-            siteIds
-          ),
           loadSiteQuotaOverrideMap(siteIds),
           customDomainService.getStatuses(siteIds),
         ])
       : [
-          [],
           new Map<string, SiteQuotaOverride>(),
           new Map<string, Awaited<ReturnType<typeof customDomainService.getStatus>>>(),
         ];
 
-  const subscriptionBySiteId = mapSubscriptionRows(subscriptionRows);
-
   return rows.map((row, index) => {
-    const plan = normalizeProductPlan(row.plan);
     const quotaOverride = quotaOverrides.get(row.id) ?? normalizeSiteQuotaOverride(null);
-    const quotaDefault = getPlanQuota(plan);
-    const subscription = subscriptionBySiteId.get(row.id);
     const domainRecord = customDomainStatuses.get(row.id);
 
     return {
       id: row.id,
       slug: row.slug,
       name: row.name,
-      plan,
       status: row.status,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
-      quota: getEffectiveSiteQuota(plan, quotaOverride),
-      quotaDefault,
+      quota: getEffectiveSiteQuota(quotaOverride),
       quotaOverride,
       usage: {
         projects: Number(row.project_count || 0),
         storage: storageUsages[index],
       },
-      billing: subscription
-        ? {
-            plan: normalizeProductPlan(subscription.plan),
-            status: subscription.status,
-            currentPeriodEnd: subscription.current_period_end,
-            externalCustomerId: subscription.external_customer_id,
-            externalSubscriptionId: subscription.external_subscription_id,
-            updatedAt: subscription.updated_at,
-          }
-        : null,
       customDomain: domainRecord
         ? {
             customDomain: domainRecord.customDomain,
@@ -288,11 +229,9 @@ async function loadSiteSummaryById(siteId: string) {
 
 async function quotaChangeViolationResponse({
   siteId,
-  nextPlan,
   nextOverride,
 }: {
   siteId: string;
-  nextPlan?: 'lite' | 'pro';
   nextOverride?: SiteQuotaOverride;
 }) {
   const site = await loadSiteSummaryById(siteId);
@@ -300,12 +239,9 @@ async function quotaChangeViolationResponse({
     return NextResponse.json({ error: 'Site not found' }, { status: 404 });
   }
 
-  const effectivePlan = nextPlan ?? site.plan;
   const sanitizedOverride =
-    nextOverride === undefined
-      ? site.quotaOverride
-      : sanitizeSiteQuotaOverrideForPlan(effectivePlan, nextOverride);
-  const nextQuota = getEffectiveSiteQuota(effectivePlan, sanitizedOverride);
+    nextOverride === undefined ? site.quotaOverride : normalizeSiteQuotaOverride(nextOverride);
+  const nextQuota = getEffectiveSiteQuota(sanitizedOverride);
 
   if (!hasQuotaReduction(site.quota, nextQuota)) return null;
 
@@ -337,11 +273,10 @@ async function quotaChangeViolationResponse({
 
   return NextResponse.json(
     {
-      error: 'Plan change blocked by quota usage',
-      errorCode: 'PLAN_QUOTA_VIOLATION',
+      error: 'Quota change blocked by usage',
+      errorCode: 'QUOTA_VIOLATION',
       details: {
         siteId,
-        nextPlan: effectivePlan,
         quota: nextQuota,
         quotaOverride: sanitizedOverride,
         usage: site.usage,
@@ -351,59 +286,6 @@ async function quotaChangeViolationResponse({
     },
     { status: 409 }
   );
-}
-
-async function upsertSiteSubscription(
-  siteId: string,
-  plan: 'lite' | 'pro' | undefined,
-  billingStatus: 'trialing' | 'active' | 'past_due' | 'canceled' | undefined,
-  currentPeriodEnd: string | null | undefined
-) {
-  if (!plan && !billingStatus && currentPeriodEnd === undefined) return;
-
-  const now = new Date().toISOString();
-  const existingRows = await queryD1<{ id: string }>(
-    `SELECT id FROM site_subscriptions WHERE site_id = ? LIMIT 1`,
-    [siteId]
-  );
-  const existing = existingRows[0];
-
-  if (!existing) {
-    await queryD1(
-      `INSERT INTO site_subscriptions
-       (id, site_id, plan, status, current_period_end, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [
-        `sub-${crypto.randomUUID()}`,
-        siteId,
-        plan || 'lite',
-        billingStatus || 'trialing',
-        currentPeriodEnd ?? null,
-        now,
-        now,
-      ]
-    );
-    return;
-  }
-
-  const updates: string[] = [];
-  const params: Array<string | number | boolean | null> = [];
-  if (plan) {
-    updates.push('plan = ?');
-    params.push(plan);
-  }
-  if (billingStatus) {
-    updates.push('status = ?');
-    params.push(billingStatus);
-  }
-  if (currentPeriodEnd !== undefined) {
-    updates.push('current_period_end = ?');
-    params.push(currentPeriodEnd || null);
-  }
-
-  updates.push('updated_at = ?');
-  params.push(now, siteId);
-  await queryD1(`UPDATE site_subscriptions SET ${updates.join(', ')} WHERE site_id = ?`, params);
 }
 
 export async function GET(request: NextRequest) {
@@ -445,15 +327,14 @@ export async function POST(request: NextRequest) {
     const siteId = `site-${crypto.randomUUID()}`;
 
     await queryD1(
-      `INSERT INTO sites (id, slug, name, plan, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [siteId, slug, parsed.data.name, parsed.data.plan, parsed.data.status, now, now]
+      `INSERT INTO sites (id, slug, name, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [siteId, slug, parsed.data.name, parsed.data.status, now, now]
     );
 
     if (parsed.data.quotaOverride !== undefined) {
       await upsertSiteQuotaOverride({
         siteId,
-        plan: parsed.data.plan,
         override: parsed.data.quotaOverride,
       });
     }
@@ -468,7 +349,7 @@ export async function POST(request: NextRequest) {
       entityType: 'site',
       entityId: siteId,
       message: 'Site created',
-      metadata: { plan: parsed.data.plan, status: parsed.data.status },
+      metadata: { status: parsed.data.status },
     });
     return NextResponse.json({ site }, { status: 201 });
   } catch (error) {
@@ -506,10 +387,9 @@ export async function PUT(request: NextRequest) {
         ? normalizeSiteQuotaOverride(parsed.data.quotaOverride)
         : undefined;
 
-    if (parsed.data.plan !== undefined || nextOverride !== undefined) {
+    if (nextOverride !== undefined) {
       const quotaResponse = await quotaChangeViolationResponse({
         siteId: parsed.data.id,
-        nextPlan: parsed.data.plan,
         nextOverride,
       });
       if (quotaResponse) return quotaResponse;
@@ -529,11 +409,6 @@ export async function PUT(request: NextRequest) {
       if (slugError) return NextResponse.json({ error: slugError }, { status: 400 });
       updates.push('slug = ?');
       params.push(slug);
-    }
-
-    if (parsed.data.plan !== undefined) {
-      updates.push('plan = ?');
-      params.push(parsed.data.plan);
     }
 
     if (parsed.data.status !== undefined) {
@@ -556,26 +431,9 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Site not found' }, { status: 404 });
     }
 
-    await upsertSiteSubscription(
-      parsed.data.id,
-      parsed.data.plan,
-      parsed.data.billingStatus,
-      parsed.data.currentPeriodEnd
-    );
-
     if (nextOverride !== undefined) {
-      const quotaPlan =
-        parsed.data.plan ??
-        normalizeProductPlan(
-          (
-            await queryD1<{ plan: string }>(`SELECT plan FROM sites WHERE id = ? LIMIT 1`, [
-              parsed.data.id,
-            ])
-          )[0]?.plan
-        );
       await upsertSiteQuotaOverride({
         siteId: parsed.data.id,
-        plan: quotaPlan,
         override: nextOverride,
       });
     }
@@ -598,9 +456,7 @@ export async function PUT(request: NextRequest) {
         changed: {
           name: parsed.data.name !== undefined,
           slug: parsed.data.slug !== undefined,
-          plan: parsed.data.plan !== undefined,
           status: parsed.data.status !== undefined,
-          billingStatus: parsed.data.billingStatus !== undefined,
           quotaOverride: parsed.data.quotaOverride !== undefined,
         },
       },
@@ -676,7 +532,6 @@ export async function DELETE(request: NextRequest) {
     }
 
     const deleteTables = [
-      'site_subscriptions',
       'site_quota_overrides',
       'media_assets',
       'project_narratives',

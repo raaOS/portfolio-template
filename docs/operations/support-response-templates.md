@@ -6,8 +6,7 @@ Template jawaban support untuk operator. Copy-paste dan sesuaikan bagian dalam k
 
 ## SLA
 
-- **Lite**: respon maksimal 1×24 jam hari kerja.
-- **Pro**: target respon dalam 12 jam hari kerja. Detail SLA final ditentukan setelah Sprint 47 billing selesai.
+- **Semua buyer**: respon maksimal 1×24 jam hari kerja.
 
 ---
 
@@ -27,12 +26,7 @@ Terima kasih sudah menghubungi kami. Untuk masalah login, coba langkah berikut:
    - Refresh halaman login
    - Coba lagi
 
-Jika tetap tidak bisa, Anda bisa reset password melalui halaman:
-[domain]/client/reset-password
-
-Masukkan site slug "[slug]" dan email Anda, lalu ikuti instruksi di email.
-
-Jika masih bermasalah setelah langkah di atas, balas pesan ini dan kami akan bantu lebih lanjut.
+Jika tetap tidak bisa, balas pesan ini dan kami akan bantu lebih lanjut.
 
 Salam,
 [nama operator]
@@ -40,23 +34,20 @@ Salam,
 
 ---
 
-## Email Reset Password Tidak Masuk
+## Email Pesanan Tidak Masuk
 
 ### Template
 
 ```
 Halo [nama buyer],
 
-Jika email reset password belum masuk, coba langkah berikut:
+Email dari kami (struk saat order dibuat, atau email serah terima setelah pembayaran diverifikasi) belum sampai. Coba langkah berikut:
 
 1. Cek folder Spam / Junk / Promotions di email Anda.
 2. Tunggu beberapa menit — kadang email butuh waktu untuk sampai.
-3. Pastikan email yang Anda masukkan sama persis dengan yang terdaftar di akun Anda.
-4. Coba kirim ulang permintaan reset dari halaman: [domain]/client/reset-password
+3. Pastikan alamat email yang Anda masukkan saat order sama persis dengan yang sedang Anda cek.
 
-Catatan: link reset password berlaku selama 30 menit. Jika sudah lewat, silakan kirim ulang.
-
-Jika setelah kirim ulang masih tidak masuk, kabari kami dan kami akan bantu reset secara manual.
+Jika setelah dicek tetap tidak masuk, balas pesan ini dan kami akan kirim ulang atau konfirmasi manual.
 
 Salam,
 [nama operator]
@@ -104,19 +95,18 @@ Salam,
 ```
 Halo [nama buyer],
 
-Storage atau quota project Anda saat ini sudah mencapai batas plan [Lite/Pro].
+Storage atau quota project Anda saat ini sudah mencapai batas quota.
 
-Detail quota plan Anda:
+Detail quota Anda:
 - Project: maksimal [X] project
 - Storage: maksimal [X] MB
 - Media per project: maksimal [X] file
 
 Beberapa opsi yang tersedia:
 1. **Hapus media/project yang tidak dipakai** — ini akan mengurangi usage dan memberi ruang untuk upload baru.
-2. **Upgrade plan** — upgrade dari Lite ke Pro untuk mendapatkan limit yang lebih besar.
-3. **Custom quota** — hubungi kami jika Anda butuh penambahan quota spesifik tanpa ganti plan.
+2. **Custom quota add-on** — hubungi kami jika Anda butuh penambahan quota spesifik.
 
-Silakan kabari kami jika ingin upgrade atau penambahan quota, dan kami akan bantu prosesnya.
+Silakan kabari kami jika Anda butuh penambahan quota, dan kami akan bantu prosesnya.
 
 Salam,
 [nama operator]

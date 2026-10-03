@@ -16,16 +16,14 @@ Selalu siapkan komponen untuk:
 2. **Empty State:** Jika project kosong / belum ada.
 3. **Error State:** Pesan gagal koneksi dengan tombol Retry.
 
-## Feature Flags (Lite vs Pro)
-Gunakan flag dari config atau `site.plan` untuk menyembunyikan/menampilkan fitur.
-- **Lite:** Client tetap bisa login ke dashboard sederhana untuk edit profil/site, CRUD project terbatas, upload media terbatas, reorder, draft/publish, dan melihat quota.
-- **Pro:** Semua fitur Lite ditambah custom domain, analytics/leads, AI copy/case study, testimonial manager, submission/approval workflow, quota lebih besar, dan opsi multi-user/team ringan.
-- UI public template harus mengambil `site.plan`, `feature_flags`, dan `quota` dari API berbasis `siteSlug`; jangan hardcode asumsi single portfolio.
+## Feature Flags
+Gunakan flag `FEATURE_*` (bukan tiers paket) untuk menyembunyikan/menampilkan fitur opsional.
+- Client selalu bisa login ke dashboard untuk edit profil/site, CRUD project sesuai quota, upload media, reorder, draft/publish, dan melihat quota.
+- Fitur opsional (custom domain, analytics/leads, AI copy/case study, testimonial manager, submission/approval workflow) aktif jika flag `FEATURE_*` terkait menyala.
+- UI public template harus mengambil `feature_flags` dan `quota` dari API berbasis `siteSlug`; jangan hardcode asumsi single portfolio.
 
 ## Client UI Boundary
 - UI client/pembeli hanya boleh memanggil endpoint client/site-scoped atau endpoint content yang resolve `siteId`.
 - UI client tidak boleh memanggil endpoint master/platform seperti admin login, admin password/PIN, clear-cache, revalidate, health, settings platform, atau metrics internal.
-- Route pembeli memakai pola tenant: login di `/[siteSlug]/login`, public site di `/[siteSlug]`, dan public project di `/[siteSlug]/projects`.
+- Route pembeli memakai pola tenant: public site di `/[siteSlug]`, public project di `/[siteSlug]/projects`. Tidak ada route login per-site; login panel ada di `/admin/login`.
 - Jangan membuat UI yang mengarahkan tenant ke route global seperti `/projects` jika sedang berada di site tenant; gunakan path tenant seperti `/${siteSlug}/projects`.
-- Reset password client memakai flow self-service: tombol `Lupa Password` di login, request generic, email reset link, lalu form `/client/reset-password?token=...`.
-- UI reset tidak boleh menampilkan token secara langsung dan tidak boleh memberi pesan yang membocorkan apakah email/site benar-benar terdaftar.

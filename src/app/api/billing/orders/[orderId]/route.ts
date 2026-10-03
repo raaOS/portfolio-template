@@ -54,7 +54,7 @@ export async function GET(
     await expireOrderIfStale(orderId);
 
     const rows = await queryD1(
-      'SELECT id, desired_slug, buyer_name, buyer_email, buyer_whatsapp, plan, amount, payment_method, payment_proof_url, status, expires_at, created_at FROM orders WHERE id = ?',
+      'SELECT id, desired_slug, buyer_name, buyer_email, buyer_whatsapp, amount, payment_method, payment_proof_url, status, expires_at, created_at FROM orders WHERE id = ?',
       [orderId]
     );
 

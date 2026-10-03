@@ -115,7 +115,10 @@ export const updateSettingsSchema = z
     maintenanceMode: z.boolean().optional(),
     allowComments: z.boolean().optional(),
   })
-  .passthrough(); // Allow additional fields for flexibility
+  // SECURITY FIX (audit 2026-09-29): `.passthrough()` mewajibkan field
+  // tak dikenal ikut tersimpan ke row `settings` (junk/overwrite tak terkontrol).
+  // Hanya 3 key di atas yang disimpan.
+  .strict();
 
 // Admin Operation Schemas
 export const compressFileSchema = z

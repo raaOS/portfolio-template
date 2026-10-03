@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify, SignJWT } from 'jose';
 import { deriveSiteSecret } from '@/crud/shared/auth/session';
+import { SITE_ID } from '@/crud/shared/config';
 import { protectedRoutes, publicRoutes } from './constants';
 
 const SITE_USER_COOKIE = 'site_user_token';
@@ -87,7 +88,15 @@ export async function checkCustomerAuth(request: NextRequest) {
               audience: 'site-dashboard',
             });
 
-            if (verified && verified.sub) {
+            // SECURITY FIX (audit 2026-09-29): token wajib milik deployment ini.
+            // Derive secret memang pakai siteId dari payload, tapi bila
+            // JWT_SECRET dipakai bersama antar deployment, token site lain
+            // tetap terverifikasi — tolak di sini (guard handler juga
+            // memeriksa, ini lapisan pertama).
+            // `SITE_ID` di-capture saat module load; baca env per-request agar
+            // selalu segar (nilai akhir sama: env || 'default-site').
+            const expectedSiteId = process.env.CUSTOMER_SITE_ID || SITE_ID;
+            if (verified && verified.sub && verified.siteId === expectedSiteId) {
               isValid = true;
               verifiedPayload = verified as { exp?: number; siteId?: string; email?: string; role?: string; sub?: string };
             }

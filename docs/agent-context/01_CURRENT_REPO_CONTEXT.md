@@ -26,4 +26,4 @@ Firebase **SUDAH TIDAK DIPAKAI**. Sistem database sepenuhnya bergantung pada Clo
 Semua *leftover* atau *legacy codebase* terkait Firebase harus diabaikan atau dihapus.
 
 ## Status Produk Multi-Tenant
-Konsep terkunci: platform multi-site dengan `site_id` dan `siteSlug`. Lite dan Pro sama-sama self-service untuk client; perbedaannya ada pada quota, feature flags, workflow, analytics, custom domain, AI, dan fitur kolaborasi.
+Konsep terkunci: platform multi-site dengan `site_id` dan `siteSlug`. Semua client self-service; kapasitas dibedakan lewat quota site, feature flags, workflow, analytics, custom domain, AI, dan fitur kolaborasi.

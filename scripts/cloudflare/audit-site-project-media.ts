@@ -48,7 +48,6 @@ type SiteRow = {
   id: string;
   slug: string;
   name: string;
-  plan: string;
   status: string;
 };
 
@@ -241,13 +240,13 @@ function groupByProject(mediaRows: MediaAssetAuditRow[]) {
 async function loadSites(siteId?: string) {
   if (siteId) {
     return queryD1<SiteRow>(
-      `SELECT id, slug, name, plan, status FROM sites WHERE id = ? ORDER BY created_at ASC`,
+      `SELECT id, slug, name, status FROM sites WHERE id = ? ORDER BY created_at ASC`,
       [siteId]
     );
   }
 
   return queryD1<SiteRow>(
-    `SELECT id, slug, name, plan, status FROM sites ORDER BY created_at ASC`
+    `SELECT id, slug, name, status FROM sites ORDER BY created_at ASC`
   );
 }
 

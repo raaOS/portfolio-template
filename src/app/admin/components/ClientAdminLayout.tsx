@@ -30,7 +30,7 @@ import { BackgroundUploadProvider } from '@/contexts/BackgroundUploadContext';
 
 export default function ClientAdminLayout({ children }: ClientAdminLayoutProps) {
   const pathname = usePathname();
-  const isLoginPage = pathname === '/admin/login' || pathname === '/portal/login';
+  const isLoginPage = pathname === '/admin/login';
   const queryClient = useQueryClient();
   const { logout } = useAdminAuth();
   const { windows, actions } = useAdminDesktop();

@@ -73,7 +73,6 @@ Do not deploy this as a Vercel project. Any remaining Vercel references are lega
 - Seller release checklist: [docs/release/RELEASE_CHECKLIST.md](docs/release/RELEASE_CHECKLIST.md)
 - Production deploy runbook: [docs/release/PRODUCTION_DEPLOY_RUNBOOK.md](docs/release/PRODUCTION_DEPLOY_RUNBOOK.md)
 - RC1 release notes: [docs/release/RC1_RELEASE_NOTES.md](docs/release/RC1_RELEASE_NOTES.md)
-- Lite/Pro product scope: [docs/release/LITE_PRO_SCOPE.md](docs/release/LITE_PRO_SCOPE.md)
 - Client operations: [docs/release/CLIENT_OPERATIONS.md](docs/release/CLIENT_OPERATIONS.md)
 - Sales/pricing guide: [docs/release/SALES_PRICING.md](docs/release/SALES_PRICING.md)
 - Product env inventory: [docs/product-boundary/env-inventory.md](docs/product-boundary/env-inventory.md)
@@ -96,10 +95,9 @@ npm run release:smoke    # Smoke-test a deployed production URL
 
 ## Access Model
 
-- Master admin manages sites, plans, quotas, billing metadata, client access, and safe deletion.
+- Master admin manages sites, quotas, client access, and safe deletion.
 - Clients use self-service dashboard access scoped to their own site.
-- Clients can request password reset by email when `FEATURE_CLIENT_PASSWORD_RESET=true` and a notification/email provider is configured.
-- Lite and Pro are both self-service. Lite is limited by quota/features; Pro unlocks higher quota and optional integrations.
+- Every client is self-service. Capacity differences come only from each site's quota.
 
 ## Important Notes
 

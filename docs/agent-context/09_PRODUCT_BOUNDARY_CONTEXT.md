@@ -24,8 +24,7 @@ Jangan membaca atau menyalin nilai `.env.local` ke dokumentasi, log, atau jawaba
 
 AI dan notifikasi boleh dibangun kembali sebagai integrasi produk generic:
 
-- Lite: default tanpa AI dan notifikasi eksternal.
-- Pro: AI/notifikasi bisa aktif berdasarkan `FEATURE_AI`, `FEATURE_NOTIFICATIONS`, quota, dan `site.plan`.
+- AI dan notifikasi aktif hanya jika `FEATURE_AI` / `FEATURE_NOTIFICATIONS` menyala, dengan quota dan `site` yang sesuai.
 
 Jangan memakai env pribadi lama sebagai kontrak produk baru. Jika provider lama masih dipakai sementara di kode, tandai sebagai migration debt.
 

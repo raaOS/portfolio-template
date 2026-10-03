@@ -2,7 +2,6 @@ import React from 'react';
 import { notFound } from 'next/navigation';
 import { getSiteBySlug } from '@/lib/adapters/siteDataAdapter';
 import { loadHomepageData } from '@/lib/loaders';
-import { canUseWhatsappTestimonials } from '@/lib/product/sitePlan';
 import { mapD1ToTemplateData } from '@/lib/templates/dataMapper';
 import OSDesktopRenderer from '@/components/templates/os-desktop/OSDesktopRenderer';
 import InfiniteCanvasRenderer from '@/components/templates/infinite-canvas/InfiniteCanvasRenderer';
@@ -23,33 +22,6 @@ export default async function TenantPage({ params }: TenantPageProps) {
   }
 
   const homepageData = await loadHomepageData(site.id);
-  const canShowWhatsappTestimonials = canUseWhatsappTestimonials(site.plan);
-
-  const effectiveAboutData = canShowWhatsappTestimonials
-    ? homepageData.aboutData
-    : {
-        ...homepageData.aboutData,
-        dockConfig: {
-          ...homepageData.aboutData.dockConfig,
-          whatsapp: {
-            ...homepageData.aboutData.dockConfig?.whatsapp,
-            isHidden: true,
-          },
-        },
-      };
-
-  const effectiveTestimonialsData = canShowWhatsappTestimonials
-    ? homepageData.testimonialsData
-    : {
-        testimonials: [],
-        lastUpdated: homepageData.testimonialsData.lastUpdated,
-      };
-
-  const effectiveHomepageData = {
-    ...homepageData,
-    aboutData: effectiveAboutData,
-    testimonialsData: effectiveTestimonialsData,
-  };
 
   const activeTemplateKey = site.active_template_key || 'os-desktop';
 
@@ -58,7 +30,7 @@ export default async function TenantPage({ params }: TenantPageProps) {
       ...site,
       active_template_key: activeTemplateKey,
     },
-    homepageData: effectiveHomepageData,
+    homepageData,
   });
 
   if (activeTemplateKey === 'infinite-canvas') {

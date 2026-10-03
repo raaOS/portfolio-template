@@ -25,7 +25,7 @@ npm run media:audit-projects
 
 ### Gejala
 
-Client melaporkan tidak bisa login di `/<siteSlug>/login` atau `/client/login`.
+Client melaporkan tidak bisa login di `/admin/login` (tidak ada halaman login per-site).
 
 ### Langkah Diagnosa
 
@@ -33,10 +33,11 @@ Client melaporkan tidak bisa login di `/<siteSlug>/login` atau `/client/login`.
    - Buka Master Dashboard → cari site client.
    - Jika status `suspended`, site tidak bisa diakses. Lihat bagian Suspend/Activate.
 
-2. **Cek client access terdaftar:**
-   - Buka Master Dashboard → klik site → bagian Client Access.
-   - Pastikan email client terdaftar dan status `active`.
-   - Jika belum ada, buat client access baru (lihat [buyer-onboarding-checklist.md](file:///c:/Users/USER/Documents/portfolio-template/docs/operations/buyer-onboarding-checklist.md)).
+2. **Cek akun panel client:**
+   - Pastikan pembeli sudah membuka `/setup` sehingga email + password admin terdaftar.
+   - Kalau belum yakin, reset password dari komputermu:
+     `npx tsx scripts/cloudflare/reset-customer-password.ts`
+     (lihat [buyer-onboarding-checklist.md](file:///c:/Users/USER/Documents/portfolio-template/docs/operations/buyer-onboarding-checklist.md)).
 
 3. **Cek rate limit:**
    - Login endpoint dilindungi rate limit.
@@ -49,9 +50,8 @@ Client melaporkan tidak bisa login di `/<siteSlug>/login` atau `/client/login`.
    - Coba lagi.
 
 5. **Password salah:**
-   - Jangan minta password client; arahkan ke reset password.
-   - URL reset: `/<siteSlug>/login` → klik "Lupa password" atau langsung ke `/client/reset-password`.
-   - Jika `FEATURE_CLIENT_PASSWORD_RESET` tidak aktif, operator harus reset manual via Master Dashboard → Client Access → set password baru.
+   - Jangan minta password client.
+   - Tidak ada reset password self-service — password klien direset manual oleh owner.
 
 ### Eskalasi
 
@@ -60,44 +60,40 @@ Eskalasi ke developer jika:
 - Error selain 400/403/429 muncul di Cloudflare Worker logs.
 - Client access sudah benar tapi JWT token tetap tidak terbit.
 
-## 2. Email Reset Password Tidak Masuk
+## 2. Email Pembeli Tidak Masuk
 
 ### Gejala
 
-Client sudah klik "Lupa password" dan submit email, tapi tidak menerima email reset.
+Pembeli melaporkan tidak menerima email order (struk) atau email serah terima setelah pembayaran diverifikasi.
 
 ### Langkah Diagnosa
 
-1. **Cek fitur aktif:**
-   - Pastikan `FEATURE_CLIENT_PASSWORD_RESET=true` di env production.
-   - Jika `false`, reset hanya bisa dilakukan manual oleh operator via Master Dashboard.
-
-2. **Cek notification provider:**
-   - Pastikan `NOTIFICATION_PROVIDER` terisi (biasanya `resend`).
+1. **Cek notification provider:**
+   - Pastikan `NOTIFICATION_PROVIDER` terisi (harus `resend`).
    - Pastikan `NOTIFICATION_API_KEY` dan `NOTIFICATION_DEFAULT_FROM` terisi.
-   - Tanpa ini, email tidak akan terkirim.
+   - Tanpa ini, email tidak akan terkirim sama sekali.
 
-3. **Cek spam/junk folder:**
-   - Minta client cek folder spam/junk/promotions.
+2. **Cek spam/junk folder:**
+   - Minta pembeli cek folder spam/junk/promotions.
    - Email dari Resend kadang masuk spam jika domain pengirim belum verified SPF/DKIM.
 
-4. **Cek token TTL:**
-   - Default: `CLIENT_PASSWORD_RESET_TOKEN_TTL_MINUTES=30`.
-   - Jika client menunggu terlalu lama (>30 menit), token sudah expired. Suruh kirim ulang.
+3. **Cek alamat email di order:**
+   - Buka `/admin` → Orders → pastikan `buyer_email` tertulis benar.
+   - Typo alamat membuat email terkirim tapi tidak pernah sampai.
 
-5. **Cek rate limit reset:**
-   - Endpoint reset password juga dilindungi rate limit.
-   - Jika terlalu banyak request, tunggu cooldown.
+4. **Cek status order:**
+   - Email struk hanya dikirim saat order baru dibuat.
+   - Email serah terima hanya dikirim setelah order berstatus `activated`.
 
-6. **Verifikasi via Cloudflare logs:**
-   - Filter Worker logs: `event=client.password_reset.request`.
-   - Jika ada `status=success` tapi email tidak masuk, masalah ada di provider email (Resend delivery issue).
+5. **Verifikasi via Cloudflare logs:**
+   - Filter Worker logs pada request keluar ke `api.resend.com`.
+   - Jika request sukses tapi email tidak masuk, masalah ada di provider email (Resend delivery issue).
 
 ### Eskalasi
 
 Eskalasi ke developer jika:
-- Resend API sudah `sent=true` tapi email tidak pernah sampai setelah cek spam.
-- Error D1 muncul saat insert token reset.
+- Resend API sudah merespon sukses tapi email tidak pernah sampai setelah cek spam.
+- Email struk/serah terima tidak terkirim sama sekali padahal env notifikasi sudah benar.
 
 ## 3. Upload Cover/Gallery/Video Gagal
 
@@ -110,7 +106,7 @@ Client melaporkan upload media gagal di Client Dashboard.
 1. **Cek storage quota:**
    - Buka Master Dashboard → site client → lihat card Storage.
    - Jika usage mendekati atau melebihi limit, upload akan ditolak.
-   - Solusi: upgrade plan (Lite→Pro), tambah quota override, atau minta client hapus media yang tidak dipakai.
+   - Solusi: tambah quota override atau minta client hapus media yang tidak dipakai.
 
 2. **Cek batas ukuran file:**
    - Cover image: maksimal 30 MB.
@@ -125,8 +121,7 @@ Client melaporkan upload media gagal di Client Dashboard.
    - Jika client upload format lain, suruh konversi dulu.
 
 4. **Cek batas media per project:**
-   - Lite: default 8 media per project.
-   - Pro: default 50 media per project.
+   - Default dari env `MEDIA_PER_PROJECT` (bawaan 50 media per project).
    - Bisa di-override via quota override Master Dashboard.
 
 5. **Video presign gagal:**
@@ -157,18 +152,17 @@ Client mendapat pesan quota penuh saat upload media atau buat project baru.
    - Bandingkan usage aktual vs limit efektif.
 
 2. **Jenis quota:**
-   - **Project limit**: jumlah project per site (Lite: 5, Pro: 50 default).
-   - **Storage (MB)**: total ukuran media per site (Lite: 250 MB, Pro: 5000 MB default).
-   - **Media per project**: jumlah media per project (Lite: 8, Pro: 50 default).
+   - **Project limit**: jumlah project per site (default dari env `PROJECT_LIMIT`, bawaan 50).
+   - **Storage (MB)**: total ukuran media per site (default dari env `STORAGE_MB`, bawaan 5000 MB).
+   - **Media per project**: jumlah media per project (default dari env `MEDIA_PER_PROJECT`, bawaan 50).
 
 3. **Solusi:**
-   - **Upgrade plan**: Lite → Pro untuk semua limit naik.
-   - **Quota override**: Master Dashboard → site → set custom quota per site tanpa ganti plan.
+   - **Quota override**: Master Dashboard → site → set custom quota per site (hanya menaikkan limit di atas default).
    - **Hapus media/project**: client bisa hapus draft project atau media yang tidak dipakai untuk mengurangi usage.
 
-4. **Peringatan downgrade:**
-   - Downgrade Pro → Lite hanya bisa jika usage aktual tidak melebihi limit Lite.
-   - Jika usage melebihi, client harus kurangi dulu sebelum downgrade.
+4. **Peringatan penurunan quota:**
+   - Menurunkan quota hanya bisa jika usage aktual tidak melebihi limit baru.
+   - Jika usage melebihi, usage harus dikurangi dulu sebelum limit diturunkan.
 
 ### Eskalasi
 
@@ -258,24 +252,23 @@ Ringkasan singkat:
 
 Jangan restore ke production database tanpa approval eksplisit dan flag `--allow-current-database --i-understand-this-can-overwrite-production`.
 
-## 8. Billing / Refund (Placeholder)
+## 8. Pembayaran / Refund (Placeholder)
 
-Bagian ini akan dilengkapi setelah Sprint 47 - Billing Automation selesai.
+Bagian ini akan dilengkapi setelah alur billing otomatis selesai.
 
 Sementara, jika ada masalah pembayaran:
 
-- Cek status subscription di Master Dashboard.
-- Jika perlu aktivasi manual: ubah status site ke `active` dan billing status ke `active` via Master Dashboard.
-- Jangan ubah data billing langsung di D1 tanpa melalui API/Dashboard.
+- Cek status order di panel Pesanan (Master Dashboard).
+- Jika perlu aktivasi manual: aktifkan order dari panel, atau ubah status site ke `active` via Master Dashboard.
+- Jangan ubah data pembayaran langsung di D1 tanpa melalui API/Dashboard.
 
 ## 9. Daftar Eskalasi
 
 | Masalah | Operator Tangani Sendiri | Eskalasi ke Developer |
 |---|---|---|
-| Login gagal (password salah) | ✅ Reset password | — |
+| Login gagal (password salah) | ✅ Reset manual via `reset-customer-password.ts` | — |
 | Login gagal (CSRF) | ✅ Clear cookies | — |
 | Login gagal (rate limit) | ✅ Tunggu cooldown | ❌ Jika cooldown tidak pulih |
-| Email reset tidak masuk | ✅ Cek spam, kirim ulang | ❌ Jika Resend API `sent=true` tapi email tidak pernah sampai |
 | Upload gagal (quota) | ✅ Upgrade/hapus media | — |
 | Upload gagal (R2 error) | — | ❌ Selalu eskalasi |
 | Site tidak tampil | ✅ Cek status + project | ❌ Jika health check gagal |

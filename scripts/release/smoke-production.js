@@ -124,14 +124,6 @@ async function main() {
   const checks = [
     { path: '/api/health' },
     { path: '/' },
-    { path: '/client/login' },
-    {
-      path: `/${encodedSiteSlug}/login`,
-      expectedStatuses: [200, 307],
-      bodyIncludes: `/client/login?site=${encodedSiteSlug}`,
-    },
-    { path: '/client/reset-password' },
-    { path: '/client/dashboard' },
     { path: `/api/public/sites/${encodedSiteSlug}` },
     { path: `/api/public/sites/${encodedSiteSlug}/projects` },
   ];
