@@ -24,7 +24,14 @@ Enam perbaikan keamanan pada jalur order publik (checkout → upload bukti bayar
 - **`GET /api/admin/audit-logs` kini menggabungkan dua sumber sejarah itu** (dulu hanya blob `app_kv`): dibaca berurutan (`Promise.all`), didedup berdasarkan id (kv menang karena metadata lebih kaya), diurutkan terbaru dahulu, lalu dipotong ke 50 entri. Bila tabel relasional belum ada di deployment lama, pembacaannya gagal diam-diam dan viewer tetap menampilkan data KV.
 - **Rute `/admin/system/activity-log` ditambahkan** — sebelumnya `APP_ROUTE_MAP` menunjuk ke halaman yang tidak ada, satu-satunya entri `APP_ROUTE_MAP` tanpa `page.tsx` (deep-link langsung ke URL itu akan 404).
 - **Perbaikan lint (1 error `react-hooks/set-state-in-effect`):** pemuatan awal di `ActivityLogPanel` kini dijadwalkan lewat `setTimeout(…, 0)` — pola yang sama dengan `OrdersPanel` — sehingga `setState` tidak dipanggil sinkron di dalam `useEffect`.
-- **Verifikasi:** `npx tsc --noEmit` 0 error, `npx eslint src` 0 error, `npx vitest run` **113 files / 863 tests PASS**.
+- **Verifikasi:** `npx tsc --noEmit` 0 error, `npx eslint src` 0 error, `npx vitest run` **114 files / 881 tests PASS** (gabungan kedua jalur kerja), `release:audit` 62/62, `release:sale-readiness` 13/13.
+
+### 🚀 Deploy Produksi & Pembersihan Database (sudah dijalankan)
+
+- **Versi ini sudah tayang di produksi** (2026-10-03). Deploy sempat gagal sekali karena kendala lingkungan Windows yang sudah dikenal (workerd tidak bisa membuat folder di luar folder project) — diatasi dengan menyetel `TEMP`/`TMP` sementara ke `node_modules\.cache\mftemp` sesuai runbook, lalu deploy ulang sukses. Pemeriksaan asap produksi **6/6 lolos** (halaman utama, kesehatan API, data demo, berkas FFmpeg).
+- **Database sudah dibersihkan, bukan sekadar direncanakan.** Enam perintah `remove-plan-columns.ts --apply` berjalan `[ok]`: kolom `plan` di tabel `sites` dan `orders`, tabel `site_subscriptions` beserta index-nya, tabel `client_password_resets`, dan **tabel `client_access`**. Pemeriksaan ulang menunjukkan semuanya `[n/a]` → *"Database sudah bersih"*, dan pemeriksaan hidup dijalankan ulang sesudahnya tetap **6/6 lolos**.
+- **Tabel `client_access` ikut dihapus sesuai pilihanmu:** 4 baris email + hash pembeli di dalamnya hilang permanen tanpa disalin ke mana pun (tabel itu memang tidak dibaca kode mana pun).
+- **Yang perlu kamu lakukan:** kalau tab panel admin masih terbuka dari sebelum update, **login ulang sekali** — token admin lama sengaja ditolak versi baru (wajib membawa penanda `siteId`). Cara beli, form checkout, upload bukti bayar, dan email pesanan **tidak berubah**.
 
 ## [1.3.17] - 2026-10-03
 

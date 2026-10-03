@@ -638,9 +638,7 @@ describe('orderService', () => {
       vi.mocked(cloudflareD1.queryD1)
         .mockResolvedValueOnce([]) // expired -> waiting_verification update
         .mockResolvedValueOnce([order]) // lock order with UPDATE RETURNING
-        .mockResolvedValueOnce([]) // existingClients check (empty)
         .mockResolvedValueOnce([]) // insert sites
-        .mockResolvedValueOnce([]) // insert client_access
         .mockResolvedValueOnce([]) // update order activated
         .mockResolvedValueOnce([]); // insert audit_log
 
