@@ -88,6 +88,10 @@ export function checkCSRF(request: NextRequest) {
       // Webhook eksternal (GitHub push) — diproteksi HMAC signature
       // `x-hub-signature-256` di handler, bukan cookie CSRF.
       '/api/revalidate',
+      // Cron trigger internal (Cloudflare `crons` -> handler `scheduled` ->
+      // POST /api/cron/daily lewat service binding) — diproteksi header
+      // `x-cron-secret` (CRON_SECRET) di handler, bukan cookie CSRF.
+      '/api/cron',
     ];
     // SECURITY FIX (audit 2026-09-29): pencocokan per-segmen — `startsWith`
     // mentah mengizinkan path baru yang kebetulan berawalan sama (mis.

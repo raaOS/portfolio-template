@@ -244,6 +244,55 @@ function patchKnownVendorDuplicateCase(serverDir) {
   );
 }
 
+function appendScheduledCronHandler(openNextDir) {
+  const workerPath = path.join(openNextDir, 'worker.js');
+
+  if (!fs.existsSync(workerPath)) {
+    throw new Error('Unable to add cron handler: .open-next/worker.js not found.');
+  }
+
+  const original = fs.readFileSync(workerPath, 'utf8');
+  if (original.includes('export async function scheduled(')) return;
+
+  if (!original.includes('export default')) {
+    throw new Error('Unable to add cron handler: OpenNext worker.js has no default export.');
+  }
+
+  const scheduledHandler = [
+    '',
+    '// Cron trigger (wrangler.jsonc `triggers.crons`). OpenNext tidak mengekspor',
+    '// `scheduled`, jadi diekspor di sini lalu memanggil aplikasi Next lewat',
+    '// service binding sendiri ke POST /api/cron/daily (dilindungi CRON_SECRET).',
+    '// Sengaja memakai `await`, bukan `ctx.waitUntil`: kalau endpoint gagal, run cron',
+    '// ikut gagal dan langsung terlihat di log/observability Cloudflare — kegagalan',
+    '// sunyi lebih berbahaya daripada satu run yang berwarna merah.',
+    'export async function scheduled(_event, env) {',
+    '    const secret = env.CRON_SECRET;',
+    '    if (!secret) {',
+    '        console.warn("[cron] CRON_SECRET belum di-set; run harian dilewati.");',
+    '        return;',
+    '    }',
+    '    if (!env.WORKER_SELF_REFERENCE) {',
+    '        throw new Error("[cron] binding WORKER_SELF_REFERENCE tidak ada.");',
+    '    }',
+    '    const response = await env.WORKER_SELF_REFERENCE.fetch(',
+    '        new Request("https://cron.internal/api/cron/daily", {',
+    '            method: "POST",',
+    '            headers: { "x-cron-secret": secret },',
+    '        })',
+    '    );',
+    '    console.log("[cron] POST /api/cron/daily ->", response.status);',
+    '    if (!response.ok) {',
+    '        throw new Error("cron endpoint returned " + response.status);',
+    '    }',
+    '}',
+    '',
+  ].join('\n');
+
+  fs.writeFileSync(workerPath, `${original.trimEnd()}\n${scheduledHandler}`);
+  console.log('[cloudflare-build] Appended cron scheduled handler to Worker entry.');
+}
+
 function prepareOpenNextWorkerOutput() {
   loadLocalEnvForBuildNotices();
 
@@ -260,6 +309,7 @@ function prepareOpenNextWorkerOutput() {
   patchKnownVendorDuplicateCase(serverDir);
   minifyMiddlewareBundle(openNextDir);
   removeBrowserOnlyFfmpegAssets(openNextDir);
+  appendScheduledCronHandler(openNextDir);
   assertWorkersAssetSizes(openNextDir);
 }
 

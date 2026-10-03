@@ -33,6 +33,13 @@
       "service": "portfolio-os-template"
     }
   ],
+  // Cron harian 01:00 WIB (18:00 UTC). OpenNext tidak mengekspor handler
+  // `scheduled`, jadi handler itu ditambahkan ke `.open-next/worker.js` oleh
+  // `scripts/cloudflare/prepare-opennext-worker-output.js` setelah build, lalu
+  // memanggil POST /api/cron/daily lewat service binding WORKER_SELF_REFERENCE.
+  "triggers": {
+    "crons": ["0 18 * * *"]
+  },
   "observability": {
     "enabled": true
   }

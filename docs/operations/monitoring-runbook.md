@@ -118,11 +118,45 @@ Event yang dicakup:
 
 Log sengaja tidak mencetak password, token, cookie, authorization header, CSRF token, atau API key. Request context dibatasi ke method, path, `cf-ray`, dan country.
 
+## Daily Cron Trigger (Cloudflare Workers)
+
+Deployment memakai cron trigger harian **01:00 WIB (18:00 UTC)** yang didefinisikan di `wrangler.jsonc` (`triggers.crons`).
+
+Alurnya:
+
+1. Cloudflare memanggil handler `scheduled` di `.open-next/worker.js` — handler itu **diekspor oleh** `scripts/cloudflare/prepare-opennext-worker-output.js` setelah tiap `npm run cf:build`, karena OpenNext tidak mengekspor `scheduled` sendiri.
+2. Handler `scheduled` memanggil `POST /api/cron/daily` lewat service binding `WORKER_SELF_REFERENCE` (request internal, tidak melewati internet publik), membawa header `x-cron-secret`.
+3. Endpoint tersebut (`src/app/api/cron/daily/route.ts`) membandingkan header dengan env `CRON_SECRET` secara *timing-safe*, lalu menjalankan `sweepExpiredOrders()` — menandai order yang lewat masa berlakunya. Sweeper punya guard 10 menit di dalamnya sehingga pemanggilan berulang tidak membakar kuota D1.
+
+Catatan operasional:
+
+- Jika `CRON_SECRET` kosong, run harian **dilewati dengan peringatan log** (bukan error) dan endpoint menjawab 500. Isi `CRON_SECRET` di `.env.local` lalu jalankan `npm run cf:secrets` untuk mengaktifkan.
+- Cek log Worker (observability aktif) dengan filter `[cron]` untuk memastikan run terakhir menjawab 200.
+- Backup D1/R2 **bukan** bagian dari cron ini — lihat `docs/operations/backup-restore-runbook.md`.
+
+## Rotasi Rahasia (Worker Secrets)
+
+Nilai rahasia produksi kini hidup sebagai **Worker secrets**, bukan sekadar nilai yang tertanam saat build — jadi bisa diganti **tanpa deploy ulang** dan nilai lama di `.env.local` tidak lagi mengendalikan produksi (env Worker diprioritaskan di atas nilai build-time).
+
+```bash
+# Pratinjau: hanya menampilkan nama key + status (nilai tidak pernah dicetak)
+npm run cf:secrets
+
+# Tulis ulang semua key dari .env.local ke Worker secrets
+npx tsx scripts/cloudflare/put-worker-secrets.ts --apply
+
+# Putar hanya satu key setelah nilai .env.local diubah
+npx tsx scripts/cloudflare/put-worker-secrets.ts --apply --keys=CRON_SECRET
+```
+
+Key yang dipindahkan: `JWT_SECRET`, `PASSWORD_SALT`, `ADMIN_PASSWORD_SCRYPT`, `ADMIN_PIN`, `REVALIDATION_TOKEN`, `CRON_SECRET`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_SECRET`, `TELEGRAM_ADMIN_CHAT_ID`, `NOTIFICATION_API_KEY`, `AI_API_KEY`, `CLOUDFLARE_D1_API_TOKEN`, `CLOUDFLARE_R2_ACCESS_KEY_ID`, `CLOUDFLARE_R2_SECRET_ACCESS_KEY`. `NEXT_PUBLIC_*` sengaja tidak dipindahkan (nilainya memang harus tertanam di bundle klien).
+
 ## Daily Dashboard Checklist
 
 Cek harian:
 
 - Cloudflare Worker logs: filter `portfolio_os_operational_event`.
+- Cron harian: filter log `[cron]` — run terakhir harus `POST /api/cron/daily -> 200`.
 - Error spikes:
   - `level=error`
   - `event=d1.query_error`

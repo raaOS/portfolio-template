@@ -3,6 +3,36 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.19] - 2026-10-04
+
+### ⏰ Cron Harian Cloudflare: Order Kedaluwarsa Kini Ditandai Otomatis
+
+- **Sebelumnya penanda order kedaluwarsa hanya jalan kalau panel admin Order dibuka.** Fungsi `sweepExpiredOrders()` memang sudah ada sejak lama, tetapi satu-satunya pemanggilnya adalah `GET /api/admin/orders` — kalau panel tidak dibuka, order yang lewat masa berlakunya tetap "pending" selamanya. Kini ada **jadwal otomatis harian pukul 01:00 WIB (18:00 UTC)** di Cloudflare (`triggers.crons` di `wrangler.jsonc`).
+- **Cara kerjanya:** Cloudflare memanggil handler `scheduled` → handler itu memanggil `POST /api/cron/daily` lewat *service binding* internal `WORKER_SELF_REFERENCE` (request sepenuhnya di dalam jaringan Cloudflare, tidak lewat internet publik) → endpoint memverifikasi token lalu menjalankan sweeper. Sweeper sendiri punya jaminan 10 menit, jadi walau dipanggil berulang kuota database tidak diboroskan.
+- **Handler `scheduled` ditambahkan otomatis oleh skrip build** (`prepare-opennext-worker-output.js`) karena paket OpenNext belum menyediakannya; `main` di `wrangler.jsonc` tetap `.open-next/worker.js` sesuai aturan pre-deploy. Sengaja memakai `await`, bukan `ctx.waitUntil`, supaya kegagalan pemanggilan langsung dihitung sebagai *run* gagal dan muncul di log Cloudflare — bukan kegagalan sunyi.
+- **Endpoint baru `POST /api/cron/daily` dilindungi token `CRON_SECRET`** dengan pembandingan *timing-safe* (pola yang sama dengan webhook Telegram). Tanpa token: **401**; token salah: **401**; `CRON_SECRET` belum diisi: cron dilewati dengan peringatan log (fitur ini opsional, bukan error).
+- **Uji:** 6 test baru (500 tanpa konfigurasi, 401 tanpa/salah/beda-panjang token, 200 sukses, 500 saat sweep gagal).
+
+### 🔐 12 Rahasia Dipindah ke Worker Secrets (Rotasi Tanpa Deploy Ulang)
+
+- **Sebelumnya `wrangler secret list` = `[]`.** Semua rahasia produksi hanya hidup sebagai nilai yang tertanam saat `next build`, artinya mengganti rahasia harus build + deploy ulang. Kini **12 key menjadi Worker secrets**: `JWT_SECRET`, `PASSWORD_SALT`, `ADMIN_PASSWORD_SCRYPT`, `REVALIDATION_TOKEN`, `CRON_SECRET`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_SECRET`, `TELEGRAM_ADMIN_CHAT_ID`, `NOTIFICATION_API_KEY`, `CLOUDFLARE_D1_API_TOKEN`, `CLOUDFLARE_R2_ACCESS_KEY_ID`, `CLOUDFLARE_R2_SECRET_ACCESS_KEY`.
+- **Praktiknya di produksi tidak berubah sama sekali** — nilai disalin apa adanya dari `.env.local` (buktinya pemeriksaan asap tetap **6/6 lolos** sebelum dan sesudah pemindahan). Yang berubah: **sekarang Cloudflare yang menjadi sumber kebenaran**, jadi rahasia bisa diputar tanpa deploy ulang, dan nilai lama di `.env.local` tidak lagi mengendalikan server.
+- **Perintah baru:** `npm run cf:secrets` (pratinjau — hanya menampilkan nama key + status, nilai tidak pernah dicetak), lanjutkan dengan `--apply` untuk menulis, atau `--apply --keys=CRON_SECRET` untuk satu key saja.
+- **`.env.local` tetap dibutuhkan** oleh `npm run dev` dan berbagai script pemeliharaan lokal, jadi file itu tidak dihapus. Jujur soal batasnya: salinannya masih ikut tertanam di bundel build (bundel hanya bisa diunduh pemilik akun Cloudflare), tetapi nilai itulah yang tidak lagi dipakai di runtime.
+- `NEXT_PUBLIC_*` sengaja **tidak** dipindahkan — nilai itu memang harus tertanam di bundle klien.
+
+### 📚 Dokumentasi Operasional
+
+- **Runbook monitoring** kini memuat dua bagian baru: *Daily Cron Trigger (Cloudflare Workers)* berisi alur langkah demi langkah + cara memeriksanya, dan *Rotasi Rahasia (Worker Secrets)* berisi perintah aman untuk memutar token. Checklist harian bertambah satu item: cek log `[cron]`.
+- **Catatan kecil di `src/middleware/constants.ts`** menjelaskan kenapa `/api/cron/*` sengaja tidak masuk daftar route yang dilindungi cookie (pengamannya ada di handler), agar tidak salah "diperbaiki" oleh AI berikutnya.
+- **Verifikasi:** `npx tsc --noEmit` 0 error, `npx eslint src` 0 error, **115 file / 887 test PASS**, `release:audit` **62/62**, `release:sale-readiness` **13/13**, pre-deploy + compat-audit 0 blocker.
+
+### 🚀 Deploy Produksi (sudah dijalankan)
+
+- **Versi ini tayang di produksi** (2026-10-04), Version ID `6f2bd3ae-1b2d-4ebe-9bef-19fbd7f3002e`, dengan pendaftaran jadwal `schedule: 0 18 * * *`. Pemeriksaan asap produksi **6/6 lolos**.
+- **Uji langsung ke produksi:** `POST /api/cron/daily` dengan token → **200** `{"ok":true,...}`; tanpa token / token salah → **401**.
+- **Jadwal pertama: 01:00 WIB malam ini.** Kalau panel admin tidak pernah dibuka, inilah yang akan menandai order kedaluwarsa.
+
 ## [1.3.18] - 2026-10-03
 
 ### 🔒 Keamanan Alur Order & Billing (Tahap 4–5 Audit)

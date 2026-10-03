@@ -34,6 +34,7 @@
     "cf:preview": "npm run cf:build && wrangler dev --env-file .env.local",
     "cf:deploy": "npm run cf:build && opennextjs-cloudflare deploy",
     "cf:typegen": "wrangler types cloudflare-env.d.ts --env-interface CloudflareEnv --include-runtime false",
+    "cf:secrets": "npx tsx scripts/cloudflare/put-worker-secrets.ts",
     "cf:compat-audit": "node scripts/cloudflare/worker-compat-audit.js",
     "cf:doctor": "npx tsx scripts/cloudflare/product-bootstrap.ts",
     "cf:readiness": "npx tsx scripts/cloudflare/production-readiness.ts",

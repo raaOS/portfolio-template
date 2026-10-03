@@ -1,0 +1,49 @@
+import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
+import { sweepExpiredOrders } from '@/lib/services/orderService';
+
+/**
+ * POST /api/cron/daily — pekerjaan harian yang dijalankan Cloudflare cron trigger
+ * (`triggers.crons` di wrangler.jsonc, 01:00 WIB / 18:00 UTC).
+ *
+ * Pemanggilnya bukan browser, tapi handler `scheduled` yang diekspor ke
+ * `.open-next/worker.js` oleh `scripts/cloudflare/prepare-opennext-worker-output.js`
+ * — route ini dipanggil lewat service binding `WORKER_SELF_REFERENCE`
+ * (request internal, tidak lewat internet publik).
+ *
+ * Route-nya tetap bisa diakses publik, jadi wajib membawa header
+ * `x-cron-secret` yang sama dengan `CRON_SECRET`, dibandingkan secara
+ * timing-safe. Tanpa konfigurasi `CRON_SECRET`, endpoint menjawab 500 dan
+ * handler `scheduled` melewati run (lihat catatan di skrip prepare output).
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const secret = process.env.CRON_SECRET;
+    const provided = request.headers.get('x-cron-secret') || '';
+
+    if (!secret) {
+      return NextResponse.json({ message: 'Secret not configured' }, { status: 500 });
+    }
+
+    if (!provided) {
+      return NextResponse.json({ message: 'No secret' }, { status: 401 });
+    }
+
+    // Perbandingan timing-safe: panjang dulu (bukan rahasia), lalu byte-per-byte
+    // tanpa short-circuit — pola yang sama dengan webhook Telegram.
+    const providedBuffer = Buffer.from(provided, 'utf8');
+    const secretBuffer = Buffer.from(secret, 'utf8');
+    if (providedBuffer.length !== secretBuffer.length || !crypto.timingSafeEqual(providedBuffer, secretBuffer)) {
+      return NextResponse.json({ message: 'Invalid secret' }, { status: 401 });
+    }
+
+    // Menandai order kedaluwarsa. Aman dipanggil berulang: ada guard 10 menit
+    // di dalam sweepExpiredOrders() sehingga D1 tidak diboroskan.
+    await sweepExpiredOrders();
+
+    return NextResponse.json({ ok: true, ranAt: new Date().toISOString() });
+  } catch (err) {
+    console.error('[cron/daily] Failed:', err instanceof Error ? err.message : err);
+    return NextResponse.json({ message: 'Cron run failed' }, { status: 500 });
+  }
+}

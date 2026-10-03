@@ -50,6 +50,7 @@ These are platform-owned product integrations, not personal portfolio integratio
 - `CLOUDFLARE_R2_BINDING` (default `MEDIA_BUCKET`; only needed if the Worker binding name differs from `wrangler.jsonc`)
 - `NEXT_PUBLIC_FFMPEG_BASE_URL` (default `/r2/ffmpeg`; browser FFmpeg core files are stored in R2 keys `ffmpeg/*` and served through the app proxy)
 - `CLOUDFLARE_D1_RESTORE_DATABASE_ID` (optional staging/restore D1 target for backup/restore drill; never point this to production during normal drills)
+- `CRON_SECRET` (optional token for the daily Worker cron trigger; when set, `scheduled` calls `POST /api/cron/daily` with header `x-cron-secret`, when empty the daily run is skipped with a warning)
 - `MONITORING_TARGET_URL` (optional synthetic monitor target URL)
 - `MONITORING_SITE_SLUG` (optional public site slug used by synthetic monitor)
 - `MONITORING_HTTP_TIMEOUT_MS` (optional synthetic request timeout)

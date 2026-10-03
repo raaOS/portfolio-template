@@ -42,6 +42,12 @@ export const publicRoutes = [
   '/api/auth/check-auth',
 ];
 
+// Catatan: `/api/cron/*` sengaja TIDAK didaftarkan di sini. Path itu memang
+// tidak pernah match `protectedRoutes` (hanya `/admin` dan `/api/admin`),
+// jadi lolos auth by-design — pengaman utamanya ada di handler sendiri
+// (`CRON_SECRET`, lihat `src/app/api/cron/daily/route.ts`), dan CSRF-nya
+// diizinkan khusus untuk path ini di `src/middleware/csrf.ts`.
+
 // Note: RATE_LIMIT_* previously defined here was removed. Rate limiting is
 // enforced inside mutating handlers via `enforceRequestRateLimit` /
 // `checkDataRateLimit`, not in Edge middleware — see `src/middleware.ts` comments.
