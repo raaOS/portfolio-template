@@ -10,7 +10,7 @@ Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **U
 - **Masalahnya:** fitur pemasangan custom domain masih memakai sistem lama Cloudflare Pages dan menyuruh klien menambah 1 record CNAME manual ke `<slug>.pages.dev` — padahal sejak 1.3.20 situs klien dideploy sebagai **Worker**, jadi fitur ini tidak akan berfungsi.
 - **Perbaikannya:** kini memakai pintu API resmi Cloudflare untuk menyambungkan domain langsung ke Worker klien (`PUT /accounts/{id}/workers/domains`). **Cloudflare membuat record DNS dan sertifikat HTTPS secara otomatis** — klien tidak perlu mengatur apa pun lagi di tempat membeli domain (syarat: nameserver domain sudah mengarah ke akun Cloudflare klien).
 - Perubahan: portal (`/api/custom-domain` + tampilan hasil & pesan WhatsApp), CLI `cloud-manager`, serta panduan owner & dokumen izin token klien (D1, R2, Workers — Pages tidak dipakai lagi).
-- **Diuji:** 9 unit test otomatis (panggilan API, pesan galat, template WhatsApp tanpa CNAME). **Belum diuji dengan akun Cloudflare/domain sungguhan** — butuh 1 domain uji atau klien pertama.
+- **Diuji:** 9 unit test otomatis **+ uji nyata sukses di akun Cloudflare sungguhan** (2026-10-04): domain uji `uji.makeitbetter.my.id` disambungkan ke Worker produksi → situs terbuka **HTTP 200** (13 detik, sertifikat HTTPS valid) → record dilepas lagi sampai bersih (NXDOMAIN). Skrip uji: `scripts/onboarding/uji-custom-domain.ts`.
 
 ## [1.3.20] - 2026-10-04
 

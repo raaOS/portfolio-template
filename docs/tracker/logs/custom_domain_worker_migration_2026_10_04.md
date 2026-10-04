@@ -1,7 +1,7 @@
 # Log: Custom Domain Klien Dimigrasi dari Cloudflare Pages ke Worker (v1.3.21)
 
 **Tanggal:** 2026-10-04
-**Status:** 🟢 Selesai — gerbang hijau: test target **9/9**, `npm test` **116 file / 896 test PASS**, `tsc --noEmit` **0 error** (utama + ter-target 4 file scripts), `eslint src` **0**, `release:audit` **59/59**, `release:sale-readiness` **12/12**; **uji nyata akun Cloudflare menunggu domain uji/klien pertama**
+**Status:** 🟢 Selesai — gerbang hijau: test target **9/9**, `npm test` **116 file / 896 test PASS**, `tsc --noEmit` **0 error** (utama + ter-target 4 file scripts), `eslint src` **0**, `release:audit` **59/59**, `release:sale-readiness` **12/12**; **uji nyata akun Cloudflare SUNGGUHAN LULUS** (attach → HTTP 200 → detach bersih, lihat bagian 5)
 **Trigger:** Owner menjawab **"ya perbaiki"** atas pertanyaan sesi sebelumnya (perbaiki sekarang vs tunda sampai klien pertama). Gap ini tercatat sebagai gap #1 di `patch_celah_env_klien_2026_10_04.md`.
 
 ---
@@ -43,8 +43,23 @@ Diverifikasi dari dokumentasi Cloudflare (dicek 2026-10-04):
 - `CHANGELOG.md` — entri `[1.3.21]`.
 - Gap #1 di `patch_celah_env_klien_2026_10_04.md` ditandai sudah diperbaiki (teks lama tidak dihapus, hanya ditambah catatan).
 
-## 5. Belum / Lanjutan
+## 5. Hasil Uji Nyata (2026-10-04, akun Cloudflare owner)
 
-- **Uji nyata butuh akun Cloudflare yang punya zona domain** (milik owner atau klien pertama): attach → cek `https://<domain>` → `DELETE /accounts/{id}/workers/domains/{domain_id}`. Endpoint `DELETE` (detach) belum dipakai di kode — belum ada fitur lepas domain.
-- Izin token klien (Workers Scripts Write) diverifikasi dari dokumen API, belum diuji dengan token nyata.
-- Deploy klien tidak menyentuh custom domain (config wrangler generate tanpa `routes`) → domain yang sudah terpasang bertahan saat redeploy; belum diuji end-to-end.
+Skrip `scripts/onboarding/uji-custom-domain.ts` (BARU, alat verifikasi ulang untuk klien berikutnya) dijalankan terhadap akun Cloudflare sungguhan dengan API Token milik owner (disimpan di `arsip-klien/uji-domain/token.txt`, gitignored):
+
+```
+[uji] Token diterima API Cloudflare. ✅
+[uji] Attach sukses: uji.makeitbetter.my.id → Worker "portfolio-os-template" (zone makeitbetter.my.id) [1151ms]
+[uji] SITUS TERBUKA ✅ (HTTP 200 via 104.21.32.101) pada percobaan ke-2 — total 13s
+[uji] Record DILEPAS, akun kembali bersih ✅
+[uji] KESIMPULAN: attach → situs terbuka → detach, SEMUA SUKSES ✅
+```
+
+- Verifikasi independen sesudahnya: DoH publik (`dns.google`) untuk A & AAAA `uji.makeitbetter.my.id` → **Status 3 (NXDOMAIN)** = record benar-benar lepas.
+- Catatan teknis saat uji: (a) **DNS lokal (router) menyimpan cache NXDOMAIN ~30 menit** sehingga verifikasi awal lewat `fetch` gagal palsu — skrip diubah memakai IP dari DoH publik + `curl --resolve` (validasi TLS tetap penuh terhadap hostname); (b) bug skrip `DELETE` membalas **204 tanpa body** → `res.json()` melempar `Unexpected end of JSON input` — helper `cfApi` skrip kini meng-parse body kosong dengan aman.
+
+## 6. Sisa / Lanjutan
+
+- Izin token: uji memakai token owner (Workers Scripts Write + DNS Write/Read + beberapa tambahan pilihan owner) — **izin minimal persis belum diuji**; kalau ada penolakan API soal DNS, tambah izin Zone → DNS → Edit.
+- **Uji end-to-end deploy klien pertama** (akun CF milik klien) masih menunggu klien pertama — termasuk membuktikan zona domain klien yang berbeda akun bisa attach.
+- Portal tidak punya tombol **lepas/detach** domain (`DELETE /accounts/{id}/workers/domains/{id}` baru dipakai skrip uji) — tambahkan hanya kalau ada kebutuhan nyata.
