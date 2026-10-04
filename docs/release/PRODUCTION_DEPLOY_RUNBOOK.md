@@ -9,12 +9,12 @@ Target platform:
 - Cloudflare Workers/OpenNext for runtime.
 - Cloudflare D1 for relational data.
 - Cloudflare R2 for media and browser FFmpeg assets.
-- Multi-site single platform.
+- Managed service: one deployment per client, running in that client's own Cloudflare account (provisioned by the `PENGELOLA_KLIEN.bat` portal).
 
 Out of scope:
 
 - Vercel deployment.
-- One deployment per buyer.
+- A shared multi-tenant platform that hosts many clients in one deployment/account.
 - Personal Telegram/job-hunter/contact integrations.
 
 ## Pre-Deploy Gate
@@ -104,9 +104,9 @@ After automated smoke passes:
 
 - [ ] Open homepage.
 - [ ] Open admin login.
-- [ ] Login as master admin.
-- [ ] Create a test site.
-- [ ] Create a test client access user.
+- [ ] Login as admin with the seeded email + password (`/admin/login`).
+- [ ] Confirm the site row exists for this deployment (`GET /api/admin/sites`).
+- [ ] Confirm `site_users` holds the seeded admin row for this deployment.
 - [ ] Create a draft project.
 - [ ] Upload a cover image.
 - [ ] Upload gallery image.
@@ -115,7 +115,7 @@ After automated smoke passes:
 - [ ] Confirm storage usage changes after upload.
 - [ ] Confirm quota blocks over-limit action.
 - [ ] Confirm a site quota override raises the limit.
-- [ ] Create a second test site and confirm data from site A does not appear in site B.
+- [ ] Isolation check (staging only): create a second test site and confirm data from site A does not appear in site B — a production deployment serves exactly one client site.
 
 ## Rollback
 

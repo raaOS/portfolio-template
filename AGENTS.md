@@ -37,7 +37,7 @@ Sistem dokumentasi pelacakan pekerjaan (Tracker) telah diaktifkan untuk menghema
 ┌─────────────────────────────────────────────────┐
 │  OWNER (kita)                                   │
 │  - Deploy template ke akun Cloudflare customer  │
-│  - Setup awal: /setup wizard                    │
+│  - Setup awal: portal PENGELOLA_KLIEN.bat       │
 │  - Maintenance: Wrangler CLI                    │
 └─────────────────────────────────────────────────┘
                       │
@@ -46,11 +46,11 @@ Sistem dokumentasi pelacakan pekerjaan (Tracker) telah diaktifkan untuk menghema
 │  CUSTOMER (1 Cloudflare account)                │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐      │
 │  │ D1 DB    │  │ R2 Bucket│  │ Pages    │      │
-│  │ (8 tabel)│  │ (media)  │  │ (deploy) │      │
+│  │(10 tabel)│  │ (media)  │  │ (deploy) │      │
 │  └──────────┘  └──────────┘  └──────────┘      │
 │                                                  │
 │  Admin Panel: /admin (macOS desktop style)       │
-│  Setup Wizard: /setup (first-time only)          │
+│  Onboarding: portal PENGELOLA_KLIEN.bat          │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -60,8 +60,9 @@ Sistem dokumentasi pelacakan pekerjaan (Tracker) telah diaktifkan untuk menghema
 - Tidak ada multi-site resolution — setiap D1 hanya berisi data 1 customer
 - Auth pakai `jose` (Edge-compatible), cookie `site_user_token`
 - Konten legacy (about, skills, dll) disimpan di tabel `app_kv` (key-value JSON)
-- Customer login: `/admin/login` → email + password
-- Setup wizard: `/setup` → seed admin user + content data
+- Customer login: `/admin/login` → email + password (kredensial ada di `arsip-klien/<slug>/config.env`)
+- Onboarding: portal `PENGELOLA_KLIEN.bat` (`localhost:4567`) men-seed row `site` + admin user di D1 klien, lalu klien isi konten sendiri lewat `/admin`
+- `/setup` hanya jalur manual lama — bukan bagian alur normal; `POST /api/setup` membalas **400** kalau admin sudah ada
 
 ### Keputusan Produk Terkunci (Wajib Diikuti)
 
@@ -343,8 +344,8 @@ Lihat berkas `.env.example` sebagai referensi utama. Beberapa variabel penting m
 - `CLOUDFLARE_D1_DATABASE_ID` & `CLOUDFLARE_D1_API_TOKEN`: Kredensial database Cloudflare D1.
 - `CLOUDFLARE_R2_BUCKET` & `CLOUDFLARE_R2_PUBLIC_BASE_URL`: Kredensial media bucket Cloudflare R2.
 - `JWT_SECRET` & `PASSWORD_SALT`: Digunakan untuk enkripsi token otentikasi.
-- `FEATURE_CLIENT_DASHBOARD`, `FEATURE_MASTER_DASHBOARD`, `FEATURE_AI`, `FEATURE_NOTIFICATIONS`: Feature gate produk.
-- `AI_PROVIDER` & `AI_API_KEY`: Provider AI generic untuk fitur Pro jika `FEATURE_AI=true`.
+- `FEATURE_AI`, `FEATURE_NOTIFICATIONS`, `FEATURE_CUSTOM_DOMAIN`, `FEATURE_ANALYTICS`: Feature gate produk (lihat `.env.example`). `FEATURE_CLIENT_DASHBOARD` dan `FEATURE_MASTER_DASHBOARD` **sudah dihapus dari kode** — tidak ada lagi panel master untuk membuat/mengelola banyak site dari dalam admin.
+- `AI_PROVIDER` & `AI_API_KEY`: Provider AI generic jika `FEATURE_AI=true`.
 - `NOTIFICATION_PROVIDER` & `NOTIFICATION_API_KEY`: Provider notifikasi generic jika `FEATURE_NOTIFICATIONS=true`.
 - `NEXT_PUBLIC_DEV_VITALS`: PenampilCore Web Vitals melayang di pojok halaman (khusus development).
 
@@ -421,18 +422,30 @@ export const SITE_ID = process.env.CUSTOMER_SITE_ID || 'default-site';
 - Digunakan di: `siteRequestContext.ts`, `projectSiteContext.ts`, `siteMutationAuth.ts`
 - Setiap D1 hanya berisi data 1 customer
 
-### D1 Schema (8 Tabel)
+### D1 Schema
 
-| Tabel | Fungsi |
-|---|---|
-| `sites` | Informasi site (id, slug, name, plan, status) |
-| `site_users` | Login credentials (email, password_hash, role) |
-| `projects` | Data project portfolio |
-| `media_assets` | Referensi file di R2 |
-| `site_settings` | Pengaturan site (key-value) |
-| `audit_logs` | Jejak aktivitas |
-| `rate_limits` | Proteksi brute force |
-| `app_kv` | Key-value store untuk konten legacy |
+Ada **dua** berkas DDL yang hidup berdampingan — jangan tertukar:
+
+**1. Skema runtime customer — `src/crud/shared/db/schema.ts` (`SHARED_SCHEMA_QUERIES`, 10 tabel).**
+Dipasang portal onboarding ke D1 milik klien (`scripts/onboarding/server.ts:172`, `scripts/onboarding/cloud-manager.ts:242`) dan dibuat ulang saat runtime lewat `src/crud/shared/db/connection.ts`.
+
+| # | Tabel | Fungsi |
+|---|---|---|
+| 1 | `sites` | Informasi site (id, slug, name, status, active_template_key) |
+| 2 | `site_users` | Login credentials (email, password_hash, role) |
+| 3 | `projects` | Data project portfolio |
+| 4 | `media_assets` | Referensi file di R2 |
+| 5 | `site_settings` | Pengaturan site (key-value) |
+| 6 | `audit_logs` | Jejak aktivitas |
+| 7 | `rate_limits` | Proteksi brute force |
+| 8 | `app_kv` | Key-value store untuk konten legacy |
+| 9 | `portfolio_templates` | Katalog template (diisi oleh `seedDeployment()`) |
+| 10 | `site_template_entitlements` | Hak pakai template per site (diisi oleh `seedDeployment()`) |
+
+**2. Skema bootstrap produk — `src/lib/d1-schema.ts` (`D1_SCHEMA_QUERIES`, 12 tabel).**
+Dipakai `npm run cf:bootstrap` (`scripts/cloudflare/product-bootstrap.ts`), backup/restore (`scripts/cloudflare/backup-d1.ts`, `restore-d1.ts`), dan readiness gate. Empat namanya sama dengan skema di atas (`sites`, `projects`, `media_assets`, `audit_logs`) tapi definisi kolomnya berbeda, plus 8 tabel lain: `site_quota_overrides`, `project_narratives`, `submissions`, `ai_generations`, `orders`, `site_custom_domains`, `site_analytics`, `platform_settings` (skema ini tidak punya `site_users`, `site_settings`, `rate_limits`, `app_kv`, `portfolio_templates`, `site_template_entitlements`).
+
+> Tidak ada kolom `plan`/tier di tabel `sites` — paket Lite/Pro sudah dihapus (v1.3.15); harga tunggal Rp199.000.
 
 ### Content Storage (app_kv)
 
@@ -449,40 +462,71 @@ Konten legacy disimpan sebagai JSON string di tabel `app_kv`:
 
 ### Setup Flow
 
+**Alur normal tidak memakai `/setup`.** Onboarding lewat portal `PENGELOLA_KLIEN.bat` → `localhost:4567` (`npm run client:new` → `scripts/onboarding/server.ts`):
+
 ```
-1. Owner deploy ke akun customer (Wrangler CLI)
-2. Customer buka /setup
-3. Form: site name, admin email, admin password
-4. POST /api/setup → seedDeployment()
+1. Owner daftarkan klien baru di portal: Gmail klien + Account ID & API Token
+   dari akun Cloudflare MILIK KLIEN (disimpan di arsip-klien/<slug>/config.env)
+2. STEP 1-3: verifikasi kredensial → buat database D1 + bucket R2 di akun klien
+3. STEP 4: pasang skema tabel (SHARED_SCHEMA_QUERIES) → seed row `site`
+   (active_template_key sesuai pilihan template) dan admin user (scrypt)
+   (scripts/onboarding/server.ts:170-207)
+4. STEP 5: arsipkan kredensial & dokumen ke arsip-klien/<slug>/ (config.env
+   berisi ADMIN_EMAIL + ADMIN_PASSWORD)
+5. Build + deploy per klien lewat `deployClient()`
+   (`scripts/onboarding/client-deploy.ts`, dipanggil portal STEP 5):
+   env build di-inject dari config.env (override 13 kunci, reset kunci owner,
+   generate JWT_SECRET/PASSWORD_SALT per klien), lalu `npx wrangler deploy
+   --config .open-next/wrangler.client.<slug>.jsonc` ke akun klien
+6. Klien login https://<slug>.workers.dev/admin/login (atau custom domain)
+   lalu mengisi isi situsnya sendiri lewat /admin (kredensial dari config.env)
+```
+
+**Jalur manual lama `/setup`** (bukan bagian alur normal):
+
+```
+1. POST /api/setup → seedDeployment()  (src/crud/shared/db/seed.ts)
    → Create site row di D1
+   → Seed katalog template + entitlement default
    → Create admin user (scrypt password)
-   → Seed content keys di app_kv
-5. Redirect ke /admin/login
-6. Customer login dengan email + password
+2. Endpoint MENOLAK dengan 400 "Setup sudah selesai. Admin user sudah ada."
+   begitu ada admin (src/app/api/setup/route.ts:64-69, 96-99) — jadi /setup
+   sudah mati pada deployment yang sudah di-onboarding portal.
+3. Reset password klien bukan lewat /setup: owner jalankan
+   scripts/cloudflare/reset-customer-password.ts
 ```
 
 ### Deploy Pipeline
 
+Deploy per klien ditangani `deployClient()` di `scripts/onboarding/client-deploy.ts` (dipanggil portal `server.ts` STEP 5 dan CLI `cloud-manager.ts`), **bukan** `wrangler pages deploy` lagi:
+
 ```bash
-# Build
-./scripts/deploy/build-customer.sh <slug> <api-token> <account-id>
+# 1. Build dengan env klien (arsip-klien/<slug>/config.env) — 3 lapis:
+#    a. proses build: override 13 kunci dari config.env, reset 21 kunci owner
+#       jadi '' (buildClientEnvPlan), generate JWT_SECRET/PASSWORD_SALT per klien
+#    b. artefak runtime: .open-next/cloudflare/next-env.mjs ditulis ulang
+#    c. config wrangler: .open-next/wrangler.client.<slug>.jsonc (vars
+#       CUSTOMER_SITE_ID + KV namespace klien, tanpa binding milik owner)
+# 2. Deploy Worker per klien (bukan Pages) ke akun klien:
+npx wrangler deploy --config .open-next/wrangler.client.<slug>.jsonc
+#    env: CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN dari config.env
 
-# Deploy
-./scripts/deploy/deploy-customer.sh <slug> <api-token> <account-id>
-
-# Customer akses: https://<slug>.pages.dev
-# Customer buka: https://<slug>.pages.dev/setup
+# Customer akses: https://<slug>.workers.dev (atau custom domain)
+# Customer login: https://<slug>.workers.dev/admin/login
 ```
+
+> Kenapa berubah (v1.3.20): `wrangler pages deploy` lama **tidak memasang env D1/R2 per klien** → semua deployment klien memakai database owner (celah audit 2026-10-04). Lihat `docs/tracker/logs/patch_celah_env_klien_2026_10_04.md`.
+> `scripts/deploy/build-customer.sh` dan `scripts/deploy/deploy-customer.sh` **tidak dipanggil oleh kode mana pun** — keduanya sisa jalur lama.
 
 ### Admin UI Zones (3 Zones)
 
 | Zone | Apps |
 |---|---|
-| **Content & Berkas** | Projects, Profile, Experience, Skills, Archive, Labels, Explorer, Event Pages |
-| **Sistem & Tampilan** | Appearance, Dock, Widgets, Sounds |
+| **Konten & Berkas** | Projects, Profile, Experience, Skills, Archive, Labels, Explorer, Event Pages |
+| **Sistem & Tampilan** | Appearance, Dock, Widgets, Sounds, **AI**, **Analytics**, **Activity Log** |
 | **Komunikasi** | Notifications, Messages, Feedback, Contacts |
 
-> Zone "Manajemen Sistem & Klien" (clientDashboard, paymentConfig, orders) sudah dihapus.
+> Zone "Manajemen Sistem & Klien" (clientDashboard, paymentConfig, orders) sudah dihapus sepenuhnya (registry bersih + berkas panel `ClientDashboardPanel`/`OrdersPanel`/`PaymentConfigPanel` dihapus pada v1.3.20; endpoint API `orders`/`payment-config`/`sites` tetap hidup untuk billing & tooling).
 
 ### Test Mock Pattern
 

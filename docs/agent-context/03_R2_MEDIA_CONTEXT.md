@@ -8,8 +8,8 @@
 `sites/{siteId}/projects/{projectId}/{mediaId}-{variant}.{ext}`
 
 ## Alur Upload
-1. **Upload Admin Master:** Admin dapat upload/override media semua site via Worker endpoint atau *signed URL* untuk kebutuhan support.
-2. **Upload Client:** Client boleh upload/ganti media project sendiri dengan batas quota site, ukuran file terbatas, dan path selalu scoped ke `siteId`.
+1. **Upload owner/support:** Owner bisa membantu upload/override media lewat endpoint admin (`/api/admin/upload`) atau *signed URL* untuk kebutuhan support. Tidak ada panel "admin master semua site" — satu deployment hanya berisi satu site milik satu klien.
+2. **Upload klien:** Klien boleh upload/ganti media project sendiri dengan batas quota site, ukuran file terbatas, dan path selalu scoped ke `siteId`.
 3. **Opsi lanjutan:** Submission/approval workflow dan fitur tambahan lain aktif jika feature flag terkait diaktifkan.
 
 ## Optimasi & Quota

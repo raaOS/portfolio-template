@@ -1,13 +1,13 @@
 # Portfolio OS Template
 
-Sellable multi-site portfolio template powered by Cloudflare.
+Sellable managed-service portfolio template powered by Cloudflare — one deployment per buyer, inside that buyer's own Cloudflare account.
 
 This repository targets a full Cloudflare stack:
 
 - Cloudflare Workers/OpenNext for the app and API runtime.
 - Cloudflare D1 for relational tenant/project data.
 - Cloudflare R2 for media storage.
-- One multi-site platform, not one deployment per buyer.
+- One Cloudflare account per buyer: the owner provisions and deploys each client's site into the Cloudflare account owned by that client.
 
 Do not deploy this as a Vercel project. Any remaining Vercel references are legacy migration context, not the product target.
 
@@ -32,9 +32,9 @@ Do not deploy this as a Vercel project. Any remaining Vercel references are lega
    - D1 API token.
    - R2 S3-compatible access key.
 
-4. Fill `.env.local` with the product Cloudflare account values.
+4. Fill `.env.local` with the owner's Cloudflare account values (tooling/bootstrap account owned by the seller — not the client's account; each client site is provisioned and deployed into that client's own Cloudflare account).
 
-5. Confirm the env points to the product account:
+5. Confirm the env points to the owner's tooling account:
 
    ```env
    PRODUCT_CLOUDFLARE_ENV_CONFIRMED="true"
@@ -69,7 +69,7 @@ Do not deploy this as a Vercel project. Any remaining Vercel references are lega
 
 ## Main Docs
 
-- Buyer setup: [docs/release/BUYER_ONBOARDING.md](docs/release/BUYER_ONBOARDING.md)
+- Client onboarding & handoff: [docs/operations/BENGKEL_HANDOFF.md](docs/operations/BENGKEL_HANDOFF.md)
 - Seller release checklist: [docs/release/RELEASE_CHECKLIST.md](docs/release/RELEASE_CHECKLIST.md)
 - Production deploy runbook: [docs/release/PRODUCTION_DEPLOY_RUNBOOK.md](docs/release/PRODUCTION_DEPLOY_RUNBOOK.md)
 - RC1 release notes: [docs/release/RC1_RELEASE_NOTES.md](docs/release/RC1_RELEASE_NOTES.md)
@@ -95,9 +95,9 @@ npm run release:smoke    # Smoke-test a deployed production URL
 
 ## Access Model
 
-- Master admin manages sites, quotas, client access, and safe deletion.
-- Clients use self-service dashboard access scoped to their own site.
-- Every client is self-service. Capacity differences come only from each site's quota.
+- Owner provisions every new client through the `PENGELOLA_KLIEN.bat` portal (`localhost:4567`): the client's Gmail is registered, the client's Cloudflare Account ID + API Token are entered, and the portal provisions D1 + R2 inside the client's own Cloudflare account, seeds the admin user, and deploys the site there.
+- Each client manages their own site content by signing in to `/admin` on their own site. The credentials are stored in `arsip-klien/<slug>/config.env` on the owner's machine.
+- There is no master dashboard for managing many clients from inside the admin panel: sites are not bought, created, or managed from `/admin`, and there is one Cloudflare account per buyer.
 
 ## Important Notes
 

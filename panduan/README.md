@@ -12,7 +12,7 @@ Folder ini berisi panduan lengkap penggunaan sistem portofolio, yang telah dipis
 
 ### 2. [Panduan untuk Klien (Pembeli / Pemilik Portofolio)](file:///c:/Users/USER/Documents/portfolio-template/panduan/PANDUAN_UNTUK_KLIEN.md)
 > **Buka file:** [`panduan/PANDUAN_UNTUK_KLIEN.md`](file:///c:/Users/USER/Documents/portfolio-template/panduan/PANDUAN_UNTUK_KLIEN.md)  
-> File ini bisa kamu berikan langsung ke klien kamu (bisa dicetak jadi PDF atau dikirim via chat). Berisi cara aktivasi akun pertama kali (`/setup`), cara login (`/admin/login`), dan cara mengisi foto karya, biodata, serta nomor WhatsApp semudah menggunakan laptop Mac biasa.
+> File ini bisa kamu berikan langsung ke klien kamu (bisa dicetak jadi PDF atau dikirim via chat). Berisi cara login pertama kali (`/admin/login` dengan email + password yang sudah kamu serahkan), dan cara mengisi foto karya, biodata, serta nomor WhatsApp semudah menggunakan laptop Mac biasa.
 
 ---
 

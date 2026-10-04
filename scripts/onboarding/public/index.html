@@ -725,7 +725,7 @@
         <div class="form-group">
           <label for="clientSlug">Slug URL Website (Otomatis)</label>
           <input type="text" id="clientSlug" placeholder="budi-pratama" required>
-          <div class="input-hint">Target URL: <code id="slug-preview">https://budi-pratama.pages.dev</code></div>
+          <div class="input-hint">Target URL: <code id="slug-preview">https://budi-pratama.workers.dev</code></div>
         </div>
 
         <div class="form-group">
@@ -1171,11 +1171,11 @@
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
     slugInput.value = slug;
-    slugPreview.textContent = `https://${slug || 'nama-klien'}.pages.dev`;
+    slugPreview.textContent = `https://${slug || 'nama-klien'}.workers.dev`;
   });
 
   slugInput.addEventListener('input', (e) => {
-    slugPreview.textContent = `https://${e.target.value || 'nama-klien'}.pages.dev`;
+    slugPreview.textContent = `https://${e.target.value || 'nama-klien'}.workers.dev`;
   });
 
   // Form Submit: Onboard
@@ -1513,7 +1513,7 @@ Setelah DNS diperbarui, website portofolio Anda akan langsung aktif di https://$
 
     const domainText = c.customDomain
       ? `<strong>${c.customDomain}</strong>`
-      : `<span style="color: var(--text-muted);">belum ada (${c.clientSlug}.pages.dev)</span>`;
+      : `<span style="color: var(--text-muted);">belum ada (${c.clientSlug}.workers.dev)</span>`;
 
     return `
       <tr style="border-bottom: 1px solid var(--border);">

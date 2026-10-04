@@ -34,8 +34,8 @@ export default function ActivityLogPanel() {
     }
   }, []);
 
-  // Load awal ditunda ke macrotask berikutnya (pola yang sama dengan OrdersPanel)
-  // agar tidak memanggil setState secara sinkron di dalam effect.
+  // Load awal ditunda ke macrotask berikutnya agar tidak memanggil setState
+  // secara sinkron di dalam effect (rule react-hooks/set-state-in-effect).
   useEffect(() => {
     const timer = setTimeout(() => void fetchLogs(), 0);
     return () => clearTimeout(timer);

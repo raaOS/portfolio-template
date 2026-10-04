@@ -16,6 +16,7 @@ import crypto from 'crypto';
 import { spawn } from 'child_process';
 import { SHARED_SCHEMA_QUERIES } from '../../src/crud/shared/db/schema';
 import { hashPasswordScrypt } from '../../src/crud/shared/auth/password';
+import { deployClient, resolveWorkersSubdomain } from './client-deploy';
 
 const ROOT_DIR = process.cwd();
 const ARCHIVE_DIR = path.join(ROOT_DIR, 'arsip-klien');
@@ -281,6 +282,15 @@ async function handleOnboard() {
   console.log('\n[5/7] Menyimpan Data Klien ke Arsip...');
   const { dirPath, folderName } = getNextArchiveDir(clientSlug);
 
+  // URL publik memakai Cloudflare Worker (Opsi B), bukan Pages.
+  const subdomain = await resolveWorkersSubdomain(accountId, apiToken);
+  let websiteUrl = `https://${clientSlug}.${subdomain ? `${subdomain}.` : ''}workers.dev`;
+  let adminUrl = `${websiteUrl}/admin`;
+
+  // Secret milik klien — tidak pernah memakai nilai dari .env.local owner.
+  const jwtSecret = crypto.randomBytes(32).toString('hex');
+  const passwordSalt = crypto.randomBytes(16).toString('hex');
+
   const envContent = [
     `# ========================================================`,
     `# ARSIP KLIEN: ${clientName} (${folderName})`,
@@ -289,15 +299,25 @@ async function handleOnboard() {
     `CUSTOMER_NAME="${clientName}"`,
     `CUSTOMER_SLUG="${clientSlug}"`,
     `ACTIVE_TEMPLATE_KEY="${templateKey}"`,
+    `CUSTOMER_SITE_ID="${siteId}"`,
     `CLOUDFLARE_ACCOUNT_ID="${accountId}"`,
     `CLOUDFLARE_D1_DATABASE_NAME="${dbName}"`,
     `CLOUDFLARE_D1_DATABASE_ID="${databaseId}"`,
+    `CLOUDFLARE_D1_API_TOKEN="${apiToken}"`,
     `CLOUDFLARE_R2_BUCKET_NAME="${r2BucketName}"`,
+    `CLOUDFLARE_R2_BUCKET="${r2BucketName}"`,
+    `CLOUDFLARE_R2_ACCOUNT_ID="${accountId}"`,
+    `CLOUDFLARE_R2_PUBLIC_BASE_URL="/r2"`,
     `CLOUDFLARE_API_TOKEN="${apiToken}"`,
+    `JWT_SECRET="${jwtSecret}"`,
+    `PASSWORD_SALT="${passwordSalt}"`,
+    subdomain
+      ? `WORKERS_SUBDOMAIN="${subdomain}"`
+      : `# WORKERS_SUBDOMAIN="" (belum terbaca saat onboarding)`,
     `ADMIN_EMAIL="${adminEmail}"`,
     `ADMIN_PASSWORD="${adminPassword}"`,
-    `WEBSITE_URL="https://${clientSlug}.pages.dev"`,
-    `ADMIN_URL="https://${clientSlug}.pages.dev/admin"`,
+    `WEBSITE_URL="${websiteUrl}"`,
+    `ADMIN_URL="${adminUrl}"`,
     ``,
   ].join('\n');
   fs.writeFileSync(path.join(dirPath, 'config.env'), envContent, 'utf-8');
@@ -312,8 +332,8 @@ async function handleOnboard() {
     ``,
     `ALAMAT WEBSITE & LOGIN:`,
     `------------------------------------------------------------------`,
-    `• Alamat Website   : https://${clientSlug}.pages.dev`,
-    `• Alamat Admin     : https://${clientSlug}.pages.dev/admin`,
+    `• Alamat Website   : ${websiteUrl}`,
+    `• Alamat Admin     : ${adminUrl}`,
     `• Email Login      : ${adminEmail}`,
     `• Password Admin   : ${adminPassword}`,
     ``,
@@ -321,7 +341,7 @@ async function handleOnboard() {
     `------------------------------------------------------------------`,
     `• Cloudflare D1 DB : ${dbName} (ID: ${databaseId})`,
     `• Cloudflare R2    : ${r2BucketName}`,
-    `• Cloudflare Pages : ${clientSlug}`,
+    `• Cloudflare Worker: ${clientSlug}`,
     ``,
     `==================================================================`,
     `PESAN WHATSAPP SIAP COPY-PASTE KE KLIEN:`,
@@ -330,10 +350,10 @@ async function handleOnboard() {
     `Website portofolio interaktif kamu sudah resmi aktif dan siap dipakai! 🚀`,
     ``,
     `🌐 Website Kamu:`,
-    `https://${clientSlug}.pages.dev`,
+    `${websiteUrl}`,
     ``,
     `🔐 Ruang Admin Pribadi (untuk kelola karya, foto, & profil):`,
-    `https://${clientSlug}.pages.dev/admin`,
+    `${adminUrl}`,
     `Email    : ${adminEmail}`,
     `Password : ${adminPassword}`,
     ``,
@@ -343,54 +363,27 @@ async function handleOnboard() {
   fs.writeFileSync(path.join(dirPath, 'SURAT_SERAH_TERIMA.txt'), handoverDoc, 'utf-8');
   console.log(`✓ Arsip tersimpan di: arsip-klien/${folderName}`);
 
-  // 6. Kompilasi Template (Build OpenNext)
-  console.log('\n[6/7] Mengompilasi Kode Template Portofolio (npm run cf:build)...');
-  const openNextDir = path.join(ROOT_DIR, '.open-next');
-  const forceBuild = getParam('--force-build', 'FORCE_BUILD', 'true') === 'true';
-
-  if (!fs.existsSync(openNextDir) || forceBuild) {
-    const buildResult = await runCommandStreaming(
-      'npm',
-      ['run', 'cf:build'],
-      { cwd: ROOT_DIR },
-      (line) => console.log(`   [build] ${line}`)
-    );
-    if (buildResult.code !== 0) {
-      throw new Error(`Kompilasi template gagal dengan kode keluar ${buildResult.code}`);
-    }
-    console.log('✓ Kompilasi template berhasil.');
-  } else {
-    console.log('✓ Menggunakan bundle .open-next yang sudah ada.');
-  }
-
-  // 7. Deploy ke Cloudflare Pages Klien
-  console.log(`\n[7/7] Mendeploy Website ke Cloudflare Pages (${clientSlug})...`);
-  const deployResult = await runCommandStreaming(
-    'npx',
-    [
-      'wrangler',
-      'pages',
-      'deploy',
-      '.open-next',
-      `--project-name=${clientSlug}`,
-      '--commit-dirty=true',
-    ],
-    {
-      cwd: ROOT_DIR,
-      env: {
-        CLOUDFLARE_ACCOUNT_ID: accountId,
-        CLOUDFLARE_API_TOKEN: apiToken,
-      },
-    },
-    (line) => console.log(`   [wrangler] ${line}`)
+  // 6-7. Build dengan env klien lalu deploy ke Cloudflare Worker klien
+  console.log(
+    `\n[6/7] Build template dengan env klien + deploy ke Cloudflare Worker (${clientSlug})...`
   );
+  const outcome = await deployClient({
+    rootDir: ROOT_DIR,
+    configPath: path.join(dirPath, 'config.env'),
+    dryRun: false,
+    run: runCommandStreaming,
+    onLog: (line) => console.log(`   [deploy] ${line}`),
+  });
 
-  if (deployResult.code !== 0) {
-    throw new Error(`Deploy Cloudflare Pages gagal dengan kode ${deployResult.code}`);
+  if (!outcome.ok) {
+    throw new Error(
+      `Deploy ke ${clientSlug} gagal: ${outcome.error || 'kesalahan tidak diketahui'}`
+    );
   }
 
-  const websiteUrl = `https://${clientSlug}.pages.dev`;
-  const adminUrl = `https://${clientSlug}.pages.dev/admin`;
+  // Deploy bisa memperbarui WEBSITE_URL (subdomain workers.dev terbaca).
+  websiteUrl = outcome.websiteUrl || websiteUrl;
+  adminUrl = `${websiteUrl}/admin`;
 
   console.log('\n========================================================');
   console.log('🎉 WEBSITE KLIEN BERHASIL AKTIF & LIVE!');
@@ -447,6 +440,24 @@ ${whatsappMsg}
 // =========================================================================
 // ACTION 2: UPDATE TEMPLATE TO CLIENT(S)
 // =========================================================================
+
+/** Cari path config.env di arsip-klien berdasarkan slug atau nama folder. */
+function findConfigEnv(slugOrFolder: string): string | null {
+  if (!fs.existsSync(ARCHIVE_DIR)) return null;
+  const folders = fs
+    .readdirSync(ARCHIVE_DIR, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name);
+
+  for (const folder of folders) {
+    const envPath = path.join(ARCHIVE_DIR, folder, 'config.env');
+    if (!fs.existsSync(envPath)) continue;
+    const env = parseEnv(fs.readFileSync(envPath, 'utf-8'));
+    if (env.CUSTOMER_SLUG === slugOrFolder || folder === slugOrFolder) return envPath;
+  }
+  return null;
+}
+
 async function handleUpdate() {
   console.log('\n========================================================');
   console.log('🔄 [CLOUD MASTER] MEMULAI UPDATE VERSI TEMPLATE');
@@ -454,32 +465,23 @@ async function handleUpdate() {
 
   const target = getParam('--target', 'UPDATE_TARGET', 'all');
   const specificSlug = getParam('--slug', 'CLIENT_SLUG');
-  const accountId = getParam('--account-id', 'CLOUDFLARE_ACCOUNT_ID');
-  const apiToken = getParam('--api-token', 'CLOUDFLARE_API_TOKEN');
 
-  // Compile template first
-  console.log('[1/2] Mengompilasi Kode Template Terbaru (npm run cf:build)...');
-  const buildResult = await runCommandStreaming(
-    'npm',
-    ['run', 'cf:build'],
-    { cwd: ROOT_DIR },
-    (line) => console.log(`   [build] ${line}`)
-  );
-  if (buildResult.code !== 0) {
-    throw new Error(`Kompilasi template gagal dengan kode ${buildResult.code}`);
-  }
-  console.log('✓ Kompilasi template OpenNext selesai.');
+  // Build tidak lagi dipakai bersama: tiap klien dibangun ulang dengan env
+  // miliknya sendiri (lihat deployClient).
+  console.log('[1/2] Menyiapkan daftar klien target...');
+  const targets: Array<{ name: string; slug: string; configPath: string }> = [];
 
-  // Determine target list
-  console.log('\n[2/2] Memproses Deploy Pembaruan ke Website Klien...');
-  const targets: Array<{ name: string; slug: string; accountId: string; apiToken: string }> = [];
-
-  if (specificSlug && accountId && apiToken) {
+  if (specificSlug) {
+    const configPath = findConfigEnv(specificSlug);
+    if (!configPath) {
+      throw new Error(
+        `config.env untuk slug "${specificSlug}" tidak ditemukan di arsip-klien/. Deploy per klien membutuhkan config.env (D1, R2, & secret klien).`
+      );
+    }
     targets.push({
       name: getParam('--name', 'CLIENT_NAME', specificSlug),
       slug: specificSlug,
-      accountId,
-      apiToken,
+      configPath,
     });
   } else if (fs.existsSync(ARCHIVE_DIR)) {
     const folders = fs
@@ -496,8 +498,7 @@ async function handleUpdate() {
             targets.push({
               name: env.CUSTOMER_NAME || env.CUSTOMER_SLUG,
               slug: env.CUSTOMER_SLUG,
-              accountId: env.CLOUDFLARE_ACCOUNT_ID,
-              apiToken: env.CLOUDFLARE_API_TOKEN,
+              configPath: envPath,
             });
           }
         }
@@ -511,37 +512,33 @@ async function handleUpdate() {
 
   const results: Array<{ name: string; slug: string; success: boolean; url: string; error?: string }> = [];
 
+  console.log(`\n[2/2] Build + deploy pembaruan ke ${targets.length} klien...`);
+
   for (let i = 0; i < targets.length; i++) {
     const t = targets[i];
-    console.log(`\n>>> [${i + 1}/${targets.length}] Mendeploy ke: ${t.name} (${t.slug})...`);
+    console.log(`\n>>> [${i + 1}/${targets.length}] Build + deploy ke: ${t.name} (${t.slug})...`);
 
-    const deployResult = await runCommandStreaming(
-      'npx',
-      [
-        'wrangler',
-        'pages',
-        'deploy',
-        '.open-next',
-        `--project-name=${t.slug}`,
-        '--commit-dirty=true',
-      ],
-      {
-        cwd: ROOT_DIR,
-        env: {
-          CLOUDFLARE_ACCOUNT_ID: t.accountId,
-          CLOUDFLARE_API_TOKEN: t.apiToken,
-        },
-      },
-      (line) => console.log(`   [wrangler] ${line}`)
-    );
+    const outcome = await deployClient({
+      rootDir: ROOT_DIR,
+      configPath: t.configPath,
+      dryRun: false,
+      run: runCommandStreaming,
+      onLog: (line) => console.log(`   [deploy] ${line}`),
+    });
 
-    const url = `https://${t.slug}.pages.dev`;
-    if (deployResult.code === 0) {
+    const url = outcome.websiteUrl || `https://${t.slug}.workers.dev`;
+    if (outcome.ok) {
       console.log(`✓ BERHASIL: ${t.name} telah diupdate ke template terbaru (${url}).`);
       results.push({ name: t.name, slug: t.slug, success: true, url });
     } else {
-      console.log(`✗ GAGAL: Deploy ke ${t.name} gagal dengan kode ${deployResult.code}.`);
-      results.push({ name: t.name, slug: t.slug, success: false, url, error: `Kode keluar ${deployResult.code}` });
+      console.log(`✗ GAGAL: Deploy ke ${t.name} gagal — ${outcome.error || 'kesalahan tidak diketahui'}.`);
+      results.push({
+        name: t.name,
+        slug: t.slug,
+        success: false,
+        url,
+        error: outcome.error || 'kesalahan tidak diketahui',
+      });
     }
   }
 

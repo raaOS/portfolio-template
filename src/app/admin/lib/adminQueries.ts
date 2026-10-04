@@ -8,8 +8,6 @@ import type { Label } from '@/types/labels';
 import type { Project } from '@/types/projects';
 import type { TestimonialData } from '@/types/testimonial';
 import type { NoteData } from '@/components/os/ui/elements/StickyNoteItem';
-import type { SiteQuota, SiteQuotaOverride } from '@/lib/product/siteQuota';
-import type { SiteStorageUsage } from '@/lib/product/siteStorageUsage';
 import type { SiteAnalyticsSummary } from '@/lib/services/analyticsService';
 import aboutFallback from '@/data/about.json';
 import contactFallback from '@/data/contact.json';
@@ -28,7 +26,6 @@ export const ADMIN_QUERY_KEYS = {
   about: ['admin', 'about'] as const,
   aboutPhilosophy: ['admin', 'about', 'philosophy'] as const,
   analytics: ['admin', 'analytics'] as const,
-  clientSites: ['admin', 'client-sites'] as const,
   commentCounts: ['comments', 'counts'] as const,
   contact: ['admin', 'contact'] as const,
   experience: ['admin', 'experience'] as const,
@@ -41,60 +38,11 @@ export const ADMIN_QUERY_KEYS = {
   testimonial: ['admin', 'testimonial'] as const,
 };
 
-export const ADMIN_PREFETCH_HREFS = [
-  '/admin/projects',
-  '/admin/client-dashboard',
-  '/admin/content/experience',
-  '/admin/communications/notifications',
-  '/admin/communications/contacts',
-  '/admin/communications/messages',
-  '/admin/content/profile',
-  '/admin/content/skills',
-  '/admin/content/archive',
-  '/admin/system/appearance',
-  '/admin/system/widgets',
-  '/admin/system/dock',
-  '/admin/system/sounds',
-  '/admin/content/labels',
-] as const;
-
 export interface AdminProjectsResponse {
   data?: {
     projects?: Project[];
     lastUpdated?: string;
   };
-}
-
-export interface AdminSiteSummary {
-  id: string;
-  slug: string;
-  name: string;
-  status: string;
-  createdAt: string;
-  updatedAt: string;
-  quota: SiteQuota;
-  quotaOverride: SiteQuotaOverride;
-  usage: {
-    projects: number;
-    storage: SiteStorageUsage;
-  };
-  clientAccess: {
-    id: string;
-    email: string;
-    status: string;
-    updatedAt: string;
-    lastLoginAt: string | null;
-  } | null;
-  customDomain: {
-    customDomain: string | null;
-    status: string;
-    sslStatus: string;
-  } | null;
-}
-
-export interface AdminSitesResponse {
-  sites: AdminSiteSummary[];
-  defaultSiteId: string | null;
 }
 
 export interface Lead extends Record<string, unknown> {
@@ -127,10 +75,6 @@ export const ADMIN_PLACEHOLDER_DATA = {
   hardSkills: placeholderHardSkills,
   labels: labelsFallback as Label[],
   leads: [] as Lead[],
-  clientSites: {
-    sites: [],
-    defaultSiteId: null,
-  } satisfies AdminSitesResponse,
   projects: {
     data: {
       projects: (projectsFallback as { projects?: Project[] }).projects || [],
@@ -220,10 +164,6 @@ export function fetchAdminLeads() {
   return fetchJson<Lead[]>('/api/leads').then((data) => (Array.isArray(data) ? data : []));
 }
 
-export function fetchAdminSites() {
-  return fetchJson<AdminSitesResponse>('/api/admin/sites');
-}
-
 export function fetchAdminProjects() {
   return fetchJson<AdminProjectsResponse>('/api/projects');
 }
@@ -251,127 +191,6 @@ function prefetch<T>(queryClient: QueryClient, queryKey: QueryKey, queryFn: () =
   });
 }
 
-function prefetchJobsForRoute(href: string) {
-  if (href.startsWith('/admin/projects')) {
-    return [
-      (queryClient: QueryClient) =>
-        prefetch(queryClient, ADMIN_QUERY_KEYS.projects, fetchAdminProjects),
-      (queryClient: QueryClient) =>
-        prefetch(queryClient, ADMIN_QUERY_KEYS.labels, fetchAdminLabels),
-      (queryClient: QueryClient) =>
-        prefetch(queryClient, ADMIN_QUERY_KEYS.commentCounts, fetchAdminCommentCounts),
-    ];
-  }
-
-  if (href.startsWith('/admin/client-dashboard')) {
-    return [
-      (queryClient: QueryClient) =>
-        prefetch(queryClient, ADMIN_QUERY_KEYS.clientSites, fetchAdminSites),
-      (queryClient: QueryClient) =>
-        prefetch(queryClient, ADMIN_QUERY_KEYS.labels, fetchAdminLabels),
-    ];
-  }
-
-  if (href.startsWith('/admin/content/profile')) {
-    return [
-      (queryClient: QueryClient) => prefetch(queryClient, ADMIN_QUERY_KEYS.about, fetchAdminAbout),
-      (queryClient: QueryClient) =>
-        prefetch(queryClient, ADMIN_QUERY_KEYS.projects, fetchAdminProjects),
-      (queryClient: QueryClient) =>
-        prefetch(queryClient, ADMIN_QUERY_KEYS.aboutPhilosophy, fetchAdminAboutPhilosophy),
-    ];
-  }
-
-  if (href.startsWith('/admin/content/skills')) {
-    return [
-      (queryClient: QueryClient) => prefetch(queryClient, ADMIN_QUERY_KEYS.about, fetchAdminAbout),
-      (queryClient: QueryClient) =>
-        prefetch(queryClient, ADMIN_QUERY_KEYS.hardSkills, fetchAdminHardSkills),
-    ];
-  }
-
-  if (href.startsWith('/admin/content/archive')) {
-    return [
-      (queryClient: QueryClient) =>
-        prefetch(queryClient, ADMIN_QUERY_KEYS.projects, fetchAdminProjects),
-      (queryClient: QueryClient) =>
-        prefetch(queryClient, ADMIN_QUERY_KEYS.galleryFeatured, fetchAdminGalleryFeatured),
-    ];
-  }
-
-  if (href.startsWith('/admin/content/experience')) {
-    return [
-      (queryClient: QueryClient) =>
-        prefetch(queryClient, ADMIN_QUERY_KEYS.experience, fetchAdminExperience),
-    ];
-  }
-
-  if (href.startsWith('/admin/content/labels')) {
-    return [
-      (queryClient: QueryClient) =>
-        prefetch(queryClient, ADMIN_QUERY_KEYS.labels, fetchAdminLabels),
-    ];
-  }
-
-  if (href.startsWith('/admin/system/appearance')) {
-    return [
-      (queryClient: QueryClient) => prefetch(queryClient, ADMIN_QUERY_KEYS.about, fetchAdminAbout),
-      (queryClient: QueryClient) =>
-        prefetch(queryClient, ADMIN_QUERY_KEYS.projects, fetchAdminProjects),
-    ];
-  }
-
-  if (href.startsWith('/admin/system/widgets')) {
-    return [
-      (queryClient: QueryClient) => prefetch(queryClient, ADMIN_QUERY_KEYS.about, fetchAdminAbout),
-      (queryClient: QueryClient) =>
-        prefetch(queryClient, ADMIN_QUERY_KEYS.stickyNotes, fetchAdminStickyNotes),
-    ];
-  }
-
-  if (href.startsWith('/admin/system/dock') || href.startsWith('/admin/system/sounds')) {
-    return [
-      (queryClient: QueryClient) => prefetch(queryClient, ADMIN_QUERY_KEYS.about, fetchAdminAbout),
-    ];
-  }
-
-  if (href.startsWith('/admin/communications/notifications')) {
-    return [
-      (queryClient: QueryClient) =>
-        prefetch(queryClient, ADMIN_QUERY_KEYS.testimonial, fetchAdminTestimonials),
-      (queryClient: QueryClient) =>
-        prefetch(queryClient, ADMIN_QUERY_KEYS.projects, fetchAdminProjects),
-      (queryClient: QueryClient) => prefetch(queryClient, ADMIN_QUERY_KEYS.about, fetchAdminAbout),
-    ];
-  }
-
-  if (href.startsWith('/admin/communications/contacts')) {
-    return [
-      (queryClient: QueryClient) =>
-        prefetch(queryClient, ADMIN_QUERY_KEYS.contact, fetchAdminContact),
-    ];
-  }
-
-  if (href.startsWith('/admin/communications/messages')) {
-    return [
-      (queryClient: QueryClient) => prefetch(queryClient, ADMIN_QUERY_KEYS.leads, fetchAdminLeads),
-    ];
-  }
-
-  if (href.startsWith('/admin/communications/feedback')) {
-    return [];
-  }
-
-  return [];
-}
-
-export function prefetchAdminRoute(queryClient: QueryClient, href: string) {
-  const jobs = prefetchJobsForRoute(href);
-  if (jobs.length === 0) return Promise.resolve([]);
-
-  return Promise.allSettled(jobs.map((job) => job(queryClient)));
-}
-
 export function warmAdminCrudQueries(queryClient: QueryClient) {
   return Promise.allSettled([
     prefetch(queryClient, ADMIN_QUERY_KEYS.projects, fetchAdminProjects),
@@ -380,7 +199,6 @@ export function warmAdminCrudQueries(queryClient: QueryClient) {
     prefetch(queryClient, ADMIN_QUERY_KEYS.testimonial, fetchAdminTestimonials),
     prefetch(queryClient, ADMIN_QUERY_KEYS.contact, fetchAdminContact),
     prefetch(queryClient, ADMIN_QUERY_KEYS.leads, fetchAdminLeads),
-    prefetch(queryClient, ADMIN_QUERY_KEYS.clientSites, fetchAdminSites),
     prefetch(queryClient, ADMIN_QUERY_KEYS.labels, fetchAdminLabels),
     prefetch(queryClient, ADMIN_QUERY_KEYS.commentCounts, fetchAdminCommentCounts),
   ]);

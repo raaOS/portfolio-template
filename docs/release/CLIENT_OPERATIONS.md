@@ -4,23 +4,28 @@ Panduan ini menjelaskan flow operasional setelah produk dijual ke client.
 
 ## Link Client
 
-Untuk site dengan slug `urgent`:
+Setiap klien = 1 deployment sendiri di akun Cloudflare milik klien (contoh slug `urgent`):
 
-- Public site: `https://domain-kamu.com/urgent`
-- Public projects: `https://domain-kamu.com/urgent/projects`
-- Panel kelola konten: `https://domain-kamu.com/admin/login`
+- Public site: `https://<slug>.workers.dev` (atau custom domain klien)
+- Panel kelola konten: `https://<slug>.workers.dev/admin/login`
 
-Tidak ada halaman login per-site. Semua pembeli masuk lewat `/admin/login`
-(setup awal lewat `/setup` membuat email + password admin).
+Tidak ada halaman login per-site, dan tidak ada path `/<slug>` di depan halaman —
+satu deployment sudah dikhususkan untuk satu klien. Semua login lewat `/admin/login`
+(email + password admin sudah di-seed portal onboarding, tercatat di
+`arsip-klien/<slug>/config.env` dan di API portal `/api/clients`).
+`/setup` bukan bagian alur normal: `POST /api/setup` membalas 400 kalau admin sudah ada.
 
 ## Membuat Client Baru
 
-1. Order masuk lewat `/checkout` -> diverifikasi -> diaktifkan (site dibuat,
-   link website dikirim via email). Site juga bisa dibuat langsung dari panel admin.
-2. Pembeli membuka `/setup` sekali untuk membuat email + password panel.
-3. Kirim ke pembeli:
+1. Order masuk lewat `/checkout` -> diverifikasi -> diaktifkan (tiket kerja masuk ke
+   Telegram admin; lihat `docs/operations/BENGKEL_HANDOFF.md`).
+2. Onboarding lewat portal `PENGELOLA_KLIEN.bat` (Tab "Pendaftaran Klien Baru"):
+   Account ID + API Token dari akun Cloudflare klien -> provisioning D1 `db-<slug>` dan
+   R2 `media-<slug>` -> seed row site + admin user -> deploy.
+3. Kirim ke klien:
    - link public site
    - link panel `/admin/login`
+   - email + password admin dari `arsip-klien/<slug>/config.env` (kirim lewat jalur privat)
    - pengingat: kalau lupa password, minta owner reset
      (`npx tsx scripts/cloudflare/reset-customer-password.ts`)
 
@@ -33,7 +38,7 @@ diverifikasi & order aktif) dikirim lewat provider email generik:
 NOTIFICATION_PROVIDER="resend"
 NOTIFICATION_API_KEY=""
 NOTIFICATION_DEFAULT_FROM=""
-NEXT_PUBLIC_SITE_URL="https://domain-kamu.com"
+NEXT_PUBLIC_SITE_URL="https://<slug>.workers.dev"
 ```
 
 Tanpa keempat nilai tersebut, pembeli tidak menerima email sama sekali.
@@ -78,9 +83,9 @@ Saat client melapor error:
 
 Client tidak mendapat:
 
-- akses Cloudflare;
-- akses endpoint admin master;
+- akses Cloudflare (token tetap di `arsip-klien/<slug>/config.env` milik owner);
+- akses portal owner (`PENGELOLA_KLIEN.bat`);
 - API token D1/R2;
-- akses ke data client lain.
+- akses ke data client lain (setiap client punya deployment sendiri).
 
-Master tetap bertanggung jawab atas quota, reset manual, suspend/activate, dan support override.
+Owner tetap bertanggung jawab atas quota, reset manual, suspend/activate, dan support override.

@@ -54,9 +54,11 @@ Jangan tutup jendela terminal selama portal dipakai.
 ### 5. Deploy ke akun klien
 
 - Selesaikan provisioning lewat portal (menu `[1]`), lalu deploy.
-- Di balik layar portal memakai `scripts/deploy/deploy-customer.sh`
-  (`build-customer.sh` untuk build).
-- Hasil akik: `https://<slug>.pages.dev`.
+- Di balik layar portal memanggil `deployClient()` (`scripts/onboarding/client-deploy.ts`):
+  build dengan env klien dari `arsip-klien/<slug>/config.env`, lalu
+  `npx wrangler deploy --config .open-next/wrangler.client.<slug>.jsonc`
+  ke akun klien. `scripts/deploy/deploy-customer.sh` tidak dipanggil portal.
+- Hasil akhir: `https://<slug>.workers.dev` (atau custom domain klien).
 
 ### 6. Serah terima + tandai selesai
 
@@ -65,7 +67,8 @@ Jangan tutup jendela terminal selama portal dipakai.
 - Simpan semua data klien di folder `arsip-klien/<folder-arsip>/`
   (`config.env` berisi kredensial Cloudflare milik klien — file ini tidak boleh
   masuk git).
-- Tandai order/tugasnya selesai di `/admin` → Orders.
+- Tandai order/tugasnya selesai **manual di catatan/tracker kamu** — panel Orders di `/admin`
+  sudah dihapus.
 
 ## Kalau Klien Lupa Password
 
@@ -79,7 +82,6 @@ npx tsx scripts/cloudflare/reset-customer-password.ts <folder-arsip> --email adm
 
 ## Referensi
 
-- [buyer-onboarding-checklist.md](./buyer-onboarding-checklist.md) — checklist onboarding.
 - [support-playbook.md](./support-playbook.md) — penanganan tiket support.
 - [backup-restore-runbook.md](./backup-restore-runbook.md) — backup & restore D1/R2.
 - `docs/release/PRODUCTION_DEPLOY_RUNBOOK.md` — checklist rilis ke produksi.

@@ -51,7 +51,7 @@ Cukup tanyakan 2 hal ini ke klien:
 ---
 
 ### Langkah 3: Serahkan Website ke Klien
-Setelah websitenya online, tugas teknis kamu sudah selesai! Sekarang tinggal berikan link website dan link aktivasi ke klien.
+Setelah websitenya online, tugas teknis kamu sudah selesai! Sekarang tinggal berikan link website, link ruang admin, dan kredensial login (email + password yang tercetak di `arsip-klien/<slug>/SURAT_SERAH_TERIMA.txt` / `config.env`) ke klien.
 
 Kamu tinggal copy-paste pesan WhatsApp di bawah ini:
 
@@ -62,25 +62,25 @@ Kamu tinggal copy-paste pesan WhatsApp di bawah ini:
 > *(Tinggal copy teks di bawah ini dan ganti tulisan di dalam tanda kurung siku)*
 
 ```text
-Halo Kak [Nama Klien]! 👋
+Halo kak [Nama Klien]! 👋
+Website portofolio interaktif kamu sudah resmi aktif dan siap dipakai! 🚀
 
-Kabar gembira, website portofolio interaktif Kakak sudah selesai kami siapkan dan sudah live di internet:
-🌐 Alamat Website: https://[namadomainklien.com]
+🌐 Website Kamu:
+https://[slug-klien].pages.dev
 
-Langkah selanjutnya sangat mudah, Kakak tinggal melakukan aktivasi akun pertama kali untuk mengisi data dan karya portofolio Kakak:
+🔐 Ruang Admin Pribadi (untuk kelola karya, foto, & profil):
+https://[slug-klien].pages.dev/admin
+Email    : [email login]
+Password : [password admin]
 
-1️⃣ Klik Link Aktivasi Akun Ini:
-👉 https://[namadomainklien.com]/setup
-
-2️⃣ Masukkan Nama, Email, dan buat Password baru yang mudah diingat. Lalu klik Selesai/Aktivasi.
-
-3️⃣ Setelah aktif, kapan pun Kakak mau tambah foto karya, ganti biodata, atau ganti nomor kontak, Kakak cukup buka:
-👉 https://[namadomainklien.com]/admin/login
-
-Kami juga lampirkan buku panduan praktis penggunaan website (sudah kami buat seringkas mungkin seperti menggunakan laptop biasa).
-
-Jika ada kendala saat aktivasi, kabari kami ya Kak. Selamat berkarya! 🚀
+Semua foto, video karya, dan kontak bisa kamu tambahkan sendiri dengan sangat mudah di ruang admin. Selamat berkarya dan sukses selalu! 🎉✨
 ```
+
+> Pesan di atas **sama persis** dengan template resmi yang disimpan portal ke
+> `arsip-klien/<slug>/SURAT_SERAH_TERIMA.txt` (`scripts/onboarding/server.ts:256-269`).
+> Kalau klien sudah pasang custom domain, ganti `https://[slug-klien].pages.dev` dengan
+> alamat domain klien. **Klien tidak perlu membuka `/setup`** — email + password sudah
+> dibuatkan portal onboarding.
 
 *(Jangan lupa kirimkan juga file `PANDUAN_UNTUK_KLIEN.md` yang ada di folder ini ke klien kamu, bisa dikirim dalam bentuk teks atau diekspor ke PDF).*
 
@@ -89,7 +89,7 @@ Jika ada kendala saat aktivasi, kabari kami ya Kak. Selamat berkarya! 🚀
 ## ❓ Tanya Jawab Umum (FAQ untuk Kamu)
 
 ### 1. Bagaimana jika klien lupa password akun mereka?
-Klien tidak bisa mengulang `/setup` karena database sudah terkunci. Reset dilakukan manual dari komputermu dengan perintah: `npx tsx scripts/cloudflare/reset-customer-password.ts <folder-arsip> --email admin@klien.com --generate` (ganti `<folder-arsip>` dengan nama folder klien di `arsip-klien/`, dan `--generate` akan membuat password baru yang tinggal kamu kirimkan ke klien).
+Tidak ada reset mandiri untuk klien. Portal onboarding sudah membuatkan akun admin, jadi halaman `/setup` bukan bagian alur normal (endpoint-nya menolak dengan **400** selama admin sudah ada). Reset dilakukan manual dari komputermu dengan perintah: `npx tsx scripts/cloudflare/reset-customer-password.ts <folder-arsip> --email admin@klien.com --generate` (ganti `<folder-arsip>` dengan nama folder klien di `arsip-klien/`, dan `--generate` akan membuat password baru yang tinggal kamu kirimkan ke klien).
 
 ### 2. Apakah ada biaya bulanan yang harus saya bayar?
 Tidak ada untuk skala normal. Cloudflare memberikan kuota gratis yang sangat besar (jutaan request per bulan dan penyimpanan database D1 yang cukup untuk ratusan portofolio standar).

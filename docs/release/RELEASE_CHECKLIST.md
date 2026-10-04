@@ -1,10 +1,10 @@
 # Seller Release Checklist
 
-Use this checklist before packaging, selling, or deploying a buyer instance.
+Use this checklist before deploying an instance for a client (managed service: 1 client = 1 Cloudflare account belonging to the client, provisioned by the `PENGELOLA_KLIEN.bat` portal).
 
 ## Preflight
 
-- [ ] Confirm this repo points to the product Cloudflare account, not a personal portfolio account.
+- [ ] Confirm `.env.local` points to the owner's own Cloudflare account used for template development and smoke tests (each client deployment lives in the client's own Cloudflare account, provisioned by the portal).
 - [ ] Confirm `.env.local` exists locally and is not committed.
 - [ ] Confirm `PRODUCT_CLOUDFLARE_ENV_CONFIRMED="true"` only after product Cloudflare values are set.
 - [ ] Confirm `wrangler.jsonc` R2 bucket name matches `CLOUDFLARE_R2_BUCKET`.
@@ -13,10 +13,10 @@ Use this checklist before packaging, selling, or deploying a buyer instance.
 
 ## Cloudflare Resources
 
-- [ ] D1 database created.
-- [ ] R2 bucket created.
-- [ ] D1 token created and scoped to the product account/database.
-- [ ] R2 S3 access key created and scoped to the product media bucket.
+- [ ] D1 database exists in the client's Cloudflare account (portal creates `db-<slug>`).
+- [ ] R2 bucket exists in the client's Cloudflare account (portal creates `media-<slug>`).
+- [ ] API token is scoped to the client's account (D1, Pages, R2) and stored only in `arsip-klien/<slug>/config.env`.
+- [ ] R2 S3 access key scoped to the client's media bucket.
 - [ ] R2 CORS applied if direct browser upload is used:
 
   ```bash
@@ -100,12 +100,11 @@ After deploy:
 
 - [ ] Health endpoint returns 200.
 - [ ] Public site route loads.
-- [ ] Master admin login works.
-- [ ] Master can create/update/suspend/delete a site.
-- [ ] Master can set site status and quota override.
-- [ ] Panel login works (`/admin/login` with the buyer's email + password).
+- [ ] Panel login works (`/admin/login` with the client's seeded email + password from `arsip-klien/<slug>/config.env`).
+- [ ] Owner can create/update/suspend/delete a site via `POST/PUT/DELETE /api/admin/sites` (no central dashboard panel exists).
+- [ ] Owner can set site status and quota override (`site_quota_overrides`).
 - [ ] Owner-assisted password reset works (`npx tsx scripts/cloudflare/reset-customer-password.ts`).
-- [ ] Buyer can create/edit projects within quota via `/admin/client-dashboard`.
+- [ ] Client can create/edit projects within quota via `/admin`.
 - [ ] Cover/gallery/video upload works.
 - [ ] R2 media keys are under `sites/{siteId}/...`.
 - [ ] Browser video compression loads FFmpeg from `/r2/ffmpeg`.
@@ -123,15 +122,15 @@ After deploy:
 - [ ] Sales/pricing guide included.
 - [ ] Tracker updated after the release sprint.
 
-## Handoff To Buyer
+## Handoff To Client
 
-Give the buyer:
+Give the client:
 
-- Repository or archive.
-- Cloudflare setup instructions.
-- Their generated admin password or reset process.
-- Their panel login URL: `https://domain.com/admin/login` (there is no per-site login page).
-- Their password reset process (owner-assisted; no self-service reset).
-- Their Cloudflare resource naming convention.
-- The final production URL.
-- A reminder to rotate all generated secrets after ownership transfer.
+- The live URL (`https://<slug>.workers.dev`, or their custom domain once connected).
+- Their panel login URL: `https://<slug>.workers.dev/admin/login` (there is no per-site login page).
+- Their admin email + password — already recorded in `arsip-klien/<slug>/config.env`; send it over a private channel, never publicly.
+- The client guide: `panduan/PANDUAN_UNTUK_KLIEN.md` (how to fill in their own projects, profile, and contact).
+- Their password reset process (owner-assisted via `reset-customer-password.ts`; no self-service reset).
+- Support contact for future content changes or template updates.
+
+Do **not** hand over: the repository/archive, Cloudflare setup instructions, or the API token — the deployment runs in the client's Cloudflare account while the token stays in `arsip-klien/<slug>/config.env`.

@@ -19,7 +19,7 @@ Halo [nama buyer],
 
 Terima kasih sudah menghubungi kami. Untuk masalah login, coba langkah berikut:
 
-1. Pastikan Anda mengakses halaman login yang benar: [domain]/[slug]/login
+1. Pastikan Anda mengakses halaman login yang benar: [domain]/admin/login
 2. Pastikan email dan password yang Anda gunakan sesuai dengan yang kami kirimkan saat onboarding.
 3. Jika masih gagal, coba:
    - Clear cookies browser untuk domain [domain]
@@ -73,7 +73,7 @@ Mohon maaf atas ketidaknyamanannya. Untuk masalah upload, cek beberapa hal berik
    - Video: MP4 (direkomendasikan)
 
 3. **Quota storage**: 
-   - Cek sisa quota di Dashboard Anda. Jika quota hampir penuh, Anda bisa menghapus media yang tidak dipakai atau menghubungi kami untuk upgrade.
+   - Cek sisa quota di ruang admin Anda (`/admin`). Jika quota hampir penuh, Anda bisa menghapus media yang tidak dipakai atau menghubungi kami untuk menambah quota.
 
 4. **Koneksi internet**: Upload file besar memerlukan koneksi stabil. Coba dengan koneksi yang lebih baik atau kompres file terlebih dulu.
 
@@ -123,8 +123,8 @@ Halo [nama buyer],
 
 Untuk masalah site yang tidak tampil, kami akan cek beberapa hal:
 
-1. Pastikan Anda mengakses URL yang benar: [domain]/[slug]
-2. Pastikan Anda sudah mempublish minimal 1 project di Dashboard.
+1. Pastikan Anda mengakses URL yang benar: [domain]
+2. Pastikan Anda sudah mempublish minimal 1 project di ruang admin (`/admin`).
    - Project yang masih draft tidak akan tampil di halaman publik.
 
 Jika URL dan project sudah benar tapi site tetap tidak muncul, kemungkinan ada gangguan sementara di server kami. Kami akan segera mengecek dan menginformasikan hasilnya.
@@ -146,7 +146,7 @@ Terima kasih sudah menghubungi kami terkait pembayaran.
 
 [Bagian ini akan dilengkapi setelah sistem billing otomatis aktif di Sprint 47.]
 
-Untuk sementara, jika ada masalah terkait aktivasi plan atau status pembayaran, silakan hubungi kami langsung dan kami akan bantu secara manual.
+Untuk sementara, jika ada masalah terkait aktivasi pesanan atau status pembayaran, silakan hubungi kami langsung dan kami akan bantu secara manual.
 
 Salam,
 [nama operator]

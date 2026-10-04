@@ -1,5 +1,13 @@
 # RC1 Release Notes
 
+> **⚠️ ARSIP RILIS LAMA — jangan dipakai sebagai acuan konsep.**
+> Dokumen ini ditulis 2026-07-01 dan merefleksikan model lama: **multi-site / multi-tenant
+> single platform** dengan "Master admin" yang mengelola banyak site dari satu panel.
+> Model saat ini adalah **managed service — 1 klien = 1 akun Cloudflare milik klien**, tanpa
+> Master Dashboard, tanpa paket/langganan (harga tunggal Rp199.000), onboarding lewat portal
+> `PENGELOLA_KLIEN.bat`, dan panel `clientDashboard`/`orders`/`paymentConfig` sudah dihapus.
+> Isi di bawah dipertahankan apa adanya sebagai catatan rilis.
+
 Release candidate: `Portfolio OS Template RC1`
 
 Date: 2026-07-01

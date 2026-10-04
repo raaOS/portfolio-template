@@ -4,7 +4,7 @@ Selamat datang di website portofolio baru Anda! 🎉
 
 Website Anda didesain dengan konsep **Interactive Desktop Simulator** (bergaya layar laptop Mac). Pengunjung website Anda tidak hanya membaca teks biasa, tetapi bisa berinteraksi, membuka jendela portofolio, mendengarkan musik, hingga melihat karya-karya terbaik Anda dengan visual yang sangat memukau.
 
-Panduan ini akan membantu Anda mengaktifkan akun dan mengelola seluruh isi website dengan sangat mudah — semudah menggunakan laptop sehari-hari!
+Panduan ini akan membantu Anda masuk ke ruang admin dan mengelola seluruh isi website dengan sangat mudah — semudah menggunakan laptop sehari-hari!
 
 ---
 
@@ -12,29 +12,24 @@ Panduan ini akan membantu Anda mengaktifkan akun dan mengelola seluruh isi websi
 
 ```
 [LANGKAH 1]                   [LANGKAH 2]                    [LANGKAH 3]
-Aktivasi Akun Pertama Kali ──► Masuk ke Ruang Kerja Admin ──► Mulai Isi Karya & Biodata
-(Buka /setup)                  (Buka /admin/login)            (Klik ikon aplikasi)
+Ambil Kredensial Admin ──────► Masuk ke Ruang Kerja Admin ──► Mulai Isi Karya & Biodata
+(Dari pesan serah terima)      (Buka /admin/login)            (Klik ikon aplikasi)
 ```
 
 ---
 
-## 🔑 Langkah 1: Aktivasi Akun Pertama Kali
+## 🔑 Langkah 1: Ambil Kredensial Admin Anda
 
-Sebelum Anda mengisi karya, Anda perlu membuat akun pemilik website terlebih dahulu:
+Saat website selesai kami pasang, kami mengirimkan pesan serah terima yang berisi:
 
-1. Buka browser (Chrome / Safari) di laptop atau HP Anda.
-2. Masuk ke link aktivasi:
-   ```text
-   https://[domain-website-anda.com]/setup
-   ```
-3. Di layar aktivasi, isi formulir sederhana:
-   - **Nama Lengkap / Brand Anda**
-   - **Email Anda** (akan digunakan untuk login)
-   - **Password Baru** (buat kata sandi yang aman dan mudah Anda ingat)
-   - **Judul Portofolio** (contoh: *John Doe — Creative Portfolio*)
-4. Klik tombol **Aktivasi / Selesai**.
+1. **Alamat website Anda**
+2. **Alamat ruang admin:** `https://[domain-website-anda.com]/admin`
+3. **Email login** (dibuatkan untuk Anda)
+4. **Password admin** (dibuatkan untuk Anda)
 
-> ⚠️ **Catatan Keamanan:** Halaman `/setup` ini hanya bisa dibuka satu kali saja di awal. Setelah akun Anda selesai dibuat, sistem akan otomatis mengunci halaman ini demi menjaga keamanan website Anda dari orang lain.
+Simpan keempat data tersebut di tempat aman. Jika belum menerimanya atau lupa menyimpannya, kabari kami — kami akan mengirimkannya ulang atau meresetkan password Anda.
+
+> ⚠️ **Catatan Keamanan:** Tidak ada halaman pendaftaran mandiri di website Anda — akun admin sudah dibuatkan sejak website dipasang, sehingga tidak ada pintu masuk lain bagi orang asing. Perubahan password hanya dilakukan oleh kami atas permintaan Anda.
 
 ---
 
@@ -47,7 +42,7 @@ Kapan pun Anda ingin menambah karya baru, mengubah foto profil, atau memperbarui
    https://[domain-website-anda.com]/admin/login
    ```
    *(Atau cukup ketik `https://[domain-website-anda.com]/admin` di browser, Anda akan otomatis diantar ke halaman login).*
-2. Masukkan **Email** dan **Password** yang sudah Anda buat di Langkah 1.
+2. Masukkan **Email** dan **Password** yang sudah kami berikan di Langkah 1.
 3. Klik tombol **Masuk / Log In**.
 4. Anda akan langsung masuk ke layar desktop Mac pribadi Anda!
 

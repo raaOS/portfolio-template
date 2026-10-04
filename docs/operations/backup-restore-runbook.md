@@ -12,18 +12,38 @@ Dokumen ini menjelaskan cara membuat backup Cloudflare D1/R2, melakukan restore 
 
 ## Data Yang Dibackup
 
-D1:
+D1 (daftar gabungan dua berkas DDL yang hidup; `client_access` sudah `DROP TABLE`):
+
+Dari `src/crud/shared/db/schema.ts` (skema yang dipasang portal onboarding):
 
 - `sites`
-- `client_access`
-- `site_quota_overrides`
+- `site_users`
 - `projects`
-- `project_narratives`
 - `media_assets`
+- `site_settings`
+- `audit_logs`
+- `rate_limits`
+- `app_kv`
+- `portfolio_templates`
+- `site_template_entitlements`
+
+Dari `src/lib/d1-schema.ts` (skema bootstrap produk; `sites`, `projects`, `media_assets`,
+`audit_logs` sudah tercantum di atas):
+
+- `site_quota_overrides`
+- `project_narratives`
 - `submissions`
 - `ai_generations`
-- `audit_logs`
-- `app_kv`
+- `orders`
+- `site_custom_domains`
+- `site_analytics`
+- `platform_settings`
+
+> **Catatan verifikasi (2026-10-04):** `npm run backup:d1` tanpa `--tables` masih memakai
+> daftar lama `DEFAULT_D1_BACKUP_TABLES` di `scripts/cloudflare/backup-common.ts` — daftar itu
+> masih memuat `client_access` (sudah `DROP TABLE`) dan belum memuat beberapa tabel di atas
+> (mis. `site_users`, `orders`, `platform_settings`). Samakan daftar di script itu, atau
+> jalankan dengan `--tables` eksplisit, sebelum drill backup berikutnya.
 
 R2:
 
@@ -169,7 +189,7 @@ Sprint 44 baru boleh dianggap lulus penuh jika:
 - Backup D1 berhasil dibuat tanpa secret di log.
 - R2 backup minimal memiliki manifest; untuk drill penuh, object media penting sudah di-copy atau bucket restore policy sudah dibuktikan.
 - Restore D1 berhasil ke database staging/restore khusus.
-- Minimal 1 dummy site lengkap dengan client access, project, cover/gallery/video bisa dibuka di staging.
+- Minimal 1 dummy site lengkap dengan admin user (`site_users`), project, cover/gallery/video bisa dibuka di staging.
 - `restore:audit` tidak menghasilkan error.
 - RPO/RTO di atas disetujui dan dapat diulang dari runbook ini.
 

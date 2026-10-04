@@ -161,7 +161,7 @@ Cek harian:
   - `level=error`
   - `event=d1.query_error`
   - `event=r2.upload` dengan `status=failure`
-  - `event=client.login` dengan `status=failure` atau `blocked`
+  - `event=admin.login` dengan `status=failure` atau `blocked`
 - Synthetic report terakhir: `.audit-reports/monitoring/latest.json`.
 - Storage/quota warning dari synthetic check.
 - Cloudflare dashboard:

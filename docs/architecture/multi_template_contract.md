@@ -44,7 +44,7 @@ interface TemplateRendererProps {
 ```
 
 Objek `data` membawa seluruh profil tenant:
-- **`site`**: Profil dasar (ID, slug, nama, avatar, tier `lite`/`pro`, `activeTemplateKey`).
+- **`site`**: Profil dasar (ID, slug, nama, avatar, `activeTemplateKey`).
 - **`about`**: Hero title, motto, bio, soft skills, design philosophy.
 - **`projects`**: Daftar proyek yang dipublikasikan (termasuk tag, cover, gallery, narrative).
 - **`experiences`**: Riwayat kerja dan event/penghargaan.
@@ -62,7 +62,7 @@ Objek `data` membawa seluruh profil tenant:
    - Shell macOS tetap dirender via pembungkus `OSDesktopRenderer.tsx`.
 
 2. **Fallback Otomatis:**
-   - Jika `site.active_template_key` tidak ditemukan di registry atau tenant tidak memiliki hak entitlement (misal tenant `lite` mencoba memakai template `pro`), system otomatis me-resolve template key kembali ke `'os-desktop'`.
+   - Jika `site.active_template_key` tidak ditemukan di registry (atau kosong), system otomatis me-resolve template key kembali ke `'os-desktop'` (`src/app/[siteSlug]/page.tsx`). Tier `lite`/`pro` sudah tidak ada — paket Lite/Pro dihapus sejak v1.3.15, tersisa satu harga untuk semua klien.
 
 3. **Performa Edge Worker:**
    - Semua template baru selain `os-desktop` wajib dimuat secara **lazy loading** menggunakan `next/dynamic` di `TemplateDispatcher.tsx` untuk menjaga ukuran bundle Cloudflare Workers tetap ramah kuota.

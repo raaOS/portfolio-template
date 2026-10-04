@@ -6,13 +6,13 @@ Endpoint adalah kontrak baku. Frontend tidak boleh "menebak" shape data.
 - `GET /public/sites/:siteSlug` -> Ambil profil site, tema, config.
 - `GET /public/sites/:siteSlug/projects` -> Ambil daftar project (`status='published'`).
 - `GET /public/sites/:siteSlug/projects/:projectSlug` -> Ambil detail project + narasi + galeri.
-- `GET /public/sites/:siteSlug/config` -> Ambil feature flags.
+- `GET /public/sites/:siteSlug/config` -> Ambil feature flags + quota. Route-nya memang ada (`src/app/api/public/sites/[siteSlug]/config/route.ts`) tetapi saat ini **tanpa konsumen** — tidak ada kode frontend yang memanggilnya. Flag `FEATURE_CLIENT_DASHBOARD` / `FEATURE_MASTER_DASHBOARD` sudah dihapus dari kode dan tidak lagi muncul di respons.
 
 ## Admin API (Auth Required)
-- `POST /admin/sites` -> Buat site baru (Master only).
-- `PUT /admin/sites/:id` -> Edit data site, status, dan custom quota add-on.
+- `POST /admin/sites` -> Buat site baru di D1 (route masih ada, `validateAdminRequest`). Dalam alur jualan normal, row `site` dibuat oleh portal onboarding (`PENGELOLA_KLIEN.bat`) — **tidak ada pembuatan/pembelian site dari dalam panel admin**.
+- `PUT /admin/sites/:id` -> Edit data site, status, dan custom quota add-on (bukan pembelian site).
 - `PUT /admin/sites/:id/quota` -> Legacy contract; quota custom sekarang masuk payload `PUT /admin/sites` sebagai `quotaOverride`.
-- `POST /admin/projects` -> Buat project scoped `site_id` sebagai admin/master override.
+- `POST /admin/projects` -> Buat project scoped `site_id` (satu deployment = satu site milik satu klien).
 - `PUT /admin/projects/:id` -> Edit project scoped `site_id`.
 - `DELETE /admin/projects/:id` -> Soft delete project.
 - `POST /admin/projects/reorder` -> Ubah `order_index`.
@@ -31,17 +31,17 @@ Endpoint adalah kontrak baku. Frontend tidak boleh "menebak" shape data.
 
 ## Site Scope Boundary
 - Tidak semua endpoint harus diberi `siteId`.
-- Endpoint yang menyimpan/membaca konten tenant wajib site-scoped: about/profile, contact, experience, labels, hard skills, testimonial, sticky notes, gallery featured, projects, project media, wallpaper/site media, public site config, dan client dashboard data.
+- Endpoint yang menyimpan/membaca konten tenant wajib site-scoped: about/profile, contact, experience, labels, hard skills, testimonial, sticky notes, gallery featured, projects, project media, wallpaper/site media, public site config, dan data panel `/admin` klien.
 - Endpoint platform/global tidak boleh dipaksa menjadi tenant-scoped tanpa alasan produk yang jelas: admin login, admin password/PIN, admin logout/check-auth, health, clear-cache, revalidate, settings platform, metrics internal, storage stats agregat, dan utilitas build/admin.
-- Client tidak boleh memakai endpoint master/global untuk mengubah data. Client harus lewat endpoint client/site-scoped atau endpoint content yang memvalidasi membership lewat `validateSiteMutationRequest`.
-- Jika endpoint mutasi bisa dipakai admin dan client, wajib resolve `siteId`, validasi actor terhadap site, cek plan/quota/feature flag bila relevan, dan revalidate path tenant.
+- Klien mengubah datanya lewat endpoint site-scoped atau endpoint content yang memvalidasi membership lewat `validateSiteMutationRequest` — bukan lewat endpoint platform/global di atas.
+- Jika endpoint mutasi bisa dipakai admin dan client, wajib resolve `siteId`, validasi actor terhadap site, cek quota/feature flag bila relevan, dan revalidate path tenant.
 - Jangan menjadikan `default-site` sebagai fallback data untuk tenant non-default. Tenant non-default harus membaca data sendiri atau fallback template statis yang aman.
 
 ## Quota Rules
 - Semua endpoint mutasi wajib memvalidasi `site_id`, membership, dan quota.
 - Setiap pembeli mengelola site miliknya sendiri lewat panel `/admin` (satu akun `site_users` per deployment).
 - Default quota berasal dari env `PROJECT_LIMIT`, `STORAGE_MB`, `MEDIA_PER_PROJECT`; custom quota per site disimpan di D1 `site_quota_overrides` dan hanya menaikkan limit di atas default.
-- Jangan membuat endpoint baru yang mengasumsikan Vercel atau 1 deployment per client.
+- Jangan membuat endpoint baru yang mengasumsikan Vercel maupun platform multi-klien satu akun. Konsepnya kebalik: **1 deployment = 1 klien = 1 akun Cloudflare milik klien**, jadi asumsikan selalu satu site per deployment.
 
 ## Standar Response Sukses
 ```json

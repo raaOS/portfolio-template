@@ -79,7 +79,6 @@ function checkDemoDataHygiene() {
 }
 
 [
-  'docs/release/BUYER_ONBOARDING.md',
   'docs/release/CLIENT_OPERATIONS.md',
   'docs/release/RELEASE_CHECKLIST.md',
   'docs/release/SALES_PRICING.md',

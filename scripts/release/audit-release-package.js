@@ -10,7 +10,6 @@ const requiredFiles = [
   'README.md',
   '.env.example',
   'wrangler.jsonc',
-  'docs/release/BUYER_ONBOARDING.md',
   'docs/release/CLIENT_OPERATIONS.md',
   'docs/release/RELEASE_CHECKLIST.md',
   'docs/release/PRODUCTION_DEPLOY_RUNBOOK.md',
@@ -49,8 +48,6 @@ const requiredEnvKeys = [
   'PASSWORD_SALT',
   'ADMIN_PASSWORD_SCRYPT',
   'REVALIDATION_TOKEN',
-  'FEATURE_CLIENT_DASHBOARD',
-  'FEATURE_MASTER_DASHBOARD',
   'FEATURE_AI',
   'FEATURE_NOTIFICATIONS',
   'PROJECT_LIMIT',
@@ -175,14 +172,13 @@ function checkEnvExample() {
 
 function checkCloudflareDocs() {
   const readme = readText('README.md');
-  const onboarding = readText('docs/release/BUYER_ONBOARDING.md');
   const checklist = readText('docs/release/RELEASE_CHECKLIST.md');
   const clientOps = readText('docs/release/CLIENT_OPERATIONS.md');
   const runbook = readText('docs/release/PRODUCTION_DEPLOY_RUNBOOK.md');
   const rcNotes = readText('docs/release/RC1_RELEASE_NOTES.md');
   const salesPricing = readText('docs/release/SALES_PRICING.md');
 
-  const combined = `${readme}\n${onboarding}\n${checklist}\n${clientOps}\n${runbook}\n${rcNotes}\n${salesPricing}`;
+  const combined = `${readme}\n${checklist}\n${clientOps}\n${runbook}\n${rcNotes}\n${salesPricing}`;
   const requiredPhrases = [
     'full Cloudflare',
     'Do not deploy this as a Vercel project',

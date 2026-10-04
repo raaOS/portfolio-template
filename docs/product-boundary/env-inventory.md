@@ -6,7 +6,7 @@ This document records environment variable **names only**. Do not paste secret v
 
 ## Product Required
 
-Use these with the new Cloudflare account dedicated to the sellable template product.
+Use these with the owner's own Cloudflare account dedicated to the sellable template product (tooling: bootstrap, demo seed, monitoring). Each client's site lives in a **separate Cloudflare account owned by that client** — those per-client credentials are archived per client in `arsip-klien/<slug>/config.env`, not here.
 
 - `CLOUDFLARE_ACCOUNT_ID`
 - `PRODUCT_CLOUDFLARE_ENV_CONFIRMED`
@@ -30,8 +30,8 @@ Use these with the new Cloudflare account dedicated to the sellable template pro
 
 These define what the product enables for every deployment. Keep defaults conservative.
 
-- `FEATURE_CLIENT_DASHBOARD`
-- `FEATURE_MASTER_DASHBOARD`
+Removed: `FEATURE_CLIENT_DASHBOARD` and `FEATURE_MASTER_DASHBOARD` are **no longer part of the code or `.env.example`** — there is no Master Dashboard (multi-klien) at all, and content management is done by each client signing in to `/admin` on their own deployment.
+
 - `FEATURE_AI`
 - `FEATURE_NOTIFICATIONS`
 - `FEATURE_CUSTOM_DOMAIN`

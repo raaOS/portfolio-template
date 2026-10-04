@@ -3,6 +3,34 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.20] - 2026-10-04
+
+### 🛡️ Data Klien Kini Benar-Benar Terisolasi di Database Miliknya Sendiri (perbaikan penting)
+
+- **Masalahnya:** portal onboarding memang membuatkan database (D1) dan penyimpanan media (R2) di akun Cloudflare milik klien, **tetapi proses build situs klien selama ini memakai konfigurasi milik owner**. Akibatnya, kalau klien pertama di-provision, semua datanya akan masuk ke database owner (tercampur) dan medianya ke bucket owner — janji "1 klien = 1 akun, terisolasi 100%" tidak terpenuhi. **Karena belum pernah ada klien yang di-provision, kerusakan belum terjadi** — dan sekarang sudah diperbaiki sebelum klien pertama datang.
+- **Perbaikannya:** build untuk klien kini memakai konfigurasi khusus klien tersebut (database, bucket, alamat situs, serta `JWT_SECRET`/`PASSWORD_SALT` baru yang digenerate per klien supaya sesi login tidak bisa dipakai silang antar situs). Nilai milik owner sengaja **dikosongkan** dari build klien, dan pengujian membuktikan **0 dari 20 kunci milik owner** ditemukan di seluruh artefak build klien (1.645 file diperiksa).
+- **Deploy juga berubah:** dulu `wrangler pages deploy` (yang ternyata tidak memasang konfigurasi apa pun), kini **Worker per klien** lewat config wrangler hasil generate (`wrangler.client.<slug>.jsonc`).
+- **Yang belum teruji:** deploy end-to-end ke Cloudflare sungguhan membutuhkan satu akun Cloudflare klien nyata (Account ID + API Token izin D1/R2/Workers/KV). Uji yang sudah jalan memakai data dummy + dry-run.
+
+### 🧹 Panel "Master Dashboard" Dihapus (kode mati ±2.400 baris)
+
+- **Panel pengelola banyak klien sekaligus (`ClientDashboardPanel`, `OrdersPanel`, `PaymentConfigPanel`) sudah dibuang** — ketiganya tidak terdaftar di menu admin sehingga tidak pernah bisa dibuka, dan salah satunya memanggil endpoint yang sudah tidak ada. Konsep produk memang tidak memakai panel master: owner mengelola isi situs klien dengan **login ke `/admin` di situs klien**.
+- Flag `FEATURE_MASTER_DASHBOARD` & `FEATURE_CLIENT_DASHBOARD` dihapus dari kode, `.env.example`, dan daftar pemeriksaan rilis.
+- **Endpoint API tetap dipertahankan** (billing, riwayat pesanan, statistik storage) — yang dihapus hanya panel matinya.
+- Bukti: pencarian seluruh folder `src/` dan `scripts/` = **0 sisa**.
+
+### 📚 Dokumen Disesuaikan dengan Konsep Jualan (±25 file)
+
+- **2 dokumen dihapus** karena isinya bertentangan total dengan konsep: `docs/operations/buyer-onboarding-checklist.md` dan `docs/release/BUYER_ONBOARDING.md` (bahkan menulis *"Do not create one deployment per buyer"* — kebalikan dari konsep 1 klien = 1 akun Cloudflare).
+- **Dokumen yang diperbaiki:** `README.md`, `AGENTS.md` (alur onboarding, pipeline deploy, jumlah tabel D1 diverifikasi ke file skema), seluruh `docs/agent-context/` (PRD ditulis ulang), `docs/operations/` (playbook dukungan — 17 rujukan "Master Dashboard" diganti alur portal), `docs/release/`, dan **3 panduan owner/klien** (template WhatsApp kini persis sama dengan template resmi portal; klien tidak lagi disuruh membuka `/setup` yang sudah mati).
+- Rujukan URL `.pages.dev` diganti `.workers.dev` mengikuti jalur deploy baru.
+
+### ⚠️ Catatan yang Perlu Diketahui
+
+- **Custom domain klien belum ikut migrasi** — fiturnya masih memakai API khusus Cloudflare Pages padahal deploy kini Worker. Perlu perbaikan + pengujian dengan akun Cloudflare nyata (tercatat di log tracker `patch_celah_env_klien_2026_10_04.md`).
+- **Cron harian 01:00 WIB:** handler sudah terbaca Cloudflare (`Handlers: fetch, scheduled`), tetapi pemicu otomatisnya **belum terbukti menembak** pada uji 40 menit — masih dalam penyelidikan (lihat log `cron_worker_secrets_2026_10_03.md`).
+- **Verifikasi:** `npx tsc --noEmit` 0 error · `npx eslint src` 0 error · **115 file / 887 test PASS** · `release:audit` **59/59** · `release:sale-readiness` **12/12** (skor turun wajar — pemeriksaan untuk file yang sengaja dihapus ikut dibuang).
+
 ## [1.3.19] - 2026-10-04
 
 ### ⏰ Cron Harian Cloudflare: Order Kedaluwarsa Kini Ditandai Otomatis

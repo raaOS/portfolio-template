@@ -2,9 +2,10 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { exec, spawn } from 'child_process';
+import { spawn } from 'child_process';
 import { SHARED_SCHEMA_QUERIES } from '../../src/crud/shared/db/schema';
 import { hashPasswordScrypt } from '../../src/crud/shared/auth/password';
+import { clientUrls, deployClient, resolveWorkersSubdomain } from './client-deploy';
 
 const PORT = 4567;
 const ROOT_DIR = process.cwd();
@@ -210,6 +211,17 @@ async function provisionClient(
   onProgress(5, 'Mengarsipkan Kunci & Dokumen Klien...', 'Menyimpan ke folder arsip-klien di laptop');
   const { dirPath, folderName } = getNextArchiveDir(clientSlug);
 
+  // URL publik memakai Cloudflare Worker (Opsi B), bukan Pages.
+  // Subdomain workers.dev dibaca best-effort; kalau token belum punya izin,
+  // deploy berikutnya akan mencoba lagi dan memperbarui config.env.
+  const subdomain = await resolveWorkersSubdomain(accountId, apiToken);
+  const websiteUrl = `https://${clientSlug}.${subdomain ? `${subdomain}.` : ''}workers.dev`;
+  const adminUrl = `${websiteUrl}/admin`;
+
+  // Secret milik klien — tidak pernah memakai nilai dari .env.local owner.
+  const jwtSecret = crypto.randomBytes(32).toString('hex');
+  const passwordSalt = crypto.randomBytes(16).toString('hex');
+
   const envContent = [
     `# ========================================================`,
     `# ARSIP KLIEN: ${clientName} (${folderName})`,
@@ -218,15 +230,25 @@ async function provisionClient(
     `CUSTOMER_NAME="${clientName}"`,
     `CUSTOMER_SLUG="${clientSlug}"`,
     `ACTIVE_TEMPLATE_KEY="${templateKey}"`,
+    `CUSTOMER_SITE_ID="${siteId}"`,
     `CLOUDFLARE_ACCOUNT_ID="${accountId}"`,
     `CLOUDFLARE_D1_DATABASE_NAME="${dbName}"`,
     `CLOUDFLARE_D1_DATABASE_ID="${databaseId}"`,
+    `CLOUDFLARE_D1_API_TOKEN="${apiToken}"`,
     `CLOUDFLARE_R2_BUCKET_NAME="${r2BucketName}"`,
+    `CLOUDFLARE_R2_BUCKET="${r2BucketName}"`,
+    `CLOUDFLARE_R2_ACCOUNT_ID="${accountId}"`,
+    `CLOUDFLARE_R2_PUBLIC_BASE_URL="/r2"`,
     `CLOUDFLARE_API_TOKEN="${apiToken}"`,
+    `JWT_SECRET="${jwtSecret}"`,
+    `PASSWORD_SALT="${passwordSalt}"`,
+    subdomain
+      ? `WORKERS_SUBDOMAIN="${subdomain}"`
+      : `# WORKERS_SUBDOMAIN="" (belum terbaca saat onboarding)`,
     `ADMIN_EMAIL="${adminEmail}"`,
     `ADMIN_PASSWORD="${adminPassword}"`,
-    `WEBSITE_URL="https://${clientSlug}.pages.dev"`,
-    `ADMIN_URL="https://${clientSlug}.pages.dev/admin"`,
+    `WEBSITE_URL="${websiteUrl}"`,
+    `ADMIN_URL="${adminUrl}"`,
     ``,
   ].join('\n');
   fs.writeFileSync(path.join(dirPath, 'config.env'), envContent, 'utf-8');
@@ -241,8 +263,8 @@ async function provisionClient(
     ``,
     `ALAMAT WEBSITE & LOGIN:`,
     `------------------------------------------------------------------`,
-    `• Alamat Website   : https://${clientSlug}.pages.dev`,
-    `• Alamat Admin     : https://${clientSlug}.pages.dev/admin`,
+    `• Alamat Website   : ${websiteUrl}`,
+    `• Alamat Admin     : ${adminUrl}`,
     `• Email Login      : ${adminEmail}`,
     `• Password Admin   : ${adminPassword}`,
     ``,
@@ -250,7 +272,7 @@ async function provisionClient(
     `------------------------------------------------------------------`,
     `• Cloudflare D1 DB : ${dbName} (ID: ${databaseId})`,
     `• Cloudflare R2    : ${r2BucketName}`,
-    `• Cloudflare Pages : ${clientSlug}`,
+    `• Cloudflare Worker: ${clientSlug}`,
     ``,
     `==================================================================`,
     `PESAN WHATSAPP SIAP COPY-PASTE KE KLIEN:`,
@@ -259,10 +281,10 @@ async function provisionClient(
     `Website portofolio interaktif kamu sudah resmi aktif dan siap dipakai! 🚀`,
     ``,
     `🌐 Website Kamu:`,
-    `https://${clientSlug}.pages.dev`,
+    `${websiteUrl}`,
     ``,
     `🔐 Ruang Admin Pribadi (untuk kelola karya, foto, & profil):`,
-    `https://${clientSlug}.pages.dev/admin`,
+    `${adminUrl}`,
     `Email    : ${adminEmail}`,
     `Password : ${adminPassword}`,
     ``,
@@ -279,8 +301,8 @@ async function provisionClient(
     clientName,
     clientSlug,
     templateKey,
-    websiteUrl: `https://${clientSlug}.pages.dev`,
-    adminUrl: `https://${clientSlug}.pages.dev/admin`,
+    websiteUrl,
+    adminUrl,
     adminEmail,
     adminPassword,
     archiveFolder: `arsip-klien/${folderName}`,
@@ -416,14 +438,15 @@ const server = http.createServer(async (req, res) => {
       const clients = folders.map((folderName) => {
         const envPath = path.join(ARCHIVE_DIR, folderName, 'config.env');
         const env = fs.existsSync(envPath) ? parseEnv(fs.readFileSync(envPath, 'utf-8')) : {};
+        const urls = clientUrls(env, folderName);
         return {
           id: folderName,
           clientName: env.CUSTOMER_NAME || folderName,
           clientSlug: env.CUSTOMER_SLUG || folderName.replace(/^\d+_/, ''),
           adminEmail: env.ADMIN_EMAIL || '',
           adminPassword: env.ADMIN_PASSWORD || '',
-          websiteUrl: env.WEBSITE_URL || `https://${env.CUSTOMER_SLUG || folderName}.pages.dev`,
-          adminUrl: env.ADMIN_URL || `https://${env.CUSTOMER_SLUG || folderName}.pages.dev/admin`,
+          websiteUrl: urls.websiteUrl,
+          adminUrl: urls.adminUrl,
           customDomain: env.CUSTOM_DOMAIN || '',
           templateKey: env.ACTIVE_TEMPLATE_KEY || 'os-desktop',
         };
@@ -749,7 +772,9 @@ const server = http.createServer(async (req, res) => {
     req.on('data', (chunk) => (body += chunk));
     req.on('end', async () => {
       try {
-        const { folderName, all, forceBuild } = JSON.parse(body || '{}');
+        // `forceBuild` tidak lagi dipakai: bundle dibangun ulang untuk tiap
+        // klien karena env build-nya berbeda (lihat deployClient()).
+        const { folderName, all } = JSON.parse(body || '{}');
 
         res.writeHead(200, {
           'Content-Type': 'text/event-stream',
@@ -795,53 +820,11 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
-        // STEP 1: Build OpenNext if needed
-        const openNextDir = path.join(ROOT_DIR, '.open-next');
-        const needsBuild = Boolean(forceBuild) || !fs.existsSync(openNextDir);
-
-        if (needsBuild) {
-          sendEvent('progress', {
-            stage: 'build',
-            message: 'Mengompilasi versi template terbaru (npm run cf:build)...',
-          });
-          sendEvent('log', {
-            text: '>>> [TAHAP 1] Menjalankan kompilasi: npm run cf:build...',
-          });
-
-          const buildResult = await runCommandStreaming(
-            'npm',
-            ['run', 'cf:build'],
-            { cwd: ROOT_DIR },
-            (line) => {
-              sendEvent('log', { text: line });
-            }
-          );
-
-          if (buildResult.code !== 0) {
-            sendEvent('log', {
-              text: `[GAGAL] Kompilasi template gagal dengan kode keluar ${buildResult.code}.`,
-            });
-            sendEvent('error', {
-              message:
-                'Kompilasi template gagal. Pastikan tidak ada konflik file atau dev server yang mengunci cache.',
-            });
-            res.end();
-            return;
-          }
-
-          sendEvent('log', {
-            text: '✓ Kompilasi template selesai dengan sukses! Bundle .open-next siap digunakan.',
-          });
-        } else {
-          sendEvent('log', {
-            text: 'ℹ Menggunakan bundle kompilasi .open-next yang sudah ada (forceBuild = false).',
-          });
-        }
-
-        // STEP 2: Deploy to each client
+        // STEP 1: Build + deploy per klien. Env tiap klien berbeda (D1/R2/secret
+        // milik klien), jadi bundle harus dibangun ulang untuk tiap klien.
         sendEvent('progress', {
           stage: 'deploy',
-          message: `Mulai mendeploy ke ${targetFolders.length} website klien...`,
+          message: `Mulai build & deploy ${targetFolders.length} website klien...`,
         });
 
         const results: Array<{
@@ -858,60 +841,48 @@ const server = http.createServer(async (req, res) => {
           const env = parseEnv(fs.readFileSync(envPath, 'utf-8'));
 
           const clientName = env.CUSTOMER_NAME || folder;
-          const clientSlug = env.CUSTOMER_SLUG;
-          const accountId = env.CLOUDFLARE_ACCOUNT_ID;
-          const apiToken = env.CLOUDFLARE_API_TOKEN;
+          const clientSlug = env.CUSTOMER_SLUG || folder;
 
           sendEvent('progress', {
             stage: 'deploying',
-            message: `[${i + 1}/${targetFolders.length}] Mengunggah template ke ${clientName}...`,
+            message: `[${i + 1}/${targetFolders.length}] Build & deploy ke ${clientName}...`,
             current: i + 1,
             total: targetFolders.length,
           });
 
           sendEvent('log', {
-            text: `\n------------------------------------------------------------\n>>> [${i + 1}/${targetFolders.length}] Mendeploy ke Cloudflare Pages: ${clientName} (${clientSlug})\n------------------------------------------------------------`,
+            text: `\n------------------------------------------------------------\n>>> [${i + 1}/${targetFolders.length}] Build + deploy ke Cloudflare Worker: ${clientName} (${clientSlug})\n------------------------------------------------------------`,
           });
 
-          if (!clientSlug || !accountId || !apiToken) {
-            const errDetail = 'Kredensial Cloudflare tidak lengkap di file config.env';
-            sendEvent('log', { text: `[GAGAL] ${errDetail}` });
-            results.push({ clientName, clientSlug: clientSlug || folder, success: false, error: errDetail });
-            continue;
-          }
-
-          const deployResult = await runCommandStreaming(
-            'npx',
-            [
-              'wrangler',
-              'pages',
-              'deploy',
-              '.open-next',
-              `--project-name=${clientSlug}`,
-              '--commit-dirty=true',
-            ],
-            {
-              cwd: ROOT_DIR,
-              env: {
-                CLOUDFLARE_ACCOUNT_ID: accountId,
-                CLOUDFLARE_API_TOKEN: apiToken,
-              },
-            },
-            (line) => {
+          const outcome = await deployClient({
+            rootDir: ROOT_DIR,
+            configPath: envPath,
+            dryRun: false,
+            run: runCommandStreaming,
+            onLog: (line) => {
               sendEvent('log', { text: line });
-            }
-          );
+            },
+          });
 
-          if (deployResult.code === 0) {
-            const clientUrl = env.WEBSITE_URL || `https://${clientSlug}.pages.dev`;
+          if (outcome.ok) {
             sendEvent('log', {
-              text: `✓ BERHASIL! Website ${clientName} telah diperbarui ke versi template terbaru: ${clientUrl}`,
+              text: `✓ BERHASIL! Website ${clientName} telah diperbarui ke versi template terbaru: ${outcome.websiteUrl}`,
             });
-            results.push({ clientName, clientSlug, success: true, url: clientUrl });
+            results.push({
+              clientName,
+              clientSlug: outcome.slug || clientSlug,
+              success: true,
+              url: outcome.websiteUrl,
+            });
           } else {
-            const errDetail = `Wrangler keluar dengan kode ${deployResult.code}`;
+            const errDetail = outcome.error || 'Deploy gagal';
             sendEvent('log', { text: `✗ GAGAL deploy ke ${clientName}. ${errDetail}` });
-            results.push({ clientName, clientSlug, success: false, error: errDetail });
+            results.push({
+              clientName,
+              clientSlug: outcome.slug || clientSlug,
+              success: false,
+              error: errDetail,
+            });
           }
         }
 
@@ -955,12 +926,13 @@ const server = http.createServer(async (req, res) => {
         .map((folderName) => {
           const envPath = path.join(ARCHIVE_DIR, folderName, 'config.env');
           const env = fs.existsSync(envPath) ? parseEnv(fs.readFileSync(envPath, 'utf-8')) : {};
+          const urls = clientUrls(env, folderName);
           return {
             id: folderName,
             clientName: env.CUSTOMER_NAME || folderName,
             clientSlug: env.CUSTOMER_SLUG || folderName.replace(/^\d+_/, ''),
-            websiteUrl: env.WEBSITE_URL || `https://${env.CUSTOMER_SLUG || folderName}.pages.dev`,
-            adminUrl: env.ADMIN_URL || `https://${env.CUSTOMER_SLUG || folderName}.pages.dev/admin`,
+            websiteUrl: urls.websiteUrl,
+            adminUrl: urls.adminUrl,
             customDomain: env.CUSTOM_DOMAIN || '',
             templateKey: env.ACTIVE_TEMPLATE_KEY || 'os-desktop',
           };

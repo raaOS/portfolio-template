@@ -20,8 +20,6 @@ export async function GET(request: NextRequest, props: { params: Promise<{ siteS
     const quota = await getEffectiveSiteQuotaById({ siteId: site.id });
     const config = {
       features: {
-        clientDashboard: process.env.FEATURE_CLIENT_DASHBOARD === 'true',
-        masterDashboard: process.env.FEATURE_MASTER_DASHBOARD === 'true',
         ai: process.env.FEATURE_AI === 'true',
         notifications: process.env.FEATURE_NOTIFICATIONS === 'true',
         customDomain: process.env.FEATURE_CUSTOM_DOMAIN === 'true',

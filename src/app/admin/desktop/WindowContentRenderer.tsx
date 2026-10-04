@@ -15,14 +15,6 @@ const ProjectsPanel = dynamic(() => import('@/app/admin/projects/AdminProjectsCl
   loading: () => <AdminLoading size="page" />,
 });
 
-const ClientDashboardPanel = dynamic(
-  () => import('@/app/admin/client-dashboard/ClientDashboardPanel'),
-  {
-    ssr: false,
-    loading: () => <AdminLoading size="page" />,
-  }
-);
-
 const ProfilePanel = dynamic(() => import('./panels/ProfilePanel'), {
   ssr: false,
   loading: () => <AdminLoading size="page" />,
@@ -103,23 +95,12 @@ const ContactsPanel = dynamic(
   { ssr: false, loading: () => <AdminLoading size="page" /> }
 );
 
-const PaymentConfigPanel = dynamic(
-  () => import('./panels/PaymentConfigPanel'),
-  { ssr: false, loading: () => <AdminLoading size="page" /> }
-);
-
-const OrdersPanel = dynamic(
-  () => import('./panels/OrdersPanel'),
-  { ssr: false, loading: () => <AdminLoading size="page" /> }
-);
-
 const ActivityLogPanel = dynamic(
   () => import('./panels/ActivityLogPanel'),
   { ssr: false, loading: () => <AdminLoading size="page" /> }
 );
 
 const PANEL_MAP: Record<string, React.ComponentType> = {
-  clientDashboard: ClientDashboardPanel,
   projects: ProjectsPanel,
   profile: ProfilePanel,
   experience: ExperiencePanel,
@@ -137,8 +118,6 @@ const PANEL_MAP: Record<string, React.ComponentType> = {
   messages: MessagesPanel,
   feedback: FeedbackPanel,
   contacts: ContactsPanel,
-  paymentConfig: PaymentConfigPanel,
-  orders: OrdersPanel,
   activityLog: ActivityLogPanel,
 };
 

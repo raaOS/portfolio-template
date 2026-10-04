@@ -1,6 +1,6 @@
 # 07. Integration Plan (MVP)
 
-Tujuan MVP bukan membangun SaaS besar otomatis, melainkan membuktikan bahwa sistem full Cloudflare (Pages/Workers + D1 + R2) bisa menyuplai data multi-site ke OS UI dan dashboard client dengan baik.
+Tujuan MVP bukan membangun SaaS besar otomatis, melainkan membuktikan bahwa sistem full Cloudflare (Pages/Workers + D1 + R2) bisa menyuplai data satu site milik satu klien (1 klien = 1 akun Cloudflare = 1 deployment) ke OS UI dan panel `/admin` dengan baik.
 
 ## Skenario End-to-End Test (Demo)
 1. **Seed Data:** Buat 1 *site* bernama `demo-designer` di database (bisa hardcode/seed dari script).

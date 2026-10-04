@@ -8,8 +8,8 @@ Playbook ini ditujukan untuk operator support yang menangani buyer Portfolio OS 
 
 Sebelum menangani tiket support, pastikan:
 
-- Akses admin tersedia: bisa login ke `/admin` atau punya `admin_token` cookie aktif.
-- Akses Master Dashboard: `FEATURE_MASTER_DASHBOARD=true` di env production.
+- Akses admin tersedia: bisa login ke `/admin` di situs klien (kredensial ada di `arsip-klien/<slug>/config.env` dan di API portal `/api/clients`).
+- Akses portal onboarding `PENGELOLA_KLIEN.bat` (web `localhost:4567`) untuk provisioning dan status klien. Tidak ada panel pusat — panel `clientDashboard`/`orders`/`paymentConfig` sudah dibuang dari registry admin.
 - CLI tersedia di mesin lokal yang sudah clone repo dan `.env.local` menunjuk ke production Cloudflare.
 - Familiar dengan Cloudflare Dashboard untuk cek Worker logs dan D1/R2 status.
 
@@ -30,14 +30,16 @@ Client melaporkan tidak bisa login di `/admin/login` (tidak ada halaman login pe
 ### Langkah Diagnosa
 
 1. **Cek status site:**
-   - Buka Master Dashboard → cari site client.
+   - Cek kolom `status` pada tabel `sites` di D1 klien — bisa lewat API `GET /api/admin/sites`
+     (cookie admin situs klien) atau query D1 langsung.
    - Jika status `suspended`, site tidak bisa diakses. Lihat bagian Suspend/Activate.
 
 2. **Cek akun panel client:**
-   - Pastikan pembeli sudah membuka `/setup` sehingga email + password admin terdaftar.
-   - Kalau belum yakin, reset password dari komputermu:
-     `npx tsx scripts/cloudflare/reset-customer-password.ts`
-     (lihat [buyer-onboarding-checklist.md](file:///c:/Users/USER/Documents/portfolio-template/docs/operations/buyer-onboarding-checklist.md)).
+   - Portal onboarding sudah men-seed email + password admin — datanya ada di
+     `arsip-klien/<slug>/config.env` dan di API portal `/api/clients`. `/setup` bukan bagian
+     alur normal (`POST /api/setup` membalas 400 kalau admin sudah ada).
+   - Kalau kredensial hilang, reset password dari komputermu:
+     `npx tsx scripts/cloudflare/reset-customer-password.ts <folder-arsip> --email admin@klien.com --generate`
 
 3. **Cek rate limit:**
    - Login endpoint dilindungi rate limit.
@@ -58,7 +60,7 @@ Client melaporkan tidak bisa login di `/admin/login` (tidak ada halaman login pe
 Eskalasi ke developer jika:
 - Rate limit tidak bisa di-reset setelah cooldown.
 - Error selain 400/403/429 muncul di Cloudflare Worker logs.
-- Client access sudah benar tapi JWT token tetap tidak terbit.
+- Kredensial sudah benar tapi JWT token tetap tidak terbit.
 
 ## 2. Email Pembeli Tidak Masuk
 
@@ -78,7 +80,8 @@ Pembeli melaporkan tidak menerima email order (struk) atau email serah terima se
    - Email dari Resend kadang masuk spam jika domain pengirim belum verified SPF/DKIM.
 
 3. **Cek alamat email di order:**
-   - Buka `/admin` → Orders → pastikan `buyer_email` tertulis benar.
+   - Cek kolom `buyer_email` di tabel `orders` (D1) atau lewat API `GET /api/admin/orders`
+     — panel Pesanan di `/admin` sudah dihapus.
    - Typo alamat membuat email terkirim tapi tidak pernah sampai.
 
 4. **Cek status order:**
@@ -99,12 +102,13 @@ Eskalasi ke developer jika:
 
 ### Gejala
 
-Client melaporkan upload media gagal di Client Dashboard.
+Client melaporkan upload media gagal di panel `/admin` situs klien.
 
 ### Langkah Diagnosa
 
 1. **Cek storage quota:**
-   - Buka Master Dashboard → site client → lihat card Storage.
+   - Login ke `/admin` situs klien → popout status di menubar menampilkan pemakaian storage
+     (endpoint `GET /api/admin/storage-stats`).
    - Jika usage mendekati atau melebihi limit, upload akan ditolak.
    - Solusi: tambah quota override atau minta client hapus media yang tidak dipakai.
 
@@ -122,7 +126,8 @@ Client melaporkan upload media gagal di Client Dashboard.
 
 4. **Cek batas media per project:**
    - Default dari env `MEDIA_PER_PROJECT` (bawaan 50 media per project).
-   - Bisa di-override via quota override Master Dashboard.
+   - Bisa di-override per site lewat `PUT /api/admin/sites` (field `quotaOverride`, tersimpan di
+     tabel `site_quota_overrides`).
 
 5. **Video presign gagal:**
    - Cek Cloudflare R2 env: `CLOUDFLARE_R2_BUCKET`, `CLOUDFLARE_R2_ACCESS_KEY_ID`, `CLOUDFLARE_R2_SECRET_ACCESS_KEY`.
@@ -148,7 +153,8 @@ Client mendapat pesan quota penuh saat upload media atau buat project baru.
 ### Langkah Diagnosa
 
 1. **Cek usage vs limit:**
-   - Buka Master Dashboard → site client → lihat card quota.
+   - `GET /api/admin/sites` (dengan cookie admin situs klien) memuat `quota` (usage+limit
+     efektif) dan `quotaOverride` untuk setiap site di D1 itu.
    - Bandingkan usage aktual vs limit efektif.
 
 2. **Jenis quota:**
@@ -157,7 +163,7 @@ Client mendapat pesan quota penuh saat upload media atau buat project baru.
    - **Media per project**: jumlah media per project (default dari env `MEDIA_PER_PROJECT`, bawaan 50).
 
 3. **Solusi:**
-   - **Quota override**: Master Dashboard → site → set custom quota per site (hanya menaikkan limit di atas default).
+   - **Quota override**: `PUT /api/admin/sites` dengan field `quotaOverride` — set custom quota per site (hanya menaikkan limit di atas default).
    - **Hapus media/project**: client bisa hapus draft project atau media yang tidak dipakai untuk mengurangi usage.
 
 4. **Peringatan penurunan quota:**
@@ -166,26 +172,28 @@ Client mendapat pesan quota penuh saat upload media atau buat project baru.
 
 ### Eskalasi
 
-Tidak perlu eskalasi ke developer. Masalah quota bisa ditangani operator sepenuhnya via Master Dashboard.
+Tidak perlu eskalasi ke developer. Masalah quota bisa ditangani operator sepenuhnya via `PUT /api/admin/sites` (field `quotaOverride`).
 
 ## 5. Site Tidak Tampil di Public
 
 ### Gejala
 
-Client melaporkan site mereka tidak bisa diakses di `/<siteSlug>`.
+Client melaporkan site mereka tidak bisa diakses di alamat website milik klien
+(`https://<slug>.workers.dev` atau custom domainnya).
 
 ### Langkah Diagnosa
 
 1. **Cek status site:**
-   - Master Dashboard → pastikan status `active`, bukan `suspended`.
+   - `GET /api/admin/sites` → pastikan status `active`, bukan `suspended`.
 
 2. **Cek project published:**
    - Site tanpa project published akan menampilkan empty state.
    - Pastikan minimal 1 project sudah di-publish (bukan draft).
 
-3. **Cek slug benar:**
-   - URL public: `<production-domain>/<siteSlug>`.
-   - Pastikan slug yang diakses sesuai dengan slug di Master Dashboard.
+3. **Cek alamat benar:**
+   - URL public: `https://<slug>.workers.dev` (atau custom domain klien) — deployment ini
+     khusus untuk 1 klien, jadi tidak ada path `/<siteSlug>` di depan halaman.
+   - Pastikan slug yang diakses sesuai dengan slug yang tercatat di `arsip-klien/<slug>/`.
 
 4. **Cek production health:**
    ```bash
@@ -203,9 +211,7 @@ Eskalasi ke developer jika:
 
 ### Suspend Site
 
-Gunakan Master Dashboard → site → ubah status ke `suspended`.
-
-Atau via API:
+Tidak ada panel pusat — ubah status site lewat API (cookie admin situs klien):
 
 ```bash
 curl -X PUT <production-url>/api/admin/sites \
@@ -258,9 +264,9 @@ Bagian ini akan dilengkapi setelah alur billing otomatis selesai.
 
 Sementara, jika ada masalah pembayaran:
 
-- Cek status order di panel Pesanan (Master Dashboard).
-- Jika perlu aktivasi manual: aktifkan order dari panel, atau ubah status site ke `active` via Master Dashboard.
-- Jangan ubah data pembayaran langsung di D1 tanpa melalui API/Dashboard.
+- Cek status order di tabel `orders` (D1) atau `GET /api/admin/orders` — panel Pesanan sudah dihapus.
+- Jika perlu aktivasi manual: aktifkan ordernya lewat jalur yang tersedia (API/Telegram), atau ubah status site ke `active` via `PUT /api/admin/sites`.
+- Jangan ubah data pembayaran langsung di D1 tanpa melalui API/portal.
 
 ## 9. Daftar Eskalasi
 
@@ -273,7 +279,7 @@ Sementara, jika ada masalah pembayaran:
 | Upload gagal (R2 error) | — | ❌ Selalu eskalasi |
 | Site tidak tampil | ✅ Cek status + project | ❌ Jika health check gagal |
 | Quota penuh | ✅ Override/upgrade | — |
-| Suspend/activate | ✅ Via Master Dashboard | — |
+| Suspend/activate | ✅ Via API `PUT /api/admin/sites` | — |
 | Restore | ✅ Jika ke staging | ❌ Jika ke production |
 | Billing issue | ✅ Aktivasi manual sementara | ❌ Jika webhook/state machine error |
 
