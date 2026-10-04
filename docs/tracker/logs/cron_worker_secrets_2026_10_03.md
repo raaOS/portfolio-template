@@ -46,13 +46,53 @@
 | 4 | Endpoint cron bekerja di produksi | `POST https://makeitbetter.my.id/api/cron/daily` + header token → **200** `{"ok":true,"ranAt":"2026-10-03T17:07:49.508Z"}`; token salah → **401**; tanpa header → **401** (diuji pada build sebelumnya dan setelah build `await`). |
 | 5 | Pemindahan rahasia berhasil | `wrangler secret list` **`[]` → 12 key**; smoke produksi **6/6 PASS sebelum dan sesudah** pemindahan (bukti runtime tidak berubah). |
 | 6 | Endpoint teruji otomatis | `npx vitest run src/app/api/cron/daily/route.test.ts` = **6 test PASS**. |
-| 7 | **Fire cron pertama (01:00 WIB)** | **BELUM — menunggu jadwal.** Rencana verifikasi: baca `platform_settings.billing_expire_sweep_at` (nilai epoch ms) via REST D1 sebelum dan sesudah 18:00 UTC; nilai harus bergeser ke sekitar waktu fire, yang membuktikan `scheduled` → service binding → endpoint → sweeper berjalan penuh di produksi. |
+| 7 | **Fire cron — handler sudah terbaca, trigger belum terbukti menembak** | Deploy `942ee8a2-af4b-4bc2-92ea-313d0fb82f03` (2026-10-03T19:04:54Z) → `wrangler versions view` = **`Handlers: fetch, scheduled`**. Tapi uji fire dengan jadwal uji `* * * * *` selama 40 menit (tail hidup, 3 probe `/api/health` terekam) = **0 invocation `scheduled`**; guard `platform_settings.billing_expire_sweep_at` tidak bergeser (perubahan 19:36:22Z berasal dari POST manual). Detail di bagian *Status perbaikan*. |
 
 ## Hasil Uji yang TIDAK bisa dipakai (dicatat agar tidak diulang)
 
 - `wrangler dev --test-scheduled` (lokal): `/__scheduled` pernah menjawab 200 lalu **`The Workers runtime crashed unexpectedly`**, percobaan kedua **menggantung 120 detik**.
 - `wrangler dev --remote --test-scheduled`: menjawab 200 `Ran scheduled event`, tetapi **guard database tidak bergerak** dan tidak ada log `[cron]` yang terlihat di stdout.
-- Kesimpulan sementara: keterbatasan arsitektur dev server wrangler untuk *self-referencing service binding* (dua instance miniflare; lihat issue `cloudflare/workers-sdk#5548`) — **bukan** bukti kegagalan di produksi, sebab pemanggilan `await` async tidak mungkin deadlock di runtime produksi.
+- **Kesimpulan yang benar (setelah run pertama gagal):** ketiadaan efek samping pada kedua uji itu **bukan** karena self-binding, melainkan karena handler `scheduled` memang belum terbaca (lihat bagian Run Pertama GAGAL di bawah) — `wrangler dev` tidak menemukan handler lalu tidak pernah memanggil endpoint. Kegagalan/`crash` pada uji lokal tetap diduga keterbatasan dev server wrangler dan tidak terulang di produksi.
+
+## 🚨 Run Pertama Cron GAGAL (2026-10-04 01:00 WIB) — Akar Masalah & Perbaikan
+
+**Gejala.** Pemantauan `wrangler tail` merekam invocation `scheduledTime = 2026-10-03T18:00:20Z` dengan `outcome: "exception"`:
+
+```
+"message": "Handler does not export a scheduled() function",
+"Received a ScheduledEvent but we lack a handler for ScheduledEvents
+ (a.k.a. Cron Triggers). Did you remember to export a scheduled() function?"
+```
+
+Guard `platform_settings.billing_expire_sweep_at` **tidak bergerak** (tetap `2026-10-03T17:07:47Z`, sisa uji manual) → sweeper tidak pernah berjalan. Cron terpasang, tetapi handler-nya tak pernah dipanggil.
+
+**Diagnosis (dikerjakan subagent, semua read-only).**
+
+| Cek | Hasil |
+|---|---|
+| `.open-next/worker.js` lokal | `export async function scheduled(` **ADA** (baris 51); `export default {` ada (baris 15) |
+| `npx wrangler deploy --dry-run` | exit **0**; bundel berisi `export{...,$ce as default,Hce as scheduled}` → ekspor **tidak hilang** saat bundling |
+| `npx wrangler versions view 6f2bd3ae…` | **`Handlers: fetch`** — Cloudflare sendiri hanya mencatat `fetch` |
+| Sumber workerd (`node_modules/@cloudflare/workerd-…/bin/workerd.exe` + skemanya) | `worker.c++`: `getExportedHandler(entrypointName)` dengan `entrypointName` **default `"default"`** → handler dibaca dari **objek `export default`**; skema: *"`export default {` specifies the default entrypoint, whereas `export let foo = {` defines an entrypoint named `foo`"* |
+
+**Akar masalah: bentuk ekspor, bukan mekanisme build/deploy.** `export async function scheduled()` adalah *named export* berupa fungsi top-level — workerd tidak pernah membacanya; yang dibaca hanya properti objek `export default` yang isinya cuma `fetch`. Jadi build, bundling, dan deploy semuanya sukses, tetapi handler-nya "tidak ada" bagi runtime.
+
+**Perbaikan.** `appendScheduledCronHandler()` di `scripts/cloudflare/prepare-opennext-worker-output.js` kini **menyisipkan `async scheduled(...)` ke dalam objek `export default { … }`** (mencari penutup `\n};` pertama setelah `export default {`; kalau bentuk objek berubah, skrip gagal keras dengan pesan jelas — bukan diam-diam sukses). Guard patch: marker `// [cron-patch] scheduled = properti objek export default`.
+
+> [!WARNING]
+> **Untuk AI berikutnya:** jangan pernah menambahkan handler `fetch`/`scheduled`/`queue`/`alarm` ke `.open-next/worker.js` sebagai named export. Harus berupa **properti objek `export default`**.
+
+**Status perbaikan (update 2026-10-04):**
+
+| Langkah | Hasil |
+|---|---|
+| Build ulang dengan patch bentuk objek | ✅ log `[cloudflare-build] Inserted scheduled cron handler into Worker default export.`; esbuild syntax check exit 0 |
+| Deploy | ✅ Version ID `942ee8a2-af4b-4bc2-92ea-313d0fb82f03` |
+| `wrangler versions view` | ✅ **`Handlers: fetch, scheduled`** — bug "Handler does not export a scheduled() function" sudah teratasi di level registrasi |
+| Uji fire (jadwal `* * * * *`, tail ±40 menit) | ❌ **BELUM TERBUKTI** — nol invocation `scheduled`; guard tidak bergerak |
+| `POST /api/cron/daily` manual (bukti pipeline hulu) | ✅ 200 + guard tertulis → `CRON_SECRET` ter-set, endpoint → sweeper → tulis D1 semuanya jalan |
+
+**Sisa masalah:** tautan **scheduler Cloudflare → invocation `scheduled`** belum terbukti. Kandidat penyebab berikutnya (belum dieksekusi): (1) cek halaman *Workers → Past Cron Events* di dashboard dengan token ber-skop Analytics; (2) `npx wrangler triggers deploy` untuk memaksa pendaftaran ulang pemicu; (3) ulangi tail 5–10 menit. Jadwal uji `* * * * *` sudah **dilepas dari `wrangler.jsonc`** (kembali `["0 18 * * *"]`) agar tidak tertinggal di commit.
 
 ## Bug & Insiden Selama Pengerjaan
 

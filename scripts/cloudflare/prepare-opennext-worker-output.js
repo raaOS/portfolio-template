@@ -252,45 +252,67 @@ function appendScheduledCronHandler(openNextDir) {
   }
 
   const original = fs.readFileSync(workerPath, 'utf8');
-  if (original.includes('export async function scheduled(')) return;
+  // Tanda sudah ter-patch; build OpenNext selalu membuat worker.js baru,
+  // jadi guard ini hanya untuk mencegah patch ganda bila fungsi dijalankan ulang.
+  const patchMarker = '// [cron-patch] scheduled = properti objek export default';
+  if (original.includes(patchMarker)) return;
 
-  if (!original.includes('export default')) {
-    throw new Error('Unable to add cron handler: OpenNext worker.js has no default export.');
+  // workerd TIDAK membaca handler cron dari named export. Dispatch selalu ke
+  // entrypoint default (`getExportedHandler("default")` — worker.c++), jadi
+  // `export async function scheduled()` di top-level diabaikan dan Cloudflare
+  // menjawab "Handler does not export a scheduled() function". Terbukti pada
+  // fire pertama 2026-10-04 01:00 WIB. Karena itu `scheduled` dimasukkan ke
+  // DALAM objek `export default { ... }`.
+  const defaultExport = 'export default {';
+  const startIdx = original.indexOf(defaultExport);
+  if (startIdx === -1) {
+    throw new Error(
+      'Unable to add cron handler: shape of OpenNext worker.js default export changed (no `export default {`).'
+    );
   }
 
-  const scheduledHandler = [
-    '',
-    '// Cron trigger (wrangler.jsonc `triggers.crons`). OpenNext tidak mengekspor',
-    '// `scheduled`, jadi diekspor di sini lalu memanggil aplikasi Next lewat',
-    '// service binding sendiri ke POST /api/cron/daily (dilindungi CRON_SECRET).',
-    '// Sengaja memakai `await`, bukan `ctx.waitUntil`: kalau endpoint gagal, run cron',
-    '// ikut gagal dan langsung terlihat di log/observability Cloudflare — kegagalan',
-    '// sunyi lebih berbahaya daripada satu run yang berwarna merah.',
-    'export async function scheduled(_event, env) {',
-    '    const secret = env.CRON_SECRET;',
-    '    if (!secret) {',
-    '        console.warn("[cron] CRON_SECRET belum di-set; run harian dilewati.");',
-    '        return;',
-    '    }',
-    '    if (!env.WORKER_SELF_REFERENCE) {',
-    '        throw new Error("[cron] binding WORKER_SELF_REFERENCE tidak ada.");',
-    '    }',
-    '    const response = await env.WORKER_SELF_REFERENCE.fetch(',
-    '        new Request("https://cron.internal/api/cron/daily", {',
-    '            method: "POST",',
-    '            headers: { "x-cron-secret": secret },',
-    '        })',
-    '    );',
-    '    console.log("[cron] POST /api/cron/daily ->", response.status);',
-    '    if (!response.ok) {',
-    '        throw new Error("cron endpoint returned " + response.status);',
-    '    }',
-    '}',
+  // Objek default selalu ditutup baris `};` — sisipkan method sebelum penutup itu.
+  const closeIdx = original.indexOf('\n};', startIdx);
+  if (closeIdx === -1) {
+    throw new Error('Unable to add cron handler: cannot find the end of the default export object.');
+  }
+
+  const scheduledMethod = [
+    `    ${patchMarker}.`,
+    '    // Handler cron harian (wrangler.jsonc `triggers.crons`, 01:00 WIB).',
+    '    // Memanggil aplikasi Next lewat service binding sendiri ke',
+    '    // POST /api/cron/daily (dilindungi CRON_SECRET). Sengaja memakai `await`,',
+    '    // bukan `ctx.waitUntil`: kalau endpoint gagal, run cron ikut gagal dan',
+    '    // langsung terlihat di log/observability Cloudflare — kegagalan sunyi',
+    '    // lebih berbahaya daripada satu run yang berwarna merah.',
+    '    async scheduled(_event, env) {',
+    '        const secret = env.CRON_SECRET;',
+    '        if (!secret) {',
+    '            console.warn("[cron] CRON_SECRET belum di-set; run harian dilewati.");',
+    '            return;',
+    '        }',
+    '        if (!env.WORKER_SELF_REFERENCE) {',
+    '            throw new Error("[cron] binding WORKER_SELF_REFERENCE tidak ada.");',
+    '        }',
+    '        const response = await env.WORKER_SELF_REFERENCE.fetch(',
+    '            new Request("https://cron.internal/api/cron/daily", {',
+    '                method: "POST",',
+    '                headers: { "x-cron-secret": secret },',
+    '            })',
+    '        );',
+    '        console.log("[cron] POST /api/cron/daily ->", response.status);',
+    '        if (!response.ok) {',
+    '            throw new Error("cron endpoint returned " + response.status);',
+    '        }',
+    '    },',
     '',
   ].join('\n');
 
-  fs.writeFileSync(workerPath, `${original.trimEnd()}\n${scheduledHandler}`);
-  console.log('[cloudflare-build] Appended cron scheduled handler to Worker entry.');
+  const patched =
+    original.slice(0, closeIdx) + '\n' + scheduledMethod + original.slice(closeIdx + 1);
+
+  fs.writeFileSync(workerPath, patched);
+  console.log('[cloudflare-build] Inserted scheduled cron handler into Worker default export.');
 }
 
 function prepareOpenNextWorkerOutput() {

@@ -38,6 +38,10 @@
   // `scripts/cloudflare/prepare-opennext-worker-output.js` setelah build, lalu
   // memanggil POST /api/cron/daily lewat service binding WORKER_SELF_REFERENCE.
   "triggers": {
+    // ⚠️ Jadwal uji `* * * * *` pernah dipasang 2026-10-03 (deploy 942ee8a2) untuk
+    // membuktikan fire pertama, tetapi 40 menit pengamatan TIDAK menghasilkan
+    // satu pun invocation `scheduled`. Jadwal uji sudah dilepas kembali; lihat
+    // `docs/tracker/logs/cron_worker_secrets_2026_10_03.md` bagian uji fire.
     "crons": ["0 18 * * *"]
   },
   "observability": {

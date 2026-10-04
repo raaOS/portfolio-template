@@ -124,7 +124,7 @@ Deployment memakai cron trigger harian **01:00 WIB (18:00 UTC)** yang didefinisi
 
 Alurnya:
 
-1. Cloudflare memanggil handler `scheduled` di `.open-next/worker.js` — handler itu **diekspor oleh** `scripts/cloudflare/prepare-opennext-worker-output.js` setelah tiap `npm run cf:build`, karena OpenNext tidak mengekspor `scheduled` sendiri.
+1. Cloudflare memanggil handler `scheduled` di `.open-next/worker.js` — handler itu **disisipkan ke dalam objek `export default`** oleh `scripts/cloudflare/prepare-opennext-worker-output.js` setelah tiap `npm run cf:build`, karena OpenNext tidak menyediakan `scheduled` sendiri. Bentuknya sengaja bukan named export (`export function scheduled()`); workerd hanya membaca handler dari objek `export default`, sehingga bentuk named export **diabaikan** — terbukti pada run pertama 2026-10-04 01:00 WIB yang gagal dengan `Handler does not export a scheduled() function`.
 2. Handler `scheduled` memanggil `POST /api/cron/daily` lewat service binding `WORKER_SELF_REFERENCE` (request internal, tidak melewati internet publik), membawa header `x-cron-secret`.
 3. Endpoint tersebut (`src/app/api/cron/daily/route.ts`) membandingkan header dengan env `CRON_SECRET` secara *timing-safe*, lalu menjalankan `sweepExpiredOrders()` — menandai order yang lewat masa berlakunya. Sweeper punya guard 10 menit di dalamnya sehingga pemanggilan berulang tidak membakar kuota D1.
 
