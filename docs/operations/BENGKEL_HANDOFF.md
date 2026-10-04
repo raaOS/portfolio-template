@@ -33,7 +33,8 @@ Pesan itu pengingat, bukan sistem kerja — pekerjaan tetap dijalankan kamu.
 ### 3. Buat akun Cloudflare klien
 
 - Klien mendaftar Cloudflare, atau kamu daftarkan atas nama klien.
-- Ambil **Account ID** dan buat **API Token** dengan izin **D1, Pages, dan R2**.
+- Ambil **Account ID** dan buat **API Token** dengan izin **D1, R2, dan Workers (Edit)**.
+- (Izin **Pages** tidak lagi dipakai — deploy & custom domain klien sudah pindah ke Worker; izin Workers dibutuhkan untuk deploy dan penyambungan custom domain.)
 - Token inilah yang dipakai portal di langkah berikutnya; portal akan menolak token
   yang tidak valid atau tidak cocok dengan Account ID.
 

@@ -95,7 +95,7 @@ Rujukan ke keduanya dibersihkan dari `scripts/release/audit-release-package.js`,
 
 ## BAGIAN 6 — GAP YANG DIKENAL (BELUM DIPERBAIKI)
 
-1. **⚠️ Custom domain klien belum migrasi ke jalur Worker.** Fitur masih memakai **API Pages** (`POST /accounts/{id}/pages/projects/{slug}/domains` — `server.ts:509-516`) dan CNAME target `${slug}.pages.dev` (`server.ts:555`, `cloud-manager.ts:614`, `index.html:1433`) — tidak berlaku setelah deploy berubah jadi Worker. Butuh perpindahan ke Workers Domains API + pengujian akun CF nyata. **Belum dikerjakan.**
+1. **⚠️ Custom domain klien belum migrasi ke jalur Worker.** Fitur masih memakai **API Pages** (`POST /accounts/{id}/pages/projects/{slug}/domains` — `server.ts:509-516`) dan CNAME target `${slug}.pages.dev` (`server.ts:555`, `cloud-manager.ts:614`, `index.html:1433`) — tidak berlaku setelah deploy berubah jadi Worker. Butuh perpindahan ke Workers Domains API + pengujian akun CF nyata. **Belum diperbaiki.** ~~Belum dikerjakan.~~ → **SUDAH DIPERBAIKI (v1.3.21, 2026-10-04):** portal/CLI/UI kini memakai `PUT /accounts/{id}/workers/domains` (modul `scripts/onboarding/custom-domain.ts` + 9 unit test); pengujian akun CF nyata masih menunggu — lihat log `custom_domain_worker_migration_2026_10_04.md`.
 2. **Literal owner di `src/`**: 5 file memuat URL `makeitbetter.my.id` hardcode (`lib/constants.ts`, `orderService.ts`, webhook telegram, dll) + `next.config.mjs:5` — ikut ter-compile ke build klien apa pun env-nya.
 3. **E2E ke Cloudflare sungguhan belum jalan** — build probe memakai stub D1 lokal, deploy baru `--dry-run`. Butuh: akun CF klien (Account ID + token izin D1/R2/Workers/KV) + D1 ber-seed.
 4. **`wrangler.jsonc` klien menyimpan rahasia plaintext di `vars`** — pertimbangkan `wrangler secret` menyusul.

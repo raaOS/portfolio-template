@@ -3,6 +3,15 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.21] - 2026-10-04
+
+### 🌐 Custom Domain Klien Pindah dari Cloudflare Pages ke Worker
+
+- **Masalahnya:** fitur pemasangan custom domain masih memakai sistem lama Cloudflare Pages dan menyuruh klien menambah 1 record CNAME manual ke `<slug>.pages.dev` — padahal sejak 1.3.20 situs klien dideploy sebagai **Worker**, jadi fitur ini tidak akan berfungsi.
+- **Perbaikannya:** kini memakai pintu API resmi Cloudflare untuk menyambungkan domain langsung ke Worker klien (`PUT /accounts/{id}/workers/domains`). **Cloudflare membuat record DNS dan sertifikat HTTPS secara otomatis** — klien tidak perlu mengatur apa pun lagi di tempat membeli domain (syarat: nameserver domain sudah mengarah ke akun Cloudflare klien).
+- Perubahan: portal (`/api/custom-domain` + tampilan hasil & pesan WhatsApp), CLI `cloud-manager`, serta panduan owner & dokumen izin token klien (D1, R2, Workers — Pages tidak dipakai lagi).
+- **Diuji:** 9 unit test otomatis (panggilan API, pesan galat, template WhatsApp tanpa CNAME). **Belum diuji dengan akun Cloudflare/domain sungguhan** — butuh 1 domain uji atau klien pertama.
+
 ## [1.3.20] - 2026-10-04
 
 ### 🛡️ Data Klien Kini Benar-Benar Terisolasi di Database Miliknya Sendiri (perbaikan penting)

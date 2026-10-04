@@ -17,6 +17,7 @@ import { spawn } from 'child_process';
 import { SHARED_SCHEMA_QUERIES } from '../../src/crud/shared/db/schema';
 import { hashPasswordScrypt } from '../../src/crud/shared/auth/password';
 import { deployClient, resolveWorkersSubdomain } from './client-deploy';
+import { attachWorkerDomain, buildDomainHandoverMessage, normalizeDomain } from './custom-domain';
 
 const ROOT_DIR = process.cwd();
 const ARCHIVE_DIR = path.join(ROOT_DIR, 'arsip-klien');
@@ -572,7 +573,8 @@ async function handleCustomDomain() {
     throw new Error('Slug Klien dan Nama Domain wajib disertakan.');
   }
 
-  domain = domain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  domain = normalizeDomain(domain);
+  let clientName = clientSlug;
 
   // Look up credentials from archive if missing
   if ((!accountId || !apiToken) && fs.existsSync(ARCHIVE_DIR)) {
@@ -584,6 +586,7 @@ async function handleCustomDomain() {
         if (env.CUSTOMER_SLUG === clientSlug || f.includes(clientSlug)) {
           accountId = accountId || env.CLOUDFLARE_ACCOUNT_ID;
           apiToken = apiToken || env.CLOUDFLARE_API_TOKEN;
+          clientName = env.CUSTOMER_NAME || clientName;
           break;
         }
       }
@@ -594,41 +597,20 @@ async function handleCustomDomain() {
     throw new Error('Cloudflare Account ID dan API Token wajib disediakan untuk mendaftarkan domain.');
   }
 
-  console.log(`🔗 Menghubungkan domain: ${domain} -> Proyek Pages: ${clientSlug}`);
+  console.log(`🔗 Menghubungkan domain: ${domain} -> Worker: ${clientSlug}`);
 
-  const cfRes = await cfApi(
-    `/accounts/${accountId}/pages/projects/${clientSlug}/domains`,
+  const attached = await attachWorkerDomain(cfApi, {
+    accountId,
     apiToken,
-    {
-      method: 'POST',
-      body: JSON.stringify({ name: domain }),
-    }
-  );
+    hostname: domain,
+    service: clientSlug,
+  });
 
-  if (!cfRes.ok) {
-    throw new Error(`Gagal mendaftarkan domain di Cloudflare: ${cfRes.data?.errors?.[0]?.message || 'Kesalahan API'}`);
-  }
+  console.log('✓ Domain berhasil disambungkan ke Worker klien.');
+  console.log(`Zone       : ${attached.zoneName}`);
+  console.log('DNS Record : dibuat otomatis oleh Cloudflare (tanpa CNAME manual)');
 
-  const isSubdomain = domain.split('.').length > 2 && !domain.startsWith('www.');
-  const cnameHost = isSubdomain ? domain.split('.')[0] : domain.startsWith('www.') ? 'www' : '@';
-  const cnameTarget = `${clientSlug}.pages.dev`;
-
-  console.log('✓ Domain berhasil didaftarkan di Cloudflare Pages.');
-  console.log(`DNS Host   : ${cnameHost}`);
-  console.log(`DNS Target : ${cnameTarget}`);
-
-  const whatsappMsg = [
-    `Halo! 👋`,
-    `Custom domain *${domain}* sudah didaftarkan ke sistem website portofolio kamu.`,
-    ``,
-    `Tinggal 1 langkah mudah untuk aktivasi:`,
-    `Buka panel domain tempat kamu membeli domain, lalu tambahkan DNS Record ini:`,
-    `• Tipe   : CNAME`,
-    `• Nama   : ${cnameHost}`,
-    `• Target : ${cnameTarget}`,
-    ``,
-    `Setelah ditambahkan, domain kamu akan otomatis aktif dalam 5-15 menit. 🚀`,
-  ].join('\n');
+  const whatsappMsg = buildDomainHandoverMessage({ clientName, domain });
 
   const summaryMarkdown = `
 # 🌐 Custom Domain Berhasil Didaftarkan!
@@ -636,14 +618,13 @@ async function handleCustomDomain() {
 | Informasi | Rincian |
 |---|---|
 | **Domain Baru** | **https://${domain}** |
-| **Target Pages** | \`${clientSlug}.pages.dev\` |
-| **DNS Record Type** | \`CNAME\` |
-| **DNS Host / Name** | \`${cnameHost}\` |
-| **DNS Target / Value** | \`${cnameTarget}\` |
+| **Worker Tujuan** | \`${attached.service}\` |
+| **Zone Cloudflare** | \`${attached.zoneName}\` |
+| **DNS Record** | Dibuat otomatis oleh Cloudflare — tanpa CNAME manual |
 
 ---
 
-### 📋 Format Pesan WhatsApp untuk Klien (Cara Atur DNS):
+### 📋 Format Pesan WhatsApp untuk Klien:
 
 \`\`\`text
 ${whatsappMsg}

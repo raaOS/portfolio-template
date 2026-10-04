@@ -6,6 +6,7 @@ import { spawn } from 'child_process';
 import { SHARED_SCHEMA_QUERIES } from '../../src/crud/shared/db/schema';
 import { hashPasswordScrypt } from '../../src/crud/shared/auth/password';
 import { clientUrls, deployClient, resolveWorkersSubdomain } from './client-deploy';
+import { attachWorkerDomain, findWorkerDomain, buildDomainHandoverMessage } from './custom-domain';
 
 const PORT = 4567;
 const ROOT_DIR = process.cwd();
@@ -505,28 +506,21 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
-        // Call Cloudflare Pages Custom Domain API
-        const cfRes = await cfApi(
-          `/accounts/${accountId}/pages/projects/${clientSlug}/domains`,
-          apiToken,
-          {
-            method: 'POST',
-            body: JSON.stringify({ name: domain }),
-          }
-        );
-
-        if (!cfRes.ok) {
-          const errorMsg = cfRes.data?.errors?.[0]?.message || 'Gagal menambahkan domain di Cloudflare.';
+        // Sambungkan hostname ke Worker klien (API Workers Custom Domain).
+        // Cloudflare membuat DNS record + sertifikat HTTPS otomatis.
+        let attached: { hostname: string; service: string; zoneName: string };
+        try {
+          attached = await attachWorkerDomain(cfApi, {
+            accountId,
+            apiToken,
+            hostname: domain,
+            service: clientSlug,
+          });
+        } catch (err) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: false, message: errorMsg }));
+          res.end(JSON.stringify({ success: false, message: (err as Error).message }));
           return;
         }
-
-        const domainResult = cfRes.data.result as {
-          name?: string;
-          status?: string;
-          verification_data?: unknown;
-        };
 
         // Update config.env
         let envRaw = fs.readFileSync(envPath, 'utf-8');
@@ -544,29 +538,26 @@ const server = http.createServer(async (req, res) => {
           if (!suratRaw.includes('Custom Domain')) {
             suratRaw = suratRaw.replace(
               /• Alamat Website\s*:.*/,
-              `• Alamat Website   : https://${domain} (bawaan: https://${clientSlug}.pages.dev)\n• Custom Domain    : ${domain}`
+              `• Alamat Website   : https://${domain} (bawaan: https://${clientSlug}.workers.dev)\n• Custom Domain    : ${domain}`
             );
             fs.writeFileSync(suratPath, suratRaw, 'utf-8');
           }
         }
-
-        const isSubdomain = domain.split('.').length > 2 && !domain.startsWith('www.');
-        const cnameHost = isSubdomain ? domain.split('.')[0] : domain.startsWith('www.') ? 'www' : '@';
-        const cnameTarget = `${clientSlug}.pages.dev`;
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(
           JSON.stringify({
             success: true,
             domain,
-            status: domainResult?.status || 'pending',
-            cnameHost,
-            cnameTarget,
+            status: 'active',
+            zoneName: attached.zoneName,
+            service: attached.service,
             clientName,
             clientSlug,
             adminEmail: env.ADMIN_EMAIL || '',
             adminPassword: env.ADMIN_PASSWORD || '',
-            message: 'Custom domain berhasil dihubungkan ke Cloudflare Pages!',
+            whatsappMessage: buildDomainHandoverMessage({ clientName, domain }),
+            message: 'Custom domain tersambung ke Worker klien — DNS & HTTPS dibuat otomatis Cloudflare.',
           })
         );
       } catch (err) {
@@ -602,20 +593,26 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
-        const cfRes = await cfApi(
-          `/accounts/${accountId}/pages/projects/${clientSlug}/domains/${domain}`,
-          apiToken
-        );
+        const found = await findWorkerDomain(cfApi, {
+          accountId,
+          apiToken,
+          hostname: domain,
+        });
 
-        if (!cfRes.ok) {
+        if (!found) {
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: false, message: cfRes.data?.errors?.[0]?.message || 'Gagal memeriksa status' }));
+          res.end(
+            JSON.stringify({
+              success: false,
+              status: 'not_found',
+              message: `Domain ${domain} belum tersambung ke Worker ${clientSlug}.`,
+            })
+          );
           return;
         }
 
-        const result = cfRes.data.result as { status?: string };
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, status: result?.status || 'unknown' }));
+        res.end(JSON.stringify({ success: true, status: 'active', zoneName: found.zoneName, service: found.service }));
       } catch (err) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: false, message: (err as Error).message }));

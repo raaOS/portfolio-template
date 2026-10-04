@@ -169,7 +169,7 @@ Jika suatu saat klien baru membeli nama domain sendiri (contoh: `budipratama.com
 4. **Ketik Domain:** Masukkan nama domain yang dibeli klien (misal: `budipratama.com`).
 5. **Klik Tombol:** Klik **"Hubungkan Domain ke Cloudflare"**.
 6. **Selesai!** Sistem otomatis mendaftarkan domain ke Cloudflare Pages.
-7. Kamu tinggal klik tombol **"Salin Pesan WhatsApp Serah Terima Domain"** untuk memberikan petunjuk 1 baris CNAME ke klien, atau kamu pasang sendiri di tempat pembelian domain.
+7. Kamu tinggal klik tombol **"Salin Pesan WhatsApp Serah Terima Domain"** lalu kirim ke klien. Tidak ada lagi langkah CNAME: Cloudflare membuat record DNS dan HTTPS **otomatis** (syaratnya nama domain sudah berada di akun Cloudflare klien — kalau belum, pindahkan nameserver domain ke Cloudflare klien dulu).
 
 ---
 

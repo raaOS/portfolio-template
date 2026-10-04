@@ -950,16 +950,16 @@
         <div class="success-header">
           <div class="success-icon-badge">✓</div>
           <div>
-            <h2 class="title" style="font-size: 1.15rem; margin-bottom: 0.15rem;">Domain Berhasil Didaftarkan</h2>
-            <p class="subtitle" style="font-size: 0.8125rem;">Cloudflare sudah menerima pendaftaran domain ini.</p>
+            <h2 class="title" style="font-size: 1.15rem; margin-bottom: 0.15rem;">Domain Terhubung ke Worker</h2>
+            <p class="subtitle" style="font-size: 0.8125rem;">Cloudflare membuat DNS &amp; sertifikat HTTPS secara otomatis.</p>
           </div>
         </div>
 
         <div class="help-box" style="margin-bottom: 1.25rem;">
-          <strong>Petunjuk DNS untuk Klien / Registrar:</strong>
-          <br>Buka tempat membeli domain (Niagahoster, GoDaddy, dll), lalu tambahkan 1 baris CNAME berikut:
+          <strong>Tidak perlu atur DNS apa pun:</strong>
+          <br>Record DNS dibuat otomatis oleh Cloudflare (syarat: nameserver domain sudah mengarah ke akun Cloudflare klien). Biasanya aktif dalam 5-15 menit.
           <div style="margin-top: 0.5rem; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; background: #ffffff; padding: 0.5rem; border-radius: 4px; border: 1px solid var(--border);">
-            Type: <strong>CNAME</strong> &nbsp;|&nbsp; Host: <strong id="res-cname-host">@</strong> &nbsp;|&nbsp; Target: <strong id="res-cname-target">-</strong>
+            Domain: <strong id="res-domain-host">-</strong> &nbsp;|&nbsp; Zone: <strong id="res-domain-zone">-</strong> &nbsp;|&nbsp; Status: <strong id="res-domain-status">-</strong>
           </div>
         </div>
 
@@ -1354,8 +1354,9 @@ Anda dapat mengelola karya proyek, profil, kontak, dan keahlian secara langsung 
   const btnSubmitDomain = document.getElementById('btn-submit-domain');
   const domainErrorBox = document.getElementById('domain-error-message');
   const domainResultBox = document.getElementById('domain-result-box');
-  const resCnameHost = document.getElementById('res-cname-host');
-  const resCnameTarget = document.getElementById('res-cname-target');
+  const resDomainHost = document.getElementById('res-domain-host');
+  const resDomainZone = document.getElementById('res-domain-zone');
+  const resDomainStatus = document.getElementById('res-domain-status');
   const btnCopyDomainWa = document.getElementById('btn-copy-domain-wa');
 
   async function loadArchivedClients() {
@@ -1429,22 +1430,21 @@ Anda dapat mengelola karya proyek, profil, kontak, dan keahlian secara langsung 
       }
 
       domainResultBox.style.display = 'block';
-      resCnameHost.textContent = data.cnameHost || '@';
-      resCnameTarget.textContent = data.cnameTarget || `${data.clientSlug}.pages.dev`;
+      resDomainHost.textContent = data.domain || '-';
+      resDomainZone.textContent = data.zoneName || '-';
+      resDomainStatus.textContent = data.status === 'active' ? 'aktif' : (data.status || '-');
 
-      lastDomainWhatsappText = 
-`Halo ${data.clientName},
+      lastDomainWhatsappText =
+        data.whatsappMessage ||
+        `Halo ${data.clientName},
 
-Domain ${data.domain} telah berhasil dihubungkan ke akun website portofolio Anda.
+Domain ${data.domain} sudah terhubung ke website portofolio kamu. ✅
 
-Untuk mengaktifkannya, silakan tambahkan 1 baris record DNS pada registrar tempat Anda membeli domain:
-• Tipe Record : CNAME
-• Nama / Host : ${data.cnameHost || '@'}
-• Nilai / Target: ${data.cnameTarget}
+Cloudflare sudah mengatur DNS dan sertifikat HTTPS secara otomatis — tidak perlu menambahkan record apa pun di registrar.
 
-Setelah DNS diperbarui, website portofolio Anda akan langsung aktif di https://${data.domain}`;
+Website bisa dibuka di https://${data.domain} (aktif dalam 5-15 menit). 🚀`;
 
-      showToast('Domain berhasil didaftarkan ke Cloudflare!');
+      showToast('Domain tersambung ke Worker — DNS dibuat otomatis Cloudflare!');
       await loadArchivedClients();
       selectClient.value = folderName;
     } catch (err) {
