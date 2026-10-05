@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { queryD1 } from '@/lib/cloudflareD1';
 import { cleanEnvVar } from '@/lib/utils/env';
+import { getPublicBaseUrl } from '@/lib/constants';
 import { isSlugAvailable } from './slugService';
 import { getPaymentConfig, type PaymentConfig } from './paymentConfigService';
 import { logActivity } from '@/lib/services/auditLogger';
@@ -75,7 +76,7 @@ async function expireStalePendingOrders(nowIso: string): Promise<void> {
     [nowIso, nowIso]
   );
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const baseUrl = getPublicBaseUrl();
   const checkoutUrl = `${baseUrl}/checkout`;
 
   // Stale waiting_verification (bukti diunggah tapi tak pernah selesai diverifikasi /
@@ -185,7 +186,7 @@ export async function expireOrderIfStale(orderId: string): Promise<void> {
 
   if (expiredRows.length > 0) {
     const order = expiredRows[0];
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const baseUrl = getPublicBaseUrl();
     const checkoutUrl = `${baseUrl}/checkout`;
     sendOrderExpiredEmail({
       to: order.buyer_email,
@@ -898,7 +899,7 @@ export async function createOrder(
   await sendTelegramMessage(env, tgMsg);
 
   // Send order confirmation email to buyer with direct link to order page
-  const baseUrl = env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://makeitbetter.my.id';
+  const baseUrl = env.APP_BASE_URL || getPublicBaseUrl();
   const orderUrl = `${baseUrl}/orders/${orderId}?token=${accessToken}`;
   await sendOrderEmail({
     to: input.buyerEmail.trim().toLowerCase(),
@@ -1237,7 +1238,7 @@ export async function activateOrder(
     return { success: false, message: errorMessage };
   }
 
-  const baseUrl = env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://makeitbetter.my.id';
+  const baseUrl = env.APP_BASE_URL || getPublicBaseUrl();
   const siteUrl = `${baseUrl}/${actualSlug}`;
 
   // Email serah-terima ke pembeli. Dibungkus try/catch: aktivasi sudah

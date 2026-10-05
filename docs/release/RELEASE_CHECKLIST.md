@@ -9,7 +9,7 @@ Use this checklist before deploying an instance for a client (managed service: 1
 - [ ] Confirm `PRODUCT_CLOUDFLARE_ENV_CONFIRMED="true"` only after product Cloudflare values are set.
 - [ ] Confirm `wrangler.jsonc` R2 bucket name matches `CLOUDFLARE_R2_BUCKET`.
 - [ ] Confirm `NEXT_PUBLIC_FFMPEG_BASE_URL="/r2/ffmpeg"`.
-- [ ] Confirm notification email env is configured: `NOTIFICATION_PROVIDER`, `NOTIFICATION_API_KEY`, `NOTIFICATION_DEFAULT_FROM`, and `NEXT_PUBLIC_SITE_URL`.
+- [ ] Confirm notification email env is configured: `NOTIFICATION_PROVIDER`, `NOTIFICATION_API_KEY`, `NOTIFICATION_DEFAULT_FROM`, and `NEXT_PUBLIC_APP_URL` (domain di dalam link email; `NEXT_PUBLIC_SITE_URL` hanya fallback).
 
 ## Cloudflare Resources
 

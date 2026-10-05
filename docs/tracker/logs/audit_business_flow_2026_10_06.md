@@ -69,7 +69,9 @@ temuan paling kritis oleh sesi utama.
 - Laporan audit lengkap (format prioritas CRITICAL/HIGH/MEDIUM/LOW + alur gagal + ambigu + asumsi +
   risiko keamanan + risiko skala jual + pertanyaan owner) disampaikan dalam chat sesi ini.
 - Perbaikan tahap 1 (4 temuan CRITICAL) dieksekusi sesuai izin owner ("kerjakan dan pastikan
-  valid fix") — lihat bagian **Eksekusi Perbaikan** di bawah. Temuan HIGH/MEDIUM lain menyusul.
+  valid fix") — lihat bagian **Eksekusi Perbaikan** di bawah. Temuan HIGH murni mekanis dieksekusi
+  pada hari yang sama (v1.3.25, izin owner "Lanjut ke daftar temuan HIGH") — lihat
+  **Eksekusi Perbaikan Batch HIGH**. Sisanya menunggu keputusan produk owner.
 
 ## Eksekusi Perbaikan (2026-10-06, izin owner)
 
@@ -138,10 +140,72 @@ temuan paling kritis oleh sesi utama.
 `panduan/PANDUAN_UNTUK_KAMU_OWNER.md` · `panduan/PANDUAN_KELOLA_DARI_HP.md` ·
 `docs/release/RELEASE_CHECKLIST.md` · (+ `CHANGELOG.md` v1.3.24, log ini, INDEX_TRACKER).
 
-### Belum dieksekusi (menunggu putaran berikutnya)
-Seluruh temuan HIGH/MEDIUM audit: email aktivasi placeholder domain owner, slug checkout ≠ slug
-onboarding, kuota storage upload tak ditegakkan, 6 route admin tanpa CSRF, AI klien mati 3 lapis,
-update per klien tanpa rollback + `/api/health` hardcode versi, `AGENTS.md` §12 diagram "Pages",
-klaim `SALES_PRICING.md`, H3 arsip klien tak tersedia di CI (update dari HP pasti gagal), serta
-9 pertanyaan audit yang belum dijawab owner (klien nyata pertama? Resend terkonfigurasi? repo
-GitHub privat? dst.).
+## Eksekusi Perbaikan Batch HIGH (2026-10-06, izin owner — v1.3.25)
+
+> Izin owner: "Lanjut ke daftar temuan HIGH". Batch ini mengerjakan temuan HIGH yang murni
+> mekanis (tanpa keputusan produk). Temuan yang butuh keputusan owner (AI, slug/SALES_PRICING,
+> update dari HP, rollback) tetap tertunda — lihat bagian "Belum dieksekusi".
+
+### H-URL — Email order tidak lagi menautkan ke localhost
+- **Bukti baru (diverifikasi langsung):** bundle hasil build (`handler.mjs`) memuat literal
+  `http://localhost:3000` di seluruh jalur email — checkout→struk (`APP_BASE_URL`), aktivasi→
+  serah-terima + tiket Telegram, expire/cancel (`checkoutUrl`), admin orders, telegram callback.
+  Penyebab: `NEXT_PUBLIC_APP_URL` di `.env.local` = `http://localhost:3000` dan ter-inline saat
+  build. (Kondisi ini sudah ada sebelum deploy v1.3.24 — file env yang sama dipakai build lama.)
+- `src/lib/constants.ts` — resolver baru **`getPublicBaseUrl()`** (`NEXT_PUBLIC_APP_URL` →
+  `NEXT_PUBLIC_SITE_URL` → `DEFAULT_SITE_URL`; URL loopback DIABAIKAN di luar development) +
+  `APP_VERSION` disamakan ke `1.3.25`.
+- Dipakai di 8 titik: `orderService.ts` (baseUrl ×4), `billing/checkout/route.ts`,
+  `admin/orders/route.ts`, `telegram/webhook/route.ts`, halaman `orders/[orderId]` (2 tampilan
+  hardcode `makeitbetter.my.id` → domain deployment yang benar).
+- Dokumen: `.env.example` (arti `NEXT_PUBLIC_APP_URL` vs `NEXT_PUBLIC_SITE_URL`),
+  `docs/product-boundary/env-inventory.md` (+APP_URL), `docs/release/CLIENT_OPERATIONS.md`
+  (blok env email), `docs/release/RELEASE_CHECKLIST.md` (checklist pakai APP_URL).
+
+### H-Kuota — `/api/admin/upload` menegakkan kuota storage
+- Route kini memanggil `getAdminSiteContext` + `enforceSiteStorageQuotaUnlocked` di dalam
+  `withSiteQuotaLock` (cek + upload SATU lock, anti-TOCTOU) untuk path `sites/{id}/`;
+  `default-site` (layout legacy `assets/...`, di luar prefix kuota) dikecualikan — konsisten
+  dengan guard `/api/admin/upload/direct`.
+- `ProjectQuotaError` → respons **403 + `errorCode`** (sama seperti project-cover/project-media).
+- Anotasi tipe stub `optimizeVideoForPortfolio` → `Buffer | null` (TS strict; perilaku tak berubah).
+- +3 test: kuota ditegakkan untuk path tenant, 403 saat limit terlampaui (upload dibatalkan),
+  default-site dilewati.
+
+### H-CSRF — 3 route admin mutasi dapat lapisan CSRF in-handler
+- `POST /api/admin/orders` (aktivasi/cancel/reopen), `/api/admin/clear-cache`,
+  `/api/admin/clear-rate-limit`: `checkAdminAuth` → **`validateAdminRequest`** (auth + verifikasi
+  double-submit CSRF + jejak audit log). Route GET orders tetap `checkAdminAuth` (bukan mutasi).
+- Aman bagi UI: `AdminMenuBar` sudah mengirim `x-csrf-token`; tidak ada pemanggil luar route ini.
+- Test `clear-cache` & `clear-rate-limit` disesuaikan (mock `validateAdminRequest`, async).
+
+### H-Versi — `/api/health` melapor versi rilis nyata
+- `version: '1.0.0'` hardcode → **`APP_VERSION`** (= entri teratas CHANGELOG, kini `1.3.25`).
+  Dampak: portal status board (yang membandingkan health vs CHANGELOG) kini menandai outdated
+  dengan benar dan deploy gagal bisa terdeteksi; sebelumnya SEMUA klien selalu "perlu update".
+- +test assertion di `health/route.test.ts`; test baru `src/lib/constants.test.ts` mengunci
+  `APP_VERSION` == entri CHANGELOG (anti-lenceng) + 5 test `getPublicBaseUrl`.
+- Dokumen internal: diagram `AGENTS.md` §12 `Pages (deploy)` → `Workers (deploy)`.
+
+### Gerbang validasi batch HIGH (semua hijau)
+`tsc --noEmit` exit 0 · ESLint 0 error · `npm test` = **119 file / 927 test PASS** (+9 test) ·
+CHANGELOG `v1.3.25` ditambahkan · build & deploy produksi **menunggu izin owner**.
+
+### File yang dimodifikasi (batch HIGH)
+`src/lib/constants.ts` + `src/lib/constants.test.ts` (baru) · `src/lib/services/orderService.ts` ·
+`src/app/api/billing/checkout/route.ts` · `src/app/api/admin/orders/route.ts` ·
+`src/app/api/telegram/webhook/route.ts` · `src/app/orders/[orderId]/page.tsx` ·
+`src/app/api/health/route.ts` + test · `src/app/api/admin/upload/route.ts` + test ·
+`src/app/api/admin/clear-cache/route.ts` + test · `src/app/api/admin/clear-rate-limit/route.ts` + test ·
+`.env.example` · `docs/product-boundary/env-inventory.md` · `docs/release/CLIENT_OPERATIONS.md` ·
+`docs/release/RELEASE_CHECKLIST.md` · `AGENTS.md` · (+ `CHANGELOG.md` v1.3.25, log ini, INDEX_TRACKER).
+
+### Belum dieksekusi (menunggu putusan/putaran berikutnya)
+- **HIGH butuh keputusan produk owner:** AI klien mati 3 lapis (aktifkan vs hapus janji di
+  dokumen), klaim slug di `SALES_PRICING.md:9,12` (ubah dokumen vs tambah field slug di checkout —
+  API `desiredSlug` sudah mendukung, UI belum), H3 update dari HP (arsip klien tak ada di CI),
+  rollback update per klien.
+- **MEDIUM/LOW audit lainnya** + pertanyaan audit yang belum dijawab owner (klien nyata pertama?
+  path jual via checkout atau WA? repo GitHub privat? kebijakan refund/SLA? backup laptop?).
+- **Sudah terjawab di putaran ini:** Resend **TERKONFIGURASI & terbukti jalan** (uji kirim
+  HTTP 200 + ID email, 2026-10-06); Telegram juga lengkap (token + chat + secret).

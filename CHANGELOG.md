@@ -3,6 +3,16 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.25] - 2026-10-06
+
+### 🔗 Perbaikan Temuan HIGH Hasil Audit Alur Bisnis (Batch 1)
+
+- **Link di semua email pesanan tidak lagi menunjuk `localhost`.** Masalahnya: build produksi meng-inline `NEXT_PUBLIC_APP_URL=http://localhost:3000` dari `.env.local` (dibuktikan dengan memeriksa bundle hasil build — nilai localhost muncul di jalur email struk, aktivasi, kedaluwarsa, pembatalan, dan tiket Telegram), jadi semua link yang diterima pembeli mati; halaman detail order juga menampilkan domain hardcode `makeitbetter.my.id` yang salah untuk deployment klien. Perbaikannya: satu resolver `getPublicBaseUrl()` (`NEXT_PUBLIC_APP_URL` → `NEXT_PUBLIC_SITE_URL` → domain bawaan; URL loopback otomatis diabaikan di luar mode development) kini dipakai di seluruh jalur email/Telegram dan tampilan halaman order; `.env.example` + dokumen env kini menjelaskan perbedaan `NEXT_PUBLIC_APP_URL` (basis link email) vs `NEXT_PUBLIC_SITE_URL` (SEO).
+- **Kuota storage kini ditegakkan di jalur upload utama `/api/admin/upload`.** Masalahnya: route yang dipakai sehari-hari admin ini tidak memeriksa kuota — file bisa melewati limit situs, padahal jalur presign/direct/project-media sudah mengecek. Perbaikannya: cek + upload dibungkus SATU lock per-site (anti-race TOCTOU) untuk path `sites/{id}/`, respons 403 + `errorCode` saat limit terlampaui; layout legacy `default-site` (`assets/...`) dikecualikan agar konsisten dengan guard `upload/direct`.
+- **CSRF in-handler untuk 3 route admin mutasi.** `POST /api/admin/orders` (aktivasi/cancel/reopen), `/api/admin/clear-cache`, dan `/api/admin/clear-rate-limit` kini memakai `validateAdminRequest` = auth + verifikasi double-submit CSRF + jejak audit — sebelumnya hanya auth (lapisan CSRF hanya ada di middleware Edge). UI admin sudah mengirim header CSRF, jadi tidak ada perubahan perilaku bagi admin.
+- **`/api/health` melaporkan versi rilis yang benar.** Masalahnya: field `version` di-hardcode `1.0.0` — portal `PENGELOLA_KLIEN.bat` membandingkannya dengan CHANGELOG, sehingga semua klien selalu ditandai "perlu update" dan deploy yang gagal tak pernah terdeteksi. Perbaikannya: memakai `APP_VERSION` (kini `1.3.25`) yang dijaga test agar selalu sama dengan entri teratas CHANGELOG; `/api/os/version` dan meta aplikasi ikut memakai konstanta yang sama. Diagram deploy di AGENTS.md ikut dikoreksi (Pages → Workers).
+- **Diuji (semua hijau):** `tsc --noEmit` 0 error · ESLint 0 error · **927/927 test pass** (9 test baru: resolver base URL ×5, sinkron versi CHANGELOG ×1, kuota upload ×3).
+
 ## [1.3.24] - 2026-10-06
 
 ### 🔐 Perbaikan 4 Temuan Kritis Hasil Audit Uji Alur Bisnis End-to-End

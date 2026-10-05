@@ -20,6 +20,7 @@ vi.mock('@/lib/database', () => ({
 }));
 
 import { GET } from './route';
+import { APP_VERSION } from '@/lib/constants';
 
 const originalCloudflareAccountId = process.env.CLOUDFLARE_ACCOUNT_ID;
 const originalCfPages = process.env.CF_PAGES;
@@ -57,6 +58,9 @@ describe('GET /api/health', () => {
 
     expect(response.status).toBe(200);
     expect(body.status).toBe('ok');
+    // Versi rilis nyata (bukan hardcode '1.0.0') — portal status board
+    // membandingkan nilai ini dengan CHANGELOG untuk badge "perlu update".
+    expect(body.version).toBe(APP_VERSION);
     expect(body.filesystem).toBe('accessible');
     expect(body.database).toBe('connected');
     expect(body.memory.heapUsed).toBeDefined();

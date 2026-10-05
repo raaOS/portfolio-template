@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { activateOrder, cancelOrder, reopenOrder } from '@/lib/services/orderService';
 import { enforceRequestRateLimit } from '@/lib/security/request';
+import { getPublicBaseUrl } from '@/lib/constants';
 
 // SECURITY FIX (audit 2026-09-29):
 // 1. Perbandingan secret pakai timing-safe equal.
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
         const orderId = callbackData.replace('activate_', '');
 
         const result = await activateOrder(orderId, {
-          APP_BASE_URL: process.env.NEXT_PUBLIC_APP_URL || 'https://makeitbetter.my.id',
+          APP_BASE_URL: getPublicBaseUrl(),
         });
 
         if (botToken && callbackQuery.id) {

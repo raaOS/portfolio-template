@@ -3,6 +3,7 @@ import { createOrder } from '@/lib/services/orderService';
 import { isSlugAvailable, validateSlugFormat } from '@/lib/services/slugService';
 import { enforceRequestRateLimit } from '@/lib/security/request';
 import { checkDataRateLimit } from '@/lib/dataRateLimit';
+import { getPublicBaseUrl } from '@/lib/constants';
 
 /**
  * GET /api/billing/checkout?slug=xxx
@@ -119,7 +120,7 @@ export async function POST(request: NextRequest) {
       {
         TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
         TELEGRAM_ADMIN_CHAT_ID: process.env.TELEGRAM_ADMIN_CHAT_ID,
-        APP_BASE_URL: process.env.NEXT_PUBLIC_APP_URL,
+        APP_BASE_URL: getPublicBaseUrl(),
       }
     );
 

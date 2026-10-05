@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkAdminAuth } from '@/lib/auth';
+import { validateAdminRequest } from '@/lib/auth';
 import { logAdminActivity } from '@/lib/services/auditLogger';
 
 export async function POST(request: NextRequest) {
   try {
-    if (!checkAdminAuth(request)) {
+    // Audit HIGH: auth + CSRF (double-submit) + jejak audit dalam satu helper.
+    if (!(await validateAdminRequest(request))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
