@@ -1,0 +1,39 @@
+%% Peta aset — siapa punya apa di mana (bahasa non-IT). Milik owner.
+%% Sumber kebenaran tunggal: dirender portal PENGELOLA_KLIEN (tab "Peta Bisnis").
+flowchart TB
+  subgraph PEMBELI_BOX["DIMILIKI PEMBELI"]
+    PB1["Uang Rp199.000 - langsung ke rekening Anda<br/>(tanpa potongan platform)"]
+    PB2["Website jadi + akses login /admin"]
+    PB3["Isi konten yang dia isi sendiri"]
+  end
+
+  subgraph OWNER_BOX["DIMILIKI ANDA (owner)"]
+    OW1["Kode sumber template (GitHub)"]
+    OW2["Komputer Anda: portal PENGELOLA_KLIEN,<br/>arsip klien berisi kredensial - RAHASIA"]
+    OW3["Telegram: notifikasi order + tiket kerja"]
+    OW4["Situs contoh: makeitbetter.my.id"]
+    OW5["Rekening/e-wallet: penerima uang"]
+  end
+
+  subgraph CF_BOX["AKUN CLOUDFLARE MILIK KLIEN (1 klien = 1 akun)"]
+    CF1["Database D1: seluruh tabel data"]
+    CF2["Penyimpanan R2: file foto & video"]
+    CF3["Worker: website hidup 24 jam"]
+    CF4["Domain klien (opsional): DNS + HTTPS otomatis"]
+    CF3 --- CF1
+    CF3 --- CF2
+  end
+
+  subgraph AUTO_BOX["DIJALANKAN SISTEM OTOMATIS"]
+    AU1["Cron 01:00 WIB: backup database<br/>(simpan 7 terbaru) + bersihkan order kadaluarsa"]
+    AU2["Email otomatis: struk, kedaluwarsa,<br/>serah terima"]
+  end
+
+  PB1 ==> OW5
+  OW1 ==>|sumber deploy| CF3
+  OW2 ==>|buat D1 + R2 + deploy| CF3
+  CF3 ==> PB2
+  PB3 -.-> CF1
+  AU1 -.->|backup| CF1
+  AU2 -.-> PB2
+  OW3 -.-> OW2

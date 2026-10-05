@@ -3,6 +3,17 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.24] - 2026-10-05
+
+### 🗺️ Tab "Peta Bisnis" Baru di Portal Owner (khusus Anda — klien tidak melihat)
+
+- **Portal `PENGELOLA_KLIEN.bat` kini punya tab ke-5: "Peta Bisnis"** — dua diagram gambar besar, khusus untuk Anda:
+  1. **Alur Bisnis** (Pembeli → Sistem → Anda): pesan → bayar → bukti → verifikasi → aktivasi → bengkel 6 langkah → serah terima → klien isi konten sendiri, termasuk pekerjaan otomatis jam 01:00 WIB (backup + bersih order).
+  2. **Peta Aset** (siapa punya apa di mana): data tiap klien ada di **akun Cloudflare milik klien** (terisolasi), rahasia ada di arsip komputer Anda, uang masuk **langsung** ke rekening Anda tanpa potongan platform.
+- **Kenapa klien tidak bisa melihat:** portal hanya jalan di komputer Anda — klien tidak pernah menerimanya (dipilih sendiri dari dua opsi; panel `/admin` sengaja tidak dipakai karena dipakai semua klien).
+- **Satu sumber, dua pembaca:** diagram disimpan sebagai teks (format Mermaid) di `docs/diagrams/*.mmd` — Anda melihat **gambarnya** di portal, **AI membaca teksnya** dari repo. Alur berubah? Cukup ubah file `.mmd`, portal langsung menampilkan versi terbaru tanpa restart.
+- **Teruji nyata:** portal dijalankan → endpoint diagram OK → browser merender **2 diagram penuh (17 + 14 kotak, 20 + 10 panah)** tanpa satu pun error; gerbang lulus (118 file / 914 test PASS, audit 59/59, kesiapan jual 12/12).
+
 ## [1.3.23] - 2026-10-05
 
 ### 🧰 Perbaikan Daftar Tabel Backup CLI (`npm run backup:d1`)
@@ -10,7 +21,7 @@ Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **U
 - **Masalahnya:** daftar tabel cadangan lama masih memuat `client_access` (tabel yang sudah dihapus dari database) dan belum memuat 8 tabel penting — termasuk `site_users` (login klien), `orders` (pesanan), dan `platform_settings` — jadi backup CLI melewatkan data itu.
 - **Perbaikannya (atas izin Anda):** daftar disamakan dengan **18 tabel yang benar** (gabungan dua skema database) untuk backup **dan** urutan restore; tool restore kini juga menyiapkan tabel skema bersama di database target, sehingga hasil backup yang memuat tabel login klien bisa di-restore ke staging.
 - **Diuji nyata:** backup dry-run → **18 tabel / 77 baris**, `client_access` hilang, `site_users`/`orders`/`platform_settings` ikut; backup → restore dry-run **validasi 18/18 tabel cocok**. Gerbang tetap hijau: 118 file / 914 test PASS, audit rilis **59/59** + kesiapan jual **12/12**.
-- **Bonus:** skrip drill `npm run restore:seed-drill` ikut dibersihkan dari sisa INSERT ke tabel `client_access` (tabel sudah dihapus) — skrip itu dulu *crash* di tengah jalan saat `--apply`; kini alat uji cadangan→restore utuh kembali tanpa perubahan cara kerja lainnya.
+- **Bonus:** skrip drill `npm run restore:seed-drill` ikut dibersihkan dari sisa INSERT ke tabel `client_access` (tabel sudah dihapus) — skrip itu dulu _crash_ di tengah jalan saat `--apply`; kini alat uji cadangan→restore utuh kembali tanpa perubahan cara kerja lainnya.
 
 ## [1.3.22] - 2026-10-05
 

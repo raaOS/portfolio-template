@@ -50,7 +50,16 @@
       max-width: 640px;
     }
 
-    /* Top Navigation Tabs */
+      /* Diagram Mermaid (Peta Bisnis) */
+    .mermaid {
+      background: none;
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin: 0;
+    }
+
+  /* Top Navigation Tabs */
     .tabs-nav {
       display: flex;
       gap: 0.5rem;
@@ -699,6 +708,7 @@
       <button type="button" class="tab-btn" id="tab-btn-status">Status Klien</button>
       <button type="button" class="tab-btn" id="tab-btn-domain">Kelola Custom Domain</button>
       <button type="button" class="tab-btn" id="tab-btn-update">Update Versi Template</button>
+      <button type="button" class="tab-btn" id="tab-btn-map">Peta Bisnis</button>
   </div>
 
   <!-- TAB 1: ONBOARDING VIEW -->
@@ -1091,6 +1101,27 @@
       </div>
     </div>
   </div>
+
+  <!-- TAB 5: OWNER BUSINESS MAP VIEW (khusus owner — diagram Mermaid dari docs/diagrams/) -->
+  <div id="view-map" style="display: none;">
+    <div class="header">
+      <span class="badge-master">Peta Bisnis</span>
+      <h1 class="title">Alur Bisnis &amp; Peta Aset</h1>
+      <p class="subtitle">Gambar besar khusus owner: perjalanan pembeli dari pesan sampai serah terima, dan posisi aset (siapa punya apa di mana). Diagram disimpan sebagai teks di <code class="inline-code">docs/diagrams/</code> sehingga AI juga membaca sumber yang sama.</p>
+    </div>
+
+    <div class="card">
+      <div class="section-title" style="margin-bottom: 0.5rem;">1 · Alur Bisnis: Pembeli → Sistem → Anda</div>
+      <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1rem;">Kotak belah ketupat = keputusan sistem · panah tebal = alur utama · garis putus-putus = notifikasi/otomatis · kotak "Setiap hari 01:00 WIB" = pekerjaan harian otomatis (backup + bersih order).</div>
+      <div style="overflow-x: auto;"><pre class="mermaid" id="diagram-alur">Memuat diagram...</pre></div>
+    </div>
+
+    <div class="card" style="margin-top: 1.25rem;">
+      <div class="section-title" style="margin-bottom: 0.5rem;">2 · Peta Aset: Siapa Punya Apa di Mana</div>
+      <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1rem;">Inti model bisnisnya: data tiap klien ada di akun Cloudflare milik klien (terisolasi), rahasia ada di arsip di komputer Anda, uang masuk langsung ke Anda.</div>
+      <div style="overflow-x: auto;"><pre class="mermaid" id="diagram-aset">Memuat diagram...</pre></div>
+    </div>
+  </div>
 </div>
 
 <div class="toast" id="toast">Pesan berhasil disalin ke clipboard.</div>
@@ -1106,16 +1137,18 @@
   const tabBtnDomain = document.getElementById('tab-btn-domain');
   const tabBtnUpdate = document.getElementById('tab-btn-update');
   const tabBtnStatus = document.getElementById('tab-btn-status');
+  const tabBtnMap = document.getElementById('tab-btn-map');
   const viewOnboard = document.getElementById('view-onboard');
   const viewDomain = document.getElementById('view-domain');
   const viewUpdate = document.getElementById('view-update');
   const viewStatus = document.getElementById('view-status');
+  const viewMap = document.getElementById('view-map');
 
   function switchTab(activeBtn, targetView, onActivate) {
-    [tabBtnOnboard, tabBtnDomain, tabBtnUpdate, tabBtnStatus].forEach(b => b.classList.remove('active'));
+    [tabBtnOnboard, tabBtnDomain, tabBtnUpdate, tabBtnStatus, tabBtnMap].forEach(b => b.classList.remove('active'));
     activeBtn.classList.add('active');
 
-    [viewOnboard, viewDomain, viewUpdate, viewStatus].forEach(v => {
+    [viewOnboard, viewDomain, viewUpdate, viewStatus, viewMap].forEach(v => {
       v.style.display = 'none';
       v.classList.remove('view-pane');
     });
@@ -1141,6 +1174,41 @@
 
   tabBtnUpdate.addEventListener('click', () => {
     switchTab(tabBtnUpdate, viewUpdate, loadUpdateView);
+  });
+
+  // Peta Bisnis (owner-only): render diagram Mermaid dari docs/diagrams/*.mmd
+  let bizMapLoaded = false;
+  async function loadBizMap() {
+    if (bizMapLoaded) return;
+    bizMapLoaded = true;
+    try {
+      const res = await fetch('/api/diagrams?t=' + Date.now());
+      const data = await res.json();
+      const alurEl = document.getElementById('diagram-alur');
+      const asetEl = document.getElementById('diagram-aset');
+      alurEl.textContent = (data.alurBisnis || '').trim();
+      asetEl.textContent = (data.petaAset || '').trim();
+      if (!alurEl.textContent || !asetEl.textContent) {
+        throw new Error('File diagram belum tersedia di docs/diagrams/.');
+      }
+      const mermaid = (await import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs')).default;
+      mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
+      await mermaid.run({ querySelector: '.mermaid' });
+    } catch (err) {
+      console.error('[PetaBisnis] Gagal memuat diagram:', err);
+      // Kalau sumber diagram sudah terlanjur terisi, biarkan (terbaca sebagai teks).
+      // Kalau belum, ganti placeholder dengan pesan yang jelas.
+      ['diagram-alur', 'diagram-aset'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && !el.textContent.trim().startsWith('flowchart')) {
+          el.textContent = 'Diagram gagal dimuat. Pastikan komputer terhubung internet (pustaka rendering diambil dari CDN), lalu muat ulang halaman.';
+        }
+      });
+    }
+  }
+
+  tabBtnMap.addEventListener('click', () => {
+    switchTab(tabBtnMap, viewMap, loadBizMap);
   });
 
   // Template card click
