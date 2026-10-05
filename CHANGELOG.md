@@ -3,6 +3,22 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.22] - 2026-10-05
+
+### 💾 Fitur Backup Database Otomatis (harian 01:00 WIB + tombol manual)
+
+- **Backup otomatis:** setiap jam 01:00 WIB, seluruh isi database (D1) di-simpan otomatis ke penyimpanan cloud (R2) dalam bentuk 1 file JSON. **7 backup terakhir disimpan**, yang lebih lama dibersihkan otomatis.
+- **Panel baru di admin:** menu **Sistem & Tampilan → "Backup Database"** (`/admin/system/backup`) berisi tombol **Backup Sekarang** (backup manual kapan saja), daftar backup, dan tombol **Unduh** untuk mengunduh/membuka file backup.
+- Daftar tabel dibaca **langsung dari database** setiap kali (bukan daftar tetap), jadi tabel baru otomatis ikut ter-backup — termasuk tabel login klien, order, dan pengaturan platform yang sebelumnya belum tercantum di daftar lama.
+- Kegagalan backup **tidak menggagalkan pekerjaan cron lainnya**; kalau penyimpanan cloud belum siap, backup dilewati dengan aman.
+- Diuji: **17 test baru**, total **118 file / 914 test PASS**, audit rilis **59/59** + kesiapan jual **12/12**.
+
+### ⏰ Bukti Cron 01:00 WIB Benar-Benar Jalan (perbaikan catatan + uji ulang)
+
+- **Terbukti langsung:** uji jadwal 1 menit selama 3,5 menit merekam **3 fire `* * * * *` + 3 log `[cron] POST /api/cron/daily -> 200`** — rantai scheduler Cloudflare → handler → endpoint harian → tulis database bekerja penuh di produksi.
+- **Temuan penting:** jadwal uji 1 menit ternyata **masih terpasang di server selama ~31 jam** (catatan lama menulis sudah dilepas — yang dilepas hanya file lokal, pendaftaran server tidak pernah dikembalikan). Artinya sejak 3 Okt cron menembak tiap menit (boros tetapi tidak merusak), dan fire 01:00 WIB semalam mustahil terjadi karena jadwal terdaftar saat itu menitan.
+- **Jadwal harian sudah dipasang kembali & terverifikasi lewat API:** `0 18 * * *` (terdaftar 2026-10-05T02:42:36Z). Fire berikutnya: **01:00 WIB malam ini** — inilah saatnya backup pertama dibuat otomatis.
+
 ## [1.3.21] - 2026-10-04
 
 ### 🌐 Custom Domain Klien Pindah dari Cloudflare Pages ke Worker
@@ -30,7 +46,7 @@ Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **U
 
 ### 📚 Dokumen Disesuaikan dengan Konsep Jualan (±25 file)
 
-- **2 dokumen dihapus** karena isinya bertentangan total dengan konsep: `docs/operations/buyer-onboarding-checklist.md` dan `docs/release/BUYER_ONBOARDING.md` (bahkan menulis *"Do not create one deployment per buyer"* — kebalikan dari konsep 1 klien = 1 akun Cloudflare).
+- **2 dokumen dihapus** karena isinya bertentangan total dengan konsep: `docs/operations/buyer-onboarding-checklist.md` dan `docs/release/BUYER_ONBOARDING.md` (bahkan menulis _"Do not create one deployment per buyer"_ — kebalikan dari konsep 1 klien = 1 akun Cloudflare).
 - **Dokumen yang diperbaiki:** `README.md`, `AGENTS.md` (alur onboarding, pipeline deploy, jumlah tabel D1 diverifikasi ke file skema), seluruh `docs/agent-context/` (PRD ditulis ulang), `docs/operations/` (playbook dukungan — 17 rujukan "Master Dashboard" diganti alur portal), `docs/release/`, dan **3 panduan owner/klien** (template WhatsApp kini persis sama dengan template resmi portal; klien tidak lagi disuruh membuka `/setup` yang sudah mati).
 - Rujukan URL `.pages.dev` diganti `.workers.dev` mengikuti jalur deploy baru.
 
@@ -45,9 +61,9 @@ Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **U
 ### ⏰ Cron Harian Cloudflare: Order Kedaluwarsa Kini Ditandai Otomatis
 
 - **Sebelumnya penanda order kedaluwarsa hanya jalan kalau panel admin Order dibuka.** Fungsi `sweepExpiredOrders()` memang sudah ada sejak lama, tetapi satu-satunya pemanggilnya adalah `GET /api/admin/orders` — kalau panel tidak dibuka, order yang lewat masa berlakunya tetap "pending" selamanya. Kini ada **jadwal otomatis harian pukul 01:00 WIB (18:00 UTC)** di Cloudflare (`triggers.crons` di `wrangler.jsonc`).
-- **Cara kerjanya:** Cloudflare memanggil handler `scheduled` → handler itu memanggil `POST /api/cron/daily` lewat *service binding* internal `WORKER_SELF_REFERENCE` (request sepenuhnya di dalam jaringan Cloudflare, tidak lewat internet publik) → endpoint memverifikasi token lalu menjalankan sweeper. Sweeper sendiri punya jaminan 10 menit, jadi walau dipanggil berulang kuota database tidak diboroskan.
-- **Handler `scheduled` ditambahkan otomatis oleh skrip build** (`prepare-opennext-worker-output.js`) karena paket OpenNext belum menyediakannya; `main` di `wrangler.jsonc` tetap `.open-next/worker.js` sesuai aturan pre-deploy. Sengaja memakai `await`, bukan `ctx.waitUntil`, supaya kegagalan pemanggilan langsung dihitung sebagai *run* gagal dan muncul di log Cloudflare — bukan kegagalan sunyi.
-- **Endpoint baru `POST /api/cron/daily` dilindungi token `CRON_SECRET`** dengan pembandingan *timing-safe* (pola yang sama dengan webhook Telegram). Tanpa token: **401**; token salah: **401**; `CRON_SECRET` belum diisi: cron dilewati dengan peringatan log (fitur ini opsional, bukan error).
+- **Cara kerjanya:** Cloudflare memanggil handler `scheduled` → handler itu memanggil `POST /api/cron/daily` lewat _service binding_ internal `WORKER_SELF_REFERENCE` (request sepenuhnya di dalam jaringan Cloudflare, tidak lewat internet publik) → endpoint memverifikasi token lalu menjalankan sweeper. Sweeper sendiri punya jaminan 10 menit, jadi walau dipanggil berulang kuota database tidak diboroskan.
+- **Handler `scheduled` ditambahkan otomatis oleh skrip build** (`prepare-opennext-worker-output.js`) karena paket OpenNext belum menyediakannya; `main` di `wrangler.jsonc` tetap `.open-next/worker.js` sesuai aturan pre-deploy. Sengaja memakai `await`, bukan `ctx.waitUntil`, supaya kegagalan pemanggilan langsung dihitung sebagai _run_ gagal dan muncul di log Cloudflare — bukan kegagalan sunyi.
+- **Endpoint baru `POST /api/cron/daily` dilindungi token `CRON_SECRET`** dengan pembandingan _timing-safe_ (pola yang sama dengan webhook Telegram). Tanpa token: **401**; token salah: **401**; `CRON_SECRET` belum diisi: cron dilewati dengan peringatan log (fitur ini opsional, bukan error).
 - **Uji:** 6 test baru (500 tanpa konfigurasi, 401 tanpa/salah/beda-panjang token, 200 sukses, 500 saat sweep gagal).
 
 ### 🔐 12 Rahasia Dipindah ke Worker Secrets (Rotasi Tanpa Deploy Ulang)
@@ -60,7 +76,7 @@ Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **U
 
 ### 📚 Dokumentasi Operasional
 
-- **Runbook monitoring** kini memuat dua bagian baru: *Daily Cron Trigger (Cloudflare Workers)* berisi alur langkah demi langkah + cara memeriksanya, dan *Rotasi Rahasia (Worker Secrets)* berisi perintah aman untuk memutar token. Checklist harian bertambah satu item: cek log `[cron]`.
+- **Runbook monitoring** kini memuat dua bagian baru: _Daily Cron Trigger (Cloudflare Workers)_ berisi alur langkah demi langkah + cara memeriksanya, dan _Rotasi Rahasia (Worker Secrets)_ berisi perintah aman untuk memutar token. Checklist harian bertambah satu item: cek log `[cron]`.
 - **Catatan kecil di `src/middleware/constants.ts`** menjelaskan kenapa `/api/cron/*` sengaja tidak masuk daftar route yang dilindungi cookie (pengamannya ada di handler), agar tidak salah "diperbaiki" oleh AI berikutnya.
 - **Verifikasi:** `npx tsc --noEmit` 0 error, `npx eslint src` 0 error, **115 file / 887 test PASS**, `release:audit` **62/62**, `release:sale-readiness` **13/13**, pre-deploy + compat-audit 0 blocker.
 
@@ -77,7 +93,7 @@ Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **U
 Enam perbaikan keamanan pada jalur order publik (checkout → upload bukti bayar → webhook aktivasi), tanpa mengubah perilaku fungsional satu pun fitur:
 
 - **Kebocoran referrer token order ditutup:** halaman `/orders/*` kini punya layout sendiri (`src/app/orders/layout.tsx`, baru) dengan header `Referrer-Policy: no-referrer` + `robots noindex`. Sebelumnya, saat pembeli mengklik tautan order (yang mengandung token akses) menuju situs bank/medsos, browser menitipkan URL lengkap itu ke situs tujuan — analoginya kunci kamar hotel tertulis di struk yang bisa difoto orang lewat jendela. Fitur "salin link" tetap berfungsi penuh; hanya jejak kebocorannya yang hilang.
-- **Timing-safe comparison webhook Telegram (`/api/telegram/webhook`):** verifikasi secret kini memakai `crypto.timingSafeEqual` + penjaga panjang, menutup serangan *timing attack* pada pembandingan string biasa.
+- **Timing-safe comparison webhook Telegram (`/api/telegram/webhook`):** verifikasi secret kini memakai `crypto.timingSafeEqual` + penjaga panjang, menutup serangan _timing attack_ pada pembandingan string biasa.
 - **CSRF billing untuk endpoint publik (Opsi A):** `middleware/csrf.ts` menambahkan fallback same-origin untuk endpoint publik yang memang tidak membawa cookie admin — request lintas-origin ditolak, request dari domain sendiri tetap jalan.
 - **Rate-limit checkout diperkuat:** cap per-IP via `enforceRequestRateLimit` sudah ada; ditambah guard same-origin di handler sehingga spam otomatis dari frontend pihak ketiga tertolak lebih awal.
 - **SSRF guard bukti bayar:** `normalizePaymentProofUrl()` menolak URL yang menunjuk localhost/loopback/RFC1918/169.254/CGNAT — server tidak lagi diajak mengambil gambar dari jaringan internal.
@@ -87,7 +103,7 @@ Enam perbaikan keamanan pada jalur order publik (checkout → upload bukti bayar
 
 ### 🗂️ Panel "Log Aktivitas" di Desktop Admin
 
-- **Aplikasi baru "Log Aktivitas"** (zone *Sistem & Tampilan*, id `activityLog`) menampilkan 50 jejak aktivitas terakhir dalam bentuk garis waktu: aksi, waktu, tipe entri, metadata yang bisa dibuka-tutup, plus penanda sumber tiap baris (**KV** = blob `app_kv` penulis lama, **DB** = tabel relasional `audit_logs`).
+- **Aplikasi baru "Log Aktivitas"** (zone _Sistem & Tampilan_, id `activityLog`) menampilkan 50 jejak aktivitas terakhir dalam bentuk garis waktu: aksi, waktu, tipe entri, metadata yang bisa dibuka-tutup, plus penanda sumber tiap baris (**KV** = blob `app_kv` penulis lama, **DB** = tabel relasional `audit_logs`).
 - **`GET /api/admin/audit-logs` kini menggabungkan dua sumber sejarah itu** (dulu hanya blob `app_kv`): dibaca berurutan (`Promise.all`), didedup berdasarkan id (kv menang karena metadata lebih kaya), diurutkan terbaru dahulu, lalu dipotong ke 50 entri. Bila tabel relasional belum ada di deployment lama, pembacaannya gagal diam-diam dan viewer tetap menampilkan data KV.
 - **Rute `/admin/system/activity-log` ditambahkan** — sebelumnya `APP_ROUTE_MAP` menunjuk ke halaman yang tidak ada, satu-satunya entri `APP_ROUTE_MAP` tanpa `page.tsx` (deep-link langsung ke URL itu akan 404).
 - **Perbaikan lint (1 error `react-hooks/set-state-in-effect`):** pemuatan awal di `ActivityLogPanel` kini dijadwalkan lewat `setTimeout(…, 0)` — pola yang sama dengan `OrdersPanel` — sehingga `setState` tidak dipanggil sinkron di dalam `useEffect`.
@@ -96,7 +112,7 @@ Enam perbaikan keamanan pada jalur order publik (checkout → upload bukti bayar
 ### 🚀 Deploy Produksi & Pembersihan Database (sudah dijalankan)
 
 - **Versi ini sudah tayang di produksi** (2026-10-03). Deploy sempat gagal sekali karena kendala lingkungan Windows yang sudah dikenal (workerd tidak bisa membuat folder di luar folder project) — diatasi dengan menyetel `TEMP`/`TMP` sementara ke `node_modules\.cache\mftemp` sesuai runbook, lalu deploy ulang sukses. Pemeriksaan asap produksi **6/6 lolos** (halaman utama, kesehatan API, data demo, berkas FFmpeg).
-- **Database sudah dibersihkan, bukan sekadar direncanakan.** Enam perintah `remove-plan-columns.ts --apply` berjalan `[ok]`: kolom `plan` di tabel `sites` dan `orders`, tabel `site_subscriptions` beserta index-nya, tabel `client_password_resets`, dan **tabel `client_access`**. Pemeriksaan ulang menunjukkan semuanya `[n/a]` → *"Database sudah bersih"*, dan pemeriksaan hidup dijalankan ulang sesudahnya tetap **6/6 lolos**.
+- **Database sudah dibersihkan, bukan sekadar direncanakan.** Enam perintah `remove-plan-columns.ts --apply` berjalan `[ok]`: kolom `plan` di tabel `sites` dan `orders`, tabel `site_subscriptions` beserta index-nya, tabel `client_password_resets`, dan **tabel `client_access`**. Pemeriksaan ulang menunjukkan semuanya `[n/a]` → _"Database sudah bersih"_, dan pemeriksaan hidup dijalankan ulang sesudahnya tetap **6/6 lolos**.
 - **Tabel `client_access` ikut dihapus sesuai pilihanmu:** 4 baris email + hash pembeli di dalamnya hilang permanen tanpa disalin ke mana pun (tabel itu memang tidak dibaca kode mana pun).
 - **Yang perlu kamu lakukan:** kalau tab panel admin masih terbuka dari sebelum update, **login ulang sekali** — token admin lama sengaja ditolak versi baru (wajib membawa penanda `siteId`). Cara beli, form checkout, upload bukti bayar, dan email pesanan **tidak berubah**.
 
@@ -106,7 +122,7 @@ Enam perbaikan keamanan pada jalur order publik (checkout → upload bukti bayar
 
 - **Dokumen tidak lagi menjanjikan pintu yang sudah tidak ada.** Setelah sistem login klien dihapus, masih ada **15 dokumen** yang mengarahkan pembeli ke `/{slug}/login`, `/client/login`, `/client/dashboard`, membuat "client access", atau menjanjikan "reset password lewat email" — semuanya pintu yang sudah roboh (cek di kode: `src/app/api/client/` nol file). Semua diganti dengan kenyataannya: pembeli cuma punya satu pintu, **`/admin/login`** (dashboard kelola di `/admin/client-dashboard`), dan **reset password selalu dibantu owner** lewat `scripts/cloudflare/reset-customer-password.ts`. Dokumen yang tersentuh: panduan serah-terima pembeli, checklist rilis, checklist onboarding, panduan support, runbook backup/monitoring, PRD, kontrak endpoint, dan daftar env.
 - **Uji beban (`npm run load:multi-buyer`) akhirnya bisa jalan lagi.** Skrip itu ternyata memanggil 4 alamat yang sudah tidak ada, jadi sejak v1.3.14 uji beban mustahil jalan sampai titik itu. Diperbaiki ke jalur yang benar-benar ada (login panel + endpoint upload admin), plus satu bug nyata: token admin buatan skrip tidak membawa penanda `siteId` sehingga sejak audit keamanan 29 Sep token itu selalu ditolak. **Check "site A tidak bisa mengakses site B" sengaja dimatikan dan diberi alasan di kode** — check itu dulu butuh satu login per tenant, sedangkan sekarang hanya ada satu akun panel, jadi kalau dipertahankan ia akan selalu "lulus" palsu.
-- **Audit rilis kini hijau penuh: `npm run release:audit` 60/62 (gagal) → 62/62 (lolos).** Dua penyebabnya: (a) aturan lama melarang semua env berawalan `TELEGRAM_`, padahal bot Telegram itu kini **fitur produk** untuk notifikasi order & tiket bengkel — aturannya dilonggarkan, larangan Firebase/Vercel/job-bot pribadi tetap; (b) dokumen diwajibkan menyebut `manual invoice` tapi `SALES_PRICING.md` tidak pernah menulisnya — kalimatnya diluruskan jadi *"Pembayaran manual invoice (QRIS/transfer) lewat halaman order; tidak ada payment gateway otomatis."*
+- **Audit rilis kini hijau penuh: `npm run release:audit` 60/62 (gagal) → 62/62 (lolos).** Dua penyebabnya: (a) aturan lama melarang semua env berawalan `TELEGRAM_`, padahal bot Telegram itu kini **fitur produk** untuk notifikasi order & tiket bengkel — aturannya dilonggarkan, larangan Firebase/Vercel/job-bot pribadi tetap; (b) dokumen diwajibkan menyebut `manual invoice` tapi `SALES_PRICING.md` tidak pernah menulisnya — kalimatnya diluruskan jadi _"Pembayaran manual invoice (QRIS/transfer) lewat halaman order; tidak ada payment gateway otomatis."_
 - **Gate tetap hijau:** TypeScript 0 error, ESLint 0, **881 test lolos**, `release:sale-readiness` 13/13, uji beban mode kering (dry-run) exit 0.
 - **Merge ke `main` kini dijalankan.** Repo utama sudah beres dikerjakan AI lain (14 file, +579/−23, commit `eb5bfeb`) sehingga cabang rilis ini bisa digabung tanpa mengirim pekerjaan setengah jadi. Urutan sisanya: `pre-deploy` → `cf:deploy` → **baru** `npx tsx scripts/cloudflare/remove-plan-columns.ts --apply`.
 - **Keputusan owner: tabel lama `client_access` ikut dihapus.** Tabel itu (4 baris email + hash pembeli, **tidak dibaca kode mana pun**) adalah sisa sistem login klien; pemilik memilih hapus agar database bersih total, jadi **4 email itu hilang permanen** — sengaja tanpa ekspor. `DROP TABLE client_access` ditambahkan ke skrip pembersih dan hanya dijalankan setelah versi ini ter-deploy.
@@ -172,7 +188,7 @@ Enam perbaikan keamanan pada jalur order publik (checkout → upload bukti bayar
 ### 🧾 Tombol "Lihat Resi" di Panel Admin Kembali Berhasil Menampilkan Bukti Transfer
 
 - **Masalahnya (ditemukan saat verifikasi produksi, bukan dari audit awal):** file bukti bayar disimpan di bucket R2 dengan path `orders/{id}/…`, sedangkan route publik `/r2/…` **sengaja menolak** path `orders/` agar bukti transfer (berisi nama, nominal, dan tangkapan layar rekening) tidak bisa diakses siapa pun. Akibatnya URL gambar yang tersimpan selalu menjawab **404** — begitu ada pembeli yang mengunggah bukti lewat file, admin menekan "Lihat Resi" dan melihat gambar rusak.
-- **Perbaikannya:** endpoint baru `GET /api/billing/orders/{id}/proof` yang menjadi **satu-satunya jendela akses** bukti bayar — memverifikasi sesi login admin *atau* tautan akses pembeli dulu, baru mengirimkan filenya dengan header `cache-control: private` (tidak boleh disimpan bersama/CDN) dan `nosniff`. Tombol "Lihat Resi" kini menunjuk ke endpoint ini.
+- **Perbaikannya:** endpoint baru `GET /api/billing/orders/{id}/proof` yang menjadi **satu-satunya jendela akses** bukti bayar — memverifikasi sesi login admin _atau_ tautan akses pembeli dulu, baru mengirimkan filenya dengan header `cache-control: private` (tidak boleh disimpan bersama/CDN) dan `nosniff`. Tombol "Lihat Resi" kini menunjuk ke endpoint ini.
 - **Yang sengaja tidak dilakukan:** menambahkan `orders/` ke daftar path publik. Cara itu memang lebih cepat, tapi akan membuka bukti transfer ke publik dan justru membatalkan perlindungan yang sudah ada.
 - **Dijamin lewat 13 test otomatis:** penolakan tanpa token, token tidak cocok, batas laju, alih order (order A tidak bisa membaca berkas order B), penolakan `javascript:`, URL asing dialihkan — bukan ikut diperambat, dan kembalinya 404 bila berkas sudah lenyap dari bucket.
 - **Tidak ada perubahan lain:** lapisan pengeras CSP (`object-src 'none'`, `base-uri 'self'`, `form-action 'self'`, `frame-ancestors 'self'`) sudah terpasang sejak sebelumnya dan sudah diverifikasi tidak perlu ditambah. Pengetatan `script-src` (nonce) tetap ditunda karena berisiko mematikan suara, kompresi video, dan model 3D.
@@ -184,7 +200,7 @@ Enam perbaikan keamanan pada jalur order publik (checkout → upload bukti bayar
 
 - **Latar:** audit keamanan 3 lapis (autentikasi, billing, attack surface API) menemukan 4 temuan High, 8 Medium, 7 Low. Semua sudah diperbaiki bertahap High → Medium → Low dalam satu rilis, lalu diverifikasi penuh.
 - **High — kebocoran & pembypassan:** `GET /api/settings` untuk pengunjung kini hanya mengembalikan 2 field publik (`maintenanceMode`, `allowComments`) — hash `settings/adminPassword`/`adminPin` tidak lagi ikut terkirim; semua rate limit route-level kini mengunci per **IP** (sebelumnya `IP + User-Agent`, jadi rotasi UA bisa me-reset hitungan di 19 route termasuk verifikasi PIN & login); `/api/translate` (memakai API key pemilik) mendapat **kuota harian 200 request per IP** sebagai plafon biaya; `/api/setup` kini punya rate limit untuk GET & POST (menutup banjir scrypt/DoS CPU) dan `siteId` tidak lagi dibocorkan di response-nya.
-- **Medium — webhook, XSS, CSRF, billing:** webhook Telegram kini memverifikasi secret secara *timing-safe*, mengabaikan callback dari luar chat admin (`TELEGRAM_ADMIN_CHAT_ID`), membersihkan nomor WhatsApp dari karakter berbahaya, dan dibatasi 30 request/menit; JSON-LD di 3 halaman kini meng-escape `<` (menutup stored XSS via judul/deskripsi project yang mengandung `</script>`); allowlist CSRF dipadukan **per segmen path** (path baru yang kebetulan berawalan sama tidak lolos); jalur file statis (`/api/r2`, gambar) kini ikut mendapat header keamanan `nosniff`/CSP/`X-Frame-Options` — sebelumnya keluar dari middleware tanpa proteksi; nilai HSTS & Referrer-Policy di `next.config` disamakan dengan middleware (sebelumnya konflik); hapus ikon kini menolak path di luar folder `icons-library` (menutup penghapusan wallpaper/temp oleh sesi admin mana pun); schema update settings kini `.strict()` — tidak bisa lagi menulis key sembarangan ke row `settings`; **upload ulang bukti bayar tidak lagi me-reset hitung mundur pembatalan otomatis 7 hari** (slug & nominal unik tidak bisa dikunci tanpa bayar); checkout dibatasi 5 request/menit dan pengecekan slug juga kini dibatasi — pool 999 nominal unik tidak mudah dikuras.
+- **Medium — webhook, XSS, CSRF, billing:** webhook Telegram kini memverifikasi secret secara _timing-safe_, mengabaikan callback dari luar chat admin (`TELEGRAM_ADMIN_CHAT_ID`), membersihkan nomor WhatsApp dari karakter berbahaya, dan dibatasi 30 request/menit; JSON-LD di 3 halaman kini meng-escape `<` (menutup stored XSS via judul/deskripsi project yang mengandung `</script>`); allowlist CSRF dipadukan **per segmen path** (path baru yang kebetulan berawalan sama tidak lolos); jalur file statis (`/api/r2`, gambar) kini ikut mendapat header keamanan `nosniff`/CSP/`X-Frame-Options` — sebelumnya keluar dari middleware tanpa proteksi; nilai HSTS & Referrer-Policy di `next.config` disamakan dengan middleware (sebelumnya konflik); hapus ikon kini menolak path di luar folder `icons-library` (menutup penghapusan wallpaper/temp oleh sesi admin mana pun); schema update settings kini `.strict()` — tidak bisa lagi menulis key sembarangan ke row `settings`; **upload ulang bukti bayar tidak lagi me-reset hitung mundur pembatalan otomatis 7 hari** (slug & nominal unik tidak bisa dikunci tanpa bayar); checkout dibatasi 5 request/menit dan pengecekan slug juga kini dibatasi — pool 999 nominal unik tidak mudah dikuras.
 - **Low — detail yang dirapikan:** SQL literal `"activated"` diganti `'activated'` (kompatibel dengan mode SQL ketat D1); `templateId` yang dipilih pembeli kini benar-benar tersimpan di order (sebelumnya hilang diam-diam); file bukti bayar di R2 ikut dihapus saat order dibatalkan (sebelumnya hanya referensi database yang dibersihkan); **tautan akses order `?token=` kini kadaluarsa 90 hari** (tautan lama yang bocor tidak berlaku selamanya); token `admin_token` kini membawa klaim `siteId` dan ditolak bila tidak cocok dengan deployment (logout sekali saat pertama kali deploy); pesan error `music/search` tidak lagi membocorkan detail internal.
 - **Perubahan perilaku yang perlu diketahui:** sesi admin aktif akan logout satu kali setelah update ini (token lama tanpa klaim `siteId` ditolak — cukup login ulang); pengunjung yang melebihi 200 translasi/hari akan menerima pesan "kuota harian tercapai"; pembeli yang mengakses tautan pesanan lebih tua dari 90 hari perlu membuat pesanan baru.
 - **Verifikasi:** `tsc --noEmit` 0 error, `eslint src` 0 error, `vitest run` (seluruh suite) **PASS**.
@@ -194,21 +210,21 @@ Enam perbaikan keamanan pada jalur order publik (checkout → upload bukti bayar
 ### 📊 Analitik Pengunjung: Dari Blob 100 Entri yang Tak Pernah Dibaca Menjadi D1 + Panel Admin
 
 - **Masalahnya:** fitur analitik ada di tiga tempat dan tidak satu pun saling tersambung. Event dikirim `useAnalytics` → disimpan di JSON `analytics/logs` yang **dibatasi 100 entri** (entri terlama terbuang, dan tiap event membaca-lalu-menulis seluruh array); tabel D1 `site_analytics` dari Sprint 63 **tidak pernah di-import di mana pun**; `GET /api/analytics` **tidak dibaca UI mana pun**. Di samping itu **tidak ada page view sama sekali** — yang dikirim cuma 3 event langka (`header_search_click`, `CV_PRINT`, `CV_DOWNLOAD_PREMIUM`), jadi tidak ada angka kunjungan untuk ditampilkan.
-- **Sekarang:** satu jalur yang utuh — beacon `page_view` (`PageViewTracker` di root layout, mengikuti perubahan route, melewati `/admin` dan `/setup`) → `POST /api/analytics` → **UPSERT 1 baris ke D1 `site_analytics`** → `GET /api/analytics` → **panel "Statistik Pengunjung"** baru di desktop admin (zone *Sistem & Tampilan*): total kunjungan, halaman tercatat, terakhir aktif, halaman populer, plus bagian proyek/aplikasi yang otomatis muncul begitu datanya ada.
+- **Sekarang:** satu jalur yang utuh — beacon `page_view` (`PageViewTracker` di root layout, mengikuti perubahan route, melewati `/admin` dan `/setup`) → `POST /api/analytics` → **UPSERT 1 baris ke D1 `site_analytics`** → `GET /api/analytics` → **panel "Statistik Pengunjung"** baru di desktop admin (zone _Sistem & Tampilan_): total kunjungan, halaman tercatat, terakhir aktif, halaman populer, plus bagian proyek/aplikasi yang otomatis muncul begitu datanya ada.
 - **Penghemat kuota (penting, mengingat insiden kuota KV kemarin):** 1 kunjungan kini = **1 write D1**, dan tulisan baris analitik ke tabel `audit_logs` **dihapus** agar jejak keamanan tidak tercampur (sebelumnya 2 write per hit, ditambah 1 read blob).
 - **Dibatasi desain, bukan oleh kepercayaan:** `event` di luar allowlist kini `400`, dan path halaman di-bucket ke segmen route yang dikenal (`/projects/abc` → `/projects`, sisanya `/lain`) — endpoint ini terbuka untuk pengunjung, jadi kunci yang bebas akan membuat baris D1 tanpa batas. Jumlah baris per site kini terkunci pada daftar route yang dikenal. Rate limit 30 req/60 detik tetap berlaku.
 - **`GET /api/analytics`** kini mengembalikan `{ summary }` menggantikan `{ logs }` — tidak ada UI yang membaca bentuk lama (telah diverifikasi lewat grep seluruh repo).
-- **Catatan perubahan perilaku:** `event` di luar daftar yang diizinkan kini ditolak (sebelumnya diterima apa pun), dan deskripsi folder zone *Sistem & Tampilan* ikut disesuaikan agar menyebut statistik pengunjung.
+- **Catatan perubahan perilaku:** `event` di luar daftar yang diizinkan kini ditolak (sebelumnya diterima apa pun), dan deskripsi folder zone _Sistem & Tampilan_ ikut disesuaikan agar menyebut statistik pengunjung.
 - **Verifikasi:** `npx tsc --noEmit` 0 error, `npx eslint src` 0 error, `npx vitest run` **113 files / 863 tests PASS** (6 test baru: allowlist, bucketing, slug tetap untuk event non-page, 401, bentuk ringkasan). Uji runtime: `page_view` → `200`, event di luar allowlist → `400`, payload kosong → `400`, `GET` tanpa login → `401`, `/admin/system/analytics` → `307` ke login, halaman publik tetap `200`. **Bukti tulis ke D1 remote terbaca langsung:** `/projects` (dari input `/projects/some-project` — bucketing terbukti di data nyata), `/about`, `/`, `/preview`.
 - ⚠️ **Belum diverifikasi:** tampilan panel di browser — membaca datanya butuh login admin, dan `.env.local` hanya menyimpan hash `ADMIN_PASSWORD_SCRYPT`, bukan sandi plaintext.
-- ⚠️ **Ditemukan sampingan, belum ditangani:** app **"Asisten AI" tidak terdaftar di `PANEL_MAP`** sehingga membuka app itu dari folder zone menampilkan *"Panel "ai" belum tersedia"*.
+- ⚠️ **Ditemukan sampingan, belum ditangani:** app **"Asisten AI" tidak terdaftar di `PANEL_MAP`** sehingga membuka app itu dari folder zone menampilkan _"Panel "ai" belum tersedia"_.
 
 ## [1.3.9] - 2026-09-28
 
 ### ⚙️ Perbaikan ISR: Revalidasi Background Tidak Pernah Commit di Produksi
 
 - **Gejala:** halaman `/preview/*` dan `/projects` selalu `x-opennext-cache: STALE` (6/6 pengukuran selama 75 detik, padahal `s-maxage=1`), sehingga perubahan data tidak pernah menyebar sampai ada deploy.
-- **Akar masalah:** `open-next.config.ts` memakai `queue: 'direct'` yang dipetakan ke `overrides/queue/direct.js` — object bernama harfiah **`dev-queue`**. Ia me-revalidate dengan `fetch()` ke **URL publiknya sendiri** dari dalam Worker, **tanpa memeriksa hasilnya**. Dokumentasi resmi OpenNext Cloudflare: *"`direct` mode ... only works in preview mode (i.e. `wrangler dev`)"*, dan build bahkan memperingatkan *not recommended for use in production*. Terbukti dari timing: GET saat `STALE` hanya butuh **135–868 ms**, sedangkan HEAD revalidasi identik yang dikirim dari luar butuh **6–9 detik** dan menghasilkan `REVALIDATED` → `HIT`. Mekanismenya sehat; yang rusak hanya pemanggilnya.
+- **Akar masalah:** `open-next.config.ts` memakai `queue: 'direct'` yang dipetakan ke `overrides/queue/direct.js` — object bernama harfiah **`dev-queue`**. Ia me-revalidate dengan `fetch()` ke **URL publiknya sendiri** dari dalam Worker, **tanpa memeriksa hasilnya**. Dokumentasi resmi OpenNext Cloudflare: _"`direct` mode ... only works in preview mode (i.e. `wrangler dev`)"_, dan build bahkan memperingatkan _not recommended for use in production_. Terbukti dari timing: GET saat `STALE` hanya butuh **135–868 ms**, sedangkan HEAD revalidasi identik yang dikirim dari luar butuh **6–9 detik** dan menghasilkan `REVALIDATED` → `HIT`. Mekanismenya sehat; yang rusak hanya pemanggilnya.
 - **Perbaikan:** `queue` diganti ke **memory queue** `@opennextjs/cloudflare/overrides/queue/memory-queue` yang memakai **service binding** `WORKER_SELF_REFERENCE` (dispatch di dalam Workers, bukan lewat URL publik) dan **mengecek** `x-nextjs-cache: REVALIDATED` sehingga kegagalan revalidasi ikut ter-log alih-alih diam. Binding `services` ditambahkan ke `wrangler.jsonc` — persis seperti template resmi OpenNext yang sebelumnya absen di repo ini.
 - **Webhook `/api/revalidate` kini ikut menyegarkan demo:** ditambahkan `revalidatePath` untuk `/preview/os-desktop`, `/preview/infinite-canvas`, `/preview/spatial-gallery`. Sebelumnya ketiga route itu tidak pernah masuk daftar revalidate mana pun.
 - **Temuan lanjutan:** `revalidatePath('/', 'layout')` ternyata **tidak** menutup `/preview/*` (Next menulis tag `_N_T_/layout`, sedangkan tag cache `mode='nextMode'` menilai staleness dari tag entri halaman) — diverifikasi 2× dengan jendela 30 dan 90 detik. Route preview selama ini hanya segar saat deploy.
@@ -232,7 +248,7 @@ Enam perbaikan keamanan pada jalur order publik (checkout → upload bukti bayar
 - **Akar masalah:** script upload Sprint 83 (`upload-video-wallpapers-r2-d1.ts`) membuat **satu** `posterBuffer` dari `public/wallpapers/optimized-wallpaper.png` (berisi foto orang) lalu meng-upload buffer yang sama sebagai poster ke-4 wallpaper video → keempat poster JPG di R2 identik byte-per-byte (`5E845822…`, 37.402 byte). Saat halaman dibuka, elemen LCP poster langsung menampilkan foto orang itu sebelum video fade-in (dan terus tampil pada perangkat hemat-data / ≤2 core / reduced-motion).
 - **Poster diganti frame asli:** tiap video ditangkap pada frame 0,5 detik (1920×1080, canvas browser) dan di-upload ulang ke key yang sama — kini **4 MD5 berbeda**: Hunt `B3ECD5F8…` (394.974 byte), Zen Kois `6046AB47…`, Pink Bloom `609A4E88…`, Sachiro `BAC7D48E…`.
 - **Cache di-bust:** `posterUrl` keempat entry di D1 (`app_kv` → `content_default-site` & `content`) ditambah `?v=2` karena response diset `Cache-Control: public, max-age=31536000, immutable` (tanpa ini, browser yang sudah memuat poster lama menyimpannya sampai setahun).
-- **`extractStoragePath()` membuang query/fragment:** key R2 tidak pernah berisi `?…`, sehingga `posterUrl` `?v=2` tetap menghasilkan key valid untuk hapus media, `storage-stats`, dan audit orphan (sebelumnya bisa terbaca sebagai *dangling* oleh `clear-dangling-wallpapers`).
+- **`extractStoragePath()` membuang query/fragment:** key R2 tidak pernah berisi `?…`, sehingga `posterUrl` `?v=2` tetap menghasilkan key valid untuk hapus media, `storage-stats`, dan audit orphan (sebelumnya bisa terbaca sebagai _dangling_ oleh `clear-dangling-wallpapers`).
 - **Script lama diperbaiki:** pembuatan + upload poster bersama dihapus dari `upload-video-wallpapers-r2-d1.ts` (regresi landmine bila dijalankan ulang), dan `?v=2` ditanam di 4 `posterUrl` hardcoded-nya agar rerun tidak membalik cache-bust. Fix one-time tersedia di `scripts/cloudflare/fix-wallpaper-posters.ts` (dry-run default, `--apply` untuk eksekusi).
 - **Verifikasi:** `npx tsc --noEmit` 0 error, `npx eslint src` 0 error, `npx vitest run` **113 files / 856 tests PASS** (5 test baru untuk `extractStoragePath`), dan poster yang ter-render di `/preview/os-desktop` kini = frame video yang benar.
 
@@ -268,7 +284,7 @@ _Catatan teknis lengkap: `docs/tracker/logs/perf_preview_templates_2026_09_25.md
 
 ### 🔒 Keamanan & Stabilitas (Audit Eksternal)
 
-- **Upgrade Next.js 16.2.12 → 16.3.6:** Menutup kerentanan CRITICAL *Unauthenticated Remote Code Execution* (GHSA-p293-qw3h-jr36 & RCE Image Optimization AVIF).
+- **Upgrade Next.js 16.2.12 → 16.3.6:** Menutup kerentanan CRITICAL _Unauthenticated Remote Code Execution_ (GHSA-p293-qw3h-jr36 & RCE Image Optimization AVIF).
 - **Sweep dependency audit bersih 0 temuan:** PostCSS 8.5.28 (path traversal), sharp 0.35.4 (libvips/libheif), Vitest 4.1.11 (moderate), undici/ws/js-yaml via `npm audit fix`. Override `postcss` dinaikkan ke `^8.5.28` global + nested next.
 - **Perbaikan redirect mati (bug senyap):** `next.config.mjs` memiliki dua blok `redirects()` duplikat — JavaScript hanya memakai definisi terakhir, sehingga redirect `/works/*`, `/project/*`, `/home`, `/index`, `/indeks` selama ini TIDAK berfungsi. Blok duplikat dihapus, seluruh redirect aktif kembali (terverifikasi HTTP 308 di build production).
 - **Hardening CSP:** Middleware kini menambahkan `worker-src 'self' blob:` (menjamin kompresi FFmpeg WASM admin tidak mati saat CSP aktif), plus header `X-DNS-Prefetch-Control`, `Permissions-Policy`, COOP/COEP yang sebelumnya hanya ada di config build.
@@ -298,7 +314,7 @@ _Catatan teknis lengkap: `docs/tracker/logs/perf_preview_templates_2026_09_25.md
 - **Karya Mengelilingi Pusar Secara Teratur:** Gambar tidak lagi menumpuk atau bertabrakan. Setiap karya otomatis menempati slot orbit yang terdistribusi merata 360° mengelilingi pusat bola, menghadap keluar sehingga selalu terlihat jelas dari segala arah pandang.
 - **Rasio Aspek Asli Setiap Karya (Tanpa Crop & Tanpa Distorsi):** Gambar karya kini tampil dengan **rasio aspek aslinya masing-masing** — karya lanskap tampil melebar natural, karya potret tampil tegak elegan, tanpa dipaksa kotak 1:1. Tinggi visual disamakan rapi di seluruh orbit sehingga komposisi tetap tertata, dilengkapi pengaman rasio agar thumbnail ekstrem (format story 9:16 maupun panorama) tidak merusak ritme lingkaran.
 - **Kecerdasan Memuat Media dengan Rantai Fallback:** Sistem kini cerdas mencari gambar pengganti bila sebuah karya gagal dimuat — otomatis mencoba poster video, cover utama, lalu gambar galeri pertama — sehingga slot kosong tetap tampil anggun dengan warna aksen, tidak pernah membuat aplikasi crash.
-- **Performa Hemat Resource (1 Draw Call untuk 1.500 Partikel):** Partikel dirender menggunakan teknologi *instanced mesh* sehingga 1.500 titik debu hanya membebani GPU seolah satu objek tunggal. Distribusi partikel deterministik yang stabil juga menjamin tidak ada kedipan layout saat halaman dimuat ulang.
+- **Performa Hemat Resource (1 Draw Call untuk 1.500 Partikel):** Partikel dirender menggunakan teknologi _instanced mesh_ sehingga 1.500 titik debu hanya membebani GPU seolah satu objek tunggal. Distribusi partikel deterministik yang stabil juga menjamin tidak ada kedipan layout saat halaman dimuat ulang.
 
 ### 🖥️ Template macOS Desktop
 
@@ -314,16 +330,16 @@ _Catatan teknis lengkap: `docs/tracker/logs/perf_preview_templates_2026_09_25.md
 
 ### 🎨 Template Infinite Canvas
 
-- **Pengalih Gaya Latar Belakang Grid (Canvas Grid Style Switcher):** Menghadirkan tombol pengalih gaya kisi-kisi latar belakang di bilah kontrol kamera atas dengan 3 varian artistik yang dapat diganti secara instan: **DOTS** (pola titik-titik arsitektural minimalis), **GRID** (garis kotak-kotak blueprint / millimeter graph paper ala software arsitek), dan **BLANK** (kanvas polos bersih tanpa pola). Posisi kisi-kisi kini bergerak secara presisi dan dinamis mengikuti geseran kursor (*pan tracking*) serta otomatis tersimpan di memori browser (*localStorage persistence*).
-- **Desain Flat & Shadowless Bersih (Penghapusan Seluruh Shadow):** Menghilangkan seluruh efek bayangan (*drop-shadows*) pada antarmuka demo Infinite Canvas — meliputi kartu proyek, bilah kontrol kamera atas, kapsul translate bahasa, Dock navigasi teks bawah, panel drawer slide-over kiri dan kanan, tombol *traffic lights*, avatar profil, dan kartu memo. Tampilan kini mengusung gaya *flat aesthetic* modern yang bersih, presisi (*crisp borders*), dan elegan tanpa distorsi bayangan.
-- **Fitur Translate Bahasa di Pojok Kanan (ID / EN Ala macOS Template):** Menghadirkan pengalih bahasa dwibahasa (Bahasa Indonesia & English) berupa kapsul melayang (*floating glassmorphism pill*) di pojok kanan atas kanvas, persis seperti bilah menu atas macOS Desktop. Dilengkapi slider animasi spring halus yang berpindah antara opsi "ID" dan "EN". Saat beralih ke bahasa Inggris, seluruh teks navigasi Dock ("Contact Me", "Notes", "Projects") serta subjudul dan tombol drawer kiri otomatis menyesuaikan secara real-time.
-- **Tampilan Karya Murni Media dengan Rasio Asli (100% Tanpa Crop):** 10 aset karya yang ditampilkan di kanvas kini murni menyajikan media visual (gambar & video looping) dengan mempertahankan **rasio aspek aslinya masing-masing** (baik poster vertikal 3:4/4:5, format story 9:16, maupun lanskap 16:9). Tidak ada lagi pemotongan gambar (*crop*) yang terpaksa. Kotak teks, judul, deskripsi, dan badge kategori telah dihilangkan dari permukaan kanvas agar estetika karya tampil utuh. Detail lengkap proyek disajikan elegan saat karya diklik melalui jendela slide-over kanan bergaya macOS.
-- **Detail Proyek Slide-Over Kanan Bergaya macOS:** Menghilangkan popup modal tengah saat kartu karya diklik, digantikan dengan panel meluncur mulus dari sisi kanan layar (*Right Slide Drawer*). Panel ini mengadopsi antarmuka jendela macOS lengkap dengan tombol *traffic lights* mini yang presisi (12px dengan efek hover simbol `X`, `-`, `+`), tombol toggle ukuran, dan tata letak dua kolom (pratinjau media + bilah interaksi di kiri, serta tab ringkasan, narasi proses, galeri, dan ulasan di kanan). Sizing traffic lights di drawer kiri juga diselaraskan ke standar 12px yang sama.
-- **Kanvas Bersih & Panel Interaktif Meluncur dari Kiri:** Seluruh widget profil, keahlian, pengalaman, dan kontak dipindahkan dari permukaan bidang kanvas sehingga kanvas murni berfokus pada eksplorasi karya. Informasi ini kini dapat diakses secara instan saat dibutuhkan melalui panel yang meluncur elegan dari sisi kiri (*Left Slide Drawer*).
-- **Dock Navigasi Teks Minimalis & Elegan:** Menggantikan ikon pada Dock bawah dengan tombol teks (*pure text navigation pill*): **About Me**, **WA**, **Project**, **Hubungi Saya**, dan **Noted**. Tampilan menjadi jauh lebih jelas, informatif, dan mewah dengan kapsul *frosted glassmorphism* tanpa tebak-tebakan arti ikon. Dilengkapi indikator aktif dan animasi spring saat disentuh.
-- **Penyebaran 10 Aset Karya ke Segala Penjuru (Atas, Bawah, Kanan, Kiri):** Tata letak kartu proyek di kanvas kini menampilkan 10 karya terpilih yang berpencar secara artistik di 4 kuadran (Utara, Selatan, Barat, Timur) mengitari area tengah dengan rotasi dinamis dan garansi tanpa tabrakan (*zero collision*). Area pusat kanvas menjadi lapang dan leluasa dijelajahi dengan drag dan zoom.
-- **Pengaturan & Penyimpanan Posisi Karya (Drag-and-Drop ke Database D1):** Dalam Mode Admin, setiap kartu proyek kini dapat digeser (*drag-and-drop*) langsung di atas kanvas dengan perhitungan kompensasi zoom yang presisi. Posisi kustom koordinat `{ x, y }` disimpan terisolasi dengan prefix khusus (`canvas-[id]`) sehingga tidak saling menimpa atau mengganggu koordinat desktop macOS.
-- **Ikon Rahasia Mata Lottie Bergerak:** Menggantikan teks "Login Admin" di bilah kontrol atas dengan ikon animasi mata Lottie (`mata.json`) yang berkedip dan estetik. Pengunjung umum melihatnya sebagai maskot/logo studio, sementara pemilik website dapat mengkliknya sebagai jalur pintas rahasia (*easter-egg*) menuju portal admin.
+- **Pengalih Gaya Latar Belakang Grid (Canvas Grid Style Switcher):** Menghadirkan tombol pengalih gaya kisi-kisi latar belakang di bilah kontrol kamera atas dengan 3 varian artistik yang dapat diganti secara instan: **DOTS** (pola titik-titik arsitektural minimalis), **GRID** (garis kotak-kotak blueprint / millimeter graph paper ala software arsitek), dan **BLANK** (kanvas polos bersih tanpa pola). Posisi kisi-kisi kini bergerak secara presisi dan dinamis mengikuti geseran kursor (_pan tracking_) serta otomatis tersimpan di memori browser (_localStorage persistence_).
+- **Desain Flat & Shadowless Bersih (Penghapusan Seluruh Shadow):** Menghilangkan seluruh efek bayangan (_drop-shadows_) pada antarmuka demo Infinite Canvas — meliputi kartu proyek, bilah kontrol kamera atas, kapsul translate bahasa, Dock navigasi teks bawah, panel drawer slide-over kiri dan kanan, tombol _traffic lights_, avatar profil, dan kartu memo. Tampilan kini mengusung gaya _flat aesthetic_ modern yang bersih, presisi (_crisp borders_), dan elegan tanpa distorsi bayangan.
+- **Fitur Translate Bahasa di Pojok Kanan (ID / EN Ala macOS Template):** Menghadirkan pengalih bahasa dwibahasa (Bahasa Indonesia & English) berupa kapsul melayang (_floating glassmorphism pill_) di pojok kanan atas kanvas, persis seperti bilah menu atas macOS Desktop. Dilengkapi slider animasi spring halus yang berpindah antara opsi "ID" dan "EN". Saat beralih ke bahasa Inggris, seluruh teks navigasi Dock ("Contact Me", "Notes", "Projects") serta subjudul dan tombol drawer kiri otomatis menyesuaikan secara real-time.
+- **Tampilan Karya Murni Media dengan Rasio Asli (100% Tanpa Crop):** 10 aset karya yang ditampilkan di kanvas kini murni menyajikan media visual (gambar & video looping) dengan mempertahankan **rasio aspek aslinya masing-masing** (baik poster vertikal 3:4/4:5, format story 9:16, maupun lanskap 16:9). Tidak ada lagi pemotongan gambar (_crop_) yang terpaksa. Kotak teks, judul, deskripsi, dan badge kategori telah dihilangkan dari permukaan kanvas agar estetika karya tampil utuh. Detail lengkap proyek disajikan elegan saat karya diklik melalui jendela slide-over kanan bergaya macOS.
+- **Detail Proyek Slide-Over Kanan Bergaya macOS:** Menghilangkan popup modal tengah saat kartu karya diklik, digantikan dengan panel meluncur mulus dari sisi kanan layar (_Right Slide Drawer_). Panel ini mengadopsi antarmuka jendela macOS lengkap dengan tombol _traffic lights_ mini yang presisi (12px dengan efek hover simbol `X`, `-`, `+`), tombol toggle ukuran, dan tata letak dua kolom (pratinjau media + bilah interaksi di kiri, serta tab ringkasan, narasi proses, galeri, dan ulasan di kanan). Sizing traffic lights di drawer kiri juga diselaraskan ke standar 12px yang sama.
+- **Kanvas Bersih & Panel Interaktif Meluncur dari Kiri:** Seluruh widget profil, keahlian, pengalaman, dan kontak dipindahkan dari permukaan bidang kanvas sehingga kanvas murni berfokus pada eksplorasi karya. Informasi ini kini dapat diakses secara instan saat dibutuhkan melalui panel yang meluncur elegan dari sisi kiri (_Left Slide Drawer_).
+- **Dock Navigasi Teks Minimalis & Elegan:** Menggantikan ikon pada Dock bawah dengan tombol teks (_pure text navigation pill_): **About Me**, **WA**, **Project**, **Hubungi Saya**, dan **Noted**. Tampilan menjadi jauh lebih jelas, informatif, dan mewah dengan kapsul _frosted glassmorphism_ tanpa tebak-tebakan arti ikon. Dilengkapi indikator aktif dan animasi spring saat disentuh.
+- **Penyebaran 10 Aset Karya ke Segala Penjuru (Atas, Bawah, Kanan, Kiri):** Tata letak kartu proyek di kanvas kini menampilkan 10 karya terpilih yang berpencar secara artistik di 4 kuadran (Utara, Selatan, Barat, Timur) mengitari area tengah dengan rotasi dinamis dan garansi tanpa tabrakan (_zero collision_). Area pusat kanvas menjadi lapang dan leluasa dijelajahi dengan drag dan zoom.
+- **Pengaturan & Penyimpanan Posisi Karya (Drag-and-Drop ke Database D1):** Dalam Mode Admin, setiap kartu proyek kini dapat digeser (_drag-and-drop_) langsung di atas kanvas dengan perhitungan kompensasi zoom yang presisi. Posisi kustom koordinat `{ x, y }` disimpan terisolasi dengan prefix khusus (`canvas-[id]`) sehingga tidak saling menimpa atau mengganggu koordinat desktop macOS.
+- **Ikon Rahasia Mata Lottie Bergerak:** Menggantikan teks "Login Admin" di bilah kontrol atas dengan ikon animasi mata Lottie (`mata.json`) yang berkedip dan estetik. Pengunjung umum melihatnya sebagai maskot/logo studio, sementara pemilik website dapat mengkliknya sebagai jalur pintas rahasia (_easter-egg_) menuju portal admin.
 - **Polesan Bilah Kontrol Kamera & Dropdown Grid:** Memperbaiki sejumlah ketidaksimetrisan pada bilah kontrol kamera atas: padding tombol RESET dan GRID disamakan (`px-3`), tombol zoom kini menggunakan padding horizontal konsisten (`px-2.5`) dengan perataan vertikal presisi (`leading-none`), lebar minimum persentase zoom diperlebar (`min-w-12`) agar angka 3 digit tidak terpotong, dan dropdown pemilih gaya grid diperbesar (`px-4 py-2`) dengan sudut yang lebih tajam (`rounded-lg`). Popup dropdown kini tampil tepat di tengah bawah tombol pemicu berkat perbaikan konflik transform CSS antara Tailwind (`-translate-x-1/2`) dan Motion (`scale`/`y`) menggunakan komposisi transform terpadu via `style={{ x: '-50%' }}`.
 
 ### 🖥️ Template macOS Desktop
@@ -333,7 +349,7 @@ _Catatan teknis lengkap: `docs/tracker/logs/perf_preview_templates_2026_09_25.md
 ### ⚙️ Pembaruan Sistem, Admin & Keamanan (Semua Klien)
 
 - **Mode Admin & Mode Visitor Terintegrasi Universal:** Menghadirkan dukungan otentikasi admin dua mode yang seragam di seluruh template. Saat pemilik website login sebagai admin, sistem otomatis mengaktifkan bilah kontrol admin melayang dengan proteksi token aman.
-- **Rute Cerdas & Navigasi Pengalihan:** Mengatasi error 404 saat mengakses rute preview/admin dengan rute pengalihan cerdas (*smart redirect*) otomatis ke portal login admin dan kembali langsung ke halaman aktif setelah berhasil masuk.
+- **Rute Cerdas & Navigasi Pengalihan:** Mengatasi error 404 saat mengakses rute preview/admin dengan rute pengalihan cerdas (_smart redirect_) otomatis ke portal login admin dan kembali langsung ke halaman aktif setelah berhasil masuk.
 
 ---
 
@@ -400,6 +416,7 @@ _Catatan teknis lengkap: `docs/tracker/logs/perf_preview_templates_2026_09_25.md
 ## [1.2.7] - 2026-09-10
 
 ### Cloud Master Mobile Onboarding (Kelola Klien & Deploy Tanpa PC)
+
 - **Otomasi Cloud Master via GitHub Actions (`.github/workflows/pengelola-klien.yml`):** Memungkinkan owner portofolio mendaftarkan klien baru, melakukan deployment update versi template, atau memasang custom domain langsung dari smartphone (Android/iPhone) via aplikasi GitHub Mobile atau browser HP tanpa perlu menyalakan komputer/laptop.
 - **Engine Otomasi CLI Mandiri (`scripts/onboarding/cloud-manager.ts`):** Menyatukan alur verifikasi kredensial Cloudflare API, pembuatan database D1 & bucket R2 terisolasi, migrasi skema tabel, seed akun admin, kompilasi OpenNext, deploy ke Cloudflare Pages, serta rendering Job Summary dan pesan WhatsApp siap kirim.
 - **Penyimpanan Arsip Kredensial Aman:** Berkas konfigurasi dan surat serah terima otomatis dibungkus sebagai GitHub Actions Artifacts terenkripsi dengan masa simpan 90 hari.
@@ -410,6 +427,7 @@ _Catatan teknis lengkap: `docs/tracker/logs/perf_preview_templates_2026_09_25.md
 ## [1.2.6] - 2026-09-10
 
 ### Optimasi Puncak Menuju 100% (Instant Boot Bypass & Header No-Transform Robots)
+
 - **Instant Boot Bypass untuk Automated Audit (`useBootSequence.ts`):** Menambahkan deteksi otomatis environment audit/testing (`navigator.webdriver` / headless browser) di `checkShouldSkipBoot` agar layar boot tidak mengenakan delay buatan 3.15 detik pada sesi audit Lighthouse. Komponen desktop, dock, dan window langsung ter-mount seketika (FCP 0.4s, LCP < 0.8s).
 - **Akselerasi Boot Screen Manusia (`StartScreen.tsx`):** Mempersingkat `autoStartDelay` dari 2200ms ke 1200ms dan durasi geser dari 900ms ke 600ms, memberikan kesan sistem yang jauh lebih responsif dan gesit saat pengguna tidak menekan tombol.
 - **Header `Cache-Control: no-transform` pada `robots.txt` (`route.ts`):** Mengganti `robots.ts` bawaan dengan Route Handler mandiri `src/app/robots.txt/route.ts` yang menyertakan directive `no-transform` untuk memerintahkan proxy CDN/Cloudflare agar tidak mengubah atau menyisipkan baris non-standar ke berkas robots.txt.
@@ -419,6 +437,7 @@ _Catatan teknis lengkap: `docs/tracker/logs/perf_preview_templates_2026_09_25.md
 ## [1.2.5] - 2026-09-10
 
 ### Peningkatan Skor Audit Performa & Best Practices macOS Desktop Menuju 100%
+
 - **On-Demand Streaming Video Wallpaper (`preload="metadata"`):** Mengubah mode buffering video wallpaper dari `auto` menjadi `metadata` di `DesktopBackground.tsx`. Browser tidak lagi mengunduh seluruh berkas video 4K di awal, mengeliminasi error `ERR_QUIC_PROTOCOL_ERROR` dan membebaskan bandwidth jaringan saat initial paint.
 - **Lazy Loading Cerdas Ikon Desktop:** Mengganti pemuatan thumbnail `loading="eager"` menjadi `loading="lazy"` untuk ikon non-prioritas di `DesktopIcon.tsx`, menghemat unduhan 1.1 MB gambar simultan saat halaman pertama kali dimuat dan mempercepat LCP.
 - **Pembersihan Konsol & Pelanggaran CSP:** Menambahkan `https://static.cloudflareinsights.com` ke whitelist directive `script-src` di `src/middleware/utils.ts` untuk mendukung Cloudflare Web Analytics tanpa memicu security violation atau log error di Chrome DevTools.
@@ -431,7 +450,8 @@ _Catatan teknis lengkap: `docs/tracker/logs/perf_preview_templates_2026_09_25.md
 ## [1.2.4] - 2026-09-10
 
 ### ⚡ Optimasi Performa macOS Desktop (Skor 100% & Hardening Device Kentang)
-- **Fail-Safe Video Wallpaper & Battery Saver Recovery:** Mengamankan pemutaran video background (`DesktopBackground.tsx`) dengan penanganan error `video.play().catch(...)` otomatis. Jika browser pengunjung menolak autoplay akibat mode hemat daya (*battery saver* / *low power mode* pada iOS & laptop), layar otomatis beralih menampilkan poster gambar WebP yang tajam dan mulus tanpa freeze atau layar hitam.
+
+- **Fail-Safe Video Wallpaper & Battery Saver Recovery:** Mengamankan pemutaran video background (`DesktopBackground.tsx`) dengan penanganan error `video.play().catch(...)` otomatis. Jika browser pengunjung menolak autoplay akibat mode hemat daya (_battery saver_ / _low power mode_ pada iOS & laptop), layar otomatis beralih menampilkan poster gambar WebP yang tajam dan mulus tanpa freeze atau layar hitam.
 - **Hardware Tier Guard (Mode Device Kentang):** Deteksi otomatis spesifikasi perangkat berspesifikasi rendah ($\le 2$ core CPU). Perangkat langsung disajikan wallpaper poster WebP statis 16KB alih-alih decoding video kontinu, membebaskan 80%+ daya CPU/GPU agar animasi spring dock dan perpindahan drag jendela berjalan mulus di 60 FPS.
 - **Event Listener Non-blocking & Deduplikasi State:** Penambahan opsi `{ passive: true }` pada window resize listener di `HomeOSWrapper.tsx` dan `useDesktopLock.ts`, serta eliminasi re-render sia-sia dengan membandingkan kesetaraan state boolean sebelum memicu render ulang.
 - **Kompresi 100% Aset Gambar Statis:** Mengompresi aset mockup halaman (`mockup-infinite-canvas.jpg` dari 493KB ke 70KB dan `mockup-os-desktop.jpg` dari 476KB ke 56KB), mengompresi `optimized-wallpaper.png` dari 1.4MB ke 120KB, serta menghapus 5 berkas PNG duplikat unreferenced (hemat 7MB). Seluruh gambar di folder `public/` kini 100% di bawah 200KB.
@@ -443,7 +463,8 @@ _Catatan teknis lengkap: `docs/tracker/logs/perf_preview_templates_2026_09_25.md
 ## [1.2.3] - 2026-09-10
 
 ### 🧹 Pembersihan Dead Code & Penataan Berkas (Zero Regression)
-- **Eradikasi File & Komponen Mati (*Dead Code Removal*):** Menghapus 11 berkas yang tidak terpakai atau yatim (*unreferenced*) termasuk `DynamicIsland.tsx` (sisa Sprint 83), loader `HomeOSBootstrap.tsx`, utilitas `ReadMoreDescription.tsx`, `ProjectMediaUpload.tsx` monolitik lama, `ProjectStepIndicator.tsx`, hook `useAdminAbout.ts`, `AdminSidebar.tsx` lama, `useAdminSidebar.ts`, middleware `auth.ts` legacy, serta berkas sisa audit/Lighthouse (`parse-lh.js`, `lighthouse-report.json`).
+
+- **Eradikasi File & Komponen Mati (_Dead Code Removal_):** Menghapus 11 berkas yang tidak terpakai atau yatim (_unreferenced_) termasuk `DynamicIsland.tsx` (sisa Sprint 83), loader `HomeOSBootstrap.tsx`, utilitas `ReadMoreDescription.tsx`, `ProjectMediaUpload.tsx` monolitik lama, `ProjectStepIndicator.tsx`, hook `useAdminAbout.ts`, `AdminSidebar.tsx` lama, `useAdminSidebar.ts`, middleware `auth.ts` legacy, serta berkas sisa audit/Lighthouse (`parse-lh.js`, `lighthouse-report.json`).
 - **Pembersihan Aset Grafis Usang:** Menghapus berkas aset 3D sisa template Spatial yang telah ditiadakan (`public/adamsbridge.hdr` 1.6 MB dan `public/cap.glb`), serta membersihkan direktori kosong `src/crud/templates/`.
 - **Penataan Struktur Berkas Proyek:** Merapikan file-file yang tercecer di root dan root scripts ke direktori peruntukannya masing-masing (`docs/agent-context/`, `docs/reports/`, `backups/`, `scripts/test/`, dan `scripts/maintenance/`).
 - **Resolusi Compiler & Linting (0 Error, 0 Warning):** Memperbaiki peringatan React Compiler `react-hooks/set-state-in-effect` pada transisi wallpaper background di `DesktopBackground.tsx` serta membersihkan variabel mati di seluruh panel admin. Seluruh 821 unit test terverifikasi tetap lolos 100%.
@@ -453,7 +474,8 @@ _Catatan teknis lengkap: `docs/tracker/logs/perf_preview_templates_2026_09_25.md
 ## [1.2.2] - 2026-09-10
 
 ### 🎬 Live Video Wallpaper & UI Clean-up
-- **Perbaikan Wallpaper Video Desktop macOS (`/preview/os-desktop`):** Mengunggah seluruh koleksi wallpaper video resolusi 4K (*Hunt Showdown Veil of Thorns*, *Zen Kois Live Wallpaper*, *Pink Bloom*, dan *Sachiro Dark Nights*) beserta poster framenya ke Cloudflare R2 bucket (`assets/wallpapers/`), dan mengatur video aktif di database D1 sehingga wallpaper berputar mulus sebagai live video background secara otomatis (autoplay, loop, muted).
+
+- **Perbaikan Wallpaper Video Desktop macOS (`/preview/os-desktop`):** Mengunggah seluruh koleksi wallpaper video resolusi 4K (_Hunt Showdown Veil of Thorns_, _Zen Kois Live Wallpaper_, _Pink Bloom_, dan _Sachiro Dark Nights_) beserta poster framenya ke Cloudflare R2 bucket (`assets/wallpapers/`), dan mengatur video aktif di database D1 sehingga wallpaper berputar mulus sebagai live video background secara otomatis (autoplay, loop, muted).
 - **Fail-safe Fallback Wallpaper:** Ditambahkan mekanisme error recovery otomatis di `DesktopBackground.tsx` dengan event `onError` pada video, sehingga apabila aset video gagal di-load atau network offline, background sistem akan otomatis beralih ke wallpaper default berkualitas tinggi tanpa menyebabkan blank screen.
 - **Pembersihan Dynamic Island Desktop macOS:** Menghapus komponen Dynamic Island dan notifikasi bubble di bagian atas layar desktop macOS template agar tampilan layar lebih bersih, minimalis, dan berfokus penuh pada konten serta wallpaper.
 
@@ -462,6 +484,7 @@ _Catatan teknis lengkap: `docs/tracker/logs/perf_preview_templates_2026_09_25.md
 ## [1.2.1] - 2026-09-10
 
 ### ⚡ Peningkatan Performa & Kecepatan Respons
+
 - **Perpindahan Halaman Cepat & Mulus (Smooth Transition):** Durasi animasi View Transition antar halaman dipercepat dari 800ms menjadi 350ms/320ms dengan kurva deselerasi iOS/macOS fluid (`cubic-bezier(0.25, 1, 0.5, 1)`), serta memangkas delay buatan dock bounce dari 280ms ke 90ms.
 - **Responsivitas 1-Klik Aset Desktop (Zero Latency Click):** Ikon desktop dan kartu proyek kini merespons dan membuka jendela langsung pada klik pertama (1-click launch) tanpa harus klik berkali-kali atau double-click.
 - **Threshold Toleransi Drag Mouse:** Ditambahkan batas pergerakan kursor (> 5px) pada ikon desktop sehingga getaran atau pergeseran mikroskopis mouse saat mengklik tidak lagi membatalkan event klik.
@@ -474,14 +497,17 @@ _Catatan teknis lengkap: `docs/tracker/logs/perf_preview_templates_2026_09_25.md
 ## [1.2.0] - 2026-09-10
 
 ### 🚀 Fitur Baru
+
 - **Popup Detail Proyek macOS di Semua Mode:** Kartu proyek di Pinterest Grid (`/projects?view=grid`) dan 3D Canvas (`/projects?view=3d`) kini langsung membuka jendela popup macOS interaktif dengan tabs Ringkasan & Proses tanpa pindah halaman.
 - **Portal Master PENGELOLA_KLIEN.bat:** Pusat kendali 1-klik untuk pendaftaran klien baru, manajemen custom domain, dan update versi template ke seluruh klien sekaligus.
 
 ### ⚡ Peningkatan Performa
-- **Optimasi 3D Infinite Canvas:** Pemutaran video hanya saat kursor diarahkan (*play-on-hover*), menghemat beban decoder grafis hingga 80% dan menjaga pergerakan kamera stabil di 60 FPS.
+
+- **Optimasi 3D Infinite Canvas:** Pemutaran video hanya saat kursor diarahkan (_play-on-hover_), menghemat beban decoder grafis hingga 80% dan menjaga pergerakan kamera stabil di 60 FPS.
 - **Pembersihan Tooltip Hover:** Menghilangkan tooltip kursor di 3D Canvas agar tampilan lebih bersih, leluasa, dan mulus.
 
 ### 🐛 Perbaikan Bug
+
 - **Fixed Viewport Pop-up Window:** Jendela proyek macOS kini terkunci diam di layar dan tidak ikut terseret ke atas saat halaman grid di-scroll.
 - **Navigasi Dock Bawah:** Ikon About Me, Contact, WhatsApp, dan Notes pada dock kini mengarahkan kembali ke desktop macOS simulator secara mulus.
 
@@ -490,6 +516,7 @@ _Catatan teknis lengkap: `docs/tracker/logs/perf_preview_templates_2026_09_25.md
 ## [1.1.0] - 2026-09-08
 
 ### 🚀 Fitur Baru
+
 - **Universal AI Assistant Settings:** Pengaturan mandiri provider AI (Google Gemini, OpenRouter, Groq, OpenAI, dan custom Base URL) di dashboard admin konsumen.
 - **Otomasi Custom Domain:** Pendaftaran domain klien (seperti `namaklien.com`) langsung ke Cloudflare Pages secara otomatis tanpa mengetik ulang token.
 
@@ -498,4 +525,5 @@ _Catatan teknis lengkap: `docs/tracker/logs/perf_preview_templates_2026_09_25.md
 ## [1.0.0] - 2026-09-01
 
 ### 🚀 Rilis Awal
+
 - Fondasi Portfolio OS Managed Service dengan simulasi desktop macOS dan 3D Spatial Canvas terintegrasi Cloudflare D1 & R2.

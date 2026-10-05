@@ -100,3 +100,13 @@ Guard `platform_settings.billing_expire_sweep_at` **tidak bergerak** (tetap `202
 2. **Test `wrangler dev --test-scheduled` lokal menggantung / runtime crash** (`The Workers runtime crashed unexpectedly`). Dugaan: keterbatangan arsitektur dev server wrangler untuk self-referencing service binding (dua instance miniflare; lihat issue `cloudflare/workers-sdk#5548`), bukan masalah produksi — await tidak bisa deadlock di runtime produksi.
 3. **`.env.local` sempat salah ditulis oleh skrip PowerShell** karena API .NET (`[IO.File]`) memakai CWD proses, bukan lokasi `Set-Location` → baris `CRON_SECRET` tercatat di worktree `cosmic-rocket`. Dibersihkan (file berisi hanya baris itu dihapus) dan ditulis ulang dengan path absolut ke repo utama.
 4. **Build `.open-next` gagal `EPERM`** karena sisa proses `wrangler dev` (node/cmd/workerd) masih memegang direktori → semua proses itu dimatikan, build ulang sukses.
+
+## Koreksi & Penyelesaian (update 2026-10-05)
+
+Diverifikasi ulang via `GET /accounts/{id}/workers/scripts/portfolio-os-template/schedules` (OAuth wrangler):
+
+1. **Klaim baris 95 ("Jadwal uji `* * * * *` sudah dilepas") keliru.** Yang dilepas hanya isi `wrangler.jsonc` lokal — **pendaftaran jadwal di server tidak pernah dikembalikan**: API menunjukkan `* * * * *` masih terpasang sejak `2026-10-03T19:04:59Z` (modified `2026-10-04T12:03:04Z`) sampai 2026-10-05T02:42Z. Artinya sejak deploy 3 Okt worker menembak tiap menit (geraknya guard tiap 10 menit konsisten dengan itu), dan "uji fire 40 menit = 0 invocation" (baris 92) **bertentangan dengan data API** — dugaan: artefak pengukuran `wrangler tail` (format keluaran bergantung TTY; tanpa `--format pretty` hasilnya JSON tanpa kata "scheduled").
+2. **Mekanisme TERBUKTI (2026-10-05, 09:38–09:41 WIB):** `npx wrangler triggers deploy` memasang `* * * * *` (`Deployed portfolio-os-template triggers` + `schedule: * * * * *`), lalu `wrangler tail --format pretty` selama 215 detik merekam **3 event `"* * * * *" @ … - Ok` + 3 log `[cron] POST /api/cron/daily -> 200`**; guard D1 bergeser 02:23:00Z → 02:33:00Z (selisih tepat 10 menit = interval guard).
+3. **Jadwal harian dikembalikan & terverifikasi:** output `schedule: 0 18 * * *` + GET schedules → `0 18 * * *` (created `2026-10-05T02:42:36Z`); `git diff -- wrangler.jsonc` kosong.
+
+Lanjutan (fitur backup + bukti fire harian): lihat log `backup_d1_cron_proof_2026_10_05.md`.

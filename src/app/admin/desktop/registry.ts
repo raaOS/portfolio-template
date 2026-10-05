@@ -18,6 +18,7 @@ import {
   Sparkles,
   BarChart3,
   ScrollText,
+  DatabaseBackup,
 } from 'lucide-react';
 import type { AdminZone } from './types';
 
@@ -177,6 +178,15 @@ export const ADMIN_ZONES: AdminZone[] = [
         defaultWidth: 900,
         defaultHeight: 650,
       },
+      {
+        id: 'backup',
+        label: 'Backup Database',
+        icon: DatabaseBackup,
+        iconColor: 'text-emerald-600',
+        iconBg: 'bg-emerald-100',
+        defaultWidth: 900,
+        defaultHeight: 600,
+      },
     ],
   },
   {
@@ -248,6 +258,7 @@ export const APP_ROUTE_MAP: Record<string, string> = {
   ai: '/admin/system/ai',
   analytics: '/admin/system/analytics',
   activityLog: '/admin/system/activity-log',
+  backup: '/admin/system/backup',
   notifications: '/admin/communications/notifications',
   messages: '/admin/communications/messages',
   feedback: '/admin/communications/feedback',

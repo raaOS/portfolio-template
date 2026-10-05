@@ -70,7 +70,17 @@ Atau pass langsung saat command:
 
 Jangan gunakan database produksi sebagai target restore kecuali sedang prosedur disaster recovery yang disetujui manual.
 
-## Backup D1
+## Backup Otomatis Harian (v1.3.22)
+
+Sejak v1.3.22 ada jalur backup **runtime** di aplikasi (terpisah dari script CLI di atas):
+
+- **Jadwal:** ikut cron `0 18 * * *` UTC (= **01:00 WIB**) di `/api/cron/daily`, setelah sweep order.
+- **Isi:** seluruh tabel D1 (daftar dibaca langsung dari `sqlite_master` — tidak bergantung `DEFAULT_D1_BACKUP_TABLES`), 1 file JSON berformat `D1BackupFile` (kompatibel `npm run restore:d1`).
+- **Lokasi:** R2 `sites/{siteId}/backups/d1/<ISO>.json`, **retensi 7 terbaru**, guard idempoten <20 jam.
+- **Panel admin:** `Sistem & Tampilan → Backup Database` (`/admin/system/backup`) — tombol _Backup Sekarang_, daftar, dan _Unduh_. Unduh lewat `/api/admin/backup/download?key=...` (admin login + validasi key ketat), bukan lewat `/api/r2/[...key]` (prefix `backups/` diblokir `isAllowedKey`).
+- **Restore:** unduh file-nya, lalu pakai jalur CLI `npm run restore:d1 -- --backup <file>` seperti bagian _Restore D1 Ke Staging_ di bawah. Belum ada tombol restore otomatis di panel.
+
+## Backup D1 (CLI / drill)
 
 Dry-run untuk melihat jumlah row:
 

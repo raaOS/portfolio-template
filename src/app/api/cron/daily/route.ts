@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { sweepExpiredOrders } from '@/lib/services/orderService';
+import { runDailyBackup } from '@/lib/services/d1BackupService';
 
 /**
  * POST /api/cron/daily — pekerjaan harian yang dijalankan Cloudflare cron trigger
@@ -40,6 +41,13 @@ export async function POST(request: NextRequest) {
     // Menandai order kedaluwarsa. Aman dipanggil berulang: ada guard 10 menit
     // di dalam sweepExpiredOrders() sehingga D1 tidak diboroskan.
     await sweepExpiredOrders();
+
+    // Backup D1 harian. Kegagalan backup TIDAK boleh menggagalkan run cron.
+    try {
+      await runDailyBackup();
+    } catch (err) {
+      console.error('[cron/daily] backup failed:', err instanceof Error ? err.message : err);
+    }
 
     return NextResponse.json({ ok: true, ranAt: new Date().toISOString() });
   } catch (err) {

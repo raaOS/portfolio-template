@@ -1,12 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const { sweepExpiredOrdersMock } = vi.hoisted(() => ({
+const { sweepExpiredOrdersMock, runDailyBackupMock } = vi.hoisted(() => ({
   sweepExpiredOrdersMock: vi.fn().mockResolvedValue(undefined),
+  runDailyBackupMock: vi.fn().mockResolvedValue({ ran: true, key: 'backup.json' }),
 }));
 
 vi.mock('@/lib/services/orderService', () => ({
   sweepExpiredOrders: sweepExpiredOrdersMock,
+}));
+
+vi.mock('@/lib/services/d1BackupService', () => ({
+  runDailyBackup: runDailyBackupMock,
 }));
 
 import { POST } from './route';
@@ -22,6 +27,7 @@ describe('POST /api/cron/daily', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     sweepExpiredOrdersMock.mockResolvedValue(undefined);
+    runDailyBackupMock.mockResolvedValue({ ran: true, key: 'backup.json' });
     delete (process.env as Partial<NodeJS.ProcessEnv>).CRON_SECRET;
   });
 
@@ -82,5 +88,29 @@ describe('POST /api/cron/daily', () => {
 
     expect(response.status).toBe(500);
     expect(body.message).toBe('Cron run failed');
+  });
+
+  it('runs the daily D1 backup exactly once when the secret matches', async () => {
+    process.env.CRON_SECRET = 'test-secret';
+    const response = await POST(buildRequest({ 'x-cron-secret': 'test-secret' }) as never);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.ok).toBe(true);
+    expect(sweepExpiredOrdersMock).toHaveBeenCalledTimes(1);
+    expect(runDailyBackupMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the run green when the daily backup throws', async () => {
+    process.env.CRON_SECRET = 'test-secret';
+    runDailyBackupMock.mockRejectedValueOnce(new Error('r2 down'));
+
+    const response = await POST(buildRequest({ 'x-cron-secret': 'test-secret' }) as never);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.ok).toBe(true);
+    expect(sweepExpiredOrdersMock).toHaveBeenCalledTimes(1);
+    expect(runDailyBackupMock).toHaveBeenCalledTimes(1);
   });
 });
