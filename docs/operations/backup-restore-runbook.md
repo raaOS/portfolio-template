@@ -39,11 +39,14 @@ Dari `src/lib/d1-schema.ts` (skema bootstrap produk; `sites`, `projects`, `media
 - `site_analytics`
 - `platform_settings`
 
-> **Catatan verifikasi (2026-10-04):** `npm run backup:d1` tanpa `--tables` masih memakai
-> daftar lama `DEFAULT_D1_BACKUP_TABLES` di `scripts/cloudflare/backup-common.ts` — daftar itu
-> masih memuat `client_access` (sudah `DROP TABLE`) dan belum memuat beberapa tabel di atas
-> (mis. `site_users`, `orders`, `platform_settings`). Samakan daftar di script itu, atau
-> jalankan dengan `--tables` eksplisit, sebelum drill backup berikutnya.
+> **Catatan verifikasi (2026-10-04, DIPERBARUI 2026-10-05 — sudah diperbaiki atas izin owner):**
+> `DEFAULT_D1_BACKUP_TABLES` dan `RESTORE_TABLE_ORDER` di `scripts/cloudflare/backup-common.ts`
+> kini memuat **18 tabel gabungan dua skema** (daftar di atas) tanpa `client_access`.
+> `restore-d1.ts` `bootstrapTarget()` juga menjalankan `SHARED_SCHEMA_QUERIES` supaya tabel
+> skema bersama (`site_users`, `site_settings`, `rate_limits`, `portfolio_templates`,
+> `site_template_entitlements`) ikut tercipta di target staging. Verifikasi nyata 2026-10-05:
+> `backup:d1 --dry-run` → 18 tabel / 77 rows / missing kosong; backup → restore dry-run
+> validasi 18/18 tabel cocok. `client_access` dihapus dari daftar karena sudah `DROP TABLE`.
 
 R2:
 

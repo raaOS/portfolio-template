@@ -41,29 +41,47 @@ export type D1BackupFile = {
 };
 
 export const DEFAULT_D1_BACKUP_TABLES = [
+  // Gabungan dua skema DDL yang hidup (lihat backup-restore-runbook.md):
+  // SHARED_SCHEMA_QUERIES + D1_SCHEMA_QUERIES. `client_access` sudah DROP TABLE.
   'sites',
-  'client_access',
-  'site_quota_overrides',
+  'site_users',
   'projects',
-  'project_narratives',
   'media_assets',
+  'site_settings',
+  'audit_logs',
+  'rate_limits',
+  'app_kv',
+  'portfolio_templates',
+  'site_template_entitlements',
+  'site_quota_overrides',
+  'project_narratives',
   'submissions',
   'ai_generations',
-  'audit_logs',
-  'app_kv',
+  'orders',
+  'site_custom_domains',
+  'site_analytics',
+  'platform_settings',
 ] as const;
 
 export const RESTORE_TABLE_ORDER = [
   'sites',
-  'client_access',
-  'site_quota_overrides',
+  'site_users',
   'projects',
-  'project_narratives',
   'media_assets',
+  'site_settings',
+  'audit_logs',
+  'rate_limits',
+  'app_kv',
+  'portfolio_templates',
+  'site_template_entitlements',
+  'site_quota_overrides',
+  'project_narratives',
   'submissions',
   'ai_generations',
-  'audit_logs',
-  'app_kv',
+  'orders',
+  'site_custom_domains',
+  'site_analytics',
+  'platform_settings',
 ] as const;
 
 export function loadBackupEnv() {

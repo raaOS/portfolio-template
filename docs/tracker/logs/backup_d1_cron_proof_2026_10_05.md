@@ -61,5 +61,25 @@
 ## Sisa / Lanjutan
 
 - **Belum diuji live:** backup pertama baru jalan pada fire cron berikutnya (01:00 WIB) setelah deploy — verifikasi besok: objek baru di prefix `sites/{siteId}/backups/d1/` + tampil di panel.
-- CLI `scripts/cloudflare/backup-common.ts` (`DEFAULT_D1_BACKUP_TABLES`) **tidak diubah** (perubahan perilaku script lama = butuh izin owner, aturan Ponytail AGENTS.md §0) — jalur runtime sudah tidak bergantung padanya.
+- CLI `scripts/cloudflare/backup-common.ts` (`DEFAULT_D1_BACKUP_TABLES`) **tidak diubah** (perubahan perilaku script lama = butuh izin owner, aturan Ponytail AGENTS.md §0) — jalur runtime sudah tidak bergantung padanya. → **Diperbarui: izin owner diberikan 2026-10-05, lihat bagian Tambahan di bawah.**
 - Restore file backup (dari format `D1BackupFile`) masih lewat tooling CLI `restore-d1.ts` — belum ada tombol "Restore" di panel (belum ada permintaan).
+
+## Tambahan 2026-10-05 — Daftar Tabel CLI Disamakan (v1.3.23, atas izin owner)
+
+Owner menjawab _"lakukan perubahan di opsi ke 2"_ → perubahan perilaku script lama kini sah.
+
+**Diubah (2 file):**
+
+1. `scripts/cloudflare/backup-common.ts` — `DEFAULT_D1_BACKUP_TABLES` **dan** `RESTORE_TABLE_ORDER` (pasangan yang harus sinkron) → **18 tabel** gabungan `SHARED_SCHEMA_QUERIES` + `D1_SCHEMA_QUERIES`; `client_access` (sudah `DROP TABLE`) dihapus.
+2. `scripts/cloudflare/restore-d1.ts` — `bootstrapTarget()` kini **juga menjalankan `SHARED_SCHEMA_QUERIES`** (import baru, semua `IF NOT EXISTS`) setelah `D1_SCHEMA_QUERIES`. _Kenapa wajib:_ tanpa ini, backup baru berisi `site_users`/`site_settings`/`rate_limits`/`portfolio_templates`/`site_template_entitlements` akan membuat `DELETE FROM` gagal di target staging yang hanya dibuat dari `D1_SCHEMA_QUERIES` → restore putus. Tabel yang sudah ada (`sites`/`projects` buatan D1) dibiarkan karena `IF NOT EXISTS` — perilaku lama untuk tabel gawean D1 tidak berubah.
+
+**Caller diverifikasi sebelum ubah:** `DEFAULT_D1_BACKUP_TABLES` hanya dipakai `parseTableList` → `backup-d1.ts`; `RESTORE_TABLE_ORDER` hanya `restore-d1.ts:94` (difilter ke tabel yang ada di backup → aman).
+
+**Verifikasi nyata (bukan hanya unit test):**
+
+- `npm run backup:d1 -- --dry-run` → **Tables 18, Rows 77, missing kosong**, tanpa `client_access`; ada `site_users` 1, `orders` 12, `platform_settings` 2 (semua ikut terhitung).
+- Backup nyata ke folder lokal → `restore:d1` dry-run (tanpa `--apply`) → **validasi 18/18 tabel cocok** (`target currently X` = `incoming X`); folder backup verifikasi dihapus setelahnya; `git status` kembali hanya 2 file.
+- Gerbang penuh: `tsc --noEmit` 0 · `eslint src` 0 · `npm test` **118 file / 914 test PASS** · `release:audit` **59/59** · `release:sale-readiness` **12/12**.
+- Prettier: `backup-common.ts` di-`--write` (gagalnya karena perubahan kita); `restore-d1.ts` **gagal pra-ada** (sudah gagal di HEAD) → sengaja tidak direformat (aturan baseline: jangan reformat massal).
+
+**Di luar scope (dicatat apa adanya):** `seed-restore-drill-project.ts` masih `INSERT INTO client_access` — skrip drill lama itu sudah rusak sejak tabel di-DROP (bukan akibat perubahan ini); `audit-restore-integrity.ts` punya daftar `siteScopedTables` sendiri yang masih memuat `client_access` (berhasil tanpa error karena tabel tidak ada di backup → 0 baris).

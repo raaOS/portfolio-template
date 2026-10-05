@@ -9,6 +9,7 @@
 import { createInterface } from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import { D1_SCHEMA_QUERIES } from '../../src/lib/d1-schema';
+import { SHARED_SCHEMA_QUERIES } from '../../src/crud/shared/db/schema';
 import {
   D1BackupFile,
   D1Param,
@@ -117,6 +118,15 @@ async function bootstrapTarget(databaseId: string) {
   );
 
   for (const sql of D1_SCHEMA_QUERIES) {
+    await queryD1ForDatabase(databaseId, sql);
+  }
+
+  // Skema runtime customer (site_users, site_settings, rate_limits,
+  // portfolio_templates, site_template_entitlements) — tanpa ini, backup yang
+  // memuat tabel bersama gagal di-DELETE/INSERT pada target staging yang
+  // dibuat murni dari D1_SCHEMA_QUERIES. Semua query memakai IF NOT EXISTS
+  // (tabel yang sudah ada, termasuk `sites`/`projects` buatan D1, dibiarkan).
+  for (const sql of SHARED_SCHEMA_QUERIES) {
     await queryD1ForDatabase(databaseId, sql);
   }
 
