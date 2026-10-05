@@ -40,7 +40,7 @@
       min-height: 100vh;
       display: flex;
       justify-content: center;
-      align-items: center;
+      align-items: flex-start;
       padding: 2.5rem 1rem;
       -webkit-font-smoothing: antialiased;
     }
@@ -48,16 +48,40 @@
     .container {
       width: 100%;
       max-width: 640px;
+      transition: max-width 0.2s ease;
     }
 
-      /* Diagram Mermaid (Peta Bisnis) */
-    .mermaid {
-      background: none;
-      text-align: center;
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      margin: 0;
+    .container.is-wide {
+      max-width: 1400px;
     }
+
+    /* Diagram Mermaid (Peta Bisnis) */
+    .mermaid {
+      background: #ffffff;
+      text-align: center;
+      font-size: 0.8125rem;
+      color: var(--text);
+      margin: 0;
+      width: 100%;
+      overflow-x: auto;
+      padding: 0.75rem 0;
+      line-height: 1.4;
+    }
+
+    .mermaid svg {
+      /* Pas selebar kotak — semua bagian terlihat sekaligus tanpa geser */
+      max-width: 100% !important;
+      height: auto !important;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+      display: block;
+      margin: 0 auto;
+    }
+
+    /* Ukuran teks isi tab Peta Bisnis diperbesar supaya jelas terbaca */
+    #view-map .title { font-size: 1.75rem; }
+    #view-map .subtitle { font-size: 1rem; line-height: 1.65; }
+    #view-map .section-title { font-size: 1.0625rem; margin-bottom: 0.5rem; }
+    #view-map .card { padding: 1.5rem; }
 
   /* Top Navigation Tabs */
     .tabs-nav {
@@ -1111,15 +1135,15 @@
     </div>
 
     <div class="card">
-      <div class="section-title" style="margin-bottom: 0.5rem;">1 · Alur Bisnis: Pembeli → Sistem → Anda</div>
-      <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1rem;">Kotak belah ketupat = keputusan sistem · panah tebal = alur utama · garis putus-putus = notifikasi/otomatis · kotak "Setiap hari 01:00 WIB" = pekerjaan harian otomatis (backup + bersih order).</div>
-      <div style="overflow-x: auto;"><pre class="mermaid" id="diagram-alur">Memuat diagram...</pre></div>
+      <div class="section-title">1 · Alur Bisnis: Pembeli → Sistem → Anda</div>
+      <div style="font-size: 0.9375rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.6;">Kotak belah ketupat = keputusan sistem · panah tebal = alur utama · garis putus-putus = notifikasi/otomatis. Gambar otomatis pas selebar kotak — semua bagian terlihat sekaligus tanpa digeser.</div>
+      <div style="overflow-x: auto; padding: 0.5rem 0;"><pre class="mermaid" id="diagram-alur">Memuat diagram...</pre></div>
     </div>
 
     <div class="card" style="margin-top: 1.25rem;">
-      <div class="section-title" style="margin-bottom: 0.5rem;">2 · Peta Aset: Siapa Punya Apa di Mana</div>
-      <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1rem;">Inti model bisnisnya: data tiap klien ada di akun Cloudflare milik klien (terisolasi), rahasia ada di arsip di komputer Anda, uang masuk langsung ke Anda.</div>
-      <div style="overflow-x: auto;"><pre class="mermaid" id="diagram-aset">Memuat diagram...</pre></div>
+      <div class="section-title">2 · Peta Aset: Siapa Punya Apa di Mana</div>
+      <div style="font-size: 0.9375rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.6;">Inti model bisnisnya: data tiap klien ada di akun Cloudflare milik klien (terisolasi), rahasia di arsip di komputer Anda, uang masuk langsung ke Anda. Gambar otomatis pas selebar kotak — semua bagian terlihat sekaligus tanpa digeser.</div>
+      <div style="overflow-x: auto; padding: 0.5rem 0;"><pre class="mermaid" id="diagram-aset">Memuat diagram...</pre></div>
     </div>
   </div>
 </div>
@@ -1133,6 +1157,7 @@
   let archivedClients = [];
 
   // Navigation Tabs Switching
+  const appContainer = document.querySelector('.container');
   const tabBtnOnboard = document.getElementById('tab-btn-onboard');
   const tabBtnDomain = document.getElementById('tab-btn-domain');
   const tabBtnUpdate = document.getElementById('tab-btn-update');
@@ -1157,6 +1182,14 @@
     void targetView.offsetWidth; // Reflow to restart animation cleanly
     targetView.classList.add('view-pane');
 
+    if (appContainer) {
+      if (activeBtn === tabBtnMap || activeBtn === tabBtnStatus) {
+        appContainer.classList.add('is-wide');
+      } else {
+        appContainer.classList.remove('is-wide');
+      }
+    }
+
     if (typeof onActivate === 'function') onActivate();
   }
 
@@ -1177,31 +1210,73 @@
   });
 
   // Peta Bisnis (owner-only): render diagram Mermaid dari docs/diagrams/*.mmd
-  let bizMapLoaded = false;
+  // Selalu render ulang agar perubahan .mmd langsung terlihat tanpa restart portal.
+  let mermaidLib = null;
   async function loadBizMap() {
-    if (bizMapLoaded) return;
-    bizMapLoaded = true;
+    const alurEl = document.getElementById('diagram-alur');
+    const asetEl = document.getElementById('diagram-aset');
+    // Reset elemen — hapus SVG lama agar mermaid.run bisa proses ulang
+    alurEl.removeAttribute('data-processed');
+    asetEl.removeAttribute('data-processed');
+    const prevSvgA = alurEl.querySelector('svg');
+    const prevSvgB = asetEl.querySelector('svg');
+    if (prevSvgA) prevSvgA.remove();
+    if (prevSvgB) prevSvgB.remove();
+    alurEl.textContent = 'Memuat...';
+    asetEl.textContent = 'Memuat...';
     try {
       const res = await fetch('/api/diagrams?t=' + Date.now());
       const data = await res.json();
-      const alurEl = document.getElementById('diagram-alur');
-      const asetEl = document.getElementById('diagram-aset');
       alurEl.textContent = (data.alurBisnis || '').trim();
       asetEl.textContent = (data.petaAset || '').trim();
       if (!alurEl.textContent || !asetEl.textContent) {
         throw new Error('File diagram belum tersedia di docs/diagrams/.');
       }
-      const mermaid = (await import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs')).default;
-      mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
-      await mermaid.run({ querySelector: '.mermaid' });
+      if (!mermaidLib) {
+        mermaidLib = (await import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs')).default;
+      }
+      mermaidLib.initialize({
+        startOnLoad: false,
+        theme: 'base',
+        themeVariables: {
+          fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+          fontSize: '16px',
+          darkMode: false,
+          primaryColor: '#ffffff',
+          primaryBorderColor: '#111827',
+          primaryTextColor: '#111827',
+          secondaryColor: '#f9fafb',
+          secondaryBorderColor: '#4b5563',
+          secondaryTextColor: '#111827',
+          tertiaryColor: '#ffffff',
+          tertiaryBorderColor: '#6b7280',
+          tertiaryTextColor: '#111827',
+          lineColor: '#1f2937',
+          textColor: '#111827',
+          mainBkg: '#ffffff',
+          nodeBorder: '#111827',
+          clusterBkg: '#f3f4f6',
+          clusterBorder: '#9ca3af',
+          titleColor: '#374151',
+          edgeLabelBackground: '#f9fafb',
+          nodeTextColor: '#111827',
+        },
+        flowchart: {
+          curve: 'stepBefore',
+          nodeSpacing: 55,
+          rankSpacing: 55,
+          htmlLabels: true,
+          padding: 20,
+          useMaxWidth: true,
+        },
+      });
+      await mermaidLib.run({ nodes: [alurEl, asetEl] });
     } catch (err) {
       console.error('[PetaBisnis] Gagal memuat diagram:', err);
-      // Kalau sumber diagram sudah terlanjur terisi, biarkan (terbaca sebagai teks).
-      // Kalau belum, ganti placeholder dengan pesan yang jelas.
       ['diagram-alur', 'diagram-aset'].forEach(id => {
         const el = document.getElementById(id);
         if (el && !el.textContent.trim().startsWith('flowchart')) {
-          el.textContent = 'Diagram gagal dimuat. Pastikan komputer terhubung internet (pustaka rendering diambil dari CDN), lalu muat ulang halaman.';
+          el.textContent = 'Diagram gagal dimuat. Pastikan internet aktif, lalu muat ulang halaman.';
         }
       });
     }

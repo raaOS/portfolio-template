@@ -3,6 +3,16 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.25] - 2026-10-06
+
+### 📐 Tab "Peta Bisnis": Detail Dipulihkan + Garis Siku Rapi + Ukuran Pas
+
+- **Detail dua diagram dipulihkan penuh** ke versi aslinya (3 jalur Pembeli/Sistem/Owner dengan 17 kotak, peta aset 4 kotak besar dengan 14 node, kotak cron 01:00 WIB, detail bengkel 6 langkah, anti-spam, RAHASIA) — versi yang disederhanakan pihak lain (perubahan saat itu belum di-commit) dibatalkan total. Verifikasi: `git diff` terhadap versi asli `26b49bb` **kosong 100%**.
+- **Garis penghubung kini rapi siku-siku (sudut 90°)** seperti contoh flowchart, atas keluhan owner (_"garisnya bengkok-bengkok tidak rapih"_): `flowchart.curve` diganti `linear` (garis miring) → **`stepBefore`**. Uji 5 opsi di browser — hanya keluarga `step` yang menghasilkan garis 100% siku; dari **122 segmen** di 2 diagram: **0 segmen miring**, dan `stepBefore` paling bersih dari garis menyinggut kotak (2 vs `stepAfter` 3 vs `step` 7).
+- **Teks & gambar jelas tanpa digeser:** teks dalam diagram 16px, gambar **pas selebar kotak** (satu pandangan utuh, tanpa geser ke samping), judul halaman 28px / judul kartu 17px / keterangan 15px, lebar kontainer 1080px → **1400px**. Label dirapikan dengan pecahan baris (isi kata 100% sama) supaya diagram lebih ramping → huruf terbaca lebih besar.
+- **Teruji nyata di browser:** 2 diagram ter-render **17 + 14 kotak, 20 + 10 panah, 7 kotak jalur**, semua detail lama terverifikasi ada di dalam SVG, 0 segmen miring, tanpa scroll horizontal.
+- Perubahan hanya `scripts/onboarding/public/index.html` + `docs/diagrams/*.mmd` (alat portal owner) — **tidak perlu deploy**, tidak memengaruhi situs klien.
+
 ## [1.3.24] - 2026-10-05
 
 ### 🗺️ Tab "Peta Bisnis" Baru di Portal Owner (khusus Anda — klien tidak melihat)

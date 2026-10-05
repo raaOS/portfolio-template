@@ -2,31 +2,31 @@
 %% Sumber kebenaran tunggal: dirender portal PENGELOLA_KLIEN (tab "Peta Bisnis").
 flowchart TB
   subgraph PEMBELI_BOX["DIMILIKI PEMBELI"]
-    PB1["Uang Rp199.000 - langsung ke rekening Anda<br/>(tanpa potongan platform)"]
-    PB2["Website jadi + akses login /admin"]
-    PB3["Isi konten yang dia isi sendiri"]
+    PB1["Uang Rp199.000 -<br/>langsung ke rekening Anda<br/>(tanpa potongan platform)"]
+    PB2["Website jadi +<br/>akses login /admin"]
+    PB3["Isi konten yang<br/>dia isi sendiri"]
   end
 
   subgraph OWNER_BOX["DIMILIKI ANDA (owner)"]
-    OW1["Kode sumber template (GitHub)"]
-    OW2["Komputer Anda: portal PENGELOLA_KLIEN,<br/>arsip klien berisi kredensial - RAHASIA"]
-    OW3["Telegram: notifikasi order + tiket kerja"]
-    OW4["Situs contoh: makeitbetter.my.id"]
-    OW5["Rekening/e-wallet: penerima uang"]
+    OW1["Kode sumber<br/>template (GitHub)"]
+    OW2["Komputer Anda:<br/>portal PENGELOLA_KLIEN,<br/>arsip klien berisi<br/>kredensial - RAHASIA"]
+    OW3["Telegram:<br/>notifikasi order +<br/>tiket kerja"]
+    OW4["Situs contoh:<br/>makeitbetter.my.id"]
+    OW5["Rekening/e-wallet:<br/>penerima uang"]
   end
 
-  subgraph CF_BOX["AKUN CLOUDFLARE MILIK KLIEN (1 klien = 1 akun)"]
-    CF1["Database D1: seluruh tabel data"]
-    CF2["Penyimpanan R2: file foto & video"]
-    CF3["Worker: website hidup 24 jam"]
-    CF4["Domain klien (opsional): DNS + HTTPS otomatis"]
+  subgraph CF_BOX["AKUN CLOUDFLARE MILIK KLIEN<br/>(1 klien = 1 akun)"]
+    CF1["Database D1:<br/>seluruh tabel data"]
+    CF2["Penyimpanan R2:<br/>file foto & video"]
+    CF3["Worker:<br/>website hidup 24 jam"]
+    CF4["Domain klien (opsional):<br/>DNS + HTTPS otomatis"]
     CF3 --- CF1
     CF3 --- CF2
   end
 
   subgraph AUTO_BOX["DIJALANKAN SISTEM OTOMATIS"]
-    AU1["Cron 01:00 WIB: backup database<br/>(simpan 7 terbaru) + bersihkan order kadaluarsa"]
-    AU2["Email otomatis: struk, kedaluwarsa,<br/>serah terima"]
+    AU1["Cron 01:00 WIB:<br/>backup database<br/>(simpan 7 terbaru) +<br/>bersihkan order kadaluarsa"]
+    AU2["Email otomatis:<br/>struk, kedaluwarsa,<br/>serah terima"]
   end
 
   PB1 ==> OW5

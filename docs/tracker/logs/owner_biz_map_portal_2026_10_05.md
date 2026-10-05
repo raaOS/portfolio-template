@@ -43,3 +43,57 @@
 - Rendering ambil pustaka Mermaid dari **CDN** (jsdelivr) — portal memang butuh internet untuk semua langkah CF, jadi ini konsisten; kalau suatu saat butuh luring, vendor `mermaid.min.js` ke `scripts/onboarding/public/`.
 - Kalau alur bisnis berubah (harga, langkah bengkel, dst): **ubah `docs/diagrams/*.mmd` saja** — portal menampilkan versi terbaru otomatis (dibaca ulang tiap request, tidak perlu restart).
 - Belum ada preview diagram di README/dokumen GitHub (GitHub merender mermaid otomatis kalau dibungkus blok ```mermaid di .md) — belum diminta.
+
+## Perbaikan 2026-10-06 (v1.3.25) — 3 putaran feedback owner
+
+### Putaran 1 — _"kerjaan Opus banyak dikurangin… desain kamu kecil"_
+
+**Diagnosis (semua perubahan Opus saat itu belum di-commit, HEAD masih `26b49bb`):**
+
+| #   | Masalah                                      | Bukti                                                                                                                                                                                             |
+| --- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Kedua file `.mmd` dipangkas jadi jalur datar | `alur-bisnis.mmd` 44→26 baris (3 subgraph → 0, node 11 vs 17), `peta-aset.mmd` 39→16 baris (4 subgraph → 0, node 4 vs 14); kotak cron 01:00 WIB, anti-spam, tiket kerja 6 langkah, RAHASIA hilang |
+| 2   | Teks diagram dikecilkan                      | tema Mermaid `fontSize: '13px'` (default 16px)                                                                                                                                                    |
+| 3   | Gambar dipaksa menyusut                      | `svg { max-width: 100% !important }` + `useMaxWidth: true` → diagram 1666–2244px dipaksa masuk kotak ±900px → teks efektif hanya ±7px. **Penyebab utama "kecil"**                                 |
+
+**Fix:** kedua `.mmd` **direstore persis versi `26b49bb`** (`git diff 26b49bb -- …` = **kosong 0 baris**; API `/api/diagrams` kembali 1793 & 1386 byte); `index.html` font & judul diperbesar, `.container.is-wide` 1080 → **1400px**; hal yang bagus dari Opus dipertahankan (render ulang tiap tab dibuka, cache pustaka, `align-items: flex-start`).
+
+### Putaran 2 — _"terlalu besar diagramnya"_
+
+Solusi putaran 1 (gambar sebesar asli + geser samping, teks 20px) ditolak — jadi raksasa & harus digeser. Kembali ke **pas selebar kotak**:
+
+- `useMaxWidth: true` + `.mermaid svg { max-width: 100% }` → **semua bagian terlihat sekaligus, tanpa scroll horizontal** (terukur `scrollable: false`).
+- Font dasar 16px + **label `.mmd` dipecah jadi baris-baris pendek** (tambahan `<br/>` saja — kata 100% sama) → lebar alami akhir **alur 1713px / aset 2160px**, skala pas-otomatis lebih ringan → huruf lebih terbaca.
+- Judul halaman **28px**, judul kartu **17px**, keterangan **15px**, kartu padding 1.5rem; keterangan kartu ditulis ulang jadi "otomatis pas selebar kotak — tanpa digeser".
+
+### Putaran 3 — _"suka desainnya, tapi garisnya bengkok — mau rapi seperti gambar ke 2"_
+
+Keluhan kini **garis penghubung**: miring diagonal antar-kotak. Diagnosa: `flowchart.curve: 'linear'` → segmen lurus miring.
+
+**Uji 5 opsi langsung di browser** (render per contoh via CDN mermaid@11, lalu baca atribut `d` tiap `path.flowchart-link`):
+
+| Opsi                      | Hasil                                                          |
+| ------------------------- | -------------------------------------------------------------- |
+| `linear` (lama)           | **diagonal** — inilah garis bengkoknya                         |
+| `basis` (default mermaid) | melengkung/bergelombang — malah lebih tidak rapi               |
+| `step`                    | 100% siku — titik singgung kotak terbanyak (7)                 |
+| `stepAfter`               | 100% siku — live 3 titik singgung (2 menembus kotak keputusan) |
+| **`stepBefore`** ✅       | **100% siku & paling bersih** — dipakai akhir                  |
+
+**Hasil akhir (`stepBefore`), diukur di browser:**
+
+| Diagram     | Segmen garis | Segmen miring | Titik singgung kotak | Kotak / Panah |
+| ----------- | ------------ | ------------- | -------------------- | ------------- |
+| Alur Bisnis | 81           | **0**         | 1                    | 17 / 20       |
+| Peta Aset   | 41           | **0**         | 1                    | 14 / 10       |
+| **Total**   | **122**      | **0**         | 2                    | **31 / 30**   |
+
+_Titik singgung = ujung garis siku sesekali menyinggur tepi kotak (2 dari 122 segmen) — varian lain lebih buruk: `stepAfter` 3, `step` 7. Garis tetap menembus ruang antar-kotak (wajar untuk garis antar-jalur), tidak ada satupun garis miring._
+
+### Verifikasi akhir + gerbang
+
+- Detail terverifikasi ada di dalam SVG: "Bengkel 6 langkah", "01:00 WIB", "anti-spam", "AKUN CLOUDFLARE MILIK KLIEN", "RAHASIA" — semua `true`.
+- 7 cluster, tanpa scroll horizontal, font dasar 16px (judul 28/17/15px, kontainer 1400px).
+- Gerbang: tsc 0, eslint 0, **118 file / 914 test PASS**, `release:audit` **59/59**, `release:sale-readiness` **12/12**, prettier PASS untuk file yang disentuh.
+
+**Dampak produksi:** tidak perlu deploy — hanya `scripts/onboarding/public/index.html` + `docs/diagrams/*.mmd` (alat portal owner), di luar bundle Worker.
