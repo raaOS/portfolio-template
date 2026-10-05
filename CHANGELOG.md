@@ -10,6 +10,7 @@ Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **U
 - **Masalahnya:** daftar tabel cadangan lama masih memuat `client_access` (tabel yang sudah dihapus dari database) dan belum memuat 8 tabel penting — termasuk `site_users` (login klien), `orders` (pesanan), dan `platform_settings` — jadi backup CLI melewatkan data itu.
 - **Perbaikannya (atas izin Anda):** daftar disamakan dengan **18 tabel yang benar** (gabungan dua skema database) untuk backup **dan** urutan restore; tool restore kini juga menyiapkan tabel skema bersama di database target, sehingga hasil backup yang memuat tabel login klien bisa di-restore ke staging.
 - **Diuji nyata:** backup dry-run → **18 tabel / 77 baris**, `client_access` hilang, `site_users`/`orders`/`platform_settings` ikut; backup → restore dry-run **validasi 18/18 tabel cocok**. Gerbang tetap hijau: 118 file / 914 test PASS, audit rilis **59/59** + kesiapan jual **12/12**.
+- **Bonus:** skrip drill `npm run restore:seed-drill` ikut dibersihkan dari sisa INSERT ke tabel `client_access` (tabel sudah dihapus) — skrip itu dulu *crash* di tengah jalan saat `--apply`; kini alat uji cadangan→restore utuh kembali tanpa perubahan cara kerja lainnya.
 
 ## [1.3.22] - 2026-10-05
 

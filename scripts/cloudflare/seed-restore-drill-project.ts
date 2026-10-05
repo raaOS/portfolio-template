@@ -6,7 +6,6 @@
  * known orphan key can be reattached instead of deleted.
  */
 
-import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { promisify } from 'util';
@@ -29,9 +28,6 @@ const SITE_NAME = 'Demo Designer';
 const PROJECT_ID = 'project-demo-branding';
 const PROJECT_SLUG = 'demo-brand-identity';
 const PROJECT_TITLE = 'Restore Drill Demo Project';
-const CLIENT_ACCESS_ID = 'client-access-restore-drill-default-site';
-const CLIENT_EMAIL = 'restore-drill@example.invalid';
-const CLIENT_PASSWORD = 'RestoreDrill2026!';
 const COVER_KEY = `sites/${SITE_ID}/projects/${PROJECT_ID}/cover-demo-branding.jpg`;
 const GALLERY_IMAGE_KEY = `sites/${SITE_ID}/projects/${PROJECT_ID}/restore-drill-gallery.jpg`;
 const VIDEO_KEY = `sites/${SITE_ID}/projects/${PROJECT_ID}/restore-drill-video.mp4`;
@@ -65,17 +61,6 @@ Options:
 
 Default mode is dry-run. Secret values are never printed.
 `);
-}
-
-function requireSecurityEnv() {
-  const salt = process.env.PASSWORD_SALT?.trim();
-  if (!salt) throw new Error('PASSWORD_SALT is required to seed client access.');
-  return { salt };
-}
-
-function hashClientPassword(password: string) {
-  const { salt } = requireSecurityEnv();
-  return crypto.scryptSync(password, salt, 64).toString('hex');
 }
 
 async function r2Exists(key: string) {
@@ -321,24 +306,6 @@ async function seedD1() {
   );
 
   await queryD1(
-    `INSERT INTO client_access (id, site_id, email, password_hash, status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(site_id, email) DO UPDATE SET
-       password_hash = excluded.password_hash,
-       status = excluded.status,
-       updated_at = excluded.updated_at`,
-    [
-      CLIENT_ACCESS_ID,
-      SITE_ID,
-      CLIENT_EMAIL,
-      hashClientPassword(CLIENT_PASSWORD),
-      'active',
-      now,
-      now,
-    ]
-  );
-
-  await queryD1(
     `INSERT INTO projects
        (id, site_id, slug, title, cover_media_id, status, order_index, metadata_json, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -410,15 +377,14 @@ async function seedD1() {
 }
 
 async function summarizeD1() {
-  const rows = await queryD1<{ projects: number; media_assets: number; client_access: number }>(
+  const rows = await queryD1<{ projects: number; media_assets: number }>(
     `SELECT
        (SELECT COUNT(*) FROM projects WHERE site_id = ?) as projects,
-       (SELECT COUNT(*) FROM media_assets WHERE site_id = ?) as media_assets,
-       (SELECT COUNT(*) FROM client_access WHERE site_id = ?) as client_access`,
-    [SITE_ID, SITE_ID, SITE_ID]
+       (SELECT COUNT(*) FROM media_assets WHERE site_id = ?) as media_assets`,
+    [SITE_ID, SITE_ID]
   );
 
-  return rows[0] || { projects: 0, media_assets: 0, client_access: 0 };
+  return rows[0] || { projects: 0, media_assets: 0 };
 }
 
 async function main() {
@@ -432,7 +398,7 @@ async function main() {
     console.log('Restore drill seed dry-run');
     console.log(`Site       : ${SITE_ID} (${SITE_SLUG})`);
     console.log(`Project    : ${PROJECT_ID} (${PROJECT_SLUG})`);
-    console.log('D1 rows    : site, client_access, project, narrative, 3 media_assets');
+    console.log('D1 rows    : site, project, narrative, 3 media_assets');
     console.log('R2 objects : cover, gallery image, video, video preview, jpg poster, webp poster');
     console.log('No writes performed. Re-run with --apply to seed.');
     return;
@@ -449,7 +415,6 @@ async function main() {
   console.log(`Project       : ${PROJECT_ID} (${PROJECT_SLUG})`);
   console.log(`Projects      : ${summary.projects}`);
   console.log(`Media assets  : ${summary.media_assets}`);
-  console.log(`Client access : ${summary.client_access}`);
   console.log('R2 objects:');
   Object.entries(mediaResults).forEach(([key, status]) => {
     console.log(`- ${status}: ${key}`);
