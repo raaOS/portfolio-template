@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdminAuth } from '@/lib/auth';
-import { activateOrder, cancelOrder, getAdminOrders, sweepExpiredOrders } from '@/lib/services/orderService';
+import { activateOrder, cancelOrder, getAdminOrders, reopenOrder, sweepExpiredOrders } from '@/lib/services/orderService';
 
 export async function GET(request: NextRequest) {
   try {
@@ -66,6 +66,14 @@ export async function POST(request: NextRequest) {
 
     if (action === 'cancel') {
       const result = await cancelOrder(orderId, cancelReason);
+      if (!result.success) {
+        return NextResponse.json({ success: false, error: result.message }, { status: 400 });
+      }
+      return NextResponse.json({ success: true, message: result.message, order: result.order });
+    }
+
+    if (action === 'reopen') {
+      const result = await reopenOrder(orderId);
       if (!result.success) {
         return NextResponse.json({ success: false, error: result.message }, { status: 400 });
       }

@@ -167,7 +167,8 @@ async function handleOnboard() {
 
   if (!clientName || !adminEmail || !accountId || !apiToken) {
     throw new Error(
-      'Parameter tidak lengkap! Wajib menyertakan: Nama Klien, Email Klien, Cloudflare Account ID, dan Cloudflare API Token.'
+      'Parameter tidak lengkap! Wajib mengisi: Nama Klien, Email Klien, Cloudflare Account ID, dan Cloudflare API Token ' +
+        '(isi langsung di kolom input workflow — tidak ada token bawaan/DEFAULT lagi, sengaja demi keamanan).'
     );
   }
 
@@ -190,7 +191,9 @@ async function handleOnboard() {
   console.log(`👤 Klien: ${clientName} (${clientSlug})`);
   console.log(`🎨 Template: ${templateKey}`);
   console.log(`📧 Email: ${adminEmail}`);
-  console.log(`🔐 Password Baru: ${adminPassword}`);
+  // Password sengaja TIDAK dicetak ke log (log job tersimpan lama di GitHub).
+  // Password tersedia di Job Summary, file SURAT_SERAH_TERIMA.txt, dan config.env.
+  console.log(`🔐 Password Admin: (lihat ringkasan job di bawah / file SURAT_SERAH_TERIMA.txt)`);
   console.log(`☁️ Cloudflare Account ID: ${accountId.slice(0, 6)}...${accountId.slice(-4)}`);
 
   // 1. Verifikasi Kredensial
@@ -392,7 +395,8 @@ async function handleOnboard() {
   console.log(`🌐 Website URL : ${websiteUrl}`);
   console.log(`🔐 Admin URL   : ${adminUrl}`);
   console.log(`📧 Email       : ${adminEmail}`);
-  console.log(`🔑 Password    : ${adminPassword}`);
+  // Password tidak dicetak ke log — ada di Job Summary & arsip klien.
+  console.log(`🔑 Password    : (lihat ringkasan job di bawah / file SURAT_SERAH_TERIMA.txt)`);
   console.log('========================================================\n');
 
   // Format WhatsApp message

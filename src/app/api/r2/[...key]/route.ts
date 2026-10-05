@@ -129,6 +129,9 @@ function buildCorsHeaders() {
 
 function isAllowedKey(key: string) {
   if (!key || key.includes('..') || key.includes('\\')) return false;
+  // Cadangan D1 berisi seluruh isi database (password hash, PII order,
+  // settings) — tidak boleh pernah terbaca lewat proxy publik tanpa login.
+  if (key.includes('/backups/') || key.startsWith('backups/')) return false;
   if (
     key === 'ffmpeg/ffmpeg-core.js' ||
     key === 'ffmpeg/ffmpeg-core.wasm'

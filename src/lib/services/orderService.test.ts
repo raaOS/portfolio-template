@@ -4,6 +4,7 @@ import {
   uploadPaymentProof,
   activateOrder,
   cancelOrder,
+  reopenOrder,
   expireOrderIfStale,
   sweepExpiredOrders,
   getAdminOrders,
@@ -574,6 +575,40 @@ describe('orderService', () => {
     });
   });
 
+  describe('reopenOrder', () => {
+    it('reopens a canceled order into the verification queue and flags missing proof', async () => {
+      vi.mocked(cloudflareD1.queryD1)
+        .mockResolvedValueOnce([
+          { id: 'ORD-RC', status: 'canceled', payment_proof_url: null },
+        ]) // SELECT before reopen
+        .mockResolvedValueOnce([
+          { id: 'ORD-RC', status: 'waiting_verification', payment_proof_url: null },
+        ]); // UPDATE ... RETURNING *
+
+      const res = await reopenOrder('ORD-RC');
+
+      expect(res.success).toBe(true);
+      expect(res.message).toContain('upload ulang bukti');
+      expect(res.order?.status).toBe('waiting_verification');
+
+      const sqls = vi.mocked(cloudflareD1.queryD1).mock.calls.map(([sql]) => String(sql));
+      expect(sqls[1]).toContain("SET status = 'waiting_verification'");
+      expect(sqls[1]).toContain("'canceled', 'failed'");
+    });
+
+    it('refuses to reopen an activated order', async () => {
+      vi.mocked(cloudflareD1.queryD1).mockResolvedValueOnce([
+        { id: 'ORD-ACT', status: 'activated' },
+      ]);
+
+      const res = await reopenOrder('ORD-ACT');
+
+      expect(res.success).toBe(false);
+      expect(res.message).toContain('Status saat ini: activated');
+      expect(vi.mocked(cloudflareD1.queryD1).mock.calls.length).toBe(1);
+    });
+  });
+
   describe('expireOrderIfStale', () => {
     it('marks an overdue pending order as expired on read', async () => {
       vi.mocked(cloudflareD1.queryD1)
@@ -620,6 +655,69 @@ describe('orderService', () => {
           String(sql).includes('platform_settings') && (params as string[]).includes('billing_expire_sweep_at')
       );
       expect(guardCall).toBeDefined();
+    });
+  });
+
+  describe('sweepExpiredOrders (notifikasi pembatalan otomatis 7 hari)', () => {
+    const savedEnv: Record<string, string | undefined> = {
+      NOTIFICATION_PROVIDER: process.env.NOTIFICATION_PROVIDER,
+      NOTIFICATION_API_KEY: process.env.NOTIFICATION_API_KEY,
+      NOTIFICATION_DEFAULT_FROM: process.env.NOTIFICATION_DEFAULT_FROM,
+      TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
+      TELEGRAM_ADMIN_CHAT_ID: process.env.TELEGRAM_ADMIN_CHAT_ID,
+    };
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      for (const [key, value] of Object.entries(savedEnv)) {
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
+    });
+
+    it('emails the buyer and alerts the admin with a reopen button when auto-cancel fires', async () => {
+      process.env.NOTIFICATION_PROVIDER = 'resend';
+      process.env.NOTIFICATION_API_KEY = 're_test_key';
+      process.env.NOTIFICATION_DEFAULT_FROM = 'halo@example.com';
+      process.env.TELEGRAM_BOT_TOKEN = 'tg_test_token';
+      process.env.TELEGRAM_ADMIN_CHAT_ID = '111';
+
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+      vi.stubGlobal('fetch', fetchMock);
+
+      vi.mocked(cloudflareD1.queryD1)
+        .mockResolvedValueOnce([]) // guard select
+        .mockResolvedValueOnce([]) // activating recovery
+        .mockResolvedValueOnce([
+          {
+            id: 'ORD-AC',
+            buyer_name: 'Budi',
+            buyer_email: 'budi@test.com',
+            desired_slug: 'budi-site',
+          },
+        ]) // 7-day auto-cancel UPDATE ... RETURNING
+        .mockResolvedValueOnce([]) // stale pending select
+        .mockResolvedValueOnce([]); // INSERT platform_settings guard
+
+      await sweepExpiredOrders();
+
+      const calls = fetchMock.mock.calls.map(([url, init]) => ({
+        url: String(url),
+        body: String((init as RequestInit | undefined)?.body || ''),
+      }));
+
+      const email = calls.find((c) => c.url === 'https://api.resend.com/emails');
+      expect(email).toBeDefined();
+      expect(email?.body).toContain('budi@test.com');
+      expect(email?.body).toContain('Dibatalkan Otomatis');
+      expect(email?.body).toContain('ORD-AC');
+
+      const telegram = calls.find((c) => c.url.includes('api.telegram.org') && c.url.includes('sendMessage'));
+      expect(telegram).toBeDefined();
+      expect(telegram?.body).toContain('reopen_ORD-AC');
     });
   });
 

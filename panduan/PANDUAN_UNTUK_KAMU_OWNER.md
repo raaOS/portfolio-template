@@ -45,8 +45,8 @@ Cukup tanyakan 2 hal ini ke klien:
    - Pilih gaya template: **macOS Desktop OS** atau **Infinite Canvas**.
    - Masukkan **Account ID** & **API Token** Cloudflare klien (ada panduan bergambarnya di layar).
 4. Klik tombol: **`🚀 PROSES OTOMATIS SEKARANG`**.
-5. Sistem otomatis membuat database D1, storage R2, migrasi tabel, dan mengarsipkan file ke folder `arsip-klien/` di laptop kamu secara rapi dalam waktu ~30 detik!
-6. Setelah selesai, klik tombol **"📋 Salin Pesan WhatsApp untuk Klien"**.
+5. Sistem otomatis membuat database D1, storage R2, migrasi tabel, dan mengarsipkan file ke folder `arsip-klien/` di laptop kamu (± 30 detik), **lalu otomatis build & deploy sampai website benar-benar online** (proses build ± beberapa menit — log tampil di layar, jangan tutup halamannya).
+6. Kalau semua sukses, kartu sukses menampilkan alamat website asli dan tombol **"📋 Salin Pesan WhatsApp untuk Klien"** aktif. Kalau deploy gagal, muncul kotak peringatan **"Website BELUM online"** — tekan tombol **"Coba Deploy Ulang Sekarang"** dulu, jangan kirim pesan ke klien sebelum peringatan hilang.
 
 ---
 
@@ -66,10 +66,10 @@ Halo kak [Nama Klien]! 👋
 Website portofolio interaktif kamu sudah resmi aktif dan siap dipakai! 🚀
 
 🌐 Website Kamu:
-https://[slug-klien].pages.dev
+https://[slug-klien].workers.dev
 
 🔐 Ruang Admin Pribadi (untuk kelola karya, foto, & profil):
-https://[slug-klien].pages.dev/admin
+https://[slug-klien].workers.dev/admin
 Email    : [email login]
 Password : [password admin]
 
@@ -78,7 +78,7 @@ Semua foto, video karya, dan kontak bisa kamu tambahkan sendiri dengan sangat mu
 
 > Pesan di atas **sama persis** dengan template resmi yang disimpan portal ke
 > `arsip-klien/<slug>/SURAT_SERAH_TERIMA.txt` (`scripts/onboarding/server.ts:256-269`).
-> Kalau klien sudah pasang custom domain, ganti `https://[slug-klien].pages.dev` dengan
+> Kalau klien sudah pasang custom domain, ganti `https://[slug-klien].workers.dev` dengan
 > alamat domain klien. **Klien tidak perlu membuka `/setup`** — email + password sudah
 > dibuatkan portal onboarding.
 
@@ -168,7 +168,7 @@ Jika suatu saat klien baru membeli nama domain sendiri (contoh: `budipratama.com
 3. **Pilih Klien:** Pilih nama klien dari daftar dropdown (sistem otomatis membaca data klien dari folder `arsip-klien/` di laptop kamu).
 4. **Ketik Domain:** Masukkan nama domain yang dibeli klien (misal: `budipratama.com`).
 5. **Klik Tombol:** Klik **"Hubungkan Domain ke Cloudflare"**.
-6. **Selesai!** Sistem otomatis mendaftarkan domain ke Cloudflare Pages.
+6. **Selesai!** Sistem otomatis mendaftarkan domain ke Cloudflare (Worker) milik klien.
 7. Kamu tinggal klik tombol **"Salin Pesan WhatsApp Serah Terima Domain"** lalu kirim ke klien. Tidak ada lagi langkah CNAME: Cloudflare membuat record DNS dan HTTPS **otomatis** (syaratnya nama domain sudah berada di akun Cloudflare klien — kalau belum, pindahkan nameserver domain ke Cloudflare klien dulu).
 
 ---

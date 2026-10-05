@@ -8,7 +8,7 @@ import { hashPasswordScrypt } from '../../src/crud/shared/auth/password';
 import { clientUrls, deployClient, resolveWorkersSubdomain } from './client-deploy';
 import { attachWorkerDomain, findWorkerDomain, buildDomainHandoverMessage } from './custom-domain';
 
-const PORT = 4567;
+const PORT = Number(process.env.PORT) || 4567;
 const ROOT_DIR = process.cwd();
 const PUBLIC_DIR = path.join(ROOT_DIR, 'scripts', 'onboarding', 'public');
 const ARCHIVE_DIR = path.join(ROOT_DIR, 'arsip-klien');
@@ -294,8 +294,9 @@ async function provisionClient(
   ].join('\n');
   fs.writeFileSync(path.join(dirPath, 'SURAT_SERAH_TERIMA.txt'), handoverDoc, 'utf-8');
 
-  // STEP 6: Selesai
-  onProgress(6, 'Selesai!', 'Website dan seluruh konfigurasi siap!');
+  // STEP 6: Infrastruktur selesai — build & deploy menyusul di endpoint
+  // /api/provision (lihat panggilan deployClient() di server.ts).
+  onProgress(6, 'Infrastruktur selesai. Lanjut build & deploy website...', 'Database, storage, dan arsip klien siap.');
 
   return {
     success: true,
@@ -313,15 +314,21 @@ async function provisionClient(
 }
 
 // Create HTTP Server
-const server = http.createServer(async (req, res) => {
-  // CORS Headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+//
+// PENJAGAAN AKSES (audit business flow 2026-10-06, temuan C3):
+// - Origin guard: tolak permintaan yang dibawa halaman web lain (mencegah
+//   situs jahat membaca /api/clients yang memuat kredensial admin klien).
+// - Server hanya di-bind ke 127.0.0.1 (lihat server.listen di bawah), jadi
+//   perangkat lain di jaringan lokal/wifi tidak bisa menjangkaunya.
+// - Tidak ada CORS wildcard lagi — halaman portal (localhost:4567) memang
+//   same-origin, jadi header CORS tidak diperlukan.
+const ALLOWED_ORIGINS = new Set([`http://localhost:${PORT}`, `http://127.0.0.1:${PORT}`]);
 
-  if (req.method === 'OPTIONS') {
-    res.writeHead(200);
-    res.end();
+const server = http.createServer(async (req, res) => {
+  const requestOrigin = req.headers.origin;
+  if (requestOrigin && !ALLOWED_ORIGINS.has(requestOrigin)) {
+    res.writeHead(403, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: false, message: 'Akses ditolak.' }));
     return;
   }
 
@@ -356,7 +363,7 @@ const server = http.createServer(async (req, res) => {
           res.end(
             JSON.stringify({
               success: false,
-              message: 'API Token tidak valid. Pastikan token sudah dibuat dengan izin D1, Pages, dan R2.',
+              message: 'API Token tidak valid. Pastikan token sudah dibuat dengan izin D1, R2, dan Workers (Edit).',
             })
           );
           return;
@@ -407,7 +414,48 @@ const server = http.createServer(async (req, res) => {
           const result = await provisionClient(payload, (step, message, detail) => {
             sendEvent('progress', { step, message, detail });
           });
-          sendEvent('complete', result);
+
+          // STEP 7: Build & deploy — sebelumnya TIDAK PERNAH ada di portal ini
+          // padahal kartu sukses, surat serah terima, dan pesan WhatsApp semuanya
+          // mengklaim website sudah online. (Audit business flow 2026-10-06, C2.)
+          sendEvent('progress', {
+            step: 6,
+            message: 'Build & deploy website ke Cloudflare Worker...',
+            detail: 'Proses build bisa memakan waktu beberapa menit.',
+          });
+
+          let deployed = false;
+          let deployError = '';
+          let websiteUrl = result.websiteUrl;
+          try {
+            const outcome = await deployClient({
+              rootDir: ROOT_DIR,
+              configPath: path.join(ROOT_DIR, result.archiveFolder, 'config.env'),
+              dryRun: false,
+              run: runCommandStreaming,
+              onLog: (line) => sendEvent('log', { text: line }),
+            });
+            deployed = outcome.ok;
+            if (!outcome.ok) {
+              deployError = outcome.error || 'Build & deploy gagal.';
+            } else if (outcome.websiteUrl) {
+              websiteUrl = outcome.websiteUrl;
+            }
+          } catch (deployErr) {
+            deployError = (deployErr as Error).message || 'Build & deploy gagal.';
+          }
+
+          sendEvent('progress', {
+            step: 7,
+            message: deployed ? 'Selesai! Website sudah online.' : 'Selesai — tetapi deploy gagal.',
+          });
+          sendEvent('complete', {
+            ...result,
+            websiteUrl,
+            adminUrl: `${websiteUrl}/admin`,
+            deployed,
+            deployError,
+          });
         } catch (provisionErr) {
           sendEvent('error', { message: (provisionErr as Error).message });
         } finally {
@@ -1022,10 +1070,13 @@ function parseEnv(content: string): Record<string, string> {
   return result;
 }
 
-server.listen(PORT, () => {
+// Hanya loopback (127.0.0.1) — lihat penjagaan akses di atas: portal ini
+// memuat kredensial klien dan tidak boleh terbuka ke jaringan lokal.
+server.listen(PORT, '127.0.0.1', () => {
   console.log(`\n======================================================`);
   console.log(`🚀 Asisten Onboarding Klien Berjalan di: http://localhost:${PORT}`);
   console.log(`   Silakan buka browser Anda di http://localhost:${PORT}`);
+  console.log(`   (Hanya bisa diakses dari laptop ini — bukan dari jaringan lokal)`);
   console.log(`======================================================\n`);
 });
 

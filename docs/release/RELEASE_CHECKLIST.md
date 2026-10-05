@@ -15,7 +15,7 @@ Use this checklist before deploying an instance for a client (managed service: 1
 
 - [ ] D1 database exists in the client's Cloudflare account (portal creates `db-<slug>`).
 - [ ] R2 bucket exists in the client's Cloudflare account (portal creates `media-<slug>`).
-- [ ] API token is scoped to the client's account (D1, Pages, R2) and stored only in `arsip-klien/<slug>/config.env`.
+- [ ] API token is scoped to the client's account (D1, R2, Workers (Edit)) and stored only in `arsip-klien/<slug>/config.env`.
 - [ ] R2 S3 access key scoped to the client's media bucket.
 - [ ] R2 CORS applied if direct browser upload is used:
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { activateOrder, cancelOrder } from '@/lib/services/orderService';
+import { activateOrder, cancelOrder, reopenOrder } from '@/lib/services/orderService';
 import { enforceRequestRateLimit } from '@/lib/security/request';
 
 // SECURITY FIX (audit 2026-09-29):
@@ -137,6 +137,42 @@ export async function POST(request: NextRequest) {
               chat_id: chatId,
               message_id: messageId,
               text: `${callbackQuery.message.text}\n\n❌ <b>STATUS: CANCELED / REFUNDED</b>\n<i>${result.message}</i>${waLink}`,
+              parse_mode: 'HTML',
+            }),
+          });
+        }
+      }
+
+      // Handle Reopen Order Button (pembatalan otomatis 7 hari / aktivasi gagal)
+      if (callbackData.startsWith('reopen_')) {
+        const orderId = callbackData.replace('reopen_', '');
+        const result = await reopenOrder(orderId);
+
+        if (botToken && callbackQuery.id) {
+          await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              callback_query_id: callbackQuery.id,
+              text: result.message,
+              show_alert: true,
+            }),
+          });
+        }
+
+        if (botToken && callbackQuery.message && chatId && messageId && result.success) {
+          const waDigits = (result.order?.buyer_whatsapp || '').replace(/\D/g, '');
+          const waLink = waDigits
+            ? `\n\n💬 <b>Chat WA Pembeli untuk minta upload ulang bukti:</b> https://wa.me/${waDigits}`
+            : '';
+
+          await fetch(`https://api.telegram.org/bot${botToken}/editMessageText`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: chatId,
+              message_id: messageId,
+              text: `${callbackQuery.message.text}\n\n↩️ <b>STATUS: DIBUKA KEMBALI</b>\n<i>${result.message}</i>${waLink}`,
               parse_mode: 'HTML',
             }),
           });

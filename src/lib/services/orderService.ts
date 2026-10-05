@@ -75,12 +75,23 @@ async function expireStalePendingOrders(nowIso: string): Promise<void> {
     [nowIso, nowIso]
   );
 
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const checkoutUrl = `${baseUrl}/checkout`;
+
   // Stale waiting_verification (bukti diunggah tapi tak pernah selesai diverifikasi /
   // bukti palsu dan admin lupa cancel): dibatalkan otomatis setelah 7 hari agar
   // reservasi slug & nominal unik tidak terkunci selamanya (index unik partial
   // hanya melindungi pending/waiting/activating, bukan canceled).
-  // RETURNING id dipakai (sekali jalan) agar file bukti di R2 ikut dibersihkan.
-  const staleWaitingIds = await queryD1<{ id: string }>(
+  // RETURNING ikut mengambil data pembeli (sekali jalan) agar file bukti di R2
+  // dibersihkan dan pembatalan otomatis dikabarkan ke pembeli + admin
+  // (audit business flow 2026-10-06: tanpa notifikasi, pembeli yang sudah
+  // membayar kehilangan pesanan tanpa kabar dan admin tak punya jalan keluar).
+  const staleCanceled = await queryD1<{
+    id: string;
+    buyer_name: string;
+    buyer_email: string;
+    desired_slug: string;
+  }>(
     `UPDATE orders
      SET status = 'canceled',
          cancel_reason = ?,
@@ -88,13 +99,24 @@ async function expireStalePendingOrders(nowIso: string): Promise<void> {
          updated_at = ?
      WHERE status = 'waiting_verification'
        AND datetime(updated_at) <= datetime(?, '-7 days')
-     RETURNING id`,
+     RETURNING id, buyer_name, buyer_email, desired_slug`,
     ['Dibatalkan otomatis: bukti pembayaran tidak selesai diverifikasi dalam 7 hari.', nowIso, nowIso]
   );
 
   // Bersihkan juga file bukti bayarnya di R2 (DB sudah tidak merujuknya).
-  for (const row of staleWaitingIds || []) {
-    if (row?.id) await cleanupOrderProofObjects(row.id);
+  for (const row of staleCanceled || []) {
+    if (!row?.id) continue;
+    await cleanupOrderProofObjects(row.id);
+    sendOrderCanceledEmail({
+      to: row.buyer_email,
+      orderId: row.id,
+      buyerName: row.buyer_name,
+      desiredSlug: row.desired_slug,
+      checkoutUrl,
+    }).catch((err) => console.error(`[expireStalePendingOrders] Canceled email failed for ${row.id}:`, err));
+    notifyAutoCanceledOrder(row).catch((err) =>
+      console.error(`[expireStalePendingOrders] Telegram notice failed for ${row.id}:`, err)
+    );
   }
 
   const staleOrders = await queryD1<{
@@ -120,9 +142,6 @@ async function expireStalePendingOrders(nowIso: string): Promise<void> {
        AND datetime(expires_at) <= datetime(?)`,
     [nowIso, nowIso]
   );
-
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-  const checkoutUrl = `${baseUrl}/checkout`;
 
   // FIX #39: Dedupe notifikasi expired berdasarkan email buyer agar tidak
   // spam jika buyer memiliki banyak order pending yang expired bersamaan.
@@ -487,6 +506,110 @@ async function sendOrderExpiredEmail({
     console.error('[sendOrderExpiredEmail] Failed:', err);
     return false;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Auto-Cancellation Notices (audit business flow 2026-10-06)
+// ---------------------------------------------------------------------------
+
+/**
+ * Email ke pembeli saat pesanan DIBATALKAN OTOMATIS (7 hari tak selesai
+ * diverifikasi). Sebelum perbaikan ini pembatalan otomatis terjadi senyap —
+ * pembeli yang sudah membayar tidak pernah diberi kabar.
+ */
+async function sendOrderCanceledEmail({
+  to,
+  orderId,
+  buyerName,
+  desiredSlug,
+  checkoutUrl,
+}: {
+  to: string;
+  orderId: string;
+  buyerName: string;
+  desiredSlug: string;
+  checkoutUrl: string;
+}): Promise<boolean> {
+  const provider = (cleanEnvVar('NOTIFICATION_PROVIDER') || '').toLowerCase();
+  if (provider !== 'resend') return false;
+
+  const apiKey = cleanEnvVar('NOTIFICATION_API_KEY');
+  const from = cleanEnvVar('NOTIFICATION_DEFAULT_FROM');
+  if (!apiKey || !from) return false;
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from,
+        to,
+        subject: `🚫 Pesanan ${orderId} Dibatalkan Otomatis — Portfolio OS`,
+        text: [
+          `Halo ${buyerName},`,
+          '',
+          `Pesanan ${orderId} (slug '${desiredSlug}') dibatalkan otomatis karena bukti pembayaran`,
+          'tidak selesai diverifikasi dalam 7 hari.',
+          '',
+          'Jika Anda SUDAH MENTRANSFER: mohon maaf — segera hubungi kami dengan',
+          `menyebutkan ID pesanan ${orderId}. Pesanan bisa dibuka kembali dan`,
+          'pembayaran diverifikasi manual, lalu Anda cukup upload ulang bukti bayar.',
+          '',
+          'Jika Anda BELUM membayar, pesanan baru bisa dibuat kembali di sini:',
+          checkoutUrl,
+          '',
+          '— Portfolio OS',
+        ].join('\n'),
+        html: [
+          `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">`,
+          `<h2 style="margin:0 0 4px;color:#dc2626">Pesanan Dibatalkan Otomatis</h2>`,
+          `<p style="color:#64748b;font-size:13px;margin:0 0 20px">Portfolio OS</p>`,
+          `<p style="font-size:13px;color:#334155">Halo <strong>${buyerName}</strong>,</p>`,
+          `<p style="font-size:13px;color:#334155">Pesanan <code style="font-family:monospace;font-weight:bold">${orderId}</code> (slug <strong>${desiredSlug}</strong>) dibatalkan otomatis karena bukti pembayaran tidak selesai diverifikasi dalam 7 hari.</p>`,
+          `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px;margin:16px 0;font-size:12px;color:#991b1b">`,
+          `<strong>Sudah mentransfer?</strong> Mohon maaf — segera hubungi kami dengan menyebutkan ID pesanan ${orderId}. Pesanan bisa dibuka kembali, lalu Anda cukup upload ulang bukti bayar.`,
+          `</div>`,
+          `<p style="font-size:13px;margin:0 0 16px">Belum membayar dan masih berminat? Buat pesanan baru:</p>`,
+          `<a href="${checkoutUrl}" style="display:inline-block;background:#d97706;color:#fff;padding:10px 24px;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none">Buat Pesanan Baru</a>`,
+          `</div>`,
+        ].join(''),
+      }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.error('[sendOrderCanceledEmail] Failed:', err);
+    return false;
+  }
+}
+
+/**
+ * Notifikasi Telegram ke admin saat order dibatalkan otomatis, lengkap dengan
+ * tombol "Buka Kembali" (callback `reopen_{id}` ditangani webhook Telegram).
+ * Satu-satunya "panel" order yang nyaman dipakai owner non-teknis.
+ * Best-effort: kegagalan kirim tidak boleh menghentikan sweep.
+ */
+async function notifyAutoCanceledOrder(order: {
+  id: string;
+  buyer_name: string;
+  desired_slug: string;
+}): Promise<void> {
+  const text =
+    `⚠️ <b>ORDER DIBATALKAN OTOMATIS (7 HARI)</b>\n\n` +
+    `ID: <code>${escapeTelegramHtml(order.id)}</code>\n` +
+    `Slug: <code>${escapeTelegramHtml(order.desired_slug)}</code>\n` +
+    `Pembeli: ${escapeTelegramHtml(order.buyer_name)}\n\n` +
+    `Bukti bayar tidak selesai diverifikasi dalam 7 hari. Jika uangnya sudah masuk, ` +
+    `tekan tombol di bawah untuk membuka kembali order, lalu minta pembeli upload ` +
+    `ulang bukti bayar sebelum aktivasi.`;
+
+  const replyMarkup = {
+    inline_keyboard: [[{ text: '♻️ Buka Kembali Order', callback_data: `reopen_${order.id}` }]],
+  };
+
+  await sendTelegramMessage({}, text, replyMarkup);
 }
 
 // ---------------------------------------------------------------------------
@@ -961,7 +1084,7 @@ export async function uploadPaymentProof(
 async function sendWorkshopTicket(order: OrderRecord, siteUrl: string): Promise<void> {
   const steps = [
     '1. Buat Gmail untuk klien.',
-    '2. Buat akun Cloudflare klien (Account ID + API Token izin D1, Pages, R2).',
+    '2. Buat akun Cloudflare klien (Account ID + API Token izin D1, R2, Workers (Edit)).',
     '3. Jalankan PENGELOLA_KLIEN.bat → menu [1] Pendaftaran Klien Baru.',
     '4. Deploy lewat portal yang sama.',
     '5. Kirim akses ke klien (URL + login /admin).',
@@ -1245,6 +1368,72 @@ export async function cancelOrder(
     success: true,
     message: `Pesanan ${orderId} telah dibatalkan dan data sensitif dibersihkan.`,
     order: updatedOrder,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Reopen Order (audit business flow 2026-10-06)
+// ---------------------------------------------------------------------------
+
+/**
+ * Buka kembali order berstatus `canceled` (pembatalan otomatis 7 hari / admin)
+ * atau `failed` (aktivasi gagal) → kembali ke antrean verifikasi.
+ *
+ * Tanpa jalur ini kedua status adalah jalan buntu: order tak bisa diaktifkan
+ * lagi padahal uang bisa saja sudah masuk. Dipakai lewat tombol Telegram
+ * (`reopen_{id}`) dan `POST /api/admin/orders` (action `reopen`).
+ *
+ * Catatan: bukti bayar lama dihapus saat pembatalan (keputusan audit keamanan
+ * 2026-09-29), jadi setelah order dibuka kembali pembeli perlu upload ulang
+ * bukti sebelum aktivasi.
+ */
+export async function reopenOrder(
+  orderId: string
+): Promise<{ success: boolean; message: string; order?: OrderRecord }> {
+  const now = new Date().toISOString();
+
+  const rows = await queryD1<OrderRecord>('SELECT * FROM orders WHERE id = ?', [orderId]);
+  const order = rows[0];
+
+  if (!order) {
+    return { success: false, message: `Pesanan ${orderId} tidak ditemukan` };
+  }
+
+  if (order.status !== 'canceled' && order.status !== 'failed') {
+    return {
+      success: false,
+      message: `Hanya order berstatus canceled atau failed yang bisa dibuka kembali. Status saat ini: ${order.status}.`,
+    };
+  }
+
+  const updated = await queryD1<OrderRecord>(
+    `UPDATE orders
+     SET status = 'waiting_verification',
+         cancel_reason = NULL,
+         updated_at = ?
+     WHERE id = ? AND status IN ('canceled', 'failed')
+     RETURNING *`,
+    [now, orderId]
+  );
+
+  const reopened = updated[0];
+  if (!reopened) {
+    return { success: false, message: `Status order ${orderId} berubah saat diproses. Coba lagi.` };
+  }
+
+  await logActivity('billing.order_reopen', {
+    category: 'billing',
+    orderId,
+    fromStatus: order.status,
+  });
+
+  const needsNewProof = !order.payment_proof_url?.trim();
+  return {
+    success: true,
+    message: needsNewProof
+      ? `Order ${orderId} dibuka kembali ke antrean verifikasi. Bukti bayar lama sudah dihapus — minta pembeli upload ulang bukti sebelum aktivasi.`
+      : `Order ${orderId} dibuka kembali ke antrean verifikasi dan siap diaktifkan.`,
+    order: reopened,
   };
 }
 
