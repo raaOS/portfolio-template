@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import fs from 'node:fs';
-import path from 'node:path';
+import changelogSource from '../../CHANGELOG.md?raw';
 import { APP_VERSION, DEFAULT_SITE_URL, getPublicBaseUrl } from './constants';
 
 // Guard terhadap bug audit 2026-10-06: build produksi pernah meng-inline
@@ -47,8 +46,7 @@ describe('getPublicBaseUrl', () => {
 
 describe('APP_VERSION', () => {
   it('sama dengan entri teratas CHANGELOG.md (dipakai /api/health → portal status board)', () => {
-    const changelog = fs.readFileSync(path.join(process.cwd(), 'CHANGELOG.md'), 'utf8');
-    const match = changelog.match(/^##\s*\[([^\]]+)\]/m);
+    const match = changelogSource.match(/^##\s*\[([^\]]+)\]/m);
     expect(match).not.toBeNull();
     expect(APP_VERSION).toBe(match![1]);
   });
