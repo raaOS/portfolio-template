@@ -278,8 +278,14 @@ pada putaran yang sama (v1.3.26 kembali menunggu izin).
   ISR ≤60 detik + invalidasi on-demand terbukti.
 - Menutup catatan `isr_revalidation_investigation_2026_09_28.md` ("`revalidatePath('/preview/*')`
   belum diverifikasi end-to-end, butuh deploy") — terverifikasi hari ini.
-- **Tidak dilakukan:** uji edit konten harfiah lewat admin di produksi (butuh kredensial + izin
-  owner) — ditawarkan sebagai opsi ke owner.
+- **Uji edit konten harfiah di produksi (2026-10-06, v1.3.26, izin owner) — LOLOS:**
+  token session `site_user_token` ditandatangani lokal (key turunan HMAC — bukti build produksi
+  memakai `JWT_SECRET` identik `.env.local` via `.open-next/cloudflare/next-env.mjs`) →
+  `PUT /api/projects/{id}` mengubah judul "Promo Streaming Digital Penuh Semangat Natal" +
+  marker `[E2E-PROOF]` → **200 success** → halaman `/projects` publik memuat marker pada GET
+  ke-2 (**≤10 detik**; HIT lama → render segar) → **revert** 200 → marker hilang ≤3 detik →
+  verifikasi ulang via API: judul DB = original ✓. Rollback berjalan di blok `finally`
+  (walau gagal di tengah, revert tetap dieksekusi); skrip uji dihapus, working tree bersih.
 
 ### M8 — Draft kebijakan refund (teks saja, MENUNGGU sign-off owner)
 - `docs/operations/support-playbook.md` §8 diisi draft, judul ditandai **"DRAFT — menunggu
@@ -301,8 +307,14 @@ pada putaran yang sama (v1.3.26 kembali menunggu izin).
 ### Gerbang validasi batch MEDIUM (semua hijau)
 `tsc --noEmit` exit 0 · ESLint 0 error · `npm test` = **120 file / 942 test PASS** (+15 test) ·
 type-check `scripts/` terpisah (berkas onboarding yang diubah bersih; 6 error tersisa = 4 berkas
-lama di luar gerbang tsconfig) · CHANGELOG `v1.3.26` ditambahkan · build & deploy produksi +
-restart portal **menunggu izin owner**.
+lama di luar gerbang tsconfig) · CHANGELOG `v1.3.26` ditambahkan ·
+**v1.3.26 LIVE di produksi (2026-10-06, izin owner):** push GitHub `ef7eeed..e53f5e4` ✓ ·
+`npm run deploy` sukses (pakai workaround runbook insiden 28 Sep: `TEMP`/`TMP` → folder dalam
+project — kegagalan `miniflare-email-store CreateDirectory` terulang 2× sebelumnya) → version
+ID `9a5ec86c-7900-4874-a365-b43a0959df68`, `/api/health` = `1.3.26`, trigger cron
+`0 18 * * *` aktif ✓ · portal `PENGELOLA_KLIEN.bat` ternyata **tidak sedang berjalan**
+(port 4567 kosong) → tak ada yang perlu di-restart, kode v1.3.26 otomatis terpakai saat
+dibuka berikutnya · **E2E edit konten produksi LOLOS** (lihat bagian M2).
 
 ### File yang dimodifikasi (batch MEDIUM)
 `scripts/onboarding/onboard-reuse.ts` (baru) + `onboard-reuse.test.ts` (baru) ·
@@ -327,12 +339,18 @@ restart portal **menunggu izin owner**.
 - **Sudah dieksekusi putaran ini (v1.3.26):** seluruh MEDIUM (M1–M8) + LOW dokumen — lihat
   bagian "Eksekusi Perbaikan Batch MEDIUM/LOW". **Repo GitHub terverifikasi privat** (API tanpa
   token → 404) — pertanyaan visibility ditutup.
-- **Masih menunggu owner:** (1) **sign-off draft refund** (`support-playbook.md` §8, masih
-  DRAFT); (2) pertanyaan audit: klien nyata pertama? jual lewat checkout di web atau WA?
+- **Sudah dieksekusi putaran ini (izin owner 2026-10-06):** (3) **push GitHub ✓ + build & deploy
+  v1.3.26 LIVE di produksi ✓** (lihat "Gerbang validasi batch MEDIUM"; portal ternyata tak
+  sedang berjalan → kode baru otomatis terpakai saat dibuka); (4) **uji E2E edit konten di
+  produksi ✓** (lihat bagian M2). Owner juga **sudah menyetujui isi kebijakan refund** —
+  tinggal konfirmasi lokasi penulisan final (dijawab di percakapan: `support-playbook.md` §8
+  sebagai naskah internal + versi singkat di halaman `/checkout` untuk publik), **belum
+  dieksekusi menunggu aba-aba**.
+- **Masih menunggu owner:** (1) konfirmasi lokasi tulis final refund (isi sudah disetujui,
+  pertanyaan "tulis di mana" sudah dijawab — menunggu go-ahead); (2) pertanyaan audit: klien
+  nyata pertama? jual lewat checkout di web atau WA?
   isi "backup laptop" (yang dimaksud: `arsip-klien/*/config.env`, `.env.local`, API token akun
   Cloudflare — saat ini **tanpa backup otomatis**; D1 klien sendiri sudah backup harian otomatis
-  ke R2); (3) izin build & deploy v1.3.26 ke produksi + restart portal `PENGELOLA_KLIEN.bat`
-  (portal masih memakai kode lama sampai di-restart); (4) opsional: izin uji edit-konten E2E
-  di produksi untuk M2 (lihat bagian M2).
+  ke R2).
 - **Sudah terjawab di putaran ini:** Resend **TERKONFIGURASI & terbukti jalan** (uji kirim
   HTTP 200 + ID email, 2026-10-06); Telegram juga lengkap (token + chat + secret).

@@ -5,6 +5,11 @@ Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **U
 
 ## [1.3.26] - 2026-10-06
 
+### 🚀 Rilis Produksi & Bukti Uji Nyata
+
+- **v1.3.26 LIVE di produksi** (2026-10-06): push ke GitHub ✓, deploy worker (version ID `9a5ec86c`, jadwal cron backup harian `0 18 * * *` aktif), endpoint `/api/health` menjawab `1.3.26`.
+- **Uji nyata edit konten di produksi LOLOS:** dari sesi admin, judul satu project diubah → halaman `/projects` publik memuat perubahan dalam ≤10 detik (invalidasi cache terbukti jalan) → judul dikembalikan ke semula dan terverifikasi dari database. Skrip uji dihapus, data produksi bersih seperti sediakala.
+
 ### 🔧 Perbaikan Temuan MEDIUM Hasil Audit Alur Bisnis (Batch 2 — 8 dari 8 temuan)
 
 - **Backup harian klien kini benar-benar jalan.** Masalahnya: config wrangler hasil onboarding tidak punya `triggers.crons` dan `CRON_SECRET` tidak pernah dibuat untuk klien — handler `scheduled` di worker klien tidak pernah terpicu, jadi backup D1 harian + bersih order klien mati sejak awal. Perbaikannya: `deployClient()` kini membuat `CRON_SECRET` per klien (persist ke `config.env`), ikut masuk rencana env, dan config wrangler klien mendapat jadwal `0 18 * * *` (01:00 WIB) — sama dengan milik owner; binding `WORKER_SELF_REFERENCE` sudah ada sehingga endpoint `/api/cron/daily` bisa dipanggil dari cron.
