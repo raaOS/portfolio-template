@@ -1,6 +1,6 @@
 # Audit Logika & Alur Bisnis Menyeluruh — 2026-10-06
 
-_Status:_ ✅ Audit selesai; **perbaikan 4 temuan CRITICAL sudah dieksekusi dan tervalidasi** (persetujuan owner: "kerjakan dan pastikan valid fix"). Temuan HIGH/MEDIUM lainnya masih menunggu putaran berikutnya.
+_Status:_ ✅ Audit selesai; **perbaikan CRITICAL, HIGH (v1.3.25), dan MEDIUM + LOW (v1.3.26) — ketiganya sudah dieksekusi dan tervalidasi gerbang**. Sisa: keputusan produk owner (rollback update, sign-off draft refund) + pertanyaan audit yang belum dijawab + izin deploy v1.3.26.
 
 ## Cakupan
 
@@ -189,7 +189,8 @@ temuan paling kritis oleh sesi utama.
 
 ### Gerbang validasi batch HIGH (semua hijau)
 `tsc --noEmit` exit 0 · ESLint 0 error · `npm test` = **119 file / 927 test PASS** (+9 test) ·
-CHANGELOG `v1.3.25` ditambahkan · build & deploy produksi **menunggu izin owner**.
+CHANGELOG `v1.3.25` ditambahkan · build & deploy produksi disetujui owner & di-deploy v1.3.25
+pada putaran yang sama (v1.3.26 kembali menunggu izin).
 
 ### File yang dimodifikasi (batch HIGH)
 `src/lib/constants.ts` + `src/lib/constants.test.ts` (baru) · `src/lib/services/orderService.ts` ·
@@ -199,6 +200,119 @@ CHANGELOG `v1.3.25` ditambahkan · build & deploy produksi **menunggu izin owner
 `src/app/api/admin/clear-cache/route.ts` + test · `src/app/api/admin/clear-rate-limit/route.ts` + test ·
 `.env.example` · `docs/product-boundary/env-inventory.md` · `docs/release/CLIENT_OPERATIONS.md` ·
 `docs/release/RELEASE_CHECKLIST.md` · `AGENTS.md` · (+ `CHANGELOG.md` v1.3.25, log ini, INDEX_TRACKER).
+
+## Eksekusi Perbaikan Batch MEDIUM/LOW (2026-10-06, izin owner — v1.3.26)
+
+> Izin owner: "commit dan gabungkan, dan Audit MEDIUM/LOW dieksekusi setelahnya".
+> Semua 8 temuan MEDIUM dieksekusi: M1/M3/M4/M5/M6/M7 = kode, M2 = verifikasi E2E
+> tanpa kode, M8 = draft teks saja (butuh sign-off owner).
+
+### M1 — Cron backup klien ikut terpasang
+- **Akar:** config wrangler hasil onboarding tidak punya `triggers.crons` dan `CRON_SECRET`
+  tidak pernah dibuat untuk klien → handler `scheduled` di worker klien tak pernah terpicu →
+  backup D1 harian + bersih order klien mati sejak awal.
+- **Fix (`client-deploy.ts`):** `ensureClientSecrets` membuat `CRON_SECRET` (randomBytes 32,
+  persist ke `config.env`), `buildClientEnvPlan` memasukkan `CRON_SECRET`, `writeWranglerClientConfig`
+  menulis `triggers.crons: ['0 18 * * *']` (01:00 WIB — sama dengan owner).
+- **Verifikasi:** binding `services`/`WORKER_SELF_REFERENCE` sudah ada (`client-deploy.ts:349-355`);
+  `runDailyBackup` hanya butuh env R2 yang sudah ikut rencana env; scheduled handler di-inject
+  `prepare-opennext-worker-output.js` tanpa syarat; `deployClient` memanggil `ensureClientSecrets`
+  (baris 519) → persist (531) → `buildClientEnvPlan` (531).
+
+### M7 — Salah isi form tidak lagi mengunci email pembeli 24 jam
+- **Akar:** `checkDataRateLimit('billing_checkout_email:'+email, 5, 1j, 24j)` menghitung SETIAP
+  percobaan → 5× gagal validasi form = email diblokir 24 jam.
+- **Fix:** `DataRateLimitOptions {record?: boolean}` di `dataRateLimit.ts` — mode intip
+  (`record:false`) memutuskan & menulis `blockedUntil` di atas limit tapi TIDAK menghitung
+  (jalur local & D1 keduanya); checkout pre-check dengan `record:false`, hitungan hanya dicatat
+  setelah `createOrder` sukses. Batas 5 order/jam + blokir 24 jam tetap berlaku.
+
+### M6 — Countdown order menunggu verifikasi memakai aturan yang benar
+- **Akar:** halaman menghitung ke `expires_at` (created+24 jam) sedangkan server membatalkan
+  otomatis di `updated_at`+7 hari (`orderService.ts:102`) → countdown nol ±6,7 hari sebelum
+  pembatalan nyata; satuan `${days}d` tabrakan dengan suffix detik.
+- **Fix:** status menunggu → hitung ke `updated_at`+7 hari (fallback `expires_at`), label
+  "Dibatalkan otomatis dalam:", suffix hari "hr", `countdownUrgent` hanya `pending_payment`,
+  `updated_at` ditambahkan ke SELECT API order + `OrderData`.
+
+### M3 — Komentar & metrik publik dipagari
+- **Fix:** POST `/api/comments` → `enforceRequestRateLimit(request, 'comments_post', 5, 60_000,
+  600_000)` (kunci IP); comments + metrics menolak `siteId !== SITE_ID && siteId !== 'default-site'`
+  dengan 400 (1 D1 = 1 site; bucket sah terbukti: route `[siteSlug]` mengirim `site.id` = SITE_ID
+  dari seed, route `(site)` default `'default-site'`); rate limit metrics 60/menit tidak diubah.
+- **Test:** 2 test lama ber-`siteId: 'tenant-a'` disesuaikan ke kebijakan baru (400) + 2 test baru
+  (tolah siteId asing, terima `default-site`).
+
+### M4 — Re-provision slug tidak lagi merotasi password diam-diam / menggandakan arsip
+- **Modul baru:** `scripts/onboarding/onboard-reuse.ts` (`findArchiveForSlug`, `createArchiveDir`,
+  `pickD1Rows`, `resolveProvisionedAdminPassword`) dipakai portal `server.ts` DAN CLI
+  `cloud-manager.ts` — perilaku keduanya kini identik; duplikasi `getNextArchiveDir` dihapus.
+- **Kebijakan:** arsip lama dicari dulu (cocok `CUSTOMER_SLUG`; ganda → nomor terbesar) dan
+  folder yang SAMA dipakai ulang; `JWT_SECRET`/`PASSWORD_SALT`/`WEBSITE_URL`/`ADMIN_URL` dipakai
+  ulang (sesi login tak keluar, custom domain tak hilang), kunci tak dikenal ikut terbawa
+  (mis. `CRON_SECRET`); password eksplisit (`--password`/kolom portal) = rotasi disengaja;
+  admin sudah ada + arsip ada = pakai ulang, tanpa seed ulang; admin sudah ada + arsip hilang =
+  **error jujur** (saran `--password` / `reset-customer-password.ts`); query cek admin gagal =
+  error (tidak menebak → tidak ada rotasi diam-diam).
+- **Test:** `onboard-reuse.test.ts` — 14 test (keputusan password ×5, arsip/create ×5,
+  `pickD1Rows` ×2, `parseEnvText` ×2).
+
+### M5 — Guard custom domain duplikat + jalur lepas (detach)
+- `guardWorkerDomainAttach()` di `custom-domain.ts`: hostname sudah menempel di worker yang sama
+  → idempoten (tanpa PUT); menempel di worker LAIN → ditolak dengan instruksi (dulu `PUT`
+  diam-diam memindahkan domain). Dipasang di portal (`server.ts`) dan CLI (`cloud-manager.ts`).
+- Aksi CLI baru `detach_domain`/`disconnect_domain` memakai API resmi Cloudflare
+  `DELETE /accounts/{account_id}/workers/domains/{domain_id}` (docs resmi dicek 2026-10-06);
+  `AttachedDomain.id` kini dikembalikan `findWorkerDomain`; catatan `CUSTOM_DOMAIN` dibersihkan
+  dari config.env arsip saat detach. Lepas via portal UI belum ada (butuh tombol baru — di luar
+  ruang batch ini).
+
+### M2 — ISR/revalidasi terbukti end-to-end di produksi (verifikasi, tanpa kode)
+- **Bukti 2026-10-06 (read-only) terhadap produksi v1.3.25:** `/preview/os-desktop`
+  `x-opennext-cache: HIT` ×2 (baca cache KV sehat — kuota harian yang dulu mematikan ISR sudah
+  beres); POST `/api/revalidate` HMAC valid → `{"revalidated":true}` → GET → **STALE**
+  (invalidasi menyebar ke cache) → GET setelah 65 detik → **HIT** (revalidasi latar via memory
+  queue selesai & ter-commit). Rantai inilah yang dipakai admin saat edit konten
+  (`revalidatePath` — API/tag yang sama, call site teruji unit test).
+- `/about` & `/contact` ternyata **dynamic** (edit admin tampil langsung); `/projects` + `/preview/*`
+  ISR ≤60 detik + invalidasi on-demand terbukti.
+- Menutup catatan `isr_revalidation_investigation_2026_09_28.md` ("`revalidatePath('/preview/*')`
+  belum diverifikasi end-to-end, butuh deploy") — terverifikasi hari ini.
+- **Tidak dilakukan:** uji edit konten harfiah lewat admin di produksi (butuh kredensial + izin
+  owner) — ditawarkan sebagai opsi ke owner.
+
+### M8 — Draft kebijakan refund (teks saja, MENUNGGU sign-off owner)
+- `docs/operations/support-playbook.md` §8 diisi draft, judul ditandai **"DRAFT — menunggu
+  persetujuan owner"**: batal sebelum aktivasi → refund penuh (potong biaya transfer bila ada);
+  ≤7 hari sesudah aktivasi → refund penuh bila tak sesuai/gagal diperbaiki 3×24 jam;
+  >7 hari → tanpa uang (perbaikan/kredit); pelanggaran konten → tanpa refund + suspend;
+  SLA balasan ≤1×24 jam. **Belum boleh dijanjikan ke klien sampai owner menyetujui.**
+
+### LOW — konsistensi dokumen & pertanyaan audit
+- `docs/release/SALES_PRICING.md:12` diluruskan (email aktivasi hanya link website + ringkasan
+  order; akses admin diserahkan terpisah — diverifikasi dari kode email `orderService.ts:665-714`).
+- Verifikasi sisa klaim: `PANDUAN_UNTUK_KAMU_OWNER.md` sudah bersih dari `.pages.dev`/`Cloudflare
+  Pages`; `PANDUAN_KELOLA_DARI_HP.md` sudah "Worker" + artifact 7 hari dijelaskan jujur;
+  `AGENTS.md` §12 sudah Workers; PRD/BENGKEL sudah sesuai (perbaikan batch sebelumnya).
+- **Repo GitHub terverifikasi PRIVAT:** API GitHub tanpa autentikasi menjawab 404 untuk
+  `raaOS/portfolio-template` (remote origin sama) → artifact arsip 7 hari tidak publik;
+  pertanyaan audit "visibility repo" DITUTUP.
+
+### Gerbang validasi batch MEDIUM (semua hijau)
+`tsc --noEmit` exit 0 · ESLint 0 error · `npm test` = **120 file / 942 test PASS** (+15 test) ·
+type-check `scripts/` terpisah (berkas onboarding yang diubah bersih; 6 error tersisa = 4 berkas
+lama di luar gerbang tsconfig) · CHANGELOG `v1.3.26` ditambahkan · build & deploy produksi +
+restart portal **menunggu izin owner**.
+
+### File yang dimodifikasi (batch MEDIUM)
+`scripts/onboarding/onboard-reuse.ts` (baru) + `onboard-reuse.test.ts` (baru) ·
+`scripts/onboarding/server.ts` · `scripts/onboarding/cloud-manager.ts` ·
+`scripts/onboarding/custom-domain.ts` · `scripts/onboarding/client-deploy.ts` ·
+`src/lib/dataRateLimit.ts` · `src/app/api/billing/checkout/route.ts` ·
+`src/app/api/billing/orders/[orderId]/route.ts` · `src/app/orders/[orderId]/page.tsx` ·
+`src/app/api/comments/route.ts` + test · `src/app/api/metrics/route.ts` + test ·
+`src/lib/constants.ts` · `docs/release/SALES_PRICING.md` · `docs/operations/support-playbook.md`
+· (+ `CHANGELOG.md` v1.3.26, log ini, INDEX_TRACKER).
 
 ### Belum dieksekusi (menunggu putusan/putaran berikutnya)
 - **Keputusan produk owner sudah DIEKSEKUSI (2026-10-06, ikut v1.3.25):** (1) janji AI dihapus —
@@ -210,7 +324,15 @@ CHANGELOG `v1.3.25` ditambahkan · build & deploy produksi **menunggu izin owner
   `panduan/PANDUAN_KELOLA_DARI_HP.md` (butuh `arsip-klien/` yang tak di-commit → gagal di CI;
   `onboard_client`/`custom_domain` aman dari HP — terverifikasi di `cloud-manager.ts:483,515,584`).
 - **Sisa HIGH/produk:** rollback update per klien (belum dibahas).
-- **MEDIUM/LOW audit lainnya** + pertanyaan audit yang belum dijawab owner (klien nyata pertama?
-  path jual via checkout atau WA? repo GitHub privat? kebijakan refund/SLA? backup laptop?).
+- **Sudah dieksekusi putaran ini (v1.3.26):** seluruh MEDIUM (M1–M8) + LOW dokumen — lihat
+  bagian "Eksekusi Perbaikan Batch MEDIUM/LOW". **Repo GitHub terverifikasi privat** (API tanpa
+  token → 404) — pertanyaan visibility ditutup.
+- **Masih menunggu owner:** (1) **sign-off draft refund** (`support-playbook.md` §8, masih
+  DRAFT); (2) pertanyaan audit: klien nyata pertama? jual lewat checkout di web atau WA?
+  isi "backup laptop" (yang dimaksud: `arsip-klien/*/config.env`, `.env.local`, API token akun
+  Cloudflare — saat ini **tanpa backup otomatis**; D1 klien sendiri sudah backup harian otomatis
+  ke R2); (3) izin build & deploy v1.3.26 ke produksi + restart portal `PENGELOLA_KLIEN.bat`
+  (portal masih memakai kode lama sampai di-restart); (4) opsional: izin uji edit-konten E2E
+  di produksi untuk M2 (lihat bagian M2).
 - **Sudah terjawab di putaran ini:** Resend **TERKONFIGURASI & terbukti jalan** (uji kirim
   HTTP 200 + ID email, 2026-10-06); Telegram juga lengkap (token + chat + secret).

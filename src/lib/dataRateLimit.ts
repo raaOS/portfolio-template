@@ -66,17 +66,30 @@ function prunePersistedEntries(
   return Object.fromEntries(kept);
 }
 
+export interface DataRateLimitOptions {
+  /**
+   * `true` (default): hitung percobaan INI sebagai satu attempt (pemakaian
+   * normal). `false`: mode intip — ambil keputusan blokir tanpa menghitung
+   * attempt. Dipakai checkout (audit 2026-10-06): kegagalan validasi form
+   * tidak boleh mengunci email pembeli 24 jam — yang dihitung hanya order
+   * yang berhasil dibuat.
+   */
+  record?: boolean;
+}
+
 function checkLocalRateLimit(
   key: string,
   maxAttempts: number,
   windowMs: number,
-  blockMs: number
+  blockMs: number,
+  shouldRecord: boolean
 ): { allowed: boolean; retryAfter?: number } {
   cleanupExpiredEntries();
   const now = Date.now();
   const record = localLimits.get(key);
 
   if (!record) {
+    if (!shouldRecord) return { allowed: true }; // mode intip: jangan buat hitungan
     localLimits.set(key, { attempts: 1, resetAt: now + windowMs });
     return { allowed: true };
   }
@@ -91,11 +104,13 @@ function checkLocalRateLimit(
   }
 
   if (now > record.resetAt || (record.blockedUntil && now >= record.blockedUntil)) {
+    if (!shouldRecord) return { allowed: true }; // jendela baru milik panggilan pencatat berikutnya
     localLimits.set(key, { attempts: 1, resetAt: now + windowMs });
     return { allowed: true };
   }
 
   if (record.attempts >= maxAttempts) {
+    // Melebihi batas = blokir (penegakan), terlepas mode intip atau pencatat.
     const blockedUntil = now + blockMs;
     localLimits.set(key, { ...record, blockedUntil });
     return {
@@ -104,6 +119,7 @@ function checkLocalRateLimit(
     };
   }
 
+  if (!shouldRecord) return { allowed: true };
   localLimits.set(key, { ...record, attempts: record.attempts + 1 });
   return { allowed: true };
 }
@@ -112,13 +128,15 @@ export async function checkDataRateLimit(
   key: string,
   maxAttempts: number,
   windowMs: number,
-  blockMs: number
+  blockMs: number,
+  options: DataRateLimitOptions = {}
 ): Promise<{ allowed: boolean; retryAfter?: number }> {
+  const shouldRecord = options.record !== false;
   const now = Date.now();
   const safePath = key.replace(/[.#$/[\]]/g, '_');
 
   if (!isD1Configured()) {
-    return checkLocalRateLimit(safePath, maxAttempts, windowMs, blockMs);
+    return checkLocalRateLimit(safePath, maxAttempts, windowMs, blockMs, shouldRecord);
   }
 
   try {
@@ -143,6 +161,7 @@ export async function checkDataRateLimit(
 
       if (!record) {
         decision = { allowed: true };
+        if (!shouldRecord) return base; // mode intip: keputusan saja, tanpa hitungan
         nextStore[safePath] = { attempts: 1, resetAt: now + windowMs };
       } else if (record.blockedUntil && now < record.blockedUntil) {
         decision = {
@@ -152,8 +171,10 @@ export async function checkDataRateLimit(
         return base; // blocked: keep the store as-is (still pruned)
       } else if (now > record.resetAt || (record.blockedUntil && now >= record.blockedUntil)) {
         decision = { allowed: true };
+        if (!shouldRecord) return base; // jendela baru milik panggilan pencatat berikutnya
         nextStore[safePath] = { attempts: 1, resetAt: now + windowMs };
       } else if (record.attempts >= maxAttempts) {
+        // Melebihi batas = blokir (penegakan), terlepas mode intip atau pencatat.
         const blockedUntil = now + blockMs;
         decision = {
           allowed: false,
@@ -162,6 +183,7 @@ export async function checkDataRateLimit(
         nextStore[safePath] = { ...record, blockedUntil };
       } else {
         decision = { allowed: true };
+        if (!shouldRecord) return base; // mode intip: lolos tanpa menambah hitungan
         nextStore[safePath] = { ...record, attempts: record.attempts + 1 };
       }
 
@@ -184,6 +206,6 @@ export async function checkDataRateLimit(
     if (process.env.NODE_ENV === 'production') {
       return { allowed: false, retryAfter: 60 };
     }
-    return checkLocalRateLimit(safePath, maxAttempts, windowMs, blockMs);
+    return checkLocalRateLimit(safePath, maxAttempts, windowMs, blockMs, shouldRecord);
   }
 }

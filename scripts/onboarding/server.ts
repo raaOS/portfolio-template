@@ -6,7 +6,13 @@ import { spawn } from 'child_process';
 import { SHARED_SCHEMA_QUERIES } from '../../src/crud/shared/db/schema';
 import { hashPasswordScrypt } from '../../src/crud/shared/auth/password';
 import { clientUrls, deployClient, resolveWorkersSubdomain } from './client-deploy';
-import { attachWorkerDomain, findWorkerDomain, buildDomainHandoverMessage } from './custom-domain';
+import { attachWorkerDomain, findWorkerDomain, buildDomainHandoverMessage, guardWorkerDomainAttach } from './custom-domain';
+import {
+  findArchiveForSlug,
+  createArchiveDir,
+  pickD1Rows,
+  resolveProvisionedAdminPassword,
+} from './onboard-reuse';
 
 const PORT = Number(process.env.PORT) || 4567;
 const ROOT_DIR = process.cwd();
@@ -87,28 +93,8 @@ async function cfApi(url: string, token: string, options: RequestInit = {}) {
   return { ok: res.ok && data.success, status: res.status, data };
 }
 
-// Generate next archive folder name e.g. "01_budi_pratama"
-function getNextArchiveDir(clientSlug: string): { dirPath: string; folderName: string } {
-  const existing = fs
-    .readdirSync(ARCHIVE_DIR, { withFileTypes: true })
-    .filter((d) => d.isDirectory())
-    .map((d) => d.name);
-
-  let nextNum = 1;
-  const numbers = existing
-    .map((name) => parseInt(name.split('_')[0], 10))
-    .filter((n) => !isNaN(n));
-  if (numbers.length > 0) {
-    nextNum = Math.max(...numbers) + 1;
-  }
-
-  const prefix = String(nextNum).padStart(2, '0');
-  const safeSlug = clientSlug.replace(/[^a-zA-Z0-9-]/g, '_').toLowerCase();
-  const folderName = `${prefix}_${safeSlug}`;
-  const dirPath = path.join(ARCHIVE_DIR, folderName);
-  fs.mkdirSync(dirPath, { recursive: true });
-  return { dirPath, folderName };
-}
+// Generate folder arsip bernomor (01_slug, 02_slug, ...) — kini ada di
+// ./onboard-reuse (createArchiveDir) supaya portal & CLI memakai kebijakan yang sama.
 
 // Provisioning Worker with Progress Callback
 async function provisionClient(
@@ -116,7 +102,9 @@ async function provisionClient(
   onProgress: (step: number, message: string, detail?: string) => void
 ) {
   const { clientName, clientSlug, templateKey, accountId, apiToken, adminEmail } = payload;
-  const adminPassword = payload.adminPassword || `Porto${crypto.randomBytes(3).toString('hex')}!`;
+  // Password admin BELUM diputuskan di sini: kalau re-provision slug lama, password
+  // lama dipertahankan (lihat resolveProvisionedAdminPassword — audit MEDIUM M4).
+  const explicitPassword = (payload.adminPassword || '').trim();
   const siteId = clientSlug;
   const dbName = `db-${clientSlug}`;
   const r2BucketName = `media-${clientSlug}`;
@@ -192,64 +180,112 @@ async function provisionClient(
     body: JSON.stringify({ sql: seedSiteSql }),
   });
 
-  // Seed admin user
-  const salt = crypto.randomBytes(16).toString('hex');
-  const passwordHash = hashPasswordScrypt(adminPassword, salt);
-  const userId = `user-${crypto.randomUUID()}`;
-  const seedUserSql = `
-    INSERT INTO site_users (id, site_id, email, password_hash, password_salt, password_algorithm, role, created_at)
-    VALUES ('${userId}', '${siteId}', '${adminEmail.toLowerCase()}', '${passwordHash}', '${salt}', 'scrypt', 'admin', datetime('now'))
-    ON CONFLICT(site_id, email) DO UPDATE SET
-      password_hash = excluded.password_hash,
-      password_salt = excluded.password_salt;
-  `;
-  await cfApi(`/accounts/${accountId}/d1/database/${databaseId}/query`, apiToken, {
-    method: 'POST',
-    body: JSON.stringify({ sql: seedUserSql }),
+  // --- Penjagaan re-provision (audit MEDIUM M4, 2026-10-06) -----------------
+  // Kalau slug ini sudah pernah onboarding: pakai arsip lama + password lama,
+  // jangan rotasi diam-diam dan jangan gandakan folder arsip.
+  const existingArchive = findArchiveForSlug(ARCHIVE_DIR, clientSlug);
+  let adminExists = false;
+  if (!explicitPassword) {
+    const adminCheckRes = await cfApi(`/accounts/${accountId}/d1/database/${databaseId}/query`, apiToken, {
+      method: 'POST',
+      body: JSON.stringify({
+        sql: `SELECT id FROM site_users WHERE site_id = '${siteId}' AND email = '${adminEmail.toLowerCase()}' LIMIT 1;`,
+      }),
+    });
+    if (!adminCheckRes.ok) {
+      // Gagal memeriksa = tidak boleh menebak: rotasi diam-diam lebih berbahaya daripada error.
+      throw new Error(
+        `Gagal memeriksa apakah admin sudah ada: ${adminCheckRes.data?.errors?.[0]?.message || 'query D1 gagal'}`
+      );
+    }
+    adminExists = pickD1Rows(adminCheckRes.data).length > 0;
+  }
+  const adminDecision = resolveProvisionedAdminPassword({
+    explicitPassword,
+    adminExists,
+    archivePassword: existingArchive?.env.ADMIN_PASSWORD,
+    generateFallback: () => `Porto${crypto.randomBytes(3).toString('hex')}!`,
   });
+  const adminPassword = adminDecision.effectivePassword;
+
+  // Seed admin user (hanya kalau password memang harus ditulis: baru/rotasi eksplisit)
+  if (adminDecision.seedUser) {
+    const salt = crypto.randomBytes(16).toString('hex');
+    const passwordHash = hashPasswordScrypt(adminPassword, salt);
+    const userId = `user-${crypto.randomUUID()}`;
+    const seedUserSql = `
+      INSERT INTO site_users (id, site_id, email, password_hash, password_salt, password_algorithm, role, created_at)
+      VALUES ('${userId}', '${siteId}', '${adminEmail.toLowerCase()}', '${passwordHash}', '${salt}', 'scrypt', 'admin', datetime('now'))
+      ON CONFLICT(site_id, email) DO UPDATE SET
+        password_hash = excluded.password_hash,
+        password_salt = excluded.password_salt;
+    `;
+    await cfApi(`/accounts/${accountId}/d1/database/${databaseId}/query`, apiToken, {
+      method: 'POST',
+      body: JSON.stringify({ sql: seedUserSql }),
+    });
+  } else {
+    console.log('✓ Admin sudah ada — password lama dipertahankan (tidak dirotasi).');
+  }
 
   // STEP 5: Pengarsipan Folder Klien (Isolasi Total)
   onProgress(5, 'Mengarsipkan Kunci & Dokumen Klien...', 'Menyimpan ke folder arsip-klien di laptop');
-  const { dirPath, folderName } = getNextArchiveDir(clientSlug);
+  // Re-provision: tulis ulang ke folder arsip YANG SAMA (arsip lama dipakai ulang,
+  // tidak membuat 02_slug / 03_slug ganda).
+  const { dirPath, folderName } = existingArchive ?? createArchiveDir(ARCHIVE_DIR, clientSlug);
 
   // URL publik memakai Cloudflare Worker (Opsi B), bukan Pages.
   // Subdomain workers.dev dibaca best-effort; kalau token belum punya izin,
   // deploy berikutnya akan mencoba lagi dan memperbarui config.env.
+  // Re-provision: WEBSITE_URL/ADMIN_URL lama menang (mis. sudah custom domain).
   const subdomain = await resolveWorkersSubdomain(accountId, apiToken);
-  const websiteUrl = `https://${clientSlug}.${subdomain ? `${subdomain}.` : ''}workers.dev`;
-  const adminUrl = `${websiteUrl}/admin`;
+  const defaultWebsiteUrl = `https://${clientSlug}.${subdomain ? `${subdomain}.` : ''}workers.dev`;
+  const websiteUrl = existingArchive?.env.WEBSITE_URL || defaultWebsiteUrl;
+  const adminUrl = existingArchive?.env.ADMIN_URL || `${websiteUrl}/admin`;
 
   // Secret milik klien — tidak pernah memakai nilai dari .env.local owner.
-  const jwtSecret = crypto.randomBytes(32).toString('hex');
-  const passwordSalt = crypto.randomBytes(16).toString('hex');
+  // Re-provision: pakai ulang secret lama supaya sesi admin yang sedang login tidak keluar.
+  const jwtSecret = existingArchive?.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
+  const passwordSalt = existingArchive?.env.PASSWORD_SALT || crypto.randomBytes(16).toString('hex');
+
+  // Konten config.env: kunci yang dikontrol onboarding ditulis ulang; kunci lain
+  // dari arsip lama (mis. CRON_SECRET yang ditulis deployClient) dipertahankan.
+  const prevEnv = existingArchive?.env || {};
+  const controlledEnv: Record<string, string> = {
+    CUSTOMER_NAME: clientName,
+    CUSTOMER_SLUG: clientSlug,
+    ACTIVE_TEMPLATE_KEY: templateKey,
+    CUSTOMER_SITE_ID: siteId,
+    CLOUDFLARE_ACCOUNT_ID: accountId,
+    CLOUDFLARE_D1_DATABASE_NAME: dbName,
+    CLOUDFLARE_D1_DATABASE_ID: databaseId,
+    CLOUDFLARE_D1_API_TOKEN: apiToken,
+    CLOUDFLARE_R2_BUCKET_NAME: r2BucketName,
+    CLOUDFLARE_R2_BUCKET: r2BucketName,
+    CLOUDFLARE_R2_ACCOUNT_ID: accountId,
+    CLOUDFLARE_R2_PUBLIC_BASE_URL: '/r2',
+    CLOUDFLARE_API_TOKEN: apiToken,
+    JWT_SECRET: jwtSecret,
+    PASSWORD_SALT: passwordSalt,
+    ADMIN_EMAIL: adminEmail,
+    ADMIN_PASSWORD: adminPassword,
+    WEBSITE_URL: websiteUrl,
+    ADMIN_URL: adminUrl,
+  };
+  if (subdomain) controlledEnv.WORKERS_SUBDOMAIN = subdomain;
+  const hasWorkersSubdomain = Boolean(subdomain || prevEnv.WORKERS_SUBDOMAIN);
+  const leftoverKeys = Object.keys(prevEnv).filter((k) => !(k in controlledEnv)).sort();
 
   const envContent = [
     `# ========================================================`,
     `# ARSIP KLIEN: ${clientName} (${folderName})`,
-    `# Tanggal Pembuatan: ${new Date().toLocaleString('id-ID')}`,
+    existingArchive
+      ? `# Diperbarui (re-provision): ${new Date().toLocaleString('id-ID')}`
+      : `# Tanggal Pembuatan: ${new Date().toLocaleString('id-ID')}`,
     `# ========================================================`,
-    `CUSTOMER_NAME="${clientName}"`,
-    `CUSTOMER_SLUG="${clientSlug}"`,
-    `ACTIVE_TEMPLATE_KEY="${templateKey}"`,
-    `CUSTOMER_SITE_ID="${siteId}"`,
-    `CLOUDFLARE_ACCOUNT_ID="${accountId}"`,
-    `CLOUDFLARE_D1_DATABASE_NAME="${dbName}"`,
-    `CLOUDFLARE_D1_DATABASE_ID="${databaseId}"`,
-    `CLOUDFLARE_D1_API_TOKEN="${apiToken}"`,
-    `CLOUDFLARE_R2_BUCKET_NAME="${r2BucketName}"`,
-    `CLOUDFLARE_R2_BUCKET="${r2BucketName}"`,
-    `CLOUDFLARE_R2_ACCOUNT_ID="${accountId}"`,
-    `CLOUDFLARE_R2_PUBLIC_BASE_URL="/r2"`,
-    `CLOUDFLARE_API_TOKEN="${apiToken}"`,
-    `JWT_SECRET="${jwtSecret}"`,
-    `PASSWORD_SALT="${passwordSalt}"`,
-    subdomain
-      ? `WORKERS_SUBDOMAIN="${subdomain}"`
-      : `# WORKERS_SUBDOMAIN="" (belum terbaca saat onboarding)`,
-    `ADMIN_EMAIL="${adminEmail}"`,
-    `ADMIN_PASSWORD="${adminPassword}"`,
-    `WEBSITE_URL="${websiteUrl}"`,
-    `ADMIN_URL="${adminUrl}"`,
+    ...Object.entries(controlledEnv).map(([key, value]) => `${key}="${value}"`),
+    ...(hasWorkersSubdomain ? [] : [`# WORKERS_SUBDOMAIN="" (belum terbaca saat onboarding)`]),
+    ...leftoverKeys.map((key) => `${key}="${prevEnv[key]}"`),
     ``,
   ].join('\n');
   fs.writeFileSync(path.join(dirPath, 'config.env'), envContent, 'utf-8');
@@ -576,14 +612,26 @@ const server = http.createServer(async (req, res) => {
 
         // Sambungkan hostname ke Worker klien (API Workers Custom Domain).
         // Cloudflare membuat DNS record + sertifikat HTTPS otomatis.
+        // Guard duplikat (audit MEDIUM M5, 2026-10-06): kalau hostname menempel di
+        // Worker LAIN, attach DITOLAK (dulu diam-diam memindahkan domain); kalau sudah
+        // menempel di worker ini → idempoten, tanpa PUT ulang.
         let attached: { hostname: string; service: string; zoneName: string };
         try {
-          attached = await attachWorkerDomain(cfApi, {
+          const guard = await guardWorkerDomainAttach(cfApi, {
             accountId,
             apiToken,
             hostname: domain,
             service: clientSlug,
           });
+          attached =
+            guard.alreadyAttached && guard.existing
+              ? guard.existing
+              : await attachWorkerDomain(cfApi, {
+                  accountId,
+                  apiToken,
+                  hostname: domain,
+                  service: clientSlug,
+                });
         } catch (err) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: false, message: (err as Error).message }));

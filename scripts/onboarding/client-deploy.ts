@@ -134,9 +134,12 @@ export function clientUrls(
 }
 
 /**
- * Buat `JWT_SECRET` / `PASSWORD_SALT` klien bila belum ada, lalu simpan balik ke
+ * Buat `JWT_SECRET` / `PASSWORD_SALT` / `CRON_SECRET` klien bila belum ada, lalu simpan balik ke
  * config.env supaya tidak berubah tiap deploy (rotasi = sesi & hash admin lama
  * tidak langsung tidak berlaku).
+ *
+ * Audit 2026-10-06 (MEDIUM): tanpa `CRON_SECRET` + `triggers.crons`, handler `scheduled`
+ * di worker klien dilewati dan backup D1 harian klien TIDAK PERNAH jalan.
  */
 export function ensureClientSecrets(config: EnvMap): string[] {
   const generated: string[] = [];
@@ -147,6 +150,10 @@ export function ensureClientSecrets(config: EnvMap): string[] {
   if (!config.PASSWORD_SALT) {
     config.PASSWORD_SALT = crypto.randomBytes(16).toString('hex');
     generated.push('PASSWORD_SALT');
+  }
+  if (!config.CRON_SECRET) {
+    config.CRON_SECRET = crypto.randomBytes(32).toString('hex');
+    generated.push('CRON_SECRET');
   }
   return generated;
 }
@@ -179,6 +186,10 @@ export function buildClientEnvPlan(config: EnvMap): ClientEnvPlan {
     CLOUDFLARE_R2_PUBLIC_BASE_URL: config.CLOUDFLARE_R2_PUBLIC_BASE_URL || '/r2',
     JWT_SECRET: config.JWT_SECRET || '',
     PASSWORD_SALT: config.PASSWORD_SALT || '',
+    // Audit 2026-10-06 (MEDIUM): cron harian klien (backup D1 → R2 klien, 01:00 WIB).
+    // Handler `scheduled` sudah di-inject ke worker oleh prepare-opennext-worker-output.js;
+    // tanpa secret ini endpoint /api/cron/daily menjawab 500 dan run dilewati.
+    CRON_SECRET: config.CRON_SECRET || '',
     // Provider milik owner tidak boleh dipakai klien.
     FEATURE_AI: 'false',
     FEATURE_NOTIFICATIONS: 'false',
@@ -356,6 +367,12 @@ export function writeWranglerClientConfig(input: WranglerClientInput): string {
     ],
     observability: {
       enabled: true,
+    },
+    // Audit 2026-10-06 (MEDIUM): tanpa trigger ini, worker klien tidak pernah menjalankan
+    // `scheduled` → backup D1 harian klien mati. Jadwal sama dengan owner (01:00 WIB /
+    // 18:00 UTC). Handler `scheduled` sendiri sudah ada di worker.js hasil build.
+    triggers: {
+      crons: ['0 18 * * *'],
     },
     vars,
   };

@@ -88,11 +88,8 @@ describe('POST /api/metrics', () => {
     });
   });
 
-  it('writes metrics into the requesting tenant namespace', async () => {
+  it('rejects unknown siteId namespaces (audit MEDIUM M3, 2026-10-06)', async () => {
     enforceRequestRateLimitMock.mockResolvedValue({ allowed: true, retryAfter: 0 });
-    getProjectBySlugSqlMock.mockResolvedValue({ slug: 'demo', likes: 0, shares: 0 });
-    const transaction = vi.fn(async (updater) => updater(null));
-    refMock.mockReturnValue({ transaction });
 
     const response = await POST(
       new Request('http://localhost/api/metrics', {
@@ -102,8 +99,9 @@ describe('POST /api/metrics', () => {
       }) as never
     );
 
-    expect(response.status).toBe(200);
-    expect(getProjectBySlugSqlMock).toHaveBeenCalledWith('tenant-a', 'demo');
-    expect(refMock).toHaveBeenCalledWith('metrics/metrics/tenant-a/demo');
+    // SiteId asing ditolak sebelum membuat baris metrics baru (audit MEDIUM M3).
+    expect(response.status).toBe(400);
+    expect(refMock).not.toHaveBeenCalled();
+    expect(getProjectBySlugSqlMock).not.toHaveBeenCalled();
   });
 });

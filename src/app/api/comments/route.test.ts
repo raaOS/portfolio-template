@@ -1,13 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { refMock } = vi.hoisted(() => ({
+const { refMock, enforceRequestRateLimitMock } = vi.hoisted(() => ({
   refMock: vi.fn(),
+  enforceRequestRateLimitMock: vi.fn(),
 }));
 
 vi.mock('@/lib/database', () => ({
   db: {
     ref: refMock,
   },
+}));
+
+// Limit IP dipatok lolos di file ini: kuota aslinya (5/menit per IP) sengaja diuji
+// lewat kasus terpisah, bukan lewat jumlah test dalam berkas ini.
+vi.mock('@/lib/security/request', () => ({
+  enforceRequestRateLimit: enforceRequestRateLimitMock,
 }));
 
 import { POST } from './route';
@@ -25,6 +32,7 @@ type StoredComment = {
 describe('POST /api/comments', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    enforceRequestRateLimitMock.mockResolvedValue({ allowed: true, retryAfter: 0 });
     invalidateBannedWordsCache();
   });
 
@@ -200,19 +208,7 @@ describe('POST /api/comments', () => {
     expect(body.error).toBe('Please wait 5 seconds before posting again');
   });
 
-  it('writes a comment into the requesting tenant namespace', async () => {
-    const transaction = vi.fn(async (updater: (current: StoredComment[] | null) => StoredComment[]) => {
-      updater(null);
-      return { committed: true };
-    });
-    refMock.mockImplementation((path: string) => {
-      if (path === 'settings/bannedWords') {
-        return { once: vi.fn().mockResolvedValue({ exists: () => true, val: () => [] }) };
-      }
-      if (path === 'comments/tenant-a/demo-project') return { transaction };
-      throw new Error(`Unexpected CLOUDFLARE_D1 path: ${path}`);
-    });
-
+  it('rejects unknown siteId namespaces (audit MEDIUM M3, 2026-10-06)', async () => {
     const response = await POST(
       new Request('http://localhost/api/comments', {
         method: 'POST',
@@ -225,7 +221,38 @@ describe('POST /api/comments', () => {
       }) as never
     );
 
+    // Deployment ini hanya melayani SATU site: siteId asing ditolak sebelum
+    // menyentuh database (dulu diterima begitu saja → baris D1 tak terbatas).
+    expect(response.status).toBe(400);
+    expect(refMock).not.toHaveBeenCalled();
+  });
+
+  it('accepts the official site and the legacy default-site bucket', async () => {
+    const transaction = vi.fn(async (updater: (current: StoredComment[] | null) => StoredComment[]) => {
+      updater(null);
+      return { committed: true };
+    });
+    refMock.mockImplementation((path: string) => {
+      if (path === 'settings/bannedWords') {
+        return { once: vi.fn().mockResolvedValue({ exists: () => true, val: () => [] }) };
+      }
+      if (path === 'comments/default-site/demo-project') return { transaction };
+      throw new Error(`Unexpected CLOUDFLARE_D1 path: ${path}`);
+    });
+
+    const response = await POST(
+      new Request('http://localhost/api/comments', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          siteId: 'default-site',
+          slug: 'demo-project',
+          comment: { id: 'default-comment', text: 'Hello', name: 'Alice' },
+        }),
+      }) as never
+    );
+
     expect(response.status).toBe(200);
-    expect(refMock).toHaveBeenCalledWith('comments/tenant-a/demo-project');
+    expect(refMock).toHaveBeenCalledWith('comments/default-site/demo-project');
   });
 });

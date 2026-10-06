@@ -7,6 +7,8 @@ import { z } from 'zod';
 import { sanitizeInput } from '@/lib/security/sanitization';
 import { getBannedWords, findBannedWord } from '@/lib/services/bannedWordsService';
 import { buildCommentPath, normalizeEngagementSiteId } from '@/lib/projectEngagement';
+import { enforceRequestRateLimit } from '@/lib/security/request';
+import { SITE_ID } from '@/crud/shared/config';
 
 interface Comment {
   id: string;
@@ -63,6 +65,14 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Audit 2026-10-06 (MEDIUM): sebelumnya endpoint publik ini TANPA rate limit IP —
+    // pengunjung (atau bot) bisa membanjiri tulis komentar tanpa jeda. Batas 5/menit per IP,
+    // blokir 10 menit (pola yang sama dengan checkout).
+    const ipLimit = await enforceRequestRateLimit(request, 'comments_post', 5, 60_000, 600_000);
+    if (!ipLimit.allowed) {
+      return rateLimit(ipLimit.retryAfter ?? 60, 'Terlalu banyak permintaan. Silakan coba lagi beberapa saat.');
+    }
+
     const body = await request.json();
     const { slug, website_url } = body;
     const context = commentContextSchema.safeParse({ slug, siteId: body.siteId });
@@ -79,6 +89,12 @@ export async function POST(request: NextRequest) {
       return badRequest('Missing slug or comment');
     }
     const siteId = normalizeEngagementSiteId(context.data.siteId);
+    // Audit 2026-10-06 (MEDIUM): siteId sembarangan membuat baris D1 tak terbatas
+    // (setiap siteId baru = path komentar baru yang lolos kontrol per-path). Deployment ini
+    // hanya melayani SATU site: wajib site resmi (SITE_ID) atau bucket legacy 'default-site'.
+    if (siteId !== SITE_ID && siteId !== 'default-site') {
+      return badRequest('Unknown site');
+    }
 
     // --- 2. VALIDATE COMMENT STRUCTURE WITH ZOD ---
     let commentToSave: Comment;
