@@ -97,3 +97,50 @@ _Titik singgung = ujung garis siku sesekali menyinggur tepi kotak (2 dari 122 se
 - Gerbang: tsc 0, eslint 0, **118 file / 914 test PASS**, `release:audit` **59/59**, `release:sale-readiness` **12/12**, prettier PASS untuk file yang disentuh.
 
 **Dampak produksi:** tidak perlu deploy — hanya `scripts/onboarding/public/index.html` + `docs/diagrams/*.mmd` (alat portal owner), di luar bundle Worker.
+
+---
+
+## Putaran 4 — 2026-10-06: garis tipis diluruskan total + panah masuk tegak (v1.3.25 lanjutan)
+
+Keluhan owner (zoom jalur Owner): _"garis penghubung tipis itu tidak lurus tapi bengkok2 dan segitiga mengarah kebawahnya juga tidak lurus dan simetris tegak tapi bengkok melenceng — semua garis hitam tipis yg tidak lurus dan segitiga kebawahnya juga jangan melenceng"_
+
+### Diagnosa (diukur dari atribut `d` path, bukan tebakan)
+
+1. **Belokan kecil pada garis yang harusnya lurus** — simpak dalam satu jalur (mis. `Cek bukti bayar → Bengkel`) **tidak segaris**: pusat kotak antar-baris selisih 2,3–6,8px; mode siku mengubah selisih itu jadi langkah mendatar yang kelihatan. Terukur mentah (render tanpa `straightenEdges`): **7 belokan di 6 garis diagram alur** (3,3 / 4,0 / 2,9 / 6,5 / 2,3 / 5,5 / 6,8 px); peta aset 0.
+2. **Panah menyeleweng** — **4 garis** berhenti **mendatar tepat di tepi atas kotak** (segmen terakhir horizontal → segitiga panah menghadap samping, bukan tegak ke bawah).
+3. **Titik ganda nol-di-ujung** — kurva `step` menaruh titik kembar di ekor path: **35 titik kembar** di diagram alur → arah segmen terakhir jadi tidak tentu bagi marker panah.
+
+### Perbaikan — `straightenEdges()` di `scripts/onboarding/public/index.html` (dipanggil setiap `mermaid.run` selesai)
+
+- Buang titik kembar (jarak < 0,6px) di semua path; hanya poligon `M`/`L` yang disentuh, path berkurva dilewati (guard aman).
+- **Garis rantai** (seluruh belokan horizontal ≤ 8px, berangkat dari tepi bawah kotak sumber, berakhir dekat tepi atas kotak tujuan — **toleransi 6px** karena mermaid memangkas ujung garis ~4px sebelum kotak untuk celah segitiga panah; guard pertama gagal diam-diam karena toleransi 2px) → **dibuat satu garis tegak lurus tunggal pada sumbu-x tengah kotak tujuan** → panah masuk persis di tengah atas kotak = simetris.
+- **Ekor mendatar di tepi atas kotak** → belokannya dinaikkan ±12px (di dalam celah antar-kotak) sehingga **segmen terakhir selalu tegak** → panah selalu dari atas.
+- Idempoten: klik tab berulang tidak merusak hasil.
+
+### Hasil uji browser (pasca-restart server; render pertama flake `UnknownVizError` bawaan mermaid — pola lama, klik ulang beres)
+
+Kondisi **sebelum vs sesudah pada build yang sama** (render mentah kebetulan terbaca saat render peta aset flake → jadi kontrol A/B):
+
+| Metrik (diagram alur)             | Sebelum | Sesudah |
+| --------------------------------- | ------: | ------: |
+| Belokan kecil (0 < H ≤ 8px)       |       6 |   **0** |
+| Panah mendatar di tepi atas kotak |       4 |   **0** |
+| Titik kembar                      |      35 |   **0** |
+| Segmen miring                     |       0 |   **0** |
+
+Hasil akhir kedua diagram:
+
+| Metrik                                                      |       Alur Bisnis |         Peta Aset |
+| ----------------------------------------------------------- | ----------------: | ----------------: |
+| Belokan kecil / panah nyasar / titik kembar / segmen miring | **0 / 0 / 0 / 0** | **0 / 0 / 0 / 0** |
+| Panah masuk tegak dari atas                                 |                15 |                 7 |
+| Panah menyamping (gaya flowchart, celah ke kotak 0–4px)     |                 5 |                 3 |
+| Kotak / panah                                               |           17 / 20 |           14 / 10 |
+
+Detail (`Bengkel 6 langkah`, `01:00 WIB`, `AKUN CLOUDFLARE MILIK KLIEN`, `RAHASIA`) tetap ada; tanpa scroll horizontal.
+
+### Catatan pemindaian (tanpa tindakan)
+
+Sampling padat (tiap 2px) menemukan 9 kasus garis melewati **kotak-bounding** — mis. panah tebal `Pesan lewat website → Terima pesanan` melewati area belakang kotak `2. Bayar` (259px), garis `Uang Rp199.000 → Rekening` melewati 3 kotak di peta aset (206–272px). **Visual aman:** node dirender **setelah** path dengan isi putih **opaque** (`fill rgb(255,255,255)`) → garis lewat **di belakang** kotak, tidak terlihat menembus. Kasus lain hanya sentuhan sudut (≤6px, khususnya belah ketupat keputusan). Tidak ada tindakan; bila owner minta jalur dialihkan sepenuhnya = perubahan tata letak → minta izin dulu.
+
+**Dampak:** hanya `scripts/onboarding/public/index.html` (+63 baris) — tidak perlu deploy, tidak memengaruhi situs klien.

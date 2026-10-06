@@ -1211,6 +1211,67 @@
 
   // Peta Bisnis (owner-only): render diagram Mermaid dari docs/diagrams/*.mmd
   // Selalu render ulang agar perubahan .mmd langsung terlihat tanpa restart portal.
+  // Rapikan garis hasil render (v1.3.25 putaran 4): buang titik kembar,
+  // luruskan garis rantai yang belok beberapa px karena pusat kotak selisih,
+  // dan paksa panah yang masuk ke tepi ATAS kotak selalu tegak lurus dari atas.
+  function straightenEdges(preEl) {
+    const svg = preEl ? preEl.querySelector('svg') : null;
+    if (!svg) return;
+    const boxes = [...svg.querySelectorAll('g.node')].map(g => {
+      const b = g.getBBox();
+      const t = g.transform.baseVal.consolidate();
+      const m = t ? t.matrix : { e: 0, f: 0 };
+      return { x: b.x + m.e, y: b.y + m.f, w: b.width, h: b.height };
+    });
+    // Toleransi 6px: mermaid sengaja memangkas ujung garis ~4px sebelum tepi
+    // kotak supaya segitiga panah tidak menabrak kotak.
+    const findBox = (x, y, top) =>
+      boxes.find(b => Math.abs(y - (top ? b.y : b.y + b.h)) <= 6 && x > b.x + 4 && x < b.x + b.w - 4) || null;
+    for (const p of svg.querySelectorAll('path.flowchart-link')) {
+      const d = p.getAttribute('d') || '';
+      if (/[^ML\s\d.,-]/.test(d)) continue; // jalur berkurva (bukan poligon siku) → lewati
+      const raw = [];
+      const re = /([ML])\s*(-?[\d.]+)[,\s]+(-?[\d.]+)/g;
+      let mm;
+      while ((mm = re.exec(d))) raw.push([+mm[2], +mm[3]]);
+      if (raw.length < 2) continue;
+      const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+      const pts = raw.filter((q, i) => i === 0 || dist(q, raw[i - 1]) > 0.6);
+      if (pts.length < 2) continue;
+      const first = pts[0], last = pts[pts.length - 1];
+      let maxH = 0;
+      for (let i = 1; i < pts.length; i++) {
+        const dx = Math.abs(pts[i][0] - pts[i - 1][0]);
+        const dy = Math.abs(pts[i][1] - pts[i - 1][1]);
+        if (dy < 0.6 && dx > 0.6) maxH = Math.max(maxH, dx);
+      }
+      let out;
+      const srcBox = findBox(first[0], first[1], false);
+      const dstBox = findBox(last[0], last[1], true);
+      if (maxH <= 8 && srcBox && dstBox && last[0] > srcBox.x + 4 && last[0] < srcBox.x + srcBox.w - 4) {
+        // Garis rantai: satu garis betul-betul lurus, tepat di atas tengah kotak tujuan
+        out = [[last[0], first[1]], last];
+      } else {
+        out = pts.slice();
+        const prev = out[out.length - 2];
+        const flatTail = Math.abs(prev[1] - last[1]) < 0.6 && Math.abs(prev[0] - last[0]) > 0.6;
+        if (flatTail && dstBox) {
+          // Berhenti mendatar di tepi atas kotak → naikkan belokannya supaya panah tegak
+          let j = out.length - 1;
+          while (j > 1 && Math.abs(out[j - 1][1] - out[j][1]) < 0.6 && Math.abs(out[j - 1][0] - out[j][0]) > 0.6) j--;
+          const room = last[1] - out[j - 1][1];
+          if (room > 3) {
+            const yMid = last[1] - Math.min(12, room * 0.5);
+            const head = out.slice(0, j);
+            head.push([out[j][0], yMid], [last[0], yMid], last);
+            out = head;
+          }
+        }
+      }
+      p.setAttribute('d', out.map((q, i) => (i ? 'L' : 'M') + q[0] + ',' + q[1]).join(' '));
+    }
+  }
+
   let mermaidLib = null;
   async function loadBizMap() {
     const alurEl = document.getElementById('diagram-alur');
@@ -1271,6 +1332,8 @@
         },
       });
       await mermaidLib.run({ nodes: [alurEl, asetEl] });
+      straightenEdges(alurEl);
+      straightenEdges(asetEl);
     } catch (err) {
       console.error('[PetaBisnis] Gagal memuat diagram:', err);
       ['diagram-alur', 'diagram-aset'].forEach(id => {
