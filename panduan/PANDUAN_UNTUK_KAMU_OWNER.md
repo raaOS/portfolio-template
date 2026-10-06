@@ -124,7 +124,6 @@ Setelah login, kamu langsung masuk ke layar **Desktop macOS Simulator** (`/admin
 - Mau ganti bio dan foto profil? Klik ikon **About**.
 - Mau ganti nomor WhatsApp? Klik ikon **Contact**.
 - Mau ganti wallpaper video / lagu latar? Klik ikon **Wallpaper**.
-- Mau setting Asisten AI? Klik ikon **Asisten AI**.
 
 > 💡 **Semua data yang kamu isi di Desktop Mac ini otomatis tampil di kedua tema (Desktop Mac maupun Kanvas 3D). Kamu tidak perlu menginput data dua kali!**
 
@@ -135,20 +134,13 @@ Jika ingin melihat hasil tampilan portofolio untuk pengunjung:
 
 ---
 
-### 5. Bagaimana Konsumen Mengatur Asisten AI (Termasuk 9router dll)?
+### 5. Asisten AI — BELUM AKTIF (jangan dijanjikan ke klien)
 
-Konsumen sekarang **bisa mengatur mesin AI dan memasukkan kunci API mereka sendiri** langsung dari dashboard admin mereka tanpa perlu bantuan kamu!
+Kabar jujur: fitur AI **belum aktif** di build yang beredar sekarang. Tiga lapisnya sama-sama mati — panel admin AI tidak muncul di desktop, endpoint chat pakai kunci fallback yang tidak pernah terbaca, dan build klien selalu dijalankan dengan `FEATURE_AI=false`. Karena itu:
 
-- **Menu Aplikasi:** Buka menu **`/admin/system/ai`** (atau klik ikon aplikasi **Asisten AI** di folder *Sistem & Tampilan* pada desktop Mac).
-- **Pilihan Provider yang Didukung:**
-  1. **Google Gemini:** Gratis & cepat via Google AI Studio.
-  2. **OpenRouter:** Bisa memilih ratusan model (ChatGPT, Claude, Llama 3, DeepSeek, dll.).
-  3. **Groq:** Kecepatan ultra tinggi.
-  4. **OpenAI Official:** Kunci resmi ChatGPT langsung dari OpenAI.
-  5. **Pihak Ketiga / 9router / Custom:** Cukup masukkan alamat *Base URL* (misal: `https://api.9router.com/v1` atau DeepSeek API) dan API key mereka!
-- **Fitur Canggih:**
-  - Ada tombol **"⚡ Tes Koneksi AI"** untuk mencoba koneksi sebelum disimpan.
-  - Jika konsumen tidak mengisi kunci sendiri, sistem otomatis memakai kunci server bawaan kamu (jika ada) atau tetap berjalan aman tanpa error.
+- **Jangan menjual atau menjanjikan "Asisten AI" ke klien.** Baris "AI assistant" sudah dihapus dari halaman checkout dan panduan klien (dicek 2026-10-06).
+- API key per-site (`ai_settings` di D1, panel `/admin/system/ai`) memang sudah terpasang rapi di backend — tapi belum ada gunanya sampai ketiga lapis di atas dibuka.
+- Kalau suatu saat kamu mau mengaktifkannya (misal pakai Google Gemini / OpenRouter yang gratis), itu pekerjaan kecil tapi nyata: pasang entri `ai` di `PANEL_MAP`, arahkan endpoint `chat/send` ke kunci per-site, dan buka flag `FEATURE_AI` di pipeline deploy. Setelah itu, tulis ulang bagian ini.
 
 ---
 

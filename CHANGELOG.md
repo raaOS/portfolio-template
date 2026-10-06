@@ -13,6 +13,12 @@ Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **U
 - **`/api/health` melaporkan versi rilis yang benar.** Masalahnya: field `version` di-hardcode `1.0.0` — portal `PENGELOLA_KLIEN.bat` membandingkannya dengan CHANGELOG, sehingga semua klien selalu ditandai "perlu update" dan deploy yang gagal tak pernah terdeteksi. Perbaikannya: memakai `APP_VERSION` (kini `1.3.25`) yang dijaga test agar selalu sama dengan entri teratas CHANGELOG; `/api/os/version` dan meta aplikasi ikut memakai konstanta yang sama. Diagram deploy di AGENTS.md ikut dikoreksi (Pages → Workers).
 - **Diuji (semua hijau):** `tsc --noEmit` 0 error · ESLint 0 error · **927/927 test pass** (9 test baru: resolver base URL ×5, sinkron versi CHANGELOG ×1, kuota upload ×3).
 
+### ✅ Keputusan Owner: Kejujuran Dokumen & Penjualan (Batch Audit)
+
+- **Janji fitur AI dihapus dari penjualan & panduan.** Temuan audit: fitur AI mati 3 lapis (panel AI tidak ada di `PANEL_MAP`, endpoint chat pakai kunci fallback yang tidak pernah terbaca, `FEATURE_AI` selalu `false` di build klien). Sesuai keputusan Anda: halaman **checkout** tak lagi menampilkan baris "AI assistant terintegrasi", **panduan klien** tak lagi mengarahkan ke aplikasi `/admin/system/ai` yang belum tersedia, dan **panduan owner** bagian 5 dikoreksi jujur — klien BELUM bisa mengatur AI sendiri, jangan dijanjikan ke klien. (Mengaktifkan AI kembali jadi pekerjaan tersisa bila diinginkan nanti.)
+- **Klaim slug di `SALES_PRICING.md` dikoreksi.** Dokumen bilang "pembeli memilih slug sendiri" — padahal kode menghasilkan slug otomatis dari nama (field `desiredSlug` hanya tersedia via API, tidak ada di form). Kini dokumen sesuai kenyataan; menambahkan pilihan slug ke checkout sengaja TIDAK dilakukan (bukan bagian audit, butuh desain tersendiri).
+- **Batasan `update_template` dari HP didokumentasikan jujur** di `PANDUAN_KELOLA_DARI_HP.md`: aksi itu butuh `arsip-klien/<slug>/config.env` yang tidak ikut di-commit ke GitHub, jadi dari HP/CI pasti gagal ("config.env tidak ditemukan"); update template tetap dikerjakan dari laptop. Terverifikasi di kode: `onboard_client` & `custom_domain` tetap aman dari HP (kredensial diisi lewat formulir, arsip hanya fallback). Solusi CI (rubah workflow jadi bisa baca arsip) sengaja TIDAK dibuat — butuh kredensial di GitHub, risiko keamanan tidak sepadan.
+
 ## [1.3.24] - 2026-10-06
 
 ### 🔐 Perbaikan 4 Temuan Kritis Hasil Audit Uji Alur Bisnis End-to-End

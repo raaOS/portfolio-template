@@ -201,10 +201,15 @@ CHANGELOG `v1.3.25` ditambahkan · build & deploy produksi **menunggu izin owner
 `docs/release/RELEASE_CHECKLIST.md` · `AGENTS.md` · (+ `CHANGELOG.md` v1.3.25, log ini, INDEX_TRACKER).
 
 ### Belum dieksekusi (menunggu putusan/putaran berikutnya)
-- **HIGH butuh keputusan produk owner:** AI klien mati 3 lapis (aktifkan vs hapus janji di
-  dokumen), klaim slug di `SALES_PRICING.md:9,12` (ubah dokumen vs tambah field slug di checkout —
-  API `desiredSlug` sudah mendukung, UI belum), H3 update dari HP (arsip klien tak ada di CI),
-  rollback update per klien.
+- **Keputusan produk owner sudah DIEKSEKUSI (2026-10-06, ikut v1.3.25):** (1) janji AI dihapus —
+  baris "AI assistant terintegrasi" dari `src/app/checkout/page.tsx`, section 6 dari
+  `panduan/PANDUAN_UNTUK_KLIEN.md`, section 5 + bullet menu AI dari
+  `panduan/PANDUAN_UNTUK_KAMU_OWNER.md` (kini jujur: AI mati 3 lapis, jangan dijanjikan);
+  (2) klaim slug `SALES_PRICING.md:9` dikoreksi (slug auto-generated, TIDAK menambah field slug
+  ke checkout); (3) batasan `update_template` dari HP didokumentasikan di
+  `panduan/PANDUAN_KELOLA_DARI_HP.md` (butuh `arsip-klien/` yang tak di-commit → gagal di CI;
+  `onboard_client`/`custom_domain` aman dari HP — terverifikasi di `cloud-manager.ts:483,515,584`).
+- **Sisa HIGH/produk:** rollback update per klien (belum dibahas).
 - **MEDIUM/LOW audit lainnya** + pertanyaan audit yang belum dijawab owner (klien nyata pertama?
   path jual via checkout atau WA? repo GitHub privat? kebijakan refund/SLA? backup laptop?).
 - **Sudah terjawab di putaran ini:** Resend **TERKONFIGURASI & terbukti jalan** (uji kirim

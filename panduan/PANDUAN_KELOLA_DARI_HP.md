@@ -31,6 +31,8 @@ Anda bisa menggunakan salah satu dari dua cara berikut di HP Anda:
 | **Cloudflare Account ID & API Token** | Masukkan kredensial Cloudflare milik klien |
 | **Password Admin** | Boleh dikosongkan agar sistem membuatkan password acak yang aman otomatis |
 
+> ⚠️ **Batasan jujur — aksi `update_template` (Update Versi Template) TIDAK bisa dari HP.** Aksi ini butuh berkas `arsip-klien/<slug>/config.env` (kredensial per klien) yang **tidak ikut di-commit ke GitHub**, jadi di server CI folder itu selalu kosong dan proses langsung berhenti dengan error *"config.env untuk slug ... tidak ditemukan di arsip-klien/"*. **Update versi template klien tetap dikerjakan dari laptop**, tempat folder `arsip-klien/` lengkap. Dua aksi lain aman dari HP: `onboard_client` dan `custom_domain` memakai kredensial yang kamu isi sendiri lewat formulir.
+
 4. Ketuk tombol hijau **`Run workflow`**!
 
 ---
