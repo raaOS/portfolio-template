@@ -17,6 +17,7 @@ Use these with the owner's own Cloudflare account dedicated to the sellable temp
 - `CLOUDFLARE_R2_SECRET_ACCESS_KEY`
 - `CLOUDFLARE_R2_BUCKET`
 - `CLOUDFLARE_R2_PUBLIC_BASE_URL`
+- `NEXT_PUBLIC_APP_URL` (basis link email/Telegram order — beda dengan `NEXT_PUBLIC_SITE_URL` yang untuk SEO; baca `getPublicBaseUrl` di `src/lib/constants.ts`)
 - `NEXT_PUBLIC_SITE_URL`
 - `JWT_SECRET`
 - `PASSWORD_SALT`

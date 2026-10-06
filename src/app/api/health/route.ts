@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { enforceRequestRateLimit } from '@/lib/security/request';
+import { APP_VERSION } from '@/lib/constants';
 
 function isCloudflareRuntime(request: NextRequest): boolean {
   return Boolean(
@@ -24,7 +25,11 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       environment: process.env.NODE_ENV || 'unknown',
-      version: '1.0.0',
+      // Versi rilis nyata (disamakan dengan entri teratas CHANGELOG.md).
+      // Portal onboarding membandingkan nilai ini dengan CHANGELOG untuk
+      // badge "perlu update" — sebelumnya hardcode '1.0.0' sehingga semua
+      // klien selalu ditandai outdated dan deploy gagal tak pernah terdeteksi.
+      version: APP_VERSION,
     };
 
     if (isCloudflareRuntime(request)) {

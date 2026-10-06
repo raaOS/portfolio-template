@@ -54,6 +54,24 @@ describe('/api/r2/[...key]', () => {
       expect(body).toBe('Not Found');
     });
 
+    it('never serves D1 backup files, even under the allowed sites/ prefix', async () => {
+      isConfiguredMock.mockReturnValue(true);
+      const request = new NextRequest(
+        'http://localhost/api/r2/sites/default-site/backups/d1/2026-10-05T01-00-00-000Z.json'
+      );
+      const ctx = {
+        params: Promise.resolve({
+          key: ['sites', 'default-site', 'backups', 'd1', '2026-10-05T01-00-00-000Z.json'],
+        }),
+      };
+
+      const response = await GET(request, ctx);
+
+      expect(response.status).toBe(404);
+      expect(getObjectMock).not.toHaveBeenCalled();
+      expect(headObjectMock).not.toHaveBeenCalled();
+    });
+
     it('returns 404 for keys with path traversal', async () => {
       isConfiguredMock.mockReturnValue(true);
       const request = new NextRequest('http://localhost/api/r2/assets/../etc/passwd');

@@ -31,16 +31,18 @@ Anda bisa menggunakan salah satu dari dua cara berikut di HP Anda:
 | **Cloudflare Account ID & API Token** | Masukkan kredensial Cloudflare milik klien |
 | **Password Admin** | Boleh dikosongkan agar sistem membuatkan password acak yang aman otomatis |
 
+> ⚠️ **Batasan jujur — aksi `update_template` (Update Versi Template) TIDAK bisa dari HP.** Aksi ini butuh berkas `arsip-klien/<slug>/config.env` (kredensial per klien) yang **tidak ikut di-commit ke GitHub**, jadi di server CI folder itu selalu kosong dan proses langsung berhenti dengan error *"config.env untuk slug ... tidak ditemukan di arsip-klien/"*. **Update versi template klien tetap dikerjakan dari laptop**, tempat folder `arsip-klien/` lengkap. Dua aksi lain aman dari HP: `onboard_client` dan `custom_domain` memakai kredensial yang kamu isi sendiri lewat formulir.
+
 4. Ketuk tombol hijau **`Run workflow`**!
 
 ---
 
-### Langkah 3: Tunggu ~1 Menit & Salin Pesan WhatsApp Klien
+### Langkah 3: Tunggu Beberapa Menit & Salin Pesan WhatsApp Klien
 1. Server cloud GitHub (dengan RAM 16GB dan internet gigabit) akan otomatis menyala di cloud untuk:
    - Membuat Database D1 (`db-budi-pratama`)
    - Membuat Storage Media R2 (`media-budi-pratama`)
    - Memasang seluruh tabel database dan template
-   - Mengompilasi dan mendeploy website ke Cloudflare Pages milik klien
+   - Build & mendeploy website ke Cloudflare Worker milik klien (proses build ini yang paling lama — total biasanya beberapa menit, sabar ya)
 2. Setelah status centang hijau **✓** selesai, ketuk hasil eksekusi tersebut.
 3. Pada halaman **Summary (Ringkasan)** di layar HP Anda, akan langsung tampil:
    - Link Website Klien
@@ -51,4 +53,4 @@ Anda bisa menggunakan salah satu dari dua cara berikut di HP Anda:
 ---
 
 ## 💡 Fitur Tambahan: Mengunduh Berkas Kredensial Klien (Artifact)
-Setiap kali Anda mendaftarkan klien dari HP, GitHub Actions otomatis membungkus berkas `config.env` dan `SURAT_SERAH_TERIMA.txt` ke dalam file zip privat (**Artifacts**) yang tersimpan aman di GitHub selama 90 hari. Anda bisa mengunduh file ini kapan saja langsung ke memori HP atau laptop Anda.
+Setiap kali Anda mendaftarkan klien dari HP, GitHub Actions otomatis membungkus berkas `config.env` dan `SURAT_SERAH_TERIMA.txt` ke dalam file zip privat (**Artifacts**) yang tersimpan di GitHub selama 7 hari (retensi sengaja dipendek karena berkas ini memuat kredensial klien — salinan utamanya selalu ada di folder `arsip-klien/` di laptop Anda). Anda bisa mengunduh file ini kapan saja langsung ke memori HP atau laptop Anda.

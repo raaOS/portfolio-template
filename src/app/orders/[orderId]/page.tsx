@@ -3,6 +3,7 @@
 import React, { useState, useEffect, use, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'motion/react';
+import { getPublicBaseUrl } from '@/lib/constants';
 import {
   Copy,
   Check,
@@ -462,7 +463,7 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ orderId
             </div>
             <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-slate-500 font-medium">Target Website:</span>
-              <span className="font-mono font-bold text-blue-600">makeitbetter.my.id/{order.desired_slug}</span>
+              <span className="font-mono font-bold text-blue-600">{getPublicBaseUrl().replace(/^https?:\/\//, '')}/{order.desired_slug}</span>
             </div>
           </div>
 
@@ -692,7 +693,7 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ orderId
               <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-600" />
               <h3 className="text-sm font-extrabold text-emerald-900">Portfolio OS Aktif</h3>
               <p className="text-[11px] text-slate-600">
-                <code className="font-mono font-bold text-slate-900">makeitbetter.my.id/{order.desired_slug}</code>
+                <code className="font-mono font-bold text-slate-900">{getPublicBaseUrl().replace(/^https?:\/\//, '')}/{order.desired_slug}</code>
               </p>
               <div className="flex flex-wrap justify-center gap-2 pt-1">
                 <a

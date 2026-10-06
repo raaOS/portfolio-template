@@ -834,7 +834,12 @@
             <div class="step-icon">5</div>
             <span>Pengarsipan lokal dan pembuatan surat serah terima</span>
           </div>
+          <div class="step-item" id="step-6">
+            <div class="step-icon">6</div>
+            <span>Build & deploy website ke Cloudflare Worker (sampai online)</span>
+          </div>
         </div>
+        <div id="provision-log" style="display: none; background: #0f172a; color: #38bdf8; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; padding: 1rem; border-radius: 8px; max-height: 280px; overflow-y: auto; white-space: pre-wrap; line-height: 1.5; border: 1px solid #1e293b; margin-top: 0.75rem;"></div>
       </div>
     </div>
 
@@ -843,8 +848,8 @@
       <div class="success-header">
         <div class="success-icon-badge">✓</div>
         <div>
-          <h2 class="title" style="font-size: 1.25rem; margin-bottom: 0.15rem;">Website Klien Berhasil Disiapkan</h2>
-          <p class="subtitle" style="font-size: 0.8125rem;">Database, storage, dan konfigurasi telah aktif secara terisolasi.</p>
+          <h2 class="title" id="res-title" style="font-size: 1.25rem; margin-bottom: 0.15rem;">Website Klien Berhasil Disiapkan</h2>
+          <p class="subtitle" id="res-subtitle" style="font-size: 0.8125rem;">Database, storage, dan konfigurasi telah aktif secara terisolasi.</p>
         </div>
       </div>
 
@@ -872,6 +877,15 @@
         <div class="result-row">
           <span class="result-label">Lokasi Arsip Lokal</span>
           <span class="result-val" id="res-folder" style="color: var(--text-muted);">-</span>
+        </div>
+      </div>
+
+      <div id="deploy-warning" class="error-box" style="display: none; margin-bottom: 1rem;">
+        <strong style="display: block; margin-bottom: 0.25rem;">⚠️ Website BELUM online — proses build &amp; deploy belum berhasil.</strong>
+        <span id="deploy-warning-detail" style="font-size: 0.8125rem;"></span>
+        <div id="retry-log" style="display: none; background: #0f172a; color: #38bdf8; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; padding: 1rem; border-radius: 8px; max-height: 240px; overflow-y: auto; white-space: pre-wrap; line-height: 1.5; border: 1px solid #1e293b; margin-top: 0.75rem;"></div>
+        <div style="margin-top: 0.75rem;">
+          <button type="button" class="btn-reset" id="btn-retry-deploy" style="width: auto; padding: 0.5rem 1.25rem;">Coba Deploy Ulang Sekarang</button>
         </div>
       </div>
 
@@ -1153,6 +1167,7 @@
 <script>
   let selectedTemplate = 'os-desktop';
   let lastWhatsappText = '';
+  let provisionLastData = null;
   let lastDomainWhatsappText = '';
   let archivedClients = [];
 
@@ -1410,11 +1425,15 @@
     submitBtn.disabled = true;
     submitBtn.textContent = 'Memproses ke Cloudflare...';
     progressBox.style.display = 'block';
+    provisionLastData = null;
+    document.getElementById('provision-log').style.display = 'none';
+    document.getElementById('provision-log').textContent = '';
+    document.getElementById('deploy-warning').style.display = 'none';
 
     document.getElementById('progress-db').textContent = `db-${clientSlug}`;
     document.getElementById('progress-r2').textContent = `media-${clientSlug}`;
 
-    for (let i = 1; i <= 5; i++) {
+    for (let i = 1; i <= 6; i++) {
       const step = document.getElementById(`step-${i}`);
       step.className = 'step-item';
     }
@@ -1459,6 +1478,8 @@
 
           if (eventType === 'progress') {
             updateStep(eventData.step, eventData.message);
+          } else if (eventType === 'log') {
+            appendProvisionLog(eventData.text);
           } else if (eventType === 'complete') {
             showSuccess(eventData);
             return;
@@ -1489,9 +1510,28 @@
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  function appendProvisionLog(text) {
+    const logBox = document.getElementById('provision-log');
+    logBox.style.display = 'block';
+    logBox.textContent += text + '\n';
+    logBox.scrollTop = logBox.scrollHeight;
+  }
+
   function showSuccess(data) {
+    provisionLastData = data;
+    const deployed = data.deployed === true;
+
     formCard.style.display = 'none';
     resultCard.style.display = 'block';
+
+    // Judul & subtitle jujur sesuai kondisi nyata (audit 2026-10-06):
+    // infrastruktur sukses ≠ website online — deploy ikut dijalankan portal.
+    document.getElementById('res-title').textContent = deployed
+      ? 'Website Klien Berhasil Disiapkan & Online'
+      : 'Infrastruktur Siap — Website Belum Online';
+    document.getElementById('res-subtitle').textContent = deployed
+      ? 'Database, storage, build, dan deploy selesai — website sudah bisa dibuka.'
+      : 'Database dan storage selesai, tetapi build & deploy belum berhasil. Selesaikan deploy dulu sebelum mengirim pesan ke klien.';
 
     document.getElementById('res-client-name').textContent = data.clientName;
     
@@ -1507,8 +1547,34 @@
     document.getElementById('res-pass').textContent = data.adminPassword;
     document.getElementById('res-folder').textContent = data.archiveFolder;
 
-    lastWhatsappText = 
-`Halo ${data.clientName},
+    const warnBox = document.getElementById('deploy-warning');
+    const warnDetail = document.getElementById('deploy-warning-detail');
+    const retryBtn = document.getElementById('btn-retry-deploy');
+    const waBtn = document.getElementById('btn-copy-wa');
+
+    if (deployed) {
+      warnBox.style.display = 'none';
+      waBtn.disabled = false;
+      waBtn.style.opacity = '';
+      waBtn.textContent = 'Salin Format Pesan Serah Terima (WhatsApp)';
+    } else {
+      warnBox.style.display = 'block';
+      warnDetail.textContent =
+        ' ' + (data.deployError || 'Build & deploy belum selesai.') +
+        ' Website belum bisa dibuka. Tekan tombol di bawah untuk mencoba deploy ulang — setelah sukses, tombol pesan WhatsApp akan aktif kembali.';
+      retryBtn.disabled = false;
+      retryBtn.textContent = 'Coba Deploy Ulang Sekarang';
+      retryBtn.dataset.folder = (data.archiveFolder || '').split('/').pop();
+      const retryLog = document.getElementById('retry-log');
+      retryLog.style.display = 'none';
+      retryLog.textContent = '';
+      waBtn.disabled = true;
+      waBtn.style.opacity = '0.5';
+      waBtn.textContent = 'Selesaikan deploy dulu sebelum mengirim pesan ke klien';
+    }
+
+    lastWhatsappText = deployed
+      ? `Halo ${data.clientName},
 
 Website portofolio Anda telah selesai disiapkan dan sudah dapat diakses:
 
@@ -1520,10 +1586,86 @@ ${data.adminUrl}
 Email: ${data.adminEmail}
 Password: ${data.adminPassword}
 
-Anda dapat mengelola karya proyek, profil, kontak, dan keahlian secara langsung melalui ruang kerja admin di atas. Panduan penggunaan juga terlampir.`;
+Anda dapat mengelola karya proyek, profil, kontak, dan keahlian secara langsung melalui ruang kerja admin di atas. Panduan penggunaan juga terlampir.`
+      : '';
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
+
+  // Retry deploy langsung dari kartu sukses (tanpa pindah tab) — alur ini
+  // dipakai bila auto-deploy pada tahap onboarding gagal.
+  document.getElementById('btn-retry-deploy').addEventListener('click', async () => {
+    const folderName = document.getElementById('btn-retry-deploy').dataset.folder;
+    if (!folderName) return;
+
+    const retryBtn = document.getElementById('btn-retry-deploy');
+    const retryLog = document.getElementById('retry-log');
+    retryBtn.disabled = true;
+    retryLog.style.display = 'block';
+    retryLog.textContent = '';
+
+    try {
+      const response = await fetch('/api/deploy-client', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folderName }),
+      });
+      if (!response.body) throw new Error('Gagal membuka streaming log dari server.');
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let lastData = null;
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const block of lines) {
+          if (!block.trim()) continue;
+          const matchEvent = block.match(/^event: (.*)$/m);
+          const matchData = block.match(/^data: (.*)$/m);
+          const eventType = matchEvent ? matchEvent[1].trim() : 'message';
+          const eventData = matchData ? JSON.parse(matchData[1]) : {};
+
+          if (eventType === 'log') {
+            retryLog.textContent += (eventData.text || '') + '\n';
+            retryLog.scrollTop = retryLog.scrollHeight;
+          } else if (eventType === 'progress') {
+            retryBtn.textContent = eventData.message || 'Deploy berjalan...';
+          } else if (eventType === 'complete') {
+            lastData = eventData;
+          } else if (eventType === 'error') {
+            throw new Error(eventData.message || 'Deploy gagal.');
+          }
+        }
+      }
+
+      const results = (lastData && lastData.results) || [];
+      const okResult = results.find((r) => r.success);
+      if (okResult && provisionLastData) {
+        showSuccess({
+          ...provisionLastData,
+          deployed: true,
+          deployError: '',
+          websiteUrl: okResult.url || provisionLastData.websiteUrl,
+          adminUrl: `${okResult.url || provisionLastData.websiteUrl}/admin`,
+        });
+        showToast('Deploy berhasil! Website klien sudah online.');
+        return;
+      }
+      throw new Error((results[0] && results[0].error) || 'Deploy gagal. Lihat log di atas.');
+    } catch (err) {
+      document.getElementById('deploy-warning-detail').textContent =
+        ' ' + (err.message || 'Deploy gagal.');
+      retryBtn.disabled = false;
+      retryBtn.textContent = 'Coba Deploy Ulang Sekarang';
+    }
+  });
 
   // Copy WhatsApp message (Onboard)
   const copyBtn = document.getElementById('btn-copy-wa');
@@ -1547,6 +1689,17 @@ Anda dapat mengelola karya proyek, profil, kontak, dan keahlian secara langsung 
     progressBox.style.display = 'none';
     resultCard.style.display = 'none';
     formCard.style.display = 'block';
+    provisionLastData = null;
+    lastWhatsappText = '';
+    document.getElementById('provision-log').style.display = 'none';
+    document.getElementById('provision-log').textContent = '';
+    document.getElementById('deploy-warning').style.display = 'none';
+    document.getElementById('retry-log').style.display = 'none';
+    document.getElementById('retry-log').textContent = '';
+    const waResetBtn = document.getElementById('btn-copy-wa');
+    waResetBtn.disabled = false;
+    waResetBtn.style.opacity = '';
+    waResetBtn.textContent = 'Salin Format Pesan Serah Terima (WhatsApp)';
   });
 
   // --- CUSTOM DOMAIN SECTION LOGIC ---

@@ -92,11 +92,6 @@ Untuk mengubah isi website, klik ikon-ikon aplikasi yang tersedia:
 
 ---
 
-### 6. Mengatur Asisten AI Portofolio Anda (Aplikasi "Asisten AI")
-- Buka aplikasi **Asisten AI** (`/admin/system/ai`) untuk menghubungkan mesin AI (Google Gemini, OpenRouter, Groq, 9router, dll.) untuk membantu menulis deskripsi proyek Anda.
-
----
-
 ## 🎯 Pilihan Tampilan Website Anda (Ada 2 Template)
 
 Website portofolio Anda dilengkapi dengan **2 Template Spektakuler**. Hebatnya, **Anda tidak perlu menginput data dua kali!** Seluruh karya dan biodata yang Anda isi di langkah di atas otomatis disajikan pada kedua template ini:

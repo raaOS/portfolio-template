@@ -38,10 +38,14 @@ diverifikasi & order aktif) dikirim lewat provider email generik:
 NOTIFICATION_PROVIDER="resend"
 NOTIFICATION_API_KEY=""
 NOTIFICATION_DEFAULT_FROM=""
+NEXT_PUBLIC_APP_URL="https://<slug>.workers.dev"
 NEXT_PUBLIC_SITE_URL="https://<slug>.workers.dev"
 ```
 
-Tanpa keempat nilai tersebut, pembeli tidak menerima email sama sekali.
+Tanpa ketiga nilai `NOTIFICATION_*`, pembeli tidak menerima email sama sekali.
+`NEXT_PUBLIC_APP_URL` menentukan domain yang tampil di dalam link email
+(dukungan-SEO/`NEXT_PUBLIC_SITE_URL` dipakai sebagai fallback); keduanya di-set
+otomatis `deployClient()` dari `WEBSITE_URL`.
 
 ## Flow Project Client
 

@@ -45,8 +45,8 @@ Cukup tanyakan 2 hal ini ke klien:
    - Pilih gaya template: **macOS Desktop OS** atau **Infinite Canvas**.
    - Masukkan **Account ID** & **API Token** Cloudflare klien (ada panduan bergambarnya di layar).
 4. Klik tombol: **`🚀 PROSES OTOMATIS SEKARANG`**.
-5. Sistem otomatis membuat database D1, storage R2, migrasi tabel, dan mengarsipkan file ke folder `arsip-klien/` di laptop kamu secara rapi dalam waktu ~30 detik!
-6. Setelah selesai, klik tombol **"📋 Salin Pesan WhatsApp untuk Klien"**.
+5. Sistem otomatis membuat database D1, storage R2, migrasi tabel, dan mengarsipkan file ke folder `arsip-klien/` di laptop kamu (± 30 detik), **lalu otomatis build & deploy sampai website benar-benar online** (proses build ± beberapa menit — log tampil di layar, jangan tutup halamannya).
+6. Kalau semua sukses, kartu sukses menampilkan alamat website asli dan tombol **"📋 Salin Pesan WhatsApp untuk Klien"** aktif. Kalau deploy gagal, muncul kotak peringatan **"Website BELUM online"** — tekan tombol **"Coba Deploy Ulang Sekarang"** dulu, jangan kirim pesan ke klien sebelum peringatan hilang.
 
 ---
 
@@ -66,10 +66,10 @@ Halo kak [Nama Klien]! 👋
 Website portofolio interaktif kamu sudah resmi aktif dan siap dipakai! 🚀
 
 🌐 Website Kamu:
-https://[slug-klien].pages.dev
+https://[slug-klien].workers.dev
 
 🔐 Ruang Admin Pribadi (untuk kelola karya, foto, & profil):
-https://[slug-klien].pages.dev/admin
+https://[slug-klien].workers.dev/admin
 Email    : [email login]
 Password : [password admin]
 
@@ -78,7 +78,7 @@ Semua foto, video karya, dan kontak bisa kamu tambahkan sendiri dengan sangat mu
 
 > Pesan di atas **sama persis** dengan template resmi yang disimpan portal ke
 > `arsip-klien/<slug>/SURAT_SERAH_TERIMA.txt` (`scripts/onboarding/server.ts:256-269`).
-> Kalau klien sudah pasang custom domain, ganti `https://[slug-klien].pages.dev` dengan
+> Kalau klien sudah pasang custom domain, ganti `https://[slug-klien].workers.dev` dengan
 > alamat domain klien. **Klien tidak perlu membuka `/setup`** — email + password sudah
 > dibuatkan portal onboarding.
 
@@ -124,7 +124,6 @@ Setelah login, kamu langsung masuk ke layar **Desktop macOS Simulator** (`/admin
 - Mau ganti bio dan foto profil? Klik ikon **About**.
 - Mau ganti nomor WhatsApp? Klik ikon **Contact**.
 - Mau ganti wallpaper video / lagu latar? Klik ikon **Wallpaper**.
-- Mau setting Asisten AI? Klik ikon **Asisten AI**.
 
 > 💡 **Semua data yang kamu isi di Desktop Mac ini otomatis tampil di kedua tema (Desktop Mac maupun Kanvas 3D). Kamu tidak perlu menginput data dua kali!**
 
@@ -135,20 +134,13 @@ Jika ingin melihat hasil tampilan portofolio untuk pengunjung:
 
 ---
 
-### 5. Bagaimana Konsumen Mengatur Asisten AI (Termasuk 9router dll)?
+### 5. Asisten AI — BELUM AKTIF (jangan dijanjikan ke klien)
 
-Konsumen sekarang **bisa mengatur mesin AI dan memasukkan kunci API mereka sendiri** langsung dari dashboard admin mereka tanpa perlu bantuan kamu!
+Kabar jujur: fitur AI **belum aktif** di build yang beredar sekarang. Tiga lapisnya sama-sama mati — panel admin AI tidak muncul di desktop, endpoint chat pakai kunci fallback yang tidak pernah terbaca, dan build klien selalu dijalankan dengan `FEATURE_AI=false`. Karena itu:
 
-- **Menu Aplikasi:** Buka menu **`/admin/system/ai`** (atau klik ikon aplikasi **Asisten AI** di folder *Sistem & Tampilan* pada desktop Mac).
-- **Pilihan Provider yang Didukung:**
-  1. **Google Gemini:** Gratis & cepat via Google AI Studio.
-  2. **OpenRouter:** Bisa memilih ratusan model (ChatGPT, Claude, Llama 3, DeepSeek, dll.).
-  3. **Groq:** Kecepatan ultra tinggi.
-  4. **OpenAI Official:** Kunci resmi ChatGPT langsung dari OpenAI.
-  5. **Pihak Ketiga / 9router / Custom:** Cukup masukkan alamat *Base URL* (misal: `https://api.9router.com/v1` atau DeepSeek API) dan API key mereka!
-- **Fitur Canggih:**
-  - Ada tombol **"⚡ Tes Koneksi AI"** untuk mencoba koneksi sebelum disimpan.
-  - Jika konsumen tidak mengisi kunci sendiri, sistem otomatis memakai kunci server bawaan kamu (jika ada) atau tetap berjalan aman tanpa error.
+- **Jangan menjual atau menjanjikan "Asisten AI" ke klien.** Baris "AI assistant" sudah dihapus dari halaman checkout dan panduan klien (dicek 2026-10-06).
+- API key per-site (`ai_settings` di D1, panel `/admin/system/ai`) memang sudah terpasang rapi di backend — tapi belum ada gunanya sampai ketiga lapis di atas dibuka.
+- Kalau suatu saat kamu mau mengaktifkannya (misal pakai Google Gemini / OpenRouter yang gratis), itu pekerjaan kecil tapi nyata: pasang entri `ai` di `PANEL_MAP`, arahkan endpoint `chat/send` ke kunci per-site, dan buka flag `FEATURE_AI` di pipeline deploy. Setelah itu, tulis ulang bagian ini.
 
 ---
 
@@ -168,7 +160,7 @@ Jika suatu saat klien baru membeli nama domain sendiri (contoh: `budipratama.com
 3. **Pilih Klien:** Pilih nama klien dari daftar dropdown (sistem otomatis membaca data klien dari folder `arsip-klien/` di laptop kamu).
 4. **Ketik Domain:** Masukkan nama domain yang dibeli klien (misal: `budipratama.com`).
 5. **Klik Tombol:** Klik **"Hubungkan Domain ke Cloudflare"**.
-6. **Selesai!** Sistem otomatis mendaftarkan domain ke Cloudflare Pages.
+6. **Selesai!** Sistem otomatis mendaftarkan domain ke Cloudflare (Worker) milik klien.
 7. Kamu tinggal klik tombol **"Salin Pesan WhatsApp Serah Terima Domain"** lalu kirim ke klien. Tidak ada lagi langkah CNAME: Cloudflare membuat record DNS dan HTTPS **otomatis** (syaratnya nama domain sudah berada di akun Cloudflare klien — kalau belum, pindahkan nameserver domain ke Cloudflare klien dulu).
 
 ---

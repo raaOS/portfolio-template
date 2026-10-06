@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkAdminAuth } from '@/lib/auth';
-import { activateOrder, cancelOrder, getAdminOrders, sweepExpiredOrders } from '@/lib/services/orderService';
+import { checkAdminAuth, validateAdminRequest } from '@/lib/auth';
+import { activateOrder, cancelOrder, getAdminOrders, reopenOrder, sweepExpiredOrders } from '@/lib/services/orderService';
+import { getPublicBaseUrl } from '@/lib/constants';
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,7 +32,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    if (!checkAdminAuth(request)) {
+    // Audit HIGH: auth + CSRF (double-submit) + jejak audit dalam satu helper —
+    // sebelumnya hanya checkAdminAuth (tanpa lapisan CSRF di handler).
+    if (!(await validateAdminRequest(request))) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -49,7 +52,7 @@ export async function POST(request: NextRequest) {
       const result = await activateOrder(
         orderId,
         {
-          APP_BASE_URL: process.env.NEXT_PUBLIC_APP_URL || 'https://makeitbetter.my.id',
+          APP_BASE_URL: getPublicBaseUrl(),
         },
         {
           // Jalur late-activation: order expired yang sudah dibayar dan diverifikasi
@@ -66,6 +69,14 @@ export async function POST(request: NextRequest) {
 
     if (action === 'cancel') {
       const result = await cancelOrder(orderId, cancelReason);
+      if (!result.success) {
+        return NextResponse.json({ success: false, error: result.message }, { status: 400 });
+      }
+      return NextResponse.json({ success: true, message: result.message, order: result.order });
+    }
+
+    if (action === 'reopen') {
+      const result = await reopenOrder(orderId);
       if (!result.success) {
         return NextResponse.json({ success: false, error: result.message }, { status: 400 });
       }

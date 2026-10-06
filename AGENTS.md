@@ -45,7 +45,7 @@ Sistem dokumentasi pelacakan pekerjaan (Tracker) telah diaktifkan untuk menghema
 ┌─────────────────────────────────────────────────┐
 │  CUSTOMER (1 Cloudflare account)                │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐      │
-│  │ D1 DB    │  │ R2 Bucket│  │ Pages    │      │
+│  │ D1 DB    │  │ R2 Bucket│  │ Workers  │      │
 │  │(10 tabel)│  │ (media)  │  │ (deploy) │      │
 │  └──────────┘  └──────────┘  └──────────┘      │
 │                                                  │

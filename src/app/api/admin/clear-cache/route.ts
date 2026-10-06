@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
-import { checkAdminAuth } from '@/lib/auth';
+import { validateAdminRequest } from '@/lib/auth';
 import { clearApplicationCache } from '@/lib/cache/clearApplicationCache';
 import { logAdminActivity } from '@/lib/services/auditLogger';
 
@@ -18,7 +18,9 @@ const REVALIDATE_PATHS = [
 
 export async function POST(request: NextRequest) {
   try {
-    const isAuthenticated = checkAdminAuth(request);
+    // Audit HIGH: auth + CSRF (double-submit) + jejak audit — checkAdminAuth
+    // saja tidak memverifikasi header CSRF di handler (lapisan kedua).
+    const isAuthenticated = await validateAdminRequest(request);
     if (!isAuthenticated) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }

@@ -6,7 +6,7 @@ Dokumen ini adalah baseline komersial untuk menjual Portfolio OS Template. Angka
 
 Satu produk, satu kali beli lewat halaman pesan di website (tanpa langganan berulang):
 
-- Pembeli mengisi form checkout (`/checkout`) dan memilih slug website sendiri.
+- Pembeli mengisi form checkout (`/checkout`); slug website dibuat otomatis sistem dari nama pembeli.
 - Sistem membuat order dengan nominal unik + QRIS/transfer, berlaku 24 jam.
 - Pembeli upload bukti bayar di halaman order, lalu order diverifikasi admin.
 - Setelah verifikasi, order diaktifkan: site dibuat, link website + akses dikirim via email.

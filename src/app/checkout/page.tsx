@@ -110,7 +110,6 @@ function CheckoutForm() {
             <li>Source code template lengkap</li>
             <li>Admin panel self-service</li>
             <li>Setup dan deploy ke Cloudflare</li>
-            <li>AI assistant terintegrasi</li>
             <li>Media pipeline (R2 + kompresi otomatis)</li>
           </ul>
         </div>

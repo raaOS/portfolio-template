@@ -132,15 +132,45 @@ export const TRANSITIONS = {
 } as const;
 
 /**
- * Global Application Version (for Cache Busting)
+ * Global Application Version (cache busting + /api/health + /api/os/version).
+ * WAJIB sama dengan entri teratas CHANGELOG.md — dijaga test
+ * `src/lib/constants.test.ts` supaya tidak pernah melenceng.
  */
-export const APP_VERSION = '0.1.0';
+export const APP_VERSION = '1.3.25';
 
 /**
  * Canonical site URL — used as fallback when NEXT_PUBLIC_SITE_URL is not set.
  * Centralized here to avoid contradictory fallback values across modules.
  */
 export const DEFAULT_SITE_URL = 'https://makeitbetter.my.id';
+
+const LOOPBACK_BASE_URL = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i;
+
+/**
+ * Base URL untuk link yang dibagikan ke pembeli lewat email/Telegram
+ * (struk order, link aktivasi, notifikasi pembatalan/kedaluwarsa).
+ *
+ * Urutan: NEXT_PUBLIC_APP_URL → NEXT_PUBLIC_SITE_URL → DEFAULT_SITE_URL,
+ * dengan dua aturan pengaman:
+ *   - Mode development: localhost dipakai apa adanya (uji lokal).
+ *   - Luar development: URL loopback DIABAIKAN — build `.env.local` lokal
+ *     (bernilai http://localhost:3000) tidak boleh membuat email produksi
+ *     menautkan pembeli ke link mati.
+ */
+export function getPublicBaseUrl(): string {
+  const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
+
+  if (process.env.NODE_ENV === 'development') {
+    return trimTrailingSlash(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
+  }
+
+  for (const candidate of [process.env.NEXT_PUBLIC_APP_URL, process.env.NEXT_PUBLIC_SITE_URL]) {
+    const value = candidate ? trimTrailingSlash(candidate) : '';
+    if (value && !LOOPBACK_BASE_URL.test(value)) return value;
+  }
+
+  return DEFAULT_SITE_URL;
+}
 
 /**
  * Helper to get asset path with automatic cache busting for visitors

@@ -28,6 +28,11 @@ import {
   scopeUploadDirectory,
   WallpaperImageTooSmallError,
 } from '@/lib/media/uploadHelpers';
+import { getAdminSiteContext, ProjectQuotaError } from '@/lib/admin/projectSiteContext';
+import {
+  enforceSiteStorageQuotaUnlocked,
+  withSiteQuotaLock,
+} from '@/lib/product/siteStorageUsage';
 
 // IMPORTANT: Keep this route timeout conservative. Large media should use
 // direct-to-R2 upload instead of passing through the application runtime.
@@ -422,7 +427,18 @@ export async function POST(req: NextRequest) {
     } | null = null;
 
     if (isVideoUpload) {
-      const optimizeVideoForPortfolio = async (_input: Buffer, _options: unknown) => ({
+      const optimizeVideoForPortfolio = async (
+        _input: Buffer,
+        _options: unknown
+      ): Promise<{
+        buffer: Buffer;
+        previewBuffer: Buffer | null;
+        posterBuffer: Buffer | null;
+        originalSize: number;
+        optimizedSize: number;
+        previewSize: number;
+        posterSize: number;
+      }> => ({
         buffer: originalBuffer,
         previewBuffer: null,
         posterBuffer: null,
@@ -489,34 +505,57 @@ export async function POST(req: NextRequest) {
     }
 
     const cacheControl = 'public, max-age=31536000, immutable';
-    const [r2Main] = await Promise.all([
-      uploadToR2({
-        key: storagePath,
-        body: buffer,
-        contentType,
-        cacheControl,
-      }),
-      ...(previewPath && previewBuffer
-        ? [
-            uploadToR2({
-              key: previewPath,
-              body: previewBuffer,
-              contentType: 'video/mp4',
-              cacheControl,
-            }),
-          ]
-        : []),
-      ...(posterPath && posterBuffer
-        ? [
-            uploadToR2({
-              key: posterPath,
-              body: posterBuffer,
-              contentType: 'image/jpeg',
-              cacheControl,
-            }),
-          ]
-        : []),
-    ]);
+    const uploadBundles = () =>
+      Promise.all([
+        uploadToR2({
+          key: storagePath,
+          body: buffer,
+          contentType,
+          cacheControl,
+        }),
+        ...(previewPath && previewBuffer
+          ? [
+              uploadToR2({
+                key: previewPath,
+                body: previewBuffer,
+                contentType: 'video/mp4',
+                cacheControl,
+              }),
+            ]
+          : []),
+        ...(posterPath && posterBuffer
+          ? [
+              uploadToR2({
+                key: posterPath,
+                body: posterBuffer,
+                contentType: 'image/jpeg',
+                cacheControl,
+              }),
+            ]
+          : []),
+      ]);
+
+    // AUDIT HIGH: kuota storage per-site kini ditegakkan di jalur upload
+    // utama (sebelumnya hanya di jalur presign/direct & project media).
+    // Hanya path tenant `sites/{id}/...` yang masuk cakupan kuota;
+    // `default-site` memakai layout legacy `assets/...` di luar prefix
+    // tersebut — konsisten dengan guard `/api/admin/upload/direct`.
+    // Cek + upload dibungkus SATU lock per-site agar tidak ada race
+    // TOCTOU (meniru pola project-cover/project-media).
+    const siteQuotaMatch = storagePath.match(/^sites\/([a-zA-Z0-9_-]+)\//);
+    let r2Main: Awaited<ReturnType<typeof uploadToR2>>;
+    if (siteQuotaMatch) {
+      const site = await getAdminSiteContext(siteQuotaMatch[1]);
+      const incomingBytes =
+        buffer.length + (previewBuffer?.length || 0) + (posterBuffer?.length || 0);
+      r2Main = await withSiteQuotaLock(site.siteId, async () => {
+        await enforceSiteStorageQuotaUnlocked(site.siteId, incomingBytes, site.quota);
+        const [main] = await uploadBundles();
+        return main;
+      });
+    } else {
+      [r2Main] = await uploadBundles();
+    }
 
     // Best-effort cleanup of legacy .webp poster at the same base.
     //
@@ -589,6 +628,16 @@ export async function POST(req: NextRequest) {
     if (e instanceof SiteContextError) {
       return NextResponse.json({ error: e.message }, { status: e.status });
     }
+
+    // Kuota storage terlampaui — samakan respons dengan route project media
+    // (403 + errorCode) supaya admin UI bisa menampilkan sisa/limit kuota.
+    if (e instanceof ProjectQuotaError) {
+      return NextResponse.json(
+        { error: e.message, errorCode: e.errorCode, details: e.details },
+        { status: e.errorCode === 'SITE_NOT_FOUND' ? 404 : 403 }
+      );
+    }
+
     console.error('Upload Error:', e);
 
     // Wallpaper image dimension validation: surface ke client sebagai

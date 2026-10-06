@@ -101,16 +101,19 @@ jobs:
           TEMPLATE_KEY: ${{ inputs.template_key }}
           ADMIN_EMAIL: ${{ inputs.admin_email }}
           ADMIN_PASSWORD: ${{ inputs.admin_password }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ inputs.cloudflare_account_id || secrets.DEFAULT_CF_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare_api_token || secrets.DEFAULT_CF_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ inputs.cloudflare_account_id }}
+          CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare_api_token }}
           CUSTOM_DOMAIN: ${{ inputs.custom_domain }}
           UPDATE_TARGET: ${{ inputs.update_target }}
           FORCE_BUILD: 'true'
 
-      - name: 💾 Simpan Arsip Klien (GitHub Artifact 90 Hari)
+      # Retensi 7 hari (bukan 90): arsip berisi kredensial klien (config.env +
+      # password admin). Cukup untuk jaring pengaman singkat; salinan utama
+      # tetap ada di arsip-klien/ laptop owner. (Audit business flow 2026-10-06, C4.)
+      - name: 💾 Simpan Arsip Klien (GitHub Artifact 7 Hari)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: arsip-klien-run-${{ github.run_number }}
           path: arsip-klien/
-          retention-days: 90
+          retention-days: 7

@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { checkAdminAuthMock, clearApplicationCacheMock, logAdminActivityMock, revalidatePathMock } =
+const { validateAdminRequestMock, clearApplicationCacheMock, logAdminActivityMock, revalidatePathMock } =
   vi.hoisted(() => ({
-    checkAdminAuthMock: vi.fn(),
+    validateAdminRequestMock: vi.fn(),
     clearApplicationCacheMock: vi.fn(),
     logAdminActivityMock: vi.fn(),
     revalidatePathMock: vi.fn(),
   }));
 
 vi.mock('@/lib/auth', () => ({
-  checkAdminAuth: checkAdminAuthMock,
+  validateAdminRequest: validateAdminRequestMock,
 }));
 
 vi.mock('@/lib/cache/clearApplicationCache', () => ({
@@ -34,7 +34,7 @@ describe('POST /api/admin/clear-cache', () => {
   });
 
   it('returns 401 when not authenticated', async () => {
-    checkAdminAuthMock.mockReturnValue(false);
+    validateAdminRequestMock.mockResolvedValue(false);
     const req = new NextRequest('http://localhost/api/admin/clear-cache', { method: 'POST' });
     const res = await POST(req);
     expect(res.status).toBe(401);
@@ -44,7 +44,7 @@ describe('POST /api/admin/clear-cache', () => {
   });
 
   it('returns 200 success and clears cache when authenticated', async () => {
-    checkAdminAuthMock.mockReturnValue(true);
+    validateAdminRequestMock.mockResolvedValue(true);
     clearApplicationCacheMock.mockResolvedValue({
       serverMemory: [],
       nextFilesystem: [],
@@ -67,7 +67,7 @@ describe('POST /api/admin/clear-cache', () => {
   });
 
   it('sets correct response headers', async () => {
-    checkAdminAuthMock.mockReturnValue(true);
+    validateAdminRequestMock.mockResolvedValue(true);
     clearApplicationCacheMock.mockResolvedValue({
       serverMemory: [],
       nextFilesystem: [],
@@ -82,7 +82,7 @@ describe('POST /api/admin/clear-cache', () => {
   });
 
   it('returns 500 on internal error', async () => {
-    checkAdminAuthMock.mockReturnValue(true);
+    validateAdminRequestMock.mockResolvedValue(true);
     clearApplicationCacheMock.mockRejectedValue(new Error('FS crash'));
 
     const req = new NextRequest('http://localhost/api/admin/clear-cache', { method: 'POST' });

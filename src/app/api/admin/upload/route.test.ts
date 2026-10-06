@@ -8,14 +8,48 @@ const {
   uploadToR2Mock,
   deleteFromR2Mock,
   buildR2PublicUrlMock,
-} = vi.hoisted(() => ({
-  validateAdminMock: vi.fn(),
-  isConfiguredMock: vi.fn(),
-  missingKeysMock: vi.fn(),
-  uploadToR2Mock: vi.fn(),
-  deleteFromR2Mock: vi.fn(),
-  buildR2PublicUrlMock: vi.fn(),
-}));
+  resolveSiteIdMock,
+  assertKnownSiteMock,
+  getAdminSiteContextMock,
+  enforceQuotaMock,
+  withSiteQuotaLockMock,
+  SiteContextErrorMock,
+  ProjectQuotaErrorMock,
+} = vi.hoisted(() => {
+  class SiteContextError extends Error {
+    status: number;
+    constructor(message: string, status: number) {
+      super(message);
+      this.name = 'SiteContextError';
+      this.status = status;
+    }
+  }
+  class ProjectQuotaError extends Error {
+    errorCode: string;
+    details?: Record<string, unknown>;
+    constructor(message: string, errorCode: string, details?: Record<string, unknown>) {
+      super(message);
+      this.name = 'ProjectQuotaError';
+      this.errorCode = errorCode;
+      this.details = details;
+    }
+  }
+  return {
+    validateAdminMock: vi.fn(),
+    isConfiguredMock: vi.fn(),
+    missingKeysMock: vi.fn(),
+    uploadToR2Mock: vi.fn(),
+    deleteFromR2Mock: vi.fn(),
+    buildR2PublicUrlMock: vi.fn(),
+    resolveSiteIdMock: vi.fn(),
+    assertKnownSiteMock: vi.fn(),
+    getAdminSiteContextMock: vi.fn(),
+    enforceQuotaMock: vi.fn(),
+    withSiteQuotaLockMock: vi.fn(),
+    SiteContextErrorMock: SiteContextError,
+    ProjectQuotaErrorMock: ProjectQuotaError,
+  };
+});
 
 vi.mock('@/lib/auth', () => ({
   validateAdminRequest: validateAdminMock,
@@ -27,6 +61,22 @@ vi.mock('@/lib/r2Storage', () => ({
   getMissingR2EnvKeys: missingKeysMock,
   isR2StorageConfigured: isConfiguredMock,
   uploadToR2: uploadToR2Mock,
+}));
+
+vi.mock('@/lib/admin/siteRequestContext', () => ({
+  resolveRequestSiteId: resolveSiteIdMock,
+  assertKnownSite: assertKnownSiteMock,
+  SiteContextError: SiteContextErrorMock,
+}));
+
+vi.mock('@/lib/admin/projectSiteContext', () => ({
+  getAdminSiteContext: getAdminSiteContextMock,
+  ProjectQuotaError: ProjectQuotaErrorMock,
+}));
+
+vi.mock('@/lib/product/siteStorageUsage', () => ({
+  enforceSiteStorageQuotaUnlocked: enforceQuotaMock,
+  withSiteQuotaLock: withSiteQuotaLockMock,
 }));
 
 import { POST, DELETE } from './route';
@@ -49,6 +99,20 @@ describe('/api/upload', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     isConfiguredMock.mockReturnValue(true);
+    // Default: tenant site aktif dengan kuota — dipakai semua test yang
+    // lolos validasi sampai ke tahap upload.
+    resolveSiteIdMock.mockResolvedValue('site-1');
+    assertKnownSiteMock.mockResolvedValue(undefined);
+    getAdminSiteContextMock.mockResolvedValue({
+      siteId: 'site-1',
+      slug: 'site-1',
+      status: 'active',
+      quota: { storageMb: 5000, projectLimit: 5, mediaPerProject: 10 },
+    });
+    enforceQuotaMock.mockResolvedValue({});
+    withSiteQuotaLockMock.mockImplementation((_siteId: string, fn: () => Promise<unknown>) =>
+      fn()
+    );
   });
 
   describe('POST', () => {
@@ -216,6 +280,69 @@ describe('/api/upload', () => {
       expect(body.success).toBe(true);
       expect(body.url).toBeDefined();
       expect(body.finalFilename).toBe('myfile.png');
+    });
+
+    it('enforces storage quota for tenant-scoped paths', async () => {
+      validateAdminMock.mockResolvedValue(true);
+      uploadToR2Mock.mockResolvedValue({ url: 'https://example.com/r2/projects/myfile.png' });
+      buildR2PublicUrlMock.mockReturnValue('https://example.com/r2/projects/myfile.png');
+
+      const sp = new URLSearchParams({ filename: 'myfile', skipImageOptimization: '1' });
+      const req = buildRequestWithFormData(
+        { name: 'photo.png', type: 'image/png', data: new Uint8Array(100) },
+        sp
+      );
+      const response = await POST(req as never);
+      await response.json();
+
+      expect(response.status).toBe(200);
+      expect(withSiteQuotaLockMock).toHaveBeenCalledWith('site-1', expect.any(Function));
+      expect(enforceQuotaMock).toHaveBeenCalledWith(
+        'site-1',
+        100,
+        expect.objectContaining({ storageMb: 5000 })
+      );
+      expect(uploadToR2Mock).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns 403 when storage quota is exceeded', async () => {
+      validateAdminMock.mockResolvedValue(true);
+      enforceQuotaMock.mockRejectedValue(
+        new ProjectQuotaErrorMock('Storage quota exceeded. Limit: 5000 MB', 'STORAGE_LIMIT_EXCEEDED', {
+          siteId: 'site-1',
+        })
+      );
+
+      const sp = new URLSearchParams({ filename: 'myfile', skipImageOptimization: '1' });
+      const req = buildRequestWithFormData(
+        { name: 'photo.png', type: 'image/png', data: new Uint8Array(100) },
+        sp
+      );
+      const response = await POST(req as never);
+      const body = await response.json();
+
+      expect(response.status).toBe(403);
+      expect(body.errorCode).toBe('STORAGE_LIMIT_EXCEEDED');
+      expect(uploadToR2Mock).not.toHaveBeenCalled();
+    });
+
+    it('skips quota enforcement for default-site legacy layout', async () => {
+      validateAdminMock.mockResolvedValue(true);
+      resolveSiteIdMock.mockResolvedValue('default-site');
+      uploadToR2Mock.mockResolvedValue({ url: 'https://example.com/r2/projects/myfile.png' });
+      buildR2PublicUrlMock.mockReturnValue('https://example.com/r2/projects/myfile.png');
+
+      const sp = new URLSearchParams({ filename: 'myfile', skipImageOptimization: '1' });
+      const req = buildRequestWithFormData(
+        { name: 'photo.png', type: 'image/png', data: new Uint8Array(100) },
+        sp
+      );
+      const response = await POST(req as never);
+      await response.json();
+
+      expect(response.status).toBe(200);
+      expect(enforceQuotaMock).not.toHaveBeenCalled();
+      expect(withSiteQuotaLockMock).not.toHaveBeenCalled();
     });
   });
 
