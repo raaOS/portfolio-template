@@ -9,7 +9,7 @@ Satu produk, satu kali beli lewat halaman pesan di website (tanpa langganan beru
 - Pembeli mengisi form checkout (`/checkout`); slug website dibuat otomatis sistem dari nama pembeli.
 - Sistem membuat order dengan nominal unik + QRIS/transfer, berlaku 24 jam.
 - Pembeli upload bukti bayar di halaman order, lalu order diverifikasi admin.
-- Setelah verifikasi, order diaktifkan: site dibuat, link website + akses dikirim via email.
+- Setelah verifikasi, order diaktifkan: site dibuat dan link website (beserta ringkasan order) dikirim ke email pembeli. Email TIDAK memuat akses admin — login admin diserahkan owner saat serah terima (lihat support-playbook).
 - Tidak ada tagihan bulanan/tahunan. Upgrade quota dijual sebagai add-on, bukan langganan.
 
 Harga dasar tersimpan di satu tempat: `BASE_PRICE` di `src/constants/pricing.ts` (Rp199.000).

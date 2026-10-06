@@ -258,15 +258,37 @@ Ringkasan singkat:
 
 Jangan restore ke production database tanpa approval eksplisit dan flag `--allow-current-database --i-understand-this-can-overwrite-production`.
 
-## 8. Pembayaran / Refund (Placeholder)
+## 8. Pembayaran / Refund (DRAFT — menunggu persetujuan owner)
 
-Bagian ini akan dilengkapi setelah alur billing otomatis selesai.
+> **Status:** DRAFT 2026-10-06 (audit MEDIUM M8). Kebijakan di bawah BELUM disetujui owner —
+> jangan dijanjikan ke klien sampai owner menandatangani bagian ini. Setelah disetujui,
+> hapus baris status ini dan ganti judul menjadi "Pembayaran / Refund".
 
-Sementara, jika ada masalah pembayaran:
+### Kebijakan refund yang diusulkan
+
+1. **Sebelum aktivasi (order pending / menunggu verifikasi):** pembeli boleh membatalkan
+   kapan saja lewat halaman order atau hubungi owner. Sudah bayar tetapi order batal →
+   uang dikembalikan penuh; potongan hanya biaya transfer/QRIS yang benar-benar terpakai
+   (jika ada), dengan bukti mutasi.
+2. **Setelah aktivasi, dalam 7 hari:** refund penuh bila situs tidak sesuai deskripsi
+   pesanan ATAU rusak teknis yang tidak berhasil diperbaiki dalam 3×24 jam
+   (3 kali percobaan perbaikan, dicatat di `audit_logs`).
+3. **Setelah aktivasi, lewat 7 hari:** tanpa refund uang. Kompensasi berupa perbaikan,
+   penyesuaian konten, atau kredit layanan sesuai kasus (keputusan owner).
+4. **Pelanggaran konten (melanggar hukum / ketentuan layanan):** tanpa refund; site dapat
+   disuspend (jalur `PUT /api/admin/sites`).
+5. **SLA respons:** balasan ≤ 1×24 jam pada hari kerja; penyelesaian kasus teknis
+   ≤ 3 hari kerja.
+
+### Prosedur operasional (berlaku sekarang)
 
 - Cek status order di tabel `orders` (D1) atau `GET /api/admin/orders` — panel Pesanan sudah dihapus.
 - Jika perlu aktivasi manual: aktifkan ordernya lewat jalur yang tersedia (API/Telegram), atau ubah status site ke `active` via `PUT /api/admin/sites`.
 - Jangan ubah data pembayaran langsung di D1 tanpa melalui API/portal.
+- Refund hanya diproses **owner** (tidak ada tombol otomatis di sistem): catat keputusan +
+  alasan ke `audit_logs`, lalu proses pengembalian dana di kanal pembayaran yang dipakai
+  (QRIS/transfer manual). Order `activated` tidak bisa dibatalkan lewat flow sederhana —
+  penonaktifan site lewat suspend/downgrade terpisah.
 
 ## 9. Daftar Eskalasi
 

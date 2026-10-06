@@ -45,6 +45,8 @@ export interface WorkerDomainTarget {
 }
 
 export interface AttachedDomain {
+  /** ID domain di Cloudflare — dibutuhkan untuk detach (`DELETE .../domains/{domain_id}`). */
+  id?: string;
   hostname: string;
   service: string;
   zoneName: string;
@@ -131,6 +133,7 @@ export async function findWorkerDomain(
   if (!res.ok || !Array.isArray(res.data?.result)) return null;
 
   const list = res.data.result as Array<{
+    id?: string;
     hostname?: string;
     service?: string;
     zone_name?: string;
@@ -139,10 +142,55 @@ export async function findWorkerDomain(
   if (!found) return null;
 
   return {
+    id: found.id,
     hostname: found.hostname || target.hostname,
     service: found.service || '',
     zoneName: found.zone_name || zoneNameOf(target.hostname),
   };
+}
+
+/**
+ * Guard SEBELUM attach (audit business flow 2026-10-06, temuan MEDIUM M5):
+ * - hostname sudah menempel di Worker yang sama → idempotent (`alreadyAttached`);
+ * - hostname menempel di Worker LAIN → LEMPAR ERROR (dulu `PUT` diam-diam
+ *   memindahkan domain ke worker baru — domain klien lain bisa ketuker);
+ * - belum terpasang → lanjut attach.
+ */
+export async function guardWorkerDomainAttach(
+  cfApi: CfApi,
+  target: WorkerDomainTarget
+): Promise<{ alreadyAttached: boolean; existing?: AttachedDomain }> {
+  const existing = await findWorkerDomain(cfApi, target);
+  if (!existing) return { alreadyAttached: false };
+  if (existing.service === target.service) {
+    return { alreadyAttached: true, existing };
+  }
+  throw new Error(
+    `Domain "${target.hostname}" sudah terpasang di Worker lain ("${existing.service || '?'}"). ` +
+      `Ditolak agar tidak dipindah diam-diam ke "${target.service}". ` +
+      `Kalau memang harus dipindah, lepas dulu dari Worker lama (aksi "detach_domain" di ` +
+      `cloud-manager, atau dashboard Cloudflare → Workers → Custom Domains), lalu jalankan ulang.`
+  );
+}
+
+/**
+ * Lepas domain dari Worker (audit MEDIUM M5 — sebelumnya tidak ada jalur lepas).
+ * `DELETE /accounts/{account_id}/workers/domains/{domain_id}` (docs resmi
+ * Cloudflare, dicek 2026-10-06).
+ */
+export async function detachWorkerDomain(
+  cfApi: CfApi,
+  target: { accountId: string; apiToken: string; domainId: string }
+): Promise<void> {
+  const res = await cfApi(
+    `/accounts/${target.accountId}/workers/domains/${target.domainId}`,
+    target.apiToken,
+    { method: 'DELETE' }
+  );
+  if (!res.ok) {
+    const apiMsg = res.data?.errors?.[0]?.message || `kesalahan API Cloudflare (HTTP ${res.status})`;
+    throw new Error(`Gagal melepas domain dari Worker: ${apiMsg}`);
+  }
 }
 
 /**

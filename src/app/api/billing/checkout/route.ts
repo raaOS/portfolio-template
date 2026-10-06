@@ -90,8 +90,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Rate-limit per email — cegah spam order pakai identitas berbeda tapi inbox sama.
+    // Audit 2026-10-06 (MEDIUM): mode intip (record:false) — cek blokir TANPA menghitung
+    // percobaan. Kegagalan validasi form tidak lagi mengunci email 24 jam; hitungan hanya
+    // dicatat setelah order berhasil dibuat (di bawah).
     const emailNormalized = String(buyerEmail).trim().toLowerCase();
-    const emailLimit = await checkDataRateLimit(`billing_checkout_email:${emailNormalized}`, 5, 3_600_000, 86_400_000);
+    const emailLimitKey = `billing_checkout_email:${emailNormalized}`;
+    const emailLimit = await checkDataRateLimit(emailLimitKey, 5, 3_600_000, 86_400_000, {
+      record: false,
+    });
     if (!emailLimit.allowed) {
       return NextResponse.json(
         { error: 'Terlalu banyak pesanan dari email ini. Tunggu sebelum membuat pesanan baru.', retryAfter: emailLimit.retryAfter },
@@ -125,8 +131,12 @@ export async function POST(request: NextRequest) {
     );
 
     if (!result.success || !result.order) {
+      // Order GAGAL tidak dihitung ke rate limit email (lihat catatan record:false di atas).
       return NextResponse.json({ error: result.error || 'Gagal membuat order' }, { status: 400 });
     }
+
+    // Hanya order BERHASIL yang menghitung: 5 order/jam per email lalu blokir 24 jam.
+    await checkDataRateLimit(emailLimitKey, 5, 3_600_000, 86_400_000);
 
     const tokenParam = result.accessToken ? `?token=${result.accessToken}` : '';
 

@@ -36,6 +36,8 @@ interface OrderData {
   cancel_reason?: string | null;
   status: string;
   expires_at: string;
+  /** Dibutuhkan untuk countdown auto-cancel order waiting_verification (updated_at + 7 hari). */
+  updated_at?: string | null;
   created_at: string;
 }
 
@@ -234,8 +236,21 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ orderId
     }
   };
 
-  // M1: sisa waktu verifikasi pembayaran.
-  const expiresMs = order ? new Date(order.expires_at).getTime() - now : 0;
+  // M1: sisa waktu.
+  // Audit 2026-10-06 (MEDIUM): dulu KEDUA status menghitung ke `expires_at` (dibuat + 24 jam)
+  // padahal aturan server untuk `waiting_verification` adalah auto-cancel 7 hari dihitung dari
+  // `updated_at` (saat bukti diunggah) — akibatnya countdown menunjuk 0 jauh sebelum order
+  // benar-benar dibatalkan (bisa nyangkut nol selama ±6 hari). Kini:
+  // - pending_payment → `expires_at` (batas bayar 24 jam) — sama dengan sapuan server;
+  // - waiting_verification → `updated_at + 7 hari` — sama dengan aturan auto-cancel di
+  //   orderService (sweep `updated_at <= -7 days`).
+  const autoCancelMs = 7 * 24 * 60 * 60 * 1000;
+  const deadlineMs = order
+    ? order.status === 'waiting_verification'
+      ? (order.updated_at ? new Date(order.updated_at).getTime() : new Date(order.expires_at).getTime()) + autoCancelMs
+      : new Date(order.expires_at).getTime()
+    : 0;
+  const expiresMs = order ? deadlineMs - now : 0;
   const formatCountdown = (ms: number) => {
     if (ms <= 0) return '0j 0m 0d';
     const totalSeconds = Math.floor(ms / 1000);
@@ -243,11 +258,13 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ orderId
     const hours = Math.floor((totalSeconds % 86400) / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
+    // Satuan: hr = hari, j = jam, m = menit, d = detik (dulu hari juga memakai "d",
+    // jadi "7d 0j 0m 0d" terbaca hari-kembar dan tidak pernah menampilkan detik).
     return days > 0
-      ? `${days}d ${hours}j ${minutes}m ${seconds}d`
+      ? `${days}hr ${hours}j ${minutes}m ${seconds}d`
       : `${hours}j ${minutes}m ${seconds}d`;
   };
-  const countdownUrgent = expiresMs < 60 * 60 * 1000; // < 1 jam
+  const countdownUrgent = order?.status === 'pending_payment' && expiresMs < 60 * 60 * 1000; // < 1 jam
 
   const handleSubmitProof = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -501,7 +518,9 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ orderId
               }`}>
                 <span className="flex items-center gap-1.5">
                   <Clock className="h-3.5 w-3.5" />
-                  {order.status === 'waiting_verification' ? 'Menunggu verifikasi admin —' : 'Sisa batas waktu bayar:'}
+                  {order.status === 'waiting_verification'
+                    ? 'Dibatalkan otomatis dalam:'
+                    : 'Sisa batas waktu bayar:'}
                 </span>
                 <span className="font-mono font-extrabold tabular-nums">{formatCountdown(expiresMs)}</span>
               </div>

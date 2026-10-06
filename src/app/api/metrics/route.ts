@@ -4,6 +4,7 @@ import { enforceRequestRateLimit } from '@/lib/security/request';
 import { z } from 'zod';
 import { buildMetricsPath, normalizeEngagementSiteId } from '@/lib/projectEngagement';
 import { projectSqlService } from '@/lib/services/project/projectSqlService';
+import { SITE_ID } from '@/crud/shared/config';
 
 interface ProjectMetrics {
   likes: number;
@@ -73,6 +74,12 @@ export async function POST(request: NextRequest) {
 
     const { slug, action } = validation.data;
     const siteId = normalizeEngagementSiteId(validation.data.siteId);
+    // Audit 2026-10-06 (MEDIUM): sama seperti komentar — siteId bebas membuat baris
+    // metrics tak terbatas. Hanya site resmi (SITE_ID) atau bucket legacy 'default-site'.
+    // (Rate limit IP 60/menit sudah ada di atas — tidak diubah.)
+    if (siteId !== SITE_ID && siteId !== 'default-site') {
+      return NextResponse.json({ error: 'Unknown site' }, { status: 400 });
+    }
     const metricsRef = db.ref(buildMetricsPath(siteId, slug));
     const fallbackMetrics = await getFallbackMetrics(siteId, slug);
     let updatedMetrics: ProjectMetrics = fallbackMetrics;
