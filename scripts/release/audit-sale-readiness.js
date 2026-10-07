@@ -95,7 +95,7 @@ checkIncludes('docs/release/SALES_PRICING.md', [
   'PROJECT_LIMIT',
 ]);
 
-checkIncludes('scripts/release/smoke-production.js', ['/api/health', '/api/public/sites/']);
+checkIncludes('scripts/release/smoke-production.js', ['/api/health', '/projects']);
 
 checkDemoDataHygiene();
 

@@ -16,8 +16,9 @@ Endpoint yang dicek:
 
 - `/api/health`
 - `/`
-- `/api/public/sites/{siteSlug}`
-- `/api/public/sites/{siteSlug}/projects`
+- `/projects`
+
+(Rute public per-slug `/api/public/sites/{siteSlug}` sudah dihapus bersama konsep tenant — `--site-slug` kini hanya label laporan.)
 
 Script juga bisa mengecek storage/quota per site memakai D1/R2 env lokal. Default warning threshold adalah 80% dari quota efektif.
 

@@ -3,6 +3,53 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.27] - 2026-10-08
+
+### 🧹 Hapus total konsep tenant `/<slug>` (PK1 + PK3)
+
+- **Semua rute tenant dibuang.** Rute `/<slug>/...` (portfolio, projects, about, contact, cv, preview, api publik per-tenant) dihapus — satu deployment hanya melayani satu klien, path ber-tenant tidak pernah ada gunanya. `activateOrder` kini **Opsi A**: label generatif `site_<ts>_<rand>` ditulis ke `orders.site_id`/`audit_logs.site_id` **tanpa INSERT ke tabel `sites`**; skrip `cleanup-fake-sites.ts` membersihkan baris fake hasil alur lama (SELECT dulu → tampilkan → hapus terarah; `sites` produksi kini hanya `default-site`). 5 script penunjang ikut diperbaiki.
+- **Email aktivasi jujur (Opsi A).** "Pembayaran Terverifikasi — Website Sedang Disiapkan" hanya berisi fakta (verifikasi sukses, diupayakan online ≤1×24 jam, akses diserahkan via WhatsApp) — **nol link, nol tombol, nol slug**, diproteksi test (`not.toMatch(/https?:\/\//)`). Link website baru muncul di email "Website Sudah Online" setelah deploy benar-benar sukses.
+- **Halaman order jujur** sesuai status nyata; **banner DRAFT refund dihapus** — kebijakan refund di playbook §8 resmi disetujui owner dan boleh dijanjikan ke klien (PK3, selesai dalam commit PK1).
+
+### 📧 Email "Website Sudah Online" + dropdown slug dari order (PK2)
+
+- **`scripts/onboarding/notify-online.ts` (baru):** email Resend pasca-deploy pertama — URL live, tautan `/admin/login`, catatan kredensial; tidak pernah melempar error (mem-balik `{sent, reason}`); lookup order via `queryD1ForDatabase`. 8 test baru.
+- **Hanya deploy pertama sukses yang mengirim email** (alur provisioning + retry dengan flag `notifyOnline: true`); batch update cloud-manager dan `/api/deploy-client` sengaja tidak mengirim.
+- **Dropdown saran slug di portal** kini `<datalist>` dari `GET /api/order-slugs` (status pending/waiting/activated); ketik manual tetap bisa.
+
+### 💰 Harga jual bisa diubah owner lewat admin (PK4)
+
+- **Panel `/admin/system/harga`** (zona Sistem & Tampilan): ubah harga lewat UI → disimpan di D1 `platform_settings` key `pricing_config`; guardrail Rp1.000–Rp100.000.000 (anti-typo); `BASE_PRICE` 199.000 tetap fallback di mana pun — D1 mati/belum di-set pun tidak pernah error.
+- **Nominal order dihitung server dari harga D1** (route checkout tidak pernah menerima `amount` dari klien); tampilan harga di landing di-inject server (ISR 60 dtk, 0 request/visitor) dan checkout membaca dari `payment-info` (0 request ekstra); `GET`/`PUT /api/admin/pricing` (admin + CSRF). 11 test baru.
+
+### 📜 Halaman Syarat & Ketentuan + Kebijakan Privasi (PK5)
+
+- **`/syarat-ketentuan`** (8 poin: harga terkunci saat order, verifikasi manual ≤1×24 jam, refund = playbook §8, akses setup Cloudflare, source code sekali bayar) dan **`/kebijakan-privasi`** (10 poin sesuai alur nyata: D1/R2/Workers, Resend, WhatsApp, statistik kunjungan, tanpa cookie iklan) — brand Make it Better Studio, kontak m4keitbetter@gmail.com, saling tertaut, masuk `sitemap.xml`.
+- **Checkout:** baris persetujuan "Dengan memesan, Anda menyetujui Syarat & Ketentuan dan Kebijakan Privasi" di bawah tombol Pesan.
+- **Email struk/kedaluwarsa/batal** (teks + HTML): footer tautan S&K + Privasi dari origin situs. Email aktivasi tetap **nol link** — desain PK1 dipertahankan.
+
+### 💾 `SALIN_CADANGAN.bat` (PK6)
+
+- **Script sekali klik di root repo:** menyalin `backups\` ke flashdisk (prompt huruf drive + validasi drive) atau ke `cadangan-flashdisk\` (tekan Enter); robocopy incremental (file lama tidak disalin ulang); pesan `[OK]`/`[X]` jelas untuk pemilik non-teknis. Diuji 4 jalur: tanpa backup, salin lokal, drive salah, dan inkremental dengan data asli 62 MB.
+- `.gitignore`: `cadangan-flashdisk/*` dikeluarkan dari git kecuali `README.txt` (petunjuk cara pakai).
+
+### 📋 Runbook gladi resik klien perdana (PK7)
+
+- **`docs/operations/GLADI_RESIK_KLIEN_PERDANA.md`:** checklist 8 bagian — prasyarat → alur order storefront → portal provisioning/deploy → verifikasi isi & data → simulasi serah terima → pembersihan → gerbang final hari-H → tabel kegagalan cepat. Menunjuk dokumen yang sudah ada, tidak menduplikasi; seluruh perintah & path dirujuk diverifikasi ada.
+
+### 🧾 Catatan serah terima otomatis + kebiasaan operasional (PK8)
+
+- **`CATATAN_SERAH_TERIMA.md` ditulis otomatis `deployClient()`** ke `arsip-klien/<slug>/` setelah deploy sukses: aset URL, penunjuk kredensial (**tanpa nilai password**), status build/deploy jujur, checklist serah terima, jalur rutin backup/reset-password. Kegagalan menulis catatan tidak mengubah status deploy. 3 test baru.
+- **Support-playbook:** kebiasaan wajib **Mutasi → Baca Ulang → Laporkan** (wajib bukti baca-ulang sebelum klaim "selesai") + tabel **retensi bukti bayar terverifikasi dari kode** (file dihapus saat batal/sweep 7 hari mengikuti audit PII 29 Sep; dipertahankan saat aktif; versi lama penggantian tertinggal sampai pembersihan).
+
+### ✅ Gerbang pengujian
+
+- **Semua hijau:** `tsc --noEmit` 0 error · ESLint 0 error · seluruh test pass (123+ file) · `npm run build` exit 0 · type-check `scripts/` (tsconfig sementara) bersih.
+
+### ⚠️ Catatan rilis
+
+- Perubahan berlaku setelah **deploy produksi + restart portal `PENGELOLA_KLIEN.bat` (port 4567)**. Harga jual di panel baru terbaca setelah deploy; pastikan sesuai sebelum klien pertama.
+
 ## [1.3.26] - 2026-10-06
 
 ### 🚀 Rilis Produksi & Bukti Uji Nyata

@@ -43,7 +43,7 @@ Usage:
 
 Options:
   --url=<url>          Production base URL. Can also use PRODUCTION_SMOKE_URL.
-  --site-slug=<slug>  Public site slug to verify. Default: ${DEFAULT_SITE_SLUG}.
+  --site-slug=<slug>  (Informasi saja — rute public per-slug sudah dihapus.)
   --skip-ffmpeg       Skip /r2/ffmpeg HEAD checks.
   --allow-localhost   Allow localhost URL for testing the smoke script itself.
 `);
@@ -119,13 +119,11 @@ async function requestCheck({
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   const baseUrl = normalizeBaseUrl(options.url, options.allowLocalhost);
-  const encodedSiteSlug = encodeURIComponent(options.siteSlug);
 
   const checks = [
     { path: '/api/health' },
     { path: '/' },
-    { path: `/api/public/sites/${encodedSiteSlug}` },
-    { path: `/api/public/sites/${encodedSiteSlug}/projects` },
+    { path: '/projects' },
   ];
 
   if (!options.skipFfmpeg) {

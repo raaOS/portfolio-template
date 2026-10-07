@@ -10,51 +10,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isStaticAsset, addSecurityHeaders, shouldRedirectToHttps } from './middleware/utils';
 import { checkCustomerAuth } from './middleware/customer-auth';
 import { checkCSRF } from './middleware/csrf';
-import { customDomainService, isCustomDomainEnabled } from './lib/services/customDomainService';
+import { isStorefrontDeployment } from './lib/storefront';
 
-function getHostname(request: NextRequest) {
-  return (request.headers.get('host') || request.nextUrl.hostname)
-    .split(':')[0]
-    .trim()
-    .toLowerCase();
-}
+// Jalur mesin penjualan (toko) — hanya hidup di deployment storefront
+// (makeitbetter.my.id). Di website klien jalur ini 404 supaya tidak ada
+// order yang masuk ke D1 klien dan tidak ada halaman jualan yang tampil.
+// Custom domain klien tidak butuh rewrite lagi: halaman `/` deployment klien
+// sudah merender portofolio miliknya sendiri (lihat src/app/page.tsx).
+const STOREFRONT_ONLY_PREFIXES = ['/checkout', '/orders', '/api/billing', '/api/telegram'];
 
-function isPlatformHostname(hostname: string) {
-  const configured = [process.env.NEXT_PUBLIC_SITE_URL, process.env.NEXT_PUBLIC_APP_URL]
-    .filter(Boolean)
-    .flatMap((value) => {
-      try {
-        return [new URL(value as string).hostname.toLowerCase()];
-      } catch {
-        return [];
-      }
-    });
-  return (
-    configured.includes(hostname) ||
-    hostname === 'localhost' ||
-    hostname === '127.0.0.1' ||
-    hostname.endsWith('.workers.dev') ||
-    hostname.endsWith('.pages.dev')
-  );
-}
-
-// Path yang tetap dilayani oleh platform (bukan tenant site) di custom domain.
-// Tanpa allowlist ini, `/checkout`, `/orders`, `/templates`, `/client` di
-// domain tenant di-rewrite ke `/{slug}/...` dan menjadi 404.
-const PLATFORM_PATH_PREFIXES = [
-  '/api/',
-  '/checkout',
-  '/orders',
-  '/templates',
-  '/preview',
-  '/client',
-  '/admin',
-  '/r2',
-  '/_next',
-];
-
-function isPlatformPath(pathname: string) {
-  return PLATFORM_PATH_PREFIXES.some(
+function isStorefrontOnlyPath(pathname: string) {
+  return STOREFRONT_ONLY_PREFIXES.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`)
   );
 }
@@ -77,16 +43,10 @@ export async function middleware(request: NextRequest) {
   }
 
   if (
-    isCustomDomainEnabled() &&
-    !isPlatformPath(pathname) &&
-    !isPlatformHostname(getHostname(request))
+    !isStorefrontDeployment() &&
+    isStorefrontOnlyPath(pathname)
   ) {
-    const site = await customDomainService.resolveActiveSiteByDomain(getHostname(request));
-    if (site && !pathname.startsWith(`/${site.slug}`)) {
-      const rewriteUrl = request.nextUrl.clone();
-      rewriteUrl.pathname = `/${site.slug}${pathname === '/' ? '' : pathname}`;
-      return addSecurityHeaders(NextResponse.rewrite(rewriteUrl));
-    }
+    return addSecurityHeaders(new NextResponse(null, { status: 404 }));
   }
 
   const csrfResult = checkCSRF(request);

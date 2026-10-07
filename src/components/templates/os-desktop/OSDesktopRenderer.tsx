@@ -37,7 +37,6 @@ export default function OSDesktopRenderer({ data }: TemplateRendererProps) {
     >
       <HomeOSWrapper
         siteId={site.id}
-        siteSlug={site.slug}
         aboutData={about}
         experienceData={experienceData}
         hardSkillsData={hardSkillsData}

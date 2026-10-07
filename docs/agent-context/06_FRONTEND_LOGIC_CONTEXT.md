@@ -7,7 +7,7 @@ UI harus menerima data siap pakai.
 ## Modul Kunci
 1. **`src/lib/api-client.ts` (`unwrapApiPayload`):** Helper kecil untuk membongkar payload respons API bersarang (`{ success, data }`) — dipakai konsumen seperti `useChatProjects`.
 2. **Hook `useAdmin*` (`src/app/admin/hooks/`):** Lapisan fetch panel admin ke endpoint `/api/*` (loading/error state, header CSRF via `src/lib/security/client-csrf.ts`). (Modul lama `masterApiClient.ts` sudah tidak ada.)
-3. **`siteDataAdapter.ts`:** Sumber data tunggal (SOT) untuk halaman public (`/[siteSlug]`), membaca langsung D1 lewat `queryD1`.
+3. **`src/lib/templates/dataMapper.ts` (type `SiteInfo`):** Kontrak data site untuk renderer template. Adapter per-slug `siteDataAdapter.ts` sudah dihapus bersama rute `/{slug}` — halaman public membaca D1 per deployment (`SITE_ID`).
 4. **`projectMapper.ts`:** Bertugas melakukan *mapping* struktur baris SQL D1 (`ProjectSqlRow`, narasi, media) kembali ke bentuk object/prop lama yang diharapkan oleh komponen OS UI. Ini menjaga UI agar tidak pecah/error.
 
 ## Aturan Public/Secret

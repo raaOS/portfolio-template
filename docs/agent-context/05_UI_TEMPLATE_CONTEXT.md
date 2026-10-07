@@ -20,10 +20,10 @@ Selalu siapkan komponen untuk:
 Gunakan flag `FEATURE_*` (bukan tiers paket) untuk menyembunyikan/menampilkan fitur opsional.
 - Client selalu bisa login ke dashboard untuk edit profil/site, CRUD project sesuai quota, upload media, reorder, draft/publish, dan melihat quota.
 - Fitur opsional (custom domain, analytics/leads, AI copy/case study, testimonial manager, submission/approval workflow) aktif jika flag `FEATURE_*` terkait menyala.
-- UI public template harus mengambil `feature_flags` dan `quota` dari API berbasis `siteSlug`; jangan hardcode asumsi single portfolio.
+- UI public template membaca flag/quota dari konten D1 per deployment; rute API berbasis `siteSlug` (`/api/public/sites/*`) sudah dihapus.
 
 ## Client UI Boundary
 - UI client/pembeli hanya boleh memanggil endpoint client/site-scoped atau endpoint content yang resolve `siteId`.
 - UI client tidak boleh memanggil endpoint master/platform seperti admin login, admin password/PIN, clear-cache, revalidate, health, settings platform, atau metrics internal.
-- Route pembeli memakai pola tenant: public site di `/[siteSlug]`, public project di `/[siteSlug]/projects`. Tidak ada route login per-site; login panel ada di `/admin/login`.
-- Jangan membuat UI yang mengarahkan tenant ke route global seperti `/projects` jika sedang berada di site tenant; gunakan path tenant seperti `/${siteSlug}/projects`.
+- Route pembeli: public site di `/`, public project di `/projects` (+ `/projects/:slug`). Tidak ada route login per-site; login panel ada di `/admin/login`.
+- Rute tenant `/{slug}` & API public per-slug sudah dihapus (2026-10-07) — jangan buat UI yang membangun path per-slug.

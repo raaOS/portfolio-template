@@ -16,6 +16,9 @@ function CheckoutForm() {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [paymentActive, setPaymentActive] = useState(true);
+  // Harga tampil dari payment-info (satu fetch untuk QRIS + harga);
+  // nominal diorders tetap dihitung server dari D1. Fallback: BASE_PRICE.
+  const [basePrice, setBasePrice] = useState(BASE_PRICE);
 
   useEffect(() => {
     (async () => {
@@ -24,6 +27,9 @@ function CheckoutForm() {
         const data = await res.json();
         if (data.success && typeof data.isActive === 'boolean') {
           setPaymentActive(data.isActive);
+        }
+        if (typeof data.basePrice === 'number' && data.basePrice > 0) {
+          setBasePrice(data.basePrice);
         }
       } catch {
         // Keep default
@@ -103,7 +109,7 @@ function CheckoutForm() {
 
           <div className="checkout-price-box">
             <span className="checkout-price-label">Total pembayaran</span>
-            <span className="checkout-price-value">{formatIdr(BASE_PRICE)}</span>
+            <span className="checkout-price-value">{formatIdr(basePrice)}</span>
           </div>
 
           <ul className="checkout-includes">
@@ -205,8 +211,20 @@ function CheckoutForm() {
             disabled={loading || !paymentActive}
             className="checkout-btn"
           >
-            {loading ? 'Memproses...' : `Pesan — ${formatIdr(BASE_PRICE)}`}
+            {loading ? 'Memproses...' : `Pesan — ${formatIdr(basePrice)}`}
           </button>
+
+          <p className="checkout-consent">
+            Dengan memesan, Anda menyetujui{' '}
+            <Link href="/syarat-ketentuan" target="_blank" rel="noopener noreferrer">
+              Syarat &amp; Ketentuan
+            </Link>{' '}
+            dan{' '}
+            <Link href="/kebijakan-privasi" target="_blank" rel="noopener noreferrer">
+              Kebijakan Privasi
+            </Link>{' '}
+            Make it Better Studio.
+          </p>
         </form>
       </div>
 
@@ -468,6 +486,24 @@ function CheckoutForm() {
         .checkout-btn:disabled {
           opacity: 0.4;
           cursor: not-allowed;
+        }
+
+        .checkout-consent {
+          margin-top: 12px;
+          font-size: 11.5px;
+          line-height: 1.6;
+          color: #94a3b8;
+          text-align: center;
+        }
+
+        .checkout-consent :global(a) {
+          color: #cbd5e1;
+          text-decoration: underline;
+          text-underline-offset: 2px;
+        }
+
+        .checkout-consent :global(a:hover) {
+          color: #fff;
         }
       `}</style>
     </div>

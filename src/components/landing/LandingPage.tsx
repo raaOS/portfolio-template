@@ -42,7 +42,12 @@ const FEATURES = [
   },
 ];
 
-export default function LandingPage() {
+/**
+ * Halaman jualan storefront. `basePrice` di-inject server dari D1 (panel
+ * admin "Harga Jual") pada render `/` mode storefront — tanpa fetch tambahan
+ * di sisi klien. Fallback: `BASE_PRICE`.
+ */
+export default function LandingPage({ basePrice = BASE_PRICE }: { basePrice?: number }) {
   const year = new Date().getFullYear();
 
   return (
@@ -108,7 +113,7 @@ export default function LandingPage() {
       <section className="landing-cta">
         <hr className="landing-cta-divider" />
         <p className="landing-price-label">Harga template</p>
-        <p className="landing-price">{formatIdr(BASE_PRICE)}</p>
+        <p className="landing-price">{formatIdr(basePrice)}</p>
         <p className="landing-price-note">
           Sekali bayar — termasuk source code, admin panel, dan setup Cloudflare.
         </p>

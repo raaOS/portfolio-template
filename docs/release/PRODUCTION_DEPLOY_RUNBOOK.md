@@ -53,7 +53,7 @@ Check:
 http://localhost:8788/api/health
 http://localhost:8788/
 http://localhost:8788/admin/login
-http://localhost:8788/api/public/sites/demo-designer/projects
+http://localhost:8788/projects
 ```
 
 Stop `wrangler dev` after testing. On Windows, also make sure no `workerd` process keeps `.open-next` locked.
@@ -87,16 +87,11 @@ The smoke script checks:
 
 - `/api/health`
 - `/`
-- `/api/public/sites/{siteSlug}`
-- `/api/public/sites/{siteSlug}/projects`
+- `/projects`
 - `/r2/ffmpeg/ffmpeg-core.js`
 - `/r2/ffmpeg/ffmpeg-core.wasm`
 
-If the production instance does not include seeded demo data, pass a real public site slug:
-
-```bash
-npm run release:smoke -- --url https://your-production-domain.example --site-slug real-site-slug
-```
+Rute public per-slug (`/api/public/sites/{siteSlug}`) sudah dihapus bersama konsep tenant; `--site-slug` kini hanya informasi.
 
 ## Manual Acceptance
 

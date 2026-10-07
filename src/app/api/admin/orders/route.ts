@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdminAuth, validateAdminRequest } from '@/lib/auth';
 import { activateOrder, cancelOrder, getAdminOrders, reopenOrder, sweepExpiredOrders } from '@/lib/services/orderService';
-import { getPublicBaseUrl } from '@/lib/constants';
 
 export async function GET(request: NextRequest) {
   try {
@@ -49,18 +48,12 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'activate') {
-      const result = await activateOrder(
-        orderId,
-        {
-          APP_BASE_URL: getPublicBaseUrl(),
-        },
-        {
-          // Jalur late-activation: order expired yang sudah dibayar dan diverifikasi
-          // mutasinya secara manual oleh admin. proofUrl opsional (link screenshot WA).
-          allowExpired: Boolean(allowExpired),
-          proofUrl: typeof proofUrl === 'string' && proofUrl.trim() ? proofUrl.trim() : undefined,
-        }
-      );
+      const result = await activateOrder(orderId, {
+        // Jalur late-activation: order expired yang sudah dibayar dan diverifikasi
+        // mutasinya secara manual oleh admin. proofUrl opsional (link screenshot WA).
+        allowExpired: Boolean(allowExpired),
+        proofUrl: typeof proofUrl === 'string' && proofUrl.trim() ? proofUrl.trim() : undefined,
+      });
       if (!result.success) {
         return NextResponse.json({ success: false, error: result.message }, { status: 400 });
       }

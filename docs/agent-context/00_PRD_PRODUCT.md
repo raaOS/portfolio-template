@@ -27,5 +27,5 @@ Produk yang dibangun adalah **Portfolio OS Template**: template portfolio dengan
 - Panel `/admin` per situs → klien self-service edit profil/site dan CRUD project sesuai quota.
 - Upload media ke Cloudflare R2 (path selalu `sites/{siteId}/...`).
 - Membuat project (draft -> publish).
-- Template OS menampilkan site + project berdasarkan `siteSlug` (dibaca langsung dari D1 lewat `siteDataAdapter`; kontrak HTTP read-only tersedia di `/api/public/sites/:siteSlug*`).
+- Halaman `/` punya dua wajah sesuai deployment: storefront (halaman jualan) atau portofolio milik klien (data D1 `SITE_ID`; konsep rute `/{slug}` multi-tenant sudah dihapus — tidak ada kontrak HTTP public per-slug lagi).
 - **Non-Goals MVP:** Master Dashboard multi-klien, pembuatan/pembelian/pengelolaan site dari dalam panel admin, paket Lite/Pro, langganan/billing otomatis, integrasi WhatsApp API resmi, custom domain otomatis penuh, marketplace template, dan migrasi massal klien lama.

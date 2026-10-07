@@ -6,6 +6,7 @@ import { spawn } from 'child_process';
 import { SHARED_SCHEMA_QUERIES } from '../../src/crud/shared/db/schema';
 import { hashPasswordScrypt } from '../../src/crud/shared/auth/password';
 import { clientUrls, deployClient, resolveWorkersSubdomain } from './client-deploy';
+import { sendWebsiteOnlineEmail, listOrderSlugs } from './notify-online';
 import { attachWorkerDomain, findWorkerDomain, buildDomainHandoverMessage, guardWorkerDomainAttach } from './custom-domain';
 import {
   findArchiveForSlug,
@@ -501,6 +502,26 @@ const server = http.createServer(async (req, res) => {
             deployError = (deployErr as Error).message || 'Build & deploy gagal.';
           }
 
+          // PK2 — kabar jujur ke pembeli HANYA setelah deploy benar-benar sukses.
+          // Email "Pembayaran Terverifikasi" (tanpa link) sudah dikirim saat
+          // aktivasi; email ini berisi URL live yang sebenarnya. Best-effort:
+          // kegagalan email tidak mengubah status deploy.
+          let onlineEmailNote = '';
+          if (deployed) {
+            try {
+              const emailResult = await sendWebsiteOnlineEmail({ slug: payload.clientSlug, websiteUrl });
+              onlineEmailNote = emailResult.reason;
+              if (emailResult.sent) {
+                sendEvent('progress', {
+                  step: 7,
+                  message: 'Email "Website Sudah Online" terkirim ke pembeli.',
+                });
+              }
+            } catch (emailErr) {
+              onlineEmailNote = `Email "Sudah Online" gagal: ${(emailErr as Error).message}`;
+            }
+          }
+
           sendEvent('progress', {
             step: 7,
             message: deployed ? 'Selesai! Website sudah online.' : 'Selesai — tetapi deploy gagal.',
@@ -511,6 +532,7 @@ const server = http.createServer(async (req, res) => {
             adminUrl: `${websiteUrl}/admin`,
             deployed,
             deployError,
+            onlineEmailNote,
           });
         } catch (provisionErr) {
           sendEvent('error', { message: (provisionErr as Error).message });
@@ -522,6 +544,21 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ success: false, message: (err as Error).message }));
       }
     });
+    return;
+  }
+
+  // API: Saran slug dari orders (dropdown pemilihan slug di form provisioning)
+  if (url === '/api/order-slugs' && req.method === 'GET') {
+    (async () => {
+      try {
+        const slugs = await listOrderSlugs();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, slugs }));
+      } catch (err) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, slugs: [], message: (err as Error).message }));
+      }
+    })();
     return;
   }
 
@@ -887,7 +924,9 @@ const server = http.createServer(async (req, res) => {
       try {
         // `forceBuild` tidak lagi dipakai: bundle dibangun ulang untuk tiap
         // klien karena env build-nya berbeda (lihat deployClient()).
-        const { folderName, all } = JSON.parse(body || '{}');
+        // `notifyOnline` = konteks retry deploy PERTAMA dari kartu sukses
+        // onboarding (PK2) — batch update sengaja tidak mengirimnya.
+        const { folderName, all, notifyOnline } = JSON.parse(body || '{}');
 
         res.writeHead(200, {
           'Content-Type': 'text/event-stream',
@@ -946,6 +985,7 @@ const server = http.createServer(async (req, res) => {
           success: boolean;
           error?: string;
           url?: string;
+          emailNote?: string;
         }> = [];
 
         for (let i = 0; i < targetFolders.length; i++) {
@@ -981,11 +1021,32 @@ const server = http.createServer(async (req, res) => {
             sendEvent('log', {
               text: `✓ BERHASIL! Website ${clientName} telah diperbarui ke versi template terbaru: ${outcome.websiteUrl}`,
             });
+
+            // PK2 — retry deploy pertama dari kartu sukses onboarding:
+            // kirim email "Website Sudah Online" (best-effort).
+            let emailNote = '';
+            if (notifyOnline === true) {
+              try {
+                const emailResult = await sendWebsiteOnlineEmail({
+                  slug: outcome.slug || clientSlug,
+                  websiteUrl: outcome.websiteUrl || `https://${clientSlug}.workers.dev`,
+                });
+                emailNote = emailResult.reason;
+                sendEvent('log', {
+                  text: emailResult.sent ? `📧 ${emailResult.reason}` : `ℹ️ ${emailResult.reason}`,
+                });
+              } catch (emailErr) {
+                emailNote = `Email "Sudah Online" gagal: ${(emailErr as Error).message}`;
+                sendEvent('log', { text: `⚠️ ${emailNote}` });
+              }
+            }
+
             results.push({
               clientName,
               clientSlug: outcome.slug || clientSlug,
               success: true,
               url: outcome.websiteUrl,
+              emailNote,
             });
           } else {
             const errDetail = outcome.error || 'Deploy gagal';

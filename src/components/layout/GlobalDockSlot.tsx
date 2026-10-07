@@ -68,8 +68,8 @@ export function DockPortal({ children }: { children: ReactNode }) {
 
   // Fallback WAJIB untuk route yang tidak memasang GlobalDockSlot — yaitu
   // route di root layout (`/preview/*`), karena LayoutClient hanya dipasang di
-  // `(site)/layout.tsx` dan `[siteSlug]/layout.tsx`. Tanpa fallback ini
-  // `target` selalu null → DockPortal return null → OSDock/GlobalDock tidak
+  // `(site)/layout.tsx` dan di `/` mode klien (`src/app/page.tsx`). Tanpa
+  // fallback ini `target` selalu null → DockPortal return null → OSDock/GlobalDock tidak
   // pernah masuk DOM dan dock hilang total (bug: dock tidak muncul di
   // /preview/os-desktop).
   //

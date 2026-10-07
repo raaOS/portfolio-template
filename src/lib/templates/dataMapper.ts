@@ -4,11 +4,22 @@
  */
 
 import type { HomepageData } from '@/lib/loaders';
-import type { SiteInfo } from '@/lib/adapters/siteDataAdapter';
 import type {
   PortfolioTemplateData,
   SiteProfileHeader,
 } from '@/types/template';
+
+/**
+ * Baris tabel `sites` yang dipakai mapper (kontrak minimal — bukan lagi
+ * adapter multi-tenant; rute `/[siteSlug]` sudah dihapus).
+ */
+export interface SiteInfo {
+  id: string;
+  slug: string;
+  name: string;
+  status: string;
+  active_template_key?: string;
+}
 
 export interface SiteRecordWithTemplate extends SiteInfo {
   title?: string;

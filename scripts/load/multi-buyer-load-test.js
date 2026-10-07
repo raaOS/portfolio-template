@@ -705,23 +705,12 @@ async function tenantFlow(tenant, admin, siteUser, options, metrics) {
     result.siteId = site.id;
 
     await requestDelay(delay);
-    await visitor.request('GET', `/${tenant.slug}`, {
+    await visitor.request('GET', '/projects', {
       tenant: tenant.slug,
       name: 'public.visit',
       expectedStatuses: [200, 307, 308],
     });
     await requestDelay(delay);
-    await visitor.request('GET', `/api/public/sites/${tenant.slug}`, {
-      tenant: tenant.slug,
-      name: 'public.site',
-      expectedStatuses: [200],
-    });
-    await requestDelay(delay);
-    await visitor.request('GET', `/api/public/sites/${tenant.slug}/projects`, {
-      tenant: tenant.slug,
-      name: 'public.projects',
-      expectedStatuses: [200],
-    });
 
     let coverUrl = 'https://example.invalid/portfolio-os-load-test-cover.png';
     const galleryItems = [];

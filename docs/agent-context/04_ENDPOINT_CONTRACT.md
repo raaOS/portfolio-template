@@ -3,10 +3,7 @@
 Endpoint adalah kontrak baku. Frontend tidak boleh "menebak" shape data.
 
 ## Public API (Read-only)
-- `GET /public/sites/:siteSlug` -> Ambil profil site, tema, config.
-- `GET /public/sites/:siteSlug/projects` -> Ambil daftar project (`status='published'`).
-- `GET /public/sites/:siteSlug/projects/:projectSlug` -> Ambil detail project + narasi + galeri.
-- `GET /public/sites/:siteSlug/config` -> Ambil feature flags + quota. Route-nya memang ada (`src/app/api/public/sites/[siteSlug]/config/route.ts`) tetapi saat ini **tanpa konsumen** — tidak ada kode frontend yang memanggilnya. Flag `FEATURE_CLIENT_DASHBOARD` / `FEATURE_MASTER_DASHBOARD` sudah dihapus dari kode dan tidak lagi muncul di respons.
+- **Dihapus (2026-10-07):** `GET /public/sites/:siteSlug*` (profil, projects, detail project, config) — rute tenant `/{slug}` dan konsep multi-tenant sudah dihapus. Halaman public kini membaca D1 langsung per deployment (`/projects`, `/projects/:slug`, `/` mode klien).
 
 ## Admin API (Auth Required)
 - `POST /admin/sites` -> Buat site baru di D1 (route masih ada, `validateAdminRequest`). Dalam alur jualan normal, row `site` dibuat oleh portal onboarding (`PENGELOLA_KLIEN.bat`) — **tidak ada pembuatan/pembelian site dari dalam panel admin**.

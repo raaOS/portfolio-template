@@ -18,8 +18,7 @@ dotenv.config({ path: '.env', override: false, quiet: true });
 const DEFAULT_ENDPOINTS = [
   { name: 'health', path: '/api/health', expectedStatuses: [200] },
   { name: 'home', path: '/', expectedStatuses: [200] },
-  { name: 'public_site', path: '/api/public/sites/{siteSlug}', expectedStatuses: [200] },
-  { name: 'public_projects', path: '/api/public/sites/{siteSlug}/projects', expectedStatuses: [200] },
+  { name: 'projects', path: '/projects', expectedStatuses: [200] },
 ];
 
 function parseArgs(argv) {
