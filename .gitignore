@@ -11,6 +11,10 @@ src/data/backups/
 backups/
 .backup-drill/
 
+# Salinan cadangan manual ke flashdisk (SALIN_CADANGAN.bat) - file besar jangan ikut git
+cadangan-flashdisk/*
+!cadangan-flashdisk/README.txt
+
 # System Files
 .DS_Store
 desktop.ini
