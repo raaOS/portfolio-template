@@ -758,7 +758,8 @@
 
         <div class="form-group">
           <label for="clientSlug">Slug URL Website (Otomatis)</label>
-          <input type="text" id="clientSlug" placeholder="budi-pratama" required>
+          <input type="text" id="clientSlug" placeholder="budi-pratama" list="orderSlugSuggestions" required>
+          <datalist id="orderSlugSuggestions"></datalist>
           <div class="input-hint">Target URL: <code id="slug-preview">https://budi-pratama.workers.dev</code></div>
         </div>
 
@@ -850,6 +851,7 @@
         <div>
           <h2 class="title" id="res-title" style="font-size: 1.25rem; margin-bottom: 0.15rem;">Website Klien Berhasil Disiapkan</h2>
           <p class="subtitle" id="res-subtitle" style="font-size: 0.8125rem;">Database, storage, dan konfigurasi telah aktif secara terisolasi.</p>
+          <p class="subtitle" id="online-email-note" style="display: none; font-size: 0.75rem; color: #059669; margin-top: 0.3rem;"></p>
         </div>
       </div>
 
@@ -1399,6 +1401,20 @@
     slugPreview.textContent = `https://${e.target.value || 'nama-klien'}.workers.dev`;
   });
 
+  // PK2 — saran slug dari orders pembeli (datalist, tetap bisa ketik manual).
+  fetch('/api/order-slugs')
+    .then((r) => (r.ok ? r.json() : { slugs: [] }))
+    .then((d) => {
+      const dl = document.getElementById('orderSlugSuggestions');
+      if (!dl || !Array.isArray(d.slugs)) return;
+      for (const s of d.slugs) {
+        const opt = document.createElement('option');
+        opt.value = s;
+        dl.appendChild(opt);
+      }
+    })
+    .catch(() => {});
+
   // Form Submit: Onboard
   const form = document.getElementById('onboard-form');
   const submitBtn = document.getElementById('btn-submit');
@@ -1534,7 +1550,18 @@
       : 'Database dan storage selesai, tetapi build & deploy belum berhasil. Selesaikan deploy dulu sebelum mengirim pesan ke klien.';
 
     document.getElementById('res-client-name').textContent = data.clientName;
-    
+
+    // PK2 — status email "Website Sudah Online" dari server (best-effort).
+    const emailNoteEl = document.getElementById('online-email-note');
+    if (emailNoteEl) {
+      if (data.onlineEmailNote) {
+        emailNoteEl.textContent = '📧 ' + data.onlineEmailNote;
+        emailNoteEl.style.display = 'block';
+      } else {
+        emailNoteEl.style.display = 'none';
+      }
+    }
+
     const webLink = document.getElementById('res-web-link');
     webLink.href = data.websiteUrl;
     webLink.textContent = data.websiteUrl;
@@ -1608,7 +1635,7 @@ Anda dapat mengelola karya proyek, profil, kontak, dan keahlian secara langsung 
       const response = await fetch('/api/deploy-client', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ folderName }),
+        body: JSON.stringify({ folderName, notifyOnline: true }),
       });
       if (!response.body) throw new Error('Gagal membuka streaming log dari server.');
 
@@ -1654,6 +1681,7 @@ Anda dapat mengelola karya proyek, profil, kontak, dan keahlian secara langsung 
           deployError: '',
           websiteUrl: okResult.url || provisionLastData.websiteUrl,
           adminUrl: `${okResult.url || provisionLastData.websiteUrl}/admin`,
+          onlineEmailNote: okResult.emailNote || provisionLastData.onlineEmailNote || '',
         });
         showToast('Deploy berhasil! Website klien sudah online.');
         return;

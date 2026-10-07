@@ -17,6 +17,7 @@ import { spawn } from 'child_process';
 import { SHARED_SCHEMA_QUERIES } from '../../src/crud/shared/db/schema';
 import { hashPasswordScrypt } from '../../src/crud/shared/auth/password';
 import { deployClient, resolveWorkersSubdomain } from './client-deploy';
+import { sendWebsiteOnlineEmail } from './notify-online';
 import {
   attachWorkerDomain,
   buildDomainHandoverMessage,
@@ -428,6 +429,15 @@ async function handleOnboard() {
   // Deploy bisa memperbarui WEBSITE_URL (subdomain workers.dev terbaca).
   websiteUrl = outcome.websiteUrl || websiteUrl;
   adminUrl = `${websiteUrl}/admin`;
+
+  // PK2 — kabar jujur ke pembeli HANYA setelah deploy sukses. Mode update
+  // batch (di bawah) sengaja TIDAK mengirim email: site itu sudah online.
+  try {
+    const onlineEmail = await sendWebsiteOnlineEmail({ slug: clientSlug, websiteUrl });
+    console.log(onlineEmail.sent ? `📧 ${onlineEmail.reason}` : `ℹ️ ${onlineEmail.reason}`);
+  } catch (emailErr) {
+    console.log(`⚠️ Email "Sudah Online" gagal: ${(emailErr as Error).message}`);
+  }
 
   console.log('\n========================================================');
   console.log('🎉 WEBSITE KLIEN BERHASIL AKTIF & LIVE!');
