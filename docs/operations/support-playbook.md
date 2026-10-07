@@ -4,6 +4,24 @@ Status: Sprint 48 operational baseline.
 
 Playbook ini ditujukan untuk operator support yang menangani buyer Portfolio OS Template. Semua langkah bisa diikuti tanpa membaca source code. Jangan menyalin nilai `.env.local`, token, password, API key, atau data personal buyer ke chat, tiket, atau dokumen publik.
 
+## Kebiasaan Wajib: Mutasi → Baca Ulang → Laporkan
+
+Berlaku untuk SEMUA tindakan yang mengubah data (status order, suspend site, reset
+password, ubah harga, deploy, hapus file). Sebelum mengatakan "selesai" ke klien atau
+owner:
+
+1. **Catat** perintah/tombol apa yang Anda jalankan.
+2. **Baca ulang hasilnya** lewat jalur baca yang independen — GET API, query SELECT,
+   atau buka halamannya di browser — dan cocokkan dengan yang dijanjikan.
+3. **Laporkan dengan bukti**: sebut nilai yang terbaca (mis. `status = active`, kode
+   respons, tangkapan layar) — bukan sekadar "sudah".
+4. Baca ulang tidak cocok? **Jangan dilaporkan sukses** — ulangi, lalu eskalasi (§9)
+   bila tetap gagal.
+
+Contoh: setelah `PUT /api/admin/sites` → jalankan `GET /api/admin/sites` dan pastikan
+kolom `status` benar-benar berubah. Setelah deploy → buka URL-nya dari browser, jangan
+hanya melihat log `wrangler` sukses.
+
 ## Prasyarat Operator
 
 Sebelum menangani tiket support, pastikan:
@@ -283,6 +301,21 @@ Jangan restore ke production database tanpa approval eksplisit dan flag `--allow
    disuspend (jalur `PUT /api/admin/sites`).
 5. **SLA respons:** balasan ≤ 1×24 jam pada hari kerja; penyelesaian kasus teknis
    ≤ 3 hari kerja.
+
+### Retensi bukti bayar (diverifikasi dari kode, 2026-10-08)
+
+| Momen | File bukti di R2 (`orders/{id}/proof-*`) | Kolom `payment_proof_url` |
+|---|---|---|
+| Diunggah / diganti pembeli | file baru dibuat (nama ber-timestamp); versi lama tertinggal di folder yang sama sampai order dibersihkan | menunjuk versi terbaru |
+| Menunggu verifikasi | disimpan | terisi |
+| Dibatalkan admin | **dihapus seluruhnya** (`cleanupOrderProofObjects`) | `NULL` |
+| Dibatalkan otomatis 7 hari (sweep) | **dihapus seluruhnya** | `NULL` |
+| Dibuka kembali (reopen) | dari `canceled`: sudah bersih → pembeli wajib upload ulang; dari `failed`: bukti lama (jika masih ada) dipakai ulang | `NULL` / terisi sesuai asal |
+| Diaktifkan | disimpan sebagai bukti verifikasi | tetap |
+
+Alasan penghapusan = audit keamanan 29 Sep 2026: PII bukti transfer tidak boleh
+tertinggal di R2 setelah order batal. `amount` dan `access_token_hash` tetap
+dipertahankan (rekonsiliasi bayar telat + pembeli masih bisa membuka halaman order).
 
 ### Prosedur operasional (berlaku sekarang)
 

@@ -497,6 +497,83 @@ export function cleanNextBuildCache(rootDir: string): void {
   // dihapus di sini.
 }
 
+export interface HandoverNoteInput {
+  clientName: string;
+  slug: string;
+  websiteUrl: string;
+  adminUrl: string;
+  /** Path `arsip-klien/<folder>/config.env` (ditampilkan relatif, tanpa rahasia). */
+  configPath: string;
+  /** Kode keluar build & wrangler deploy (0 = sukses). */
+  buildCode: number;
+  deployCode: number;
+  deployNotes?: string[];
+  generatedAt?: Date;
+}
+
+/**
+ * Merender `CATATAN_SERAH_TERIMA.md` (PK8 — v1.3.27) untuk satu klien.
+ * Murni teks: TIDAK pernah menerima atau menampilkan password — file hanya
+ * menunjuk ke lokasi kredensial di `config.env`. Ditulis `deployClient()`
+ * setelah deploy sukses ke `arsip-klien/<slug>/`.
+ */
+export function renderHandoverNote(input: HandoverNoteInput): string {
+  const {
+    clientName,
+    slug,
+    websiteUrl,
+    adminUrl,
+    configPath,
+    buildCode,
+    deployCode,
+    deployNotes = [],
+    generatedAt = new Date(),
+  } = input;
+  const archiveDir = path.dirname(configPath);
+
+  const lines = [
+    `# Catatan Serah Terima — ${clientName} (${slug || 'tanpa-slug'})`,
+    '',
+    `Dibuat otomatis oleh \`deployClient()\` pada ${generatedAt.toISOString()}.`,
+    'File ini milik owner: simpan bersama arsip klien, JANGAN dibagikan ke klien.',
+    '',
+    '## Aset website',
+    '',
+    `- Website: ${websiteUrl || '(belum tercatat di config.env)'}`,
+    `- Admin panel: ${adminUrl || (websiteUrl ? `${websiteUrl}/admin/login` : '(belum tercatat)')}`,
+    `- Kredensial admin (email + password): kunci \`ADMIN_EMAIL\` dan \`ADMIN_PASSWORD\``,
+    `  di \`${configPath}\` — kirim ke klien lewat jalur privat, jangan ditempel di sini.`,
+    '',
+    '## Status deploy terakhir',
+    '',
+    `- Build: ${buildCode === 0 ? 'sukses' : `GAGAL (kode ${buildCode})`}`,
+    `- Deploy: ${deployCode === 0 ? 'sukses' : `GAGAL (kode ${deployCode})`}`,
+    ...(deployNotes.length > 0 ? ['- Catatan teknis:', ...deployNotes.map((n) => `  - ${n}`)] : []),
+    '',
+    '## Checklist serah terima (centang manual)',
+    '',
+    '- [ ] Website dibuka dari jaringan luar (bukan WiFi lokal) dan tampil normal.',
+    '- [ ] Login `/admin` berhasil memakai kredensial dari `config.env`.',
+    '- [ ] Klien sudah bisa mengubah konten sendiri lewat `/admin`.',
+    '- [ ] Kredensial dikirim ke klien lewat jalur privat.',
+    '- [ ] Lupa password klien? `npx tsx scripts/cloudflare/reset-customer-password.ts`',
+    '',
+    '## Rutin & referensi',
+    '',
+    '- Backup D1 + media: `npm run backup:d1` / `npm run backup:r2`, lalu salin ke',
+    '  flashdisk dengan `SALIN_CADANGAN.bat` (petunjuk: `cadangan-flashdisk/README.txt`),',
+    '  detail: `docs/operations/backup-restore-runbook.md`.',
+    '- Operasional klien: `docs/release/CLIENT_OPERATIONS.md`.',
+    '- Gladi resik klien berikutnya: `docs/operations/GLADI_RESIK_KLIEN_PERDANA.md`.',
+    '- Bila ada masalah: `docs/operations/support-playbook.md`.',
+    '',
+    `> Arsip: \`${archiveDir}\``,
+    '',
+  ];
+
+  return lines.join('\n');
+}
+
 export interface DeployClientOptions {
   rootDir: string;
   /** Path `arsip-klien/<folder>/config.env` milik klien. */
@@ -693,6 +770,32 @@ export async function deployClient(options: DeployClientOptions): Promise<Deploy
     { cwd: rootDir, env: { ...process.env, ...deployEnv } },
     onLog
   );
+
+  // 9. CATATAN_SERAH_TERIMA.md (PK8): hanya saat deploy sukses, dan kegagalan
+  //    menulis catatan TIDAK boleh mengubah status deploy yang sudah sukses.
+  if (deploy.code === 0 && !dryRun) {
+    const finalUrl = config.WEBSITE_URL || websiteUrl;
+    const notePath = path.join(path.dirname(configPath), 'CATATAN_SERAH_TERIMA.md');
+    try {
+      const note = renderHandoverNote({
+        clientName,
+        slug,
+        websiteUrl: finalUrl,
+        adminUrl: config.ADMIN_URL || (finalUrl ? `${finalUrl}/admin/login` : ''),
+        configPath: path.relative(rootDir, configPath) || configPath,
+        buildCode: build.code,
+        deployCode: deploy.code,
+        deployNotes: notes,
+      });
+      fs.writeFileSync(notePath, note, 'utf8');
+      notes.push(`CATATAN_SERAH_TERIMA.md ditulis: ${path.relative(rootDir, notePath) || notePath}`);
+      onLog(`>>> [CATATAN] Catatan serah terima ditulis: ${notePath}`);
+    } catch (err) {
+      notes.push(
+        `CATATAN_SERAH_TERIMA.md GAGAL ditulis: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
 
   return {
     ok: deploy.code === 0,
