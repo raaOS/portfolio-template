@@ -19,6 +19,7 @@ import {
   BarChart3,
   ScrollText,
   DatabaseBackup,
+  Banknote,
 } from 'lucide-react';
 import type { AdminZone } from './types';
 
@@ -187,6 +188,15 @@ export const ADMIN_ZONES: AdminZone[] = [
         defaultWidth: 900,
         defaultHeight: 600,
       },
+      {
+        id: 'harga',
+        label: 'Harga Jual',
+        icon: Banknote,
+        iconColor: 'text-amber-600',
+        iconBg: 'bg-amber-100',
+        defaultWidth: 800,
+        defaultHeight: 560,
+      },
     ],
   },
   {
@@ -259,6 +269,7 @@ export const APP_ROUTE_MAP: Record<string, string> = {
   analytics: '/admin/system/analytics',
   activityLog: '/admin/system/activity-log',
   backup: '/admin/system/backup',
+  harga: '/admin/system/harga',
   notifications: '/admin/communications/notifications',
   messages: '/admin/communications/messages',
   feedback: '/admin/communications/feedback',

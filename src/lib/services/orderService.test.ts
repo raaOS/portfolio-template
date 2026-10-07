@@ -68,6 +68,7 @@ describe('orderService', () => {
         .mockResolvedValueOnce([]) // expire stale pending orders
         .mockResolvedValueOnce(activePaymentConfigRows)
         .mockResolvedValueOnce([]) // M5: duplicate order check
+        .mockResolvedValueOnce([]) // pricing: harga dasar dari platform_settings
         .mockResolvedValueOnce([]) // used unique offsets
         .mockResolvedValueOnce([]); // insert order
 
@@ -93,6 +94,7 @@ describe('orderService', () => {
         .mockResolvedValueOnce([]) // expire stale pending orders
         .mockResolvedValueOnce(activePaymentConfigRows)
         .mockResolvedValueOnce([]) // M5: duplicate order check
+        .mockResolvedValueOnce([]) // pricing: harga dasar dari platform_settings
         .mockResolvedValueOnce([{ amount: 199001 }]) // active amount already used
         .mockResolvedValueOnce([]); // insert order
 
@@ -135,6 +137,7 @@ describe('orderService', () => {
         .mockResolvedValueOnce([]) // expire stale pending orders
         .mockResolvedValueOnce(configRows) // payment config: exact nominal first
         .mockResolvedValueOnce([]) // M5: duplicate order check
+        .mockResolvedValueOnce([]) // pricing: harga dasar dari platform_settings
         .mockRejectedValueOnce(new Error('UNIQUE constraint failed: orders.amount'))
         .mockResolvedValueOnce([]) // used unique offsets
         .mockResolvedValueOnce([]); // insert order
@@ -149,6 +152,49 @@ describe('orderService', () => {
       expect(res.success).toBe(true);
       expect(res.order?.amount).toBeGreaterThanOrEqual(199001);
       expect(res.order?.amount).toBeLessThanOrEqual(199999);
+    });
+
+    it('PK4: nominal order dibaca dari harga D1 (bukan konstanta) saat amount tidak dikirim', async () => {
+      vi.mocked(slugService.isSlugAvailable).mockResolvedValueOnce(true);
+      const configRows = [
+        {
+          value: JSON.stringify({
+            isActive: true,
+            qrisUniqueAmountEnabled: false,
+            qrisUniqueAmountMaxOffset: 999
+          })
+        }
+      ];
+
+      vi.mocked(cloudflareD1.queryD1)
+        .mockResolvedValueOnce([]) // expire stale: activating-recovery sweep
+        .mockResolvedValueOnce([]) // expire stale: 7-day auto-cancel sweep
+        .mockResolvedValueOnce([]) // expire stale pending orders
+        .mockResolvedValueOnce(configRows) // payment config
+        .mockResolvedValueOnce([]) // M5: duplicate order check
+        .mockResolvedValueOnce([
+          { value: JSON.stringify({ basePrice: 250000 }) } // harga D1 (panel Harga Jual)
+        ])
+        .mockResolvedValueOnce([]); // insert order
+
+      const res = await createOrder({
+        buyerName: 'Nanda',
+        buyerEmail: 'nanda@test.com',
+        buyerWhatsapp: '628123456789',
+        desiredSlug: 'nanda-design'
+      });
+
+      expect(res.success).toBe(true);
+      // Nominal = harga tersimpan di platform_settings, bukan BASE_PRICE (199000).
+      expect(res.order?.amount).toBe(250000);
+
+      const pricingCalls = vi.mocked(cloudflareD1.queryD1).mock.calls.filter(
+        ([sql, params]) =>
+          String(sql).includes('platform_settings') &&
+          Array.isArray(params) &&
+          params.includes('pricing_config')
+      );
+      expect(pricingCalls.length).toBeGreaterThan(0);
     });
 
     it('fails cleanly when payment config is inactive', async () => {

@@ -4,6 +4,7 @@ import { SITE_ID } from '@/crud/shared/config';
 import { queryD1 } from '@/lib/cloudflareD1';
 import { loadHomepageData } from '@/lib/loaders';
 import { loadAboutData } from '@/lib/about';
+import { getBasePrice } from '@/lib/services/pricingConfigService';
 import { mapD1ToTemplateData } from '@/lib/templates/dataMapper';
 import SoundConfigLoader from '@/components/layout/SoundConfigLoader';
 import LayoutClient from '@/components/layout/LayoutClient';
@@ -36,7 +37,10 @@ interface SiteRow {
  */
 export default async function Home() {
   if (isStorefrontDeployment()) {
-    return <LandingPage />;
+    // Harga jual dibaca dari D1 (panel admin "Harga Jual") — dirender server
+    // dan di-cache ISR (revalidate 60 dtk). Gagal baca → fallback BASE_PRICE
+    // di dalam getBasePrice(); tidak pernah menjatuhkan build.
+    return <LandingPage basePrice={await getBasePrice()} />;
   }
 
   // --- Mode klien: render portofolio deployment ini ---

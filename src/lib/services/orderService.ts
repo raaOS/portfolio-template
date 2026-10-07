@@ -6,7 +6,7 @@ import { isSlugAvailable } from './slugService';
 import { getPaymentConfig, type PaymentConfig } from './paymentConfigService';
 import { logActivity } from '@/lib/services/auditLogger';
 import { deleteFromR2, isR2StorageConfigured, listR2ObjectKeys } from '@/lib/r2Storage';
-import { BASE_PRICE } from '@/constants/pricing';
+import { getBasePrice } from '@/lib/services/pricingConfigService';
 
 export interface OrderRecord {
   id: string;
@@ -806,7 +806,10 @@ export async function createOrder(
     };
   }
 
-  const baseAmount = input.amount ?? BASE_PRICE;
+  // Nominal dasar = harga dari D1 (panel admin "Harga Jual"); `input.amount`
+  // hanya dipakai test/executor eksternal — route checkout tidak pernah
+  // meneruskan amount dari klien.
+  const baseAmount = input.amount ?? (await getBasePrice());
   let amount = baseAmount;
   let forceUniqueAmount = false;
 
