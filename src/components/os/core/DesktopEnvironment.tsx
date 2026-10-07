@@ -80,7 +80,6 @@ const NOTES_ENTRANCE_AFTER_WINDOWS_MS = 220;
 export interface DesktopEnvironmentProps {
   children?: React.ReactNode;
   siteId?: string;
-  siteSlug?: string;
   aboutData?: AboutData | null;
   experienceData?: ExperienceData | null;
   hardSkillsData?: HardSkillsData | null;

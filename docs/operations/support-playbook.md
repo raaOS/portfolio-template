@@ -66,7 +66,9 @@ Eskalasi ke developer jika:
 
 ### Gejala
 
-Pembeli melaporkan tidak menerima email order (struk) atau email serah terima setelah pembayaran diverifikasi.
+Pembeli melaporkan tidak menerima email order (struk), email konfirmasi pembayaran
+("✅ Pembayaran Terverifikasi — Website Sedang Disiapkan"), atau email portal
+("🎉 Website Anda Sudah Online").
 
 ### Langkah Diagnosa
 
@@ -86,7 +88,10 @@ Pembeli melaporkan tidak menerima email order (struk) atau email serah terima se
 
 4. **Cek status order:**
    - Email struk hanya dikirim saat order baru dibuat.
-   - Email serah terima hanya dikirim setelah order berstatus `activated`.
+   - Email "Pembayaran Terverifikasi" dikirim saat order berstatus `activated`
+     (berisi janji online maksimal 1×24 jam — tanpa link website).
+   - Email "Website Sudah Online" (dengan URL `https://<slug>.workers.dev`) dikirim
+     portal onboarding setelah deploy sukses (`scripts/onboarding/server.ts`).
 
 5. **Verifikasi via Cloudflare logs:**
    - Filter Worker logs pada request keluar ke `api.resend.com`.
@@ -96,7 +101,7 @@ Pembeli melaporkan tidak menerima email order (struk) atau email serah terima se
 
 Eskalasi ke developer jika:
 - Resend API sudah merespon sukses tapi email tidak pernah sampai setelah cek spam.
-- Email struk/serah terima tidak terkirim sama sekali padahal env notifikasi sudah benar.
+- Email struk/konfirmasi pembayaran/sudah-online tidak terkirim sama sekali padahal env notifikasi sudah benar.
 
 ## 3. Upload Cover/Gallery/Video Gagal
 
@@ -192,7 +197,7 @@ Client melaporkan site mereka tidak bisa diakses di alamat website milik klien
 
 3. **Cek alamat benar:**
    - URL public: `https://<slug>.workers.dev` (atau custom domain klien) — deployment ini
-     khusus untuk 1 klien, jadi tidak ada path `/<siteSlug>` di depan halaman.
+     khusus untuk 1 klien, semua halaman ada di root tanpa prefix path apa pun.
    - Pastikan slug yang diakses sesuai dengan slug yang tercatat di `arsip-klien/<slug>/`.
 
 4. **Cek production health:**
@@ -258,13 +263,12 @@ Ringkasan singkat:
 
 Jangan restore ke production database tanpa approval eksplisit dan flag `--allow-current-database --i-understand-this-can-overwrite-production`.
 
-## 8. Pembayaran / Refund (DRAFT — menunggu persetujuan owner)
+## 8. Pembayaran / Refund
 
-> **Status:** DRAFT 2026-10-06 (audit MEDIUM M8). Kebijakan di bawah BELUM disetujui owner —
-> jangan dijanjikan ke klien sampai owner menandatangani bagian ini. Setelah disetujui,
-> hapus baris status ini dan ganti judul menjadi "Pembayaran / Refund".
+> **Disetujui owner** (rencana v1.3.27, 2026-10-07) — kebijakan di bawah resmi berlaku
+> dan boleh dijanjikan ke klien.
 
-### Kebijakan refund yang diusulkan
+### Kebijakan refund
 
 1. **Sebelum aktivasi (order pending / menunggu verifikasi):** pembeli boleh membatalkan
    kapan saja lewat halaman order atau hubungi owner. Sudah bayar tetapi order batal →

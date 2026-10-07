@@ -62,7 +62,7 @@ Objek `data` membawa seluruh profil tenant:
    - Shell macOS tetap dirender via pembungkus `OSDesktopRenderer.tsx`.
 
 2. **Fallback Otomatis:**
-   - Jika `site.active_template_key` tidak ditemukan di registry (atau kosong), system otomatis me-resolve template key kembali ke `'os-desktop'` (`src/app/[siteSlug]/page.tsx`). Tier `lite`/`pro` sudah tidak ada — paket Lite/Pro dihapus sejak v1.3.15, tersisa satu harga untuk semua klien.
+   - Jika `site.active_template_key` tidak ditemukan di registry (atau kosong), system otomatis me-resolve template key kembali ke `'os-desktop'` (`src/app/page.tsx`, mode klien). Tier `lite`/`pro` sudah tidak ada — paket Lite/Pro dihapus sejak v1.3.15, tersisa satu harga untuk semua klien.
 
 3. **Performa Edge Worker:**
    - Semua template baru selain `os-desktop` wajib dimuat secara **lazy loading** menggunakan `next/dynamic` di `TemplateDispatcher.tsx` untuk menjaga ukuran bundle Cloudflare Workers tetap ramah kuota.

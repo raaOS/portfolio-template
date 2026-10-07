@@ -293,28 +293,8 @@ export class CustomDomainService {
     return persistCloudflareHostname(siteId, hostname);
   }
 
-  async resolveActiveSiteByDomain(input: string) {
-    if (!isCustomDomainEnabled() || !isD1Configured()) return null;
-    let hostname: string;
-    try {
-      hostname = normalizeCustomDomain(input);
-    } catch {
-      return null;
-    }
-
-    const rows = await queryD1<{ site_id: string; slug: string }>(
-      `SELECT d.site_id, s.slug
-       FROM site_custom_domains d
-       INNER JOIN sites s ON s.id = d.site_id
-       WHERE d.hostname = ?
-         AND d.hostname_status = 'active'
-         AND d.ssl_status = 'active'
-         AND s.status = 'active'
-       LIMIT 1`,
-      [hostname]
-    ).catch(() => []);
-    return rows[0] || null;
-  }
+  // `resolveActiveSiteByDomain` (rewrite `/{slug}` multi-tenant) sudah dihapus
+  // bersama konsep tenant — tidak ada lagi pemanggilnya.
 }
 
 export const customDomainService = new CustomDomainService();

@@ -618,12 +618,16 @@ async function notifyAutoCanceledOrder(order: {
 // ---------------------------------------------------------------------------
 
 /**
- * Email serah-terima — dikirim satu kali saat order berhasil diaktifkan.
+ * Email aktivasi — dikirim saat pembayaran TERVERIFIKASI.
  *
- * Latar (audit fitur 2026-09-30): sebelumnya pembeli hanya dihubungi saat
- * order DIBUAT (struk) dan saat order KEDALUWARSA. Momen serah-terima —
- * website sudah aktif dan bisa dibuka — tidak pernah memberi kabar ke
- * pembeli, padahal itulah momen yang paling mereka tunggu.
+ * Keputusan owner (rencana hapus konsep tenant, 2026-10-07): email ini JUJUR.
+ * Aktivasi hanya berarti "pembayaran masuk, website disiapkan" — website
+ * BELUM online (dideploy manual lewat portal onboarding). Isinya: ringkasan
+ * order + janji online maksimal 1×24 jam setelah email ini (antrean ramai
+ * dikabari lewat WhatsApp) + akses login diserahkan lewat WhatsApp.
+ * TANPA tombol/link website — tidak ada URL yang bisa dibuka saat email ini
+ * dikirim. Kabar "Website Sudah Online" dikirim portal setelah deploy sukses
+ * (lihat scripts/onboarding/server.ts, PK2).
  *
  * Best-effort: kegagalan email tidak boleh membatalkan aktivasi yang sudah
  * ter-commit ke D1, jadi pemanggilan dibungkus try/catch.
@@ -633,17 +637,13 @@ async function sendActivationEmail({
   orderId,
   buyerName,
   amount,
-  siteSlug,
-  siteUrl,
 }: {
   to: string;
   orderId: string;
   buyerName: string;
   amount?: number;
-  siteSlug: string;
-  siteUrl: string;
 }): Promise<boolean> {
-  if (!to || !orderId || !siteUrl) return false;
+  if (!to || !orderId) return false;
 
   const provider = (cleanEnvVar('NOTIFICATION_PROVIDER') || '').toLowerCase();
   if (provider !== 'resend') return false;
@@ -656,11 +656,9 @@ async function sendActivationEmail({
   const amountValue = typeof amount === 'number' && amount > 0 ? amount : null;
   const amountText = amountValue ? `• Total Bayar: Rp ${amountValue.toLocaleString('id-ID')}` : '';
 
-  // Versi HTML memakai nilai yang sudah di-escape (nama pembeli & slug adalah
-  // input pengguna) — teks polos tetap memakai nilai mentah.
+  // Versi HTML memakai nilai yang sudah di-escape (nama pembeli adalah input
+  // pengguna) — teks polos tetap memakai nilai mentah.
   const nameHtml = escapeTelegramHtml(nameText);
-  const slugHtml = escapeTelegramHtml(siteSlug);
-  const urlHtml = escapeTelegramHtml(siteUrl);
   const amountHtml = amountValue
     ? `<tr><td style="padding:6px 0;color:#64748b">Total Bayar</td><td style="padding:6px 0;text-align:right;font-weight:800;font-size:16px;color:#1e40af">Rp ${amountValue.toLocaleString('id-ID')}</td></tr>`
     : '';
@@ -675,44 +673,44 @@ async function sendActivationEmail({
       body: JSON.stringify({
         from,
         to,
-        subject: `🎉 Website Anda Sudah Aktif — Portfolio OS`,
+        subject: `✅ Pembayaran Terverifikasi — Website Sedang Disiapkan`,
         text: [
           `Halo ${nameText},`,
           '',
-          'Selamat! Website portofolio Anda sudah aktif dan bisa diakses siapa saja:',
-          siteUrl,
+          'Pembayaran Anda sudah kami verifikasi. Terima kasih! 🙏',
           '',
-          'Ringkasan serah terima:',
+          'Ringkasan order:',
           `• Order ID: ${orderId}`,
-          `• Alamat: /${siteSlug}`,
           amountText,
           '',
-          'Langkah berikutnya:',
-          '1. Buka link di atas untuk melihat website Anda.',
-          '2. Butuh penyesuaian konten (judul, daftar proyek, foto, kontak)? Balas email ini atau hubungi kami — kami siap membantu.',
-          '3. Untuk cek status pesanan, gunakan link halaman pesanan dari email struk yang kami kirim sebelumnya.',
+          'Langkah selanjutnya:',
+          '• Website Anda sedang disiapkan dan akan online paling lambat 1×24 jam setelah email ini.',
+          '• Jika antrean order sedang ramai, kami mengantrikan Anda dan mengabari lewat WhatsApp.',
+          '• Akses login ke pengaturan website akan kami serahkan lewat WhatsApp.',
           '',
-          'Simpan email ini sebagai bukti serah terima.',
+          'Simpan email ini sebagai bukti pembayaran Anda.',
           '',
-          '— Portfolio OS',
+          '— Make it Better Studio',
         ]
           .filter(Boolean)
           .join('\n'),
         html: [
           `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">`,
-          `<h2 style="margin:0 0 4px">🎉 Website Anda Sudah Aktif</h2>`,
-          `<p style="color:#64748b;font-size:13px;margin:0 0 20px">Portfolio OS</p>`,
-          `<p style="font-size:13px;color:#334155">Halo <strong>${nameHtml}</strong>, website portofolio Anda sudah aktif dan bisa diakses siapa saja.</p>`,
+          `<h2 style="margin:0 0 4px">✅ Pembayaran Terverifikasi</h2>`,
+          `<p style="color:#64748b;font-size:13px;margin:0 0 20px">Website Sedang Disiapkan — Make it Better Studio</p>`,
+          `<p style="font-size:13px;color:#334155">Halo <strong>${nameHtml}</strong>, pembayaran Anda sudah kami verifikasi. Terima kasih! 🙏</p>`,
           `<table style="width:100%;font-size:13px;border-collapse:collapse">`,
           `<tr><td style="padding:6px 0;color:#64748b">Order ID</td><td style="padding:6px 0;text-align:right;font-weight:700;font-family:monospace">${escapeTelegramHtml(orderId)}</td></tr>`,
-          `<tr><td style="padding:6px 0;color:#64748b">Alamat</td><td style="padding:6px 0;text-align:right;font-weight:700;font-family:monospace">/${slugHtml}</td></tr>`,
           amountHtml,
           `</table>`,
           `<hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0">`,
-          `<a href="${urlHtml}" style="display:inline-block;background:#1e40af;color:#fff;padding:10px 24px;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none">Buka Website Anda</a>`,
-          `<p style="font-size:13px;color:#334155;margin:16px 0 0">Butuh penyesuaian konten (judul, daftar proyek, foto, kontak)? Balas email ini atau hubungi kami — kami siap membantu.</p>`,
-          `<p style="font-size:13px;color:#334155;margin:8px 0 0">Untuk cek status pesanan, gunakan link halaman pesanan dari email struk sebelumnya.</p>`,
-          `<p style="font-size:11px;color:#94a3b8;margin:16px 0 0">Simpan email ini sebagai bukti serah terima.</p>`,
+          `<p style="font-size:13px;color:#334155;margin:16px 0 0"><strong>Langkah selanjutnya:</strong></p>`,
+          `<ul style="font-size:13px;color:#334155;padding-left:18px;margin:8px 0 0">`,
+          `<li>Website Anda sedang disiapkan — online paling lambat <strong>1×24 jam</strong> setelah email ini.</li>`,
+          `<li>Jika antrean order sedang ramai, kami mengantrikan Anda dan mengabari lewat WhatsApp.</li>`,
+          `<li>Akses login ke pengaturan website akan kami serahkan lewat WhatsApp.</li>`,
+          `</ul>`,
+          `<p style="font-size:11px;color:#94a3b8;margin:16px 0 0">Simpan email ini sebagai bukti pembayaran Anda.</p>`,
           `</div>`,
         ].join(''),
       }),
@@ -1113,7 +1111,6 @@ async function sendWorkshopTicket(order: OrderRecord, siteUrl: string): Promise<
 
 export async function activateOrder(
   orderId: string,
-  env: { APP_BASE_URL?: string } = {},
   options: { allowExpired?: boolean; proofUrl?: string } = {}
 ): Promise<{ success: boolean; message: string; siteId?: string }> {
   const { allowExpired = false, proofUrl } = options;
@@ -1173,24 +1170,15 @@ export async function activateOrder(
   }
 
   const order = lockedOrders[0];
+  // Label murni (keputusan owner 2026-10-07, Opsi A): id generatif TANPA
+  // menanam baris ke tabel `sites`. Konsep multi-tenant `/{slug}` sudah dihapus;
+  // kolom orders.site_id & audit_logs.site_id hanya penanda riwayat
+  // (TEXT, tanpa foreign key — tidak ada yang mengecek keberadaan barisnya).
   let siteId: string;
   const actualSlug = order.desired_slug;
 
-  // Wrap provisioning in try/catch with compensating cleanup (no orphan rows)
-  type CreatedRow = { kind: 'site'; id: string };
-
-  const createdRows: CreatedRow[] = [];
-
   try {
-    // New Site Provisioning Flow
     siteId = `site_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-
-    await queryD1(
-      `INSERT INTO sites (id, slug, name, status, created_at, updated_at)
-       VALUES (?, ?, ?, 'active', ?, ?)`,
-      [siteId, order.desired_slug, `${order.buyer_name}'s Portfolio`, now, now]
-    );
-    createdRows.push({ kind: 'site', id: siteId });
 
     // Update Order status to activated
     // SQL literal: pakai quote tunggal ('activated') — D1 menolak identifer
@@ -1208,18 +1196,8 @@ export async function activateOrder(
       [`audit_${crypto.randomUUID()}`, siteId, 'ORDER_ACTIVATED', now]
     );
   } catch (err) {
-    // Rollback — undo partially created rows, then mark order as failed
-    console.error(`[activateOrder] Provisioning failed for order ${orderId}, rolling back:`, err);
-
-    for (const row of createdRows) {
-      try {
-        if (row.kind === 'site') {
-          await queryD1('DELETE FROM sites WHERE id = ?', [row.id]);
-        }
-      } catch (cleanupErr) {
-        console.error(`[activateOrder] Cleanup failed for ${row.kind} ${JSON.stringify(row)}:`, cleanupErr);
-      }
-    }
+    // Rollback — batalkan penguncian order (status kembali gagal)
+    console.error(`[activateOrder] Activation failed for order ${orderId}, rolling back:`, err);
 
     try {
       await queryD1(
@@ -1230,36 +1208,36 @@ export async function activateOrder(
       console.error(`[activateOrder] Rollback also failed for order ${orderId}:`, rollbackErr);
     }
 
-    const isSlugCollision = err instanceof Error && (err.message.includes('sites.slug') || err.message.includes('UNIQUE constraint failed: sites.slug'));
-    const errorMessage = isSlugCollision
-      ? `Aktivasi gagal: Slug "${order.desired_slug}" sudah digunakan oleh website aktif lain. Silakan ubah slug order atau buat order baru.`
-      : `Aktivasi gagal: ${err instanceof Error ? err.message : 'Unknown error'}`;
-
-    return { success: false, message: errorMessage };
+    return {
+      success: false,
+      message: `Aktivasi gagal: ${err instanceof Error ? err.message : 'Unknown error'}`,
+    };
   }
 
-  const baseUrl = env.APP_BASE_URL || getPublicBaseUrl();
-  const siteUrl = `${baseUrl}/${actualSlug}`;
+  // Alamat masa depan klien: `<slug>.workers.dev` (di-deploy lewat portal
+  // onboarding, diumumkan lewat email "Website Sudah Online"). Rute `/{slug}`
+  // di domain toko sudah dihapus — jangan kirim URL domain toko sebagai
+  // "website klien".
+  const siteUrl = `https://${actualSlug}.workers.dev`;
 
-  // Email serah-terima ke pembeli. Dibungkus try/catch: aktivasi sudah
-  // ter-commit ke D1 di atas, kegagalan email tidak boleh menggagalkannya.
+  // Email "pembayaran terverifikasi, website sedang disiapkan" ke pembeli.
+  // Dibungkus try/catch: aktivasi sudah ter-commit ke D1 di atas, kegagalan
+  // email tidak boleh menggagalkannya.
   try {
     await sendActivationEmail({
       to: order.buyer_email,
       orderId,
       buyerName: order.buyer_name,
       amount: order.amount,
-      siteSlug: actualSlug,
-      siteUrl,
     });
   } catch (err) {
-    console.error(`[activateOrder] Handoff email failed for order ${orderId}:`, err);
+    console.error(`[activateOrder] Activation email failed for order ${orderId}:`, err);
   }
 
   // Tiket kerja kasir → bengkel (lihat sendWorkshopTicket).
   await sendWorkshopTicket(order, siteUrl);
 
-  const message = `Berhasil mengaktifkan pesanan ${order.id}. Site URL: ${siteUrl}`;
+  const message = `Berhasil mengaktifkan pesanan ${order.id}. Menunggu deploy: ${siteUrl}`;
 
   return { success: true, message, siteId };
 }

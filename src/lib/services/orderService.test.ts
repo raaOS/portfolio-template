@@ -318,7 +318,7 @@ describe('orderService', () => {
       expect(res.message).toContain('sudah diaktifkan');
     });
 
-    it('provisions new site for new buyer', async () => {
+    it('activates order with generative label and no sites insert', async () => {
       const order = {
         id: 'ORD-123',
         desired_slug: 'nanda-design',
@@ -331,7 +331,6 @@ describe('orderService', () => {
 
       vi.mocked(cloudflareD1.queryD1)
         .mockResolvedValueOnce([order]) // lock order with UPDATE RETURNING
-        .mockResolvedValueOnce([]) // insert sites
         .mockResolvedValueOnce([]) // update order activated
         .mockResolvedValueOnce([]); // insert audit_log
 
@@ -339,6 +338,12 @@ describe('orderService', () => {
       expect(res.success).toBe(true);
       expect(res.message).toContain('Berhasil mengaktifkan pesanan');
       expect(res.siteId).toBeDefined();
+
+      // Opsi A (keputusan owner 2026-10-07): label generatif TANPA menanam
+      // baris ke tabel sites — konsep tenant sudah dihapus.
+      const sqls = vi.mocked(cloudflareD1.queryD1).mock.calls.map(([sql]) => String(sql));
+      expect(sqls.some((sql) => sql.includes('INSERT INTO sites'))).toBe(false);
+      expect(sqls.some((sql) => sql.includes('UPDATE orders') && sql.includes("'activated'"))).toBe(true);
     });
 
     it('refuses activation before payment proof is uploaded', async () => {
@@ -351,7 +356,7 @@ describe('orderService', () => {
       expect(res.message).toContain('bukti bayar');
     });
 
-    it('cleans up partially created rows when provisioning fails mid-way', async () => {
+    it('rolls back status when activation fails and never touches sites table', async () => {
       const order = {
         id: 'ORD-777',
         desired_slug: 'cleanup-design',
@@ -364,18 +369,19 @@ describe('orderService', () => {
 
       vi.mocked(cloudflareD1.queryD1)
         .mockResolvedValueOnce([order]) // lock order
-        .mockResolvedValueOnce([]) // insert sites
-        .mockRejectedValueOnce(new Error('UPDATE orders activated failed')); // fail after inserts
+        .mockRejectedValueOnce(new Error('UPDATE orders activated failed')); // gagal di langkah pertama
 
       const res = await activateOrder('ORD-777');
 
       expect(res.success).toBe(false);
       expect(res.message).toContain('Aktivasi gagal');
-      const deleteCalls = vi.mocked(cloudflareD1.queryD1).mock.calls.filter(
-        ([sql]) => typeof sql === 'string' && sql.includes('DELETE FROM')
-      );
-      const deleteSql = deleteCalls.map(([sql]) => String(sql));
-      expect(deleteSql.some((sql) => sql.includes('DELETE FROM sites WHERE id = ?'))).toBe(true);
+
+      const sqls = vi.mocked(cloudflareD1.queryD1).mock.calls.map(([sql]) => String(sql));
+      // Tidak pernah menulis tabel sites, dan rollback menandai order gagal.
+      expect(sqls.some((sql) => sql.includes('sites'))).toBe(false);
+      expect(
+        sqls.some((sql) => sql.includes("SET status = 'failed'") && sql.includes("status = 'activating'"))
+      ).toBe(true);
     });
   });
 
@@ -406,7 +412,6 @@ describe('orderService', () => {
 
       vi.mocked(cloudflareD1.queryD1)
         .mockResolvedValueOnce([order]) // lock order with UPDATE RETURNING
-        .mockResolvedValueOnce([]) // insert sites
         .mockResolvedValueOnce([]) // update order activated
         .mockResolvedValueOnce([]); // insert audit_log
     }
@@ -422,7 +427,7 @@ describe('orderService', () => {
       }
     });
 
-    it('sends a handoff email containing the live site URL after activation', async () => {
+    it('sends an honest payment-verified email with no website link after activation', async () => {
       enableResend();
       const fetchMock = vi.fn().mockResolvedValue({ ok: true });
       vi.stubGlobal('fetch', fetchMock);
@@ -438,12 +443,18 @@ describe('orderService', () => {
 
       const payload = JSON.parse(String(init.body));
       expect(payload.to).toBe('newbuyer@test.com');
-      expect(payload.subject).toContain('Sudah Aktif');
-      expect(payload.text).toMatch(/https?:\/\/\S+\/nanda-design/);
+      // Judul & isi jujur: pembayaran masuk, website BELUM online.
+      expect(payload.subject).toContain('Pembayaran Terverifikasi');
+      expect(payload.subject).toContain('Sedang Disiapkan');
+      expect(payload.text).toContain('1×24 jam');
+      expect(payload.text).toContain('WhatsApp');
       expect(payload.text).toContain('ORD-123');
       expect(payload.text).toContain('Rp 1.500.000');
-      expect(payload.html).toContain('/nanda-design');
-      expect(payload.html).toContain('Buka Website Anda');
+      // TANPA link/tombol/URL website apa pun (tidak ada yang bisa dibuka).
+      expect(payload.text).not.toMatch(/https?:\/\//);
+      expect(payload.text).not.toContain('nanda-design');
+      expect(payload.html).not.toContain('nanda-design');
+      expect(payload.html).not.toContain('Buka Website Anda');
     });
 
     it('still reports activation as successful when the email provider fails', async () => {
@@ -508,7 +519,6 @@ describe('orderService', () => {
 
       vi.mocked(cloudflareD1.queryD1)
         .mockResolvedValueOnce([order]) // lock order with UPDATE RETURNING
-        .mockResolvedValueOnce([]) // insert sites
         .mockResolvedValueOnce([]) // update order activated
         .mockResolvedValueOnce([]); // insert audit_log
 
@@ -525,7 +535,9 @@ describe('orderService', () => {
       expect(payload.parse_mode).toBe('HTML');
       expect(payload.text).toContain('TIKET KERJA');
       expect(payload.text).toContain('PENGELOLA_KLIEN.bat');
-      expect(payload.text).toContain('/tiket-site');
+      // URL tiket = alamat masa depan klien (workers.dev), bukan rute tenant
+      // di domain toko yang sudah dihapus.
+      expect(payload.text).toContain('tiket-site.workers.dev');
       expect(payload.text).toContain('nanda@test.com');
     });
 
@@ -549,7 +561,6 @@ describe('orderService', () => {
 
       vi.mocked(cloudflareD1.queryD1)
         .mockResolvedValueOnce([order])
-        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]);
 
@@ -736,11 +747,10 @@ describe('orderService', () => {
       vi.mocked(cloudflareD1.queryD1)
         .mockResolvedValueOnce([]) // expired -> waiting_verification update
         .mockResolvedValueOnce([order]) // lock order with UPDATE RETURNING
-        .mockResolvedValueOnce([]) // insert sites
         .mockResolvedValueOnce([]) // update order activated
         .mockResolvedValueOnce([]); // insert audit_log
 
-      const res = await activateOrder('ORD-LATE', {}, { allowExpired: true, proofUrl: 'https://proof.png' });
+      const res = await activateOrder('ORD-LATE', { allowExpired: true, proofUrl: 'https://proof.png' });
 
       expect(res.success).toBe(true);
       expect(res.message).toContain('Berhasil mengaktifkan pesanan');

@@ -74,7 +74,7 @@ Check:
 - [ ] `GET /api/health` -> 200.
 - [ ] `GET /` -> 200.
 - [ ] `GET /admin/login` -> 200.
-- [ ] `GET /api/public/sites/demo-designer/projects` -> 200.
+- [ ] `GET /projects` -> 200.
 
 Stop `wrangler dev` after testing.
 

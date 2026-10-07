@@ -3,7 +3,6 @@
 import React, { useState, useEffect, use, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'motion/react';
-import { getPublicBaseUrl } from '@/lib/constants';
 import {
   Copy,
   Check,
@@ -479,8 +478,8 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ orderId
               <span className="font-bold text-slate-900">{order.buyer_name} ({order.buyer_email})</span>
             </div>
             <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <span className="text-slate-500 font-medium">Target Website:</span>
-              <span className="font-mono font-bold text-blue-600">{getPublicBaseUrl().replace(/^https?:\/\//, '')}/{order.desired_slug}</span>
+              <span className="text-slate-500 font-medium">Alamat Website:</span>
+              <span className="font-mono font-bold text-blue-600">{order.desired_slug}.workers.dev</span>
             </div>
           </div>
 
@@ -706,24 +705,23 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ orderId
             </div>
           )}
 
-          {/* Activated Success Banner */}
+          {/* Payment Verified — Website Being Prepared Banner (jujur: belum online) */}
           {order.status === 'activated' && (
             <div className="space-y-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-center">
               <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-600" />
-              <h3 className="text-sm font-extrabold text-emerald-900">Portfolio OS Aktif</h3>
+              <h3 className="text-sm font-extrabold text-emerald-900">
+                ✅ Pembayaran Terverifikasi — Website Sedang Disiapkan
+              </h3>
               <p className="text-[11px] text-slate-600">
-                <code className="font-mono font-bold text-slate-900">{getPublicBaseUrl().replace(/^https?:\/\//, '')}/{order.desired_slug}</code>
+                Website Anda online paling lambat <strong>1×24 jam</strong> setelah pembayaran ini.
+                Alamatnya:
               </p>
-              <div className="flex flex-wrap justify-center gap-2 pt-1">
-                <a
-                  href={`/${order.desired_slug}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-lg bg-emerald-600 px-3 py-2 text-[11px] font-bold text-white shadow-sm shadow-emerald-600/20 transition-all hover:bg-emerald-700"
-                >
-                  Buka Website
-                </a>
-              </div>
+              <p className="text-[11px] text-slate-600">
+                <code className="font-mono font-bold text-slate-900">{order.desired_slug}.workers.dev</code>
+              </p>
+              <p className="text-[10px] text-slate-500">
+                Akses login diserahkan lewat WhatsApp; kabar &quot;sudah online&quot; menyusul lewat email.
+              </p>
             </div>
           )}
 

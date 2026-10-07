@@ -34,16 +34,8 @@ const requiredSnippets = [
     snippets: ['allLabelsAsync(siteId', 'service.getData(false, false, siteId)'],
   },
   {
-    file: 'src/app/[siteSlug]/projects/page.tsx',
-    snippets: ['allLabelsAsync(site.id)'],
-  },
-  {
     file: 'src/app/api/homepage/route.ts',
     snippets: ['resolveRequestSiteId', 'assertKnownSite(siteId)', 'loadHomepageData(siteId)'],
-  },
-  {
-    file: 'src/app/api/public/sites/[siteSlug]/route.ts',
-    snippets: ['getSiteBySlug(siteSlug)', 'getAboutData(false, false, site.id)'],
   },
   {
     file: 'src/app/api/admin/wallpaper-poster-backfill/route.ts',

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { activateOrder, cancelOrder, reopenOrder } from '@/lib/services/orderService';
 import { enforceRequestRateLimit } from '@/lib/security/request';
-import { getPublicBaseUrl } from '@/lib/constants';
 
 // SECURITY FIX (audit 2026-09-29):
 // 1. Perbandingan secret pakai timing-safe equal.
@@ -78,9 +77,7 @@ export async function POST(request: NextRequest) {
       if (callbackData.startsWith('activate_')) {
         const orderId = callbackData.replace('activate_', '');
 
-        const result = await activateOrder(orderId, {
-          APP_BASE_URL: getPublicBaseUrl(),
-        });
+        const result = await activateOrder(orderId);
 
         if (botToken && callbackQuery.id) {
           await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
