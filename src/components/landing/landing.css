@@ -19,6 +19,40 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ---------- Legal docs (Syarat & Ketentuan / Kebijakan Privasi) ---------- */
+.landing-doc {
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.landing-doc h2 {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--lp-accent);
+  margin: 32px 0 10px;
+}
+
+.landing-doc p {
+  margin: 0 0 12px;
+}
+
+.landing-doc ul {
+  margin: 0 0 12px;
+  padding-left: 22px;
+  list-style: disc;
+}
+
+.landing-doc li {
+  margin-bottom: 8px;
+}
+
+.landing-doc a {
+  color: var(--lp-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* ---------- Nav ---------- */
 .landing-nav {
   display: flex;

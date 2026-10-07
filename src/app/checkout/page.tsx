@@ -213,6 +213,18 @@ function CheckoutForm() {
           >
             {loading ? 'Memproses...' : `Pesan — ${formatIdr(basePrice)}`}
           </button>
+
+          <p className="checkout-consent">
+            Dengan memesan, Anda menyetujui{' '}
+            <Link href="/syarat-ketentuan" target="_blank" rel="noopener noreferrer">
+              Syarat &amp; Ketentuan
+            </Link>{' '}
+            dan{' '}
+            <Link href="/kebijakan-privasi" target="_blank" rel="noopener noreferrer">
+              Kebijakan Privasi
+            </Link>{' '}
+            Make it Better Studio.
+          </p>
         </form>
       </div>
 
@@ -474,6 +486,24 @@ function CheckoutForm() {
         .checkout-btn:disabled {
           opacity: 0.4;
           cursor: not-allowed;
+        }
+
+        .checkout-consent {
+          margin-top: 12px;
+          font-size: 11.5px;
+          line-height: 1.6;
+          color: #94a3b8;
+          text-align: center;
+        }
+
+        .checkout-consent :global(a) {
+          color: #cbd5e1;
+          text-decoration: underline;
+          text-underline-offset: 2px;
+        }
+
+        .checkout-consent :global(a:hover) {
+          color: #fff;
         }
       `}</style>
     </div>
