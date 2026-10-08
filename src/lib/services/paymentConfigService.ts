@@ -8,7 +8,7 @@
  */
 
 import { queryD1 } from '@/lib/cloudflareD1';
-import { maskQRISPayload, normalizeQRISPayload, validateStaticMerchantQRIS } from '@/lib/billing/qris';
+import { normalizeQRISPayload, validateStaticMerchantQRIS } from '@/lib/billing/qris';
 
 export interface QRISAccount {
   id: string;
@@ -164,40 +164,6 @@ export async function getPaymentConfig(): Promise<PaymentConfig> {
 }
 
 /**
- * Menyimpan atau memperbarui konfigurasi pembayaran ke D1.
- */
-export async function updatePaymentConfig(
-  config: Partial<PaymentConfig>
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const current = await getPaymentConfig();
-    const merged = normalizeConfig({ ...current, ...config });
-    const validation = validatePaymentConfig(merged);
-    if (!validation.valid) {
-      return { success: false, error: validation.error };
-    }
-
-    const now = new Date().toISOString();
-
-    await queryD1(
-      `INSERT INTO platform_settings (key, value, updated_at)
-       VALUES (?, ?, ?)
-       ON CONFLICT(key)
-       DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
-      [SETTINGS_KEY, JSON.stringify(merged), now]
-    );
-
-    return { success: true };
-  } catch (err) {
-    console.error('[paymentConfigService] Failed to save config:', err);
-    return {
-      success: false,
-      error: err instanceof Error ? err.message : 'Gagal menyimpan konfigurasi',
-    };
-  }
-}
-
-/**
  * Membaca info pembayaran publik (tanpa data sensitif admin).
  * Dipakai oleh halaman checkout dan order detail.
  */
@@ -240,22 +206,5 @@ export async function getPublicPaymentInfo(): Promise<{
     verificationHours: config.verificationHours,
     adminWhatsapp: config.adminWhatsapp,
     isActive: config.isActive,
-  };
-}
-
-export async function getAdminPaymentConfig(): Promise<
-  PaymentConfig & {
-    qrisStaticPayloadMasked: string;
-    qrisAccountsMasked: Array<QRISAccount & { payloadMasked: string }>;
-  }
-> {
-  const config = await getPaymentConfig();
-  return {
-    ...config,
-    qrisStaticPayloadMasked: maskQRISPayload(config.qrisStaticPayload),
-    qrisAccountsMasked: config.qrisAccounts.map((acc) => ({
-      ...acc,
-      payloadMasked: maskQRISPayload(acc.staticPayload),
-    })),
   };
 }

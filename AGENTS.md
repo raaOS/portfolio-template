@@ -540,7 +540,7 @@ npx wrangler deploy --config .open-next/wrangler.client.<slug>.jsonc
 | **Sistem & Tampilan** | Appearance, Dock, Widgets, Sounds, **AI**, **Analytics**, **Activity Log** |
 | **Komunikasi** | Notifications, Messages, Feedback, Contacts |
 
-> Zone "Manajemen Sistem & Klien" (clientDashboard, paymentConfig, orders) sudah dihapus sepenuhnya (registry bersih + berkas panel `ClientDashboardPanel`/`OrdersPanel`/`PaymentConfigPanel` dihapus pada v1.3.20; endpoint API `orders`/`payment-config`/`sites` tetap hidup untuk billing & tooling).
+> Zone "Manajemen Sistem & Klien" (clientDashboard, paymentConfig, orders) sudah dihapus sepenuhnya (registry bersih + berkas panel `ClientDashboardPanel`/`PaymentConfigPanel` dihapus pada v1.3.20; panel `OrdersPanel` dihapus lalu **dibuat ulang** di v1.3.29 sebagai app "Pesanan" — `/admin/system/orders`). Endpoint `orders` tetap hidup (dipakai panel Pesanan, script load-test, support-playbook); endpoint `payment-config` **sudah dihapus total** 2026-10-09 (route + fungsi service `getAdminPaymentConfig`/`updatePaymentConfig` — nol pemanggil, billing baca `paymentConfigService` langsung, bukan lewat API); endpoint `sites` tetap hidup untuk tooling.
 
 ### Test Mock Pattern
 
