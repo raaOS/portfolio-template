@@ -532,13 +532,16 @@ npx wrangler deploy --config .open-next/wrangler.client.<slug>.jsonc
 > Kenapa berubah (v1.3.20): `wrangler pages deploy` lama **tidak memasang env D1/R2 per klien** → semua deployment klien memakai database owner (celah audit 2026-10-04). Lihat `docs/tracker/logs/patch_celah_env_klien_2026_10_04.md`.
 > `scripts/deploy/build-customer.sh` dan `scripts/deploy/deploy-customer.sh` (sisa jalur lama, tidak dipanggil kode mana pun) **sudah dihapus** pada audit 2026-10-08.
 
-### Admin UI Zones (3 Zones)
+### Admin UI Zones (4 Zones)
 
 | Zone | Apps |
 |---|---|
 | **Konten & Berkas** | Projects, Profile, Experience, Skills, Archive, Labels, Explorer, Event Pages |
-| **Sistem & Tampilan** | Appearance, Dock, Widgets, Sounds, **AI**, **Analytics**, **Activity Log** |
+| **Sistem** | AI, Analytics, Activity Log, Backup, Harga Jual, Orders |
+| **Tampilan** | Appearance, Dock, Widgets, Sounds |
 | **Komunikasi** | Notifications, Messages, Feedback, Contacts |
+
+> Zone "Sistem & Tampilan" lama (10 app) dipecah jadi **Sistem** + **Tampilan** pada 2026-10-09 atas keputusan owner (3 → 4 zone); definisi zona = data di `src/app/admin/desktop/registry.ts` (`ADMIN_ZONES`).
 
 > Zone "Manajemen Sistem & Klien" (clientDashboard, paymentConfig, orders) sudah dihapus sepenuhnya (registry bersih + berkas panel `ClientDashboardPanel`/`PaymentConfigPanel` dihapus pada v1.3.20; panel `OrdersPanel` dihapus lalu **dibuat ulang** di v1.3.29 sebagai app "Pesanan" — `/admin/system/orders`). Endpoint `orders` tetap hidup (dipakai panel Pesanan, script load-test, support-playbook); endpoint `payment-config` **sudah dihapus total** 2026-10-09 (route + fungsi service `getAdminPaymentConfig`/`updatePaymentConfig` — nol pemanggil, billing baca `paymentConfigService` langsung, bukan lewat API); endpoint `sites` tetap hidup untuk tooling.
 

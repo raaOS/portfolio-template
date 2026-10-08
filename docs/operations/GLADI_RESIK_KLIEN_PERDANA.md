@@ -26,7 +26,7 @@
       panduan portal STEP 2 — template *Edit Cloudflare Workers*) — dipakai portal
       STEP 1-3. Ini akun palsu-klien, bukan milik klien.
 - [ ] Harga jual sudah sesuai: login `/admin` → panel **Harga Jual** (zona
-      Sistem & Tampilan) → pastikan angkanya benar, karena nominal order dihitung dari
+      Sistem) → pastikan angkanya benar, karena nominal order dihitung dari
       sana.
 - [ ] Baca ulang `docs/operations/support-playbook.md` §8 (refund) — daftar janji yang
       **boleh** dikatakan ke klien, dan yang tidak.
