@@ -2,16 +2,16 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { Banknote, Save } from 'lucide-react';
-import { AdminAuthGuard } from '../../components/AdminAuthGuard';
-import { AdminHeader } from '../../components/components/AdminHeader';
+import { AdminAuthGuard } from '../components/AdminAuthGuard';
+import { AdminHeader } from '../components/components/AdminHeader';
 import { getWritableCsrfToken } from '@/lib/security/client-csrf';
 import { formatIdr } from '@/constants/pricing';
 
 /**
  * Panel Harga Jual (PK4): owner mengubah harga dasar template tanpa deploy.
- * Tersimpan di D1 `platform_settings` (key `pricing_config`); halaman jualan
- * (`/`) membaca via ISR ≤60 dtk dan checkout via fetch `payment-info`.
- * Nominal order tetap dihitung server — tampilan di sini hanya display.
+ * Tersimpan di D1 `platform_settings` (key `base_price_idr`); halaman jualan
+ * (`/`) & checkout membaca via cache 60 detik (ISR + cache service), nominal
+ * order tetap dihitung server — tampilan di sini hanya display.
  */
 function HargaClientContent() {
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
@@ -76,7 +76,7 @@ function HargaClientContent() {
       setCurrentPrice(data.basePrice);
       setInputValue(String(data.basePrice));
       setStatus(
-        `Harga disimpan: ${formatIdr(data.basePrice)}. Halaman jualan menyusul (ISR ≤60 dtk); checkout mengambil harga terbaru saat dibuka.`
+        `Harga disimpan: ${formatIdr(data.basePrice)}. Halaman jualan & checkout menyusul (cache 60 detik).`
       );
     } catch (err) {
       console.error('[HargaPanel] Gagal simpan harga:', err);
@@ -156,7 +156,7 @@ function HargaClientContent() {
           <ul className="list-disc space-y-1 pl-4">
             <li>Harga tampil di halaman jualan dan checkout; order yang sudah dibuat nominalnya tetap (terkunci di orders).</li>
             <li>Nominal tagihan tetap dihitung server dari database — bukan dari browser pengunjung.</li>
-            <li>Guardrail input: Rp1.000 – Rp100.000.000 (bilangan bulat).</li>
+            <li>Guardrail input: Rp50.000 – Rp50.000.000 (bilangan bulat).</li>
             <li>Belum pernah disimpan → memakai harga bawaan <code>BASE_PRICE</code>.</li>
           </ul>
         </div>

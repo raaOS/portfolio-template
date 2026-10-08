@@ -15,12 +15,18 @@ vi.mock('@/lib/cloudflareD1', () => ({
 
 import { queryD1 } from '@/lib/cloudflareD1';
 import { BASE_PRICE } from '@/constants/pricing';
-import { getBasePrice, updateBasePrice, validateBasePrice } from './pricingConfigService';
+import {
+  clearBasePriceCache,
+  getBasePrice,
+  updateBasePrice,
+  validateBasePrice
+} from './pricingConfigService';
 
 const queryMock = vi.mocked(queryD1);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  clearBasePriceCache();
 });
 
 describe('getBasePrice', () => {
@@ -28,6 +34,40 @@ describe('getBasePrice', () => {
     queryMock.mockResolvedValueOnce([{ value: JSON.stringify({ basePrice: 250000 }) }]);
 
     await expect(getBasePrice()).resolves.toBe(250000);
+  });
+
+  it('membaca key base_price_idr dengan fallback key lama pricing_config', async () => {
+    queryMock.mockResolvedValueOnce([{ value: JSON.stringify({ basePrice: 300000 }) }]);
+
+    await expect(getBasePrice()).resolves.toBe(300000);
+
+    const [sql, params] = queryMock.mock.calls[0] as [string, unknown[]];
+    expect(String(sql)).toContain('platform_settings');
+    expect(params).toContain('base_price_idr');
+    expect(params).toContain('pricing_config');
+  });
+
+  it('cache 60 detik: query D1 hanya sekali sampai cache dibersihkan', async () => {
+    queryMock.mockResolvedValueOnce([{ value: JSON.stringify({ basePrice: 250000 }) }]);
+
+    await expect(getBasePrice()).resolves.toBe(250000);
+    await expect(getBasePrice()).resolves.toBe(250000);
+
+    expect(queryMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('updateBasePrice membersihkan cache sehingga harga baru terbaca langsung', async () => {
+    queryMock.mockResolvedValueOnce([{ value: JSON.stringify({ basePrice: 250000 }) }]);
+    await expect(getBasePrice()).resolves.toBe(250000);
+
+    queryMock.mockResolvedValueOnce([]); // upsert
+    await expect(updateBasePrice(400000)).resolves.toMatchObject({
+      success: true,
+      basePrice: 400000
+    });
+
+    queryMock.mockResolvedValueOnce([{ value: JSON.stringify({ basePrice: 400000 }) }]);
+    await expect(getBasePrice()).resolves.toBe(400000);
   });
 
   it('fallback BASE_PRICE saat key belum pernah disimpan', async () => {
@@ -56,14 +96,16 @@ describe('getBasePrice', () => {
 });
 
 describe('validateBasePrice', () => {
-  it('menerima bilangan bulat dalam guardrail', () => {
+  it('menerima bilangan bulat dalam guardrail Rp50.000–Rp50.000.000', () => {
     expect(validateBasePrice(199000)).toEqual({ valid: true, value: 199000 });
     expect(validateBasePrice('250000')).toEqual({ valid: true, value: 250000 });
+    expect(validateBasePrice(50_000)).toEqual({ valid: true, value: 50_000 });
+    expect(validateBasePrice(50_000_000)).toEqual({ valid: true, value: 50_000_000 });
   });
 
-  it('menolak di bawah Rp1.000, di atas Rp100 juta, desimal, dan non-angka', () => {
-    expect(validateBasePrice(199).valid).toBe(false);
-    expect(validateBasePrice(100_000_001).valid).toBe(false);
+  it('menolak di bawah Rp50.000, di atas Rp50.000.000, desimal, dan non-angka', () => {
+    expect(validateBasePrice(49_999).valid).toBe(false);
+    expect(validateBasePrice(50_000_001).valid).toBe(false);
     expect(validateBasePrice(199000.5).valid).toBe(false);
     expect(validateBasePrice('murah').valid).toBe(false);
     expect(validateBasePrice(undefined).valid).toBe(false);
@@ -90,7 +132,7 @@ describe('updateBasePrice', () => {
     const [sql, params] = queryMock.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('INSERT INTO platform_settings');
     expect(sql).toContain('ON CONFLICT(key)');
-    expect((params as string[])[0]).toBe('pricing_config');
+    expect((params as string[])[0]).toBe('base_price_idr');
     expect(String(params[1])).toContain('"basePrice":249000');
   });
 

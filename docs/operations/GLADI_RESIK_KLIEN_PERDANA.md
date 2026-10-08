@@ -22,7 +22,9 @@
       - email Anda sendiri (untuk menerima semua email alur),
       - gambar apa pun (untuk diunggah sebagai "bukti bayar" order test).
 - [ ] Akun Cloudflare **latihan** siap (akun Anda sendiri): catat **Account ID** +
-      **API Token** — dipakai portal STEP 1-3. Ini akun palsu-klien, bukan milik klien.
+      **API Token** dengan cakupan **D1 Edit + R2 Edit + Workers Edit** (ikuti
+      panduan portal STEP 2 — template *Edit Cloudflare Workers*) — dipakai portal
+      STEP 1-3. Ini akun palsu-klien, bukan milik klien.
 - [ ] Harga jual sudah sesuai: login `/admin` → panel **Harga Jual** (zona
       Sistem & Tampilan) → pastikan angkanya benar, karena nominal order dihitung dari
       sana.
@@ -108,6 +110,9 @@ Baru** — detail langkah ada di `docs/release/CLIENT_OPERATIONS.md`:
 - [ ] `npm test` hijau (skrip gerbang: tsc 0, eslint 0, seluruh test lolos).
 - [ ] Backup terakhir ada di `backups\` dan **sudah disalin** ke flashdisk lewat
       `SALIN_CADANGAN.bat` (petunjuk: `cadangan-flashdisk/README.txt`).
+- [ ] Backup otomatis harian (cron Worker 01:00 WIB) terpasang & terverifikasi —
+      jadwal dan cara cek ada di `docs/operations/backup-restore-runbook.md`
+      (bagian "Backup Otomatis Harian").
 - [ ] Harga final terkonfirmasi di panel **Harga Jual**.
 - [ ] Support playbook §8 (refund) + `docs/operations/support-response-templates.md`
       siap dipakai saat klien bertanya.

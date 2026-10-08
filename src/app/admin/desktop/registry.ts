@@ -269,7 +269,7 @@ export const APP_ROUTE_MAP: Record<string, string> = {
   analytics: '/admin/system/analytics',
   activityLog: '/admin/system/activity-log',
   backup: '/admin/system/backup',
-  harga: '/admin/system/harga',
+  harga: '/admin/harga',
   notifications: '/admin/communications/notifications',
   messages: '/admin/communications/messages',
   feedback: '/admin/communications/feedback',

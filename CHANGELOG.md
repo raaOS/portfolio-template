@@ -3,6 +3,26 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.28] - 2026-10-08
+
+### 🧾 Batch perbaikan hasil audit reviewer rilis 1.3.27 (F-01…F-11, semua temuan dieksekusi atas izin owner)
+
+- **`SALIN_CADANGAN.bat` kini benar-benar menyelamatkan semua aset penting (F-01, temuan P1).** Dulu hanya `backups\` yang disalin — `arsip-klien\` (kredensial tiap klien) dan `.env.local` (secret utama) tidak pernah ikut, padahal dua aset itu paling sulit dibangun ulang saat bencana. Kini ketiganya disalin; dua terakhir dilewati dengan pesan jelas bila belum ada, dan kegagalan salinan per-aset ikut memunculkan exit code gagal.
+- **Output backup bertanggal `YYYY-MM-DD` (F-07).** Tujuan kini `cadangan-flashdisk\<tanggal>\` (atau `<drive>:\cadangan-portfolio\<tanggal>\`) memakai format locale-independent via PowerShell — salinan lama tidak lagi tercampur dengan yang baru.
+- **README backup menyarankan enkripsi 7-Zip berpassword (F-08).** Isi backup kini sensitif (data pembeli + arsip klien + `.env.local`): README menambah cara kompres `7z a -p -mhe=on` dan aturan simpan password terpisah dari flashdisk.
+- **Guardrail harga diselaraskan spesifikasi: Rp50.000–Rp50.000.000 (F-02).** Rentang lama Rp1.000–Rp100.000.000 loloskan typo nol-hilang (199.000 → 1.990); kini batas bawah Rp50.000 menutup kasus itu. Test boundary ditambah (Rp50.000 & Rp50.000.000 valid; Rp49.999 & Rp50.000.001 ditolak).
+- **Key harga pindah ke `base_price_idr` sesuai spesifikasi (F-03).** Key lama `pricing_config` (rilis 1.3.27) tetap dibaca sebagai fallback — harga yang pernah disimpan owner tidak hilang; penulisan hanya ke key baru, pembacaan key baru selalu menang.
+- **`getBasePrice()` punya cache 60 detik sesuai spesifikasi (F-04).** Dulu 1 query D1 per pembacaan; kini hasil baca di-cache in-memory 60 dtk, `updateBasePrice()` membersihkan cache (harga baru langsung terbaca), error query tidak di-cache. Test: query hanya sekali dalam TTL + cache bersih setelah update.
+- **Halaman harga pindah ke `/admin/harga` sesuai spesifikasi (F-05).** Dari `/admin/system/harga` (registry desktop ikut); proteksi `AdminAuthGuard` + middleware `/admin` tidak berubah — tetap redirect Admin Login tanpa sesi.
+- **Test baru: harga baru tidak menghitung ulang order lama (F-06).** Order dibuat saat Rp250.000 → harga diubah ke Rp400.000 → order baru = Rp400.000, order lama tetap Rp250.000, dan nol `UPDATE` menyentuh kolom `amount`.
+- **Runbook gladi resik melengkapi cakupan token & cron backup (F-10).** Prasyarat kini menyebut **D1 Edit + R2 Edit + Workers Edit** (template *Edit Cloudflare Workers* sesuai panduan portal); gerbang final ikut mengecek backup otomatis harian 01:00 WIB.
+- **`CATATAN_SERAH_TERIMA` checklist kini 6 langkah (F-09):** ditambah "Panduan singkat kelola konten dijelaskan ke klien".
+- **Monitoring: helper mati `endpointPath('{siteSlug}')` dihapus (F-11).** Check synthetic monitor semuanya path statis pasca-hapus tenant; `--site-slug` tetap dipakai sebagai label laporan.
+
+### ✅ Gerbang pengujian
+
+- **Semua hijau (dijalankan ulang independen setelah batch perbaikan):** `tsc --noEmit` 0 error · ESLint 0 error · **123 file / 972 test PASS** (+4 test baru) · `npm run build` exit 0.
+
 ## [1.3.27] - 2026-10-08
 
 ### 🧹 Hapus total konsep tenant `/<slug>` (PK1 + PK3)

@@ -11,6 +11,7 @@ import {
 } from './orderService';
 import * as cloudflareD1 from '@/lib/cloudflareD1';
 import * as slugService from './slugService';
+import { clearBasePriceCache, updateBasePrice } from './pricingConfigService';
 
 /**
  * Set env jadi "tidak dikonfigurasi".
@@ -43,6 +44,7 @@ const activePaymentConfigRows = [
 describe('orderService', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    clearBasePriceCache();
   });
 
   describe('createOrder', () => {
@@ -192,9 +194,82 @@ describe('orderService', () => {
         ([sql, params]) =>
           String(sql).includes('platform_settings') &&
           Array.isArray(params) &&
-          params.includes('pricing_config')
+          params.includes('base_price_idr')
       );
       expect(pricingCalls.length).toBeGreaterThan(0);
+    });
+
+    it('PK4: perubahan harga baru TIDAK menghitung ulang nominal order lama', async () => {
+      vi.mocked(slugService.isSlugAvailable).mockResolvedValue(true);
+      const configRows = [
+        {
+          value: JSON.stringify({
+            isActive: true,
+            qrisUniqueAmountEnabled: false,
+            qrisUniqueAmountMaxOffset: 999
+          })
+        }
+      ];
+
+      vi.mocked(cloudflareD1.queryD1)
+        // Order A dibuat saat harga D1 = Rp250.000
+        .mockResolvedValueOnce([]) // expire stale: activating-recovery sweep
+        .mockResolvedValueOnce([]) // expire stale: 7-day auto-cancel sweep
+        .mockResolvedValueOnce([]) // expire stale pending orders
+        .mockResolvedValueOnce(configRows) // payment config
+        .mockResolvedValueOnce([]) // M5: duplicate order check
+        .mockResolvedValueOnce([{ value: JSON.stringify({ basePrice: 250000 }) }])
+        .mockResolvedValueOnce([]) // insert order A
+        // Owner mengubah harga lewat panel → Rp400.000
+        .mockResolvedValueOnce([]) // upsert platform_settings
+        // Order B dibuat SETELAH harga berubah
+        .mockResolvedValueOnce([]) // expire stale: activating-recovery sweep
+        .mockResolvedValueOnce([]) // expire stale: 7-day auto-cancel sweep
+        .mockResolvedValueOnce([]) // expire stale pending orders
+        .mockResolvedValueOnce(configRows) // payment config
+        .mockResolvedValueOnce([]) // M5: duplicate order check
+        .mockResolvedValueOnce([{ value: JSON.stringify({ basePrice: 400000 }) }])
+        .mockResolvedValueOnce([]); // insert order B
+
+      const orderA = await createOrder({
+        buyerName: 'Nanda',
+        buyerEmail: 'nanda@test.com',
+        buyerWhatsapp: '628123456789',
+        desiredSlug: 'nanda-design'
+      });
+      expect(orderA.success).toBe(true);
+      expect(orderA.order?.amount).toBe(250000);
+
+      const saved = await updateBasePrice(400000);
+      expect(saved.success).toBe(true);
+
+      const orderB = await createOrder({
+        buyerName: 'Budi',
+        buyerEmail: 'budi@test.com',
+        buyerWhatsapp: '628987654321',
+        desiredSlug: 'budi-studio'
+      });
+      expect(orderB.success).toBe(true);
+      // Order BARU memakai harga baru…
+      expect(orderB.order?.amount).toBe(400000);
+
+      const calls = vi.mocked(cloudflareD1.queryD1).mock.calls;
+      // …tapi order LAMA (Rp250.000) tidak dihitung ulang: tidak ada satu pun
+      // UPDATE yang menyentuh kolom amount, dan order A tetap Rp250.000.
+      const amountUpdates = calls.filter(
+        ([sql]) =>
+          /UPDATE\s+orders/i.test(String(sql)) && /\bamount\b/i.test(String(sql))
+      );
+      expect(amountUpdates).toHaveLength(0);
+
+      // Penulisan harga memakai key spesifikasi `base_price_idr`.
+      const priceWrite = calls.filter(
+        ([sql, params]) =>
+          String(sql).includes('INSERT INTO platform_settings') &&
+          Array.isArray(params) &&
+          params[0] === 'base_price_idr'
+      );
+      expect(priceWrite).toHaveLength(1);
     });
 
     it('fails cleanly when payment config is inactive', async () => {

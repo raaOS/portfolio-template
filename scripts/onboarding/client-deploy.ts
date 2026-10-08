@@ -556,6 +556,7 @@ export function renderHandoverNote(input: HandoverNoteInput): string {
     '- [ ] Login `/admin` berhasil memakai kredensial dari `config.env`.',
     '- [ ] Klien sudah bisa mengubah konten sendiri lewat `/admin`.',
     '- [ ] Kredensial dikirim ke klien lewat jalur privat.',
+    '- [ ] Panduan singkat kelola konten dijelaskan ke klien (`docs/release/CLIENT_OPERATIONS.md`).',
     '- [ ] Lupa password klien? `npx tsx scripts/cloudflare/reset-customer-password.ts`',
     '',
     '## Rutin & referensi',

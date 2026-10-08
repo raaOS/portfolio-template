@@ -139,10 +139,6 @@ function buildUrl(baseUrl, pathName) {
   return `${baseUrl}${pathName.startsWith('/') ? pathName : `/${pathName}`}`;
 }
 
-function endpointPath(template, siteSlug) {
-  return template.replace('{siteSlug}', encodeURIComponent(siteSlug));
-}
-
 async function fetchWithTimeout(url, timeoutMs) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -160,7 +156,9 @@ async function fetchWithTimeout(url, timeoutMs) {
 }
 
 async function runHttpCheck(baseUrl, check, options) {
-  const pathName = endpointPath(check.path, options.siteSlug);
+  // Rute per-slug sudah dihapus (v1.3.27): semua check memakai path statis;
+  // `options.siteSlug` hanya label laporan (lihat docs/operations/monitoring-runbook.md).
+  const pathName = check.path;
   const url = buildUrl(baseUrl, pathName);
   const started = Date.now();
 
