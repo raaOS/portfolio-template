@@ -6,6 +6,7 @@ import {
   findArchiveForSlug,
   createArchiveDir,
   resolveProvisionedAdminPassword,
+  guardCrossClientSlug,
   pickD1Rows,
   parseEnvText,
 } from './onboard-reuse';
@@ -109,6 +110,30 @@ describe('findArchiveForSlug / createArchiveDir', () => {
   it('createArchiveDir mulai dari 01 kalau arsip kosong', () => {
     const created = createArchiveDir(tmpDir, 'budi');
     expect(created.folderName).toBe('01_budi');
+  });
+});
+
+describe('guardCrossClientSlug (audit 2026-10-08, temuan #6)', () => {
+  it('menolak slug yang sudah jadi arsip akun Cloudflare lain', () => {
+    writeArchive('01_budi', 'CUSTOMER_SLUG="budi"\nCLOUDFLARE_ACCOUNT_ID="akun-lama"\n');
+    const hit = findArchiveForSlug(tmpDir, 'budi');
+    expect(() => guardCrossClientSlug(hit, 'akun-baru')).toThrow(/sudah dipakai klien lain/);
+  });
+
+  it('mengizinkan re-provision pada akun Cloudflare yang sama', () => {
+    writeArchive('01_budi', 'CUSTOMER_SLUG="budi"\nCLOUDFLARE_ACCOUNT_ID="akun-sama"\n');
+    const hit = findArchiveForSlug(tmpDir, 'budi');
+    expect(() => guardCrossClientSlug(hit, 'akun-sama')).not.toThrow();
+  });
+
+  it('slug baru (tanpa arsip) tidak ditolak', () => {
+    expect(() => guardCrossClientSlug(null, 'akun-apapun')).not.toThrow();
+  });
+
+  it('arsip tanpa CLOUDFLARE_ACCOUNT_ID dilewatkan (tidak bisa dibandingkan)', () => {
+    writeArchive('01_budi', 'CUSTOMER_SLUG="budi"\n');
+    const hit = findArchiveForSlug(tmpDir, 'budi');
+    expect(() => guardCrossClientSlug(hit, 'akun-baru')).not.toThrow();
   });
 });
 

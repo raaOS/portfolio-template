@@ -4,6 +4,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { spawn } from 'child_process';
 import { SHARED_SCHEMA_QUERIES } from '../../src/crud/shared/db/schema';
+import { D1_SCHEMA_QUERIES } from '../../src/lib/d1-schema';
 import { hashPasswordScrypt } from '../../src/crud/shared/auth/password';
 import { clientUrls, deployClient, resolveWorkersSubdomain } from './client-deploy';
 import { sendWebsiteOnlineEmail, listOrderSlugs } from './notify-online';
@@ -11,8 +12,8 @@ import { attachWorkerDomain, findWorkerDomain, buildDomainHandoverMessage, guard
 import {
   findArchiveForSlug,
   createArchiveDir,
-  pickD1Rows,
   resolveProvisionedAdminPassword,
+  guardCrossClientSlug,
 } from './onboard-reuse';
 
 const PORT = Number(process.env.PORT) || 4567;
@@ -94,6 +95,46 @@ async function cfApi(url: string, token: string, options: RequestInit = {}) {
   return { ok: res.ok && data.success, status: res.status, data };
 }
 
+/**
+ * Jalankan satu statement D1 dengan BINDING PARAMETER (`?`).
+ *
+ * Audit 2026-10-08 (temuan #5): SQL disusun lewat interpolasi string
+ * (`${JSON.stringify(value)}` / kutip manual) — teks berupa potongan SQL bisa
+ * mematahkan statement. Semua nilai kini masuk lewat `params`.
+ *
+ * LEMPAR ERROR kalau statement gagal (audit temuan #2: dulu hasil tulis D1
+ * diabaikan sehingga database kosong pun dilaporkan sukses).
+ */
+async function d1Query(
+  accountId: string,
+  apiToken: string,
+  databaseId: string,
+  sql: string,
+  params: Array<string | number | null> = []
+): Promise<Array<Record<string, unknown>>> {
+  const res = await cfApi(`/accounts/${accountId}/d1/database/${databaseId}/query`, apiToken, {
+    method: 'POST',
+    body: JSON.stringify({ sql, params }),
+  });
+
+  const statements = Array.isArray(res.data?.result)
+    ? (res.data.result as Array<{
+        success?: boolean;
+        error?: string;
+        results?: Array<Record<string, unknown>>;
+      }>)
+    : [];
+  const first = statements[0];
+  const statementError = first && first.success === false ? first.error || '' : '';
+  const topError = res.data?.errors?.map((e) => e.message).filter(Boolean).join('; ') || '';
+
+  if (!res.ok || statementError || topError) {
+    throw new Error(`Query D1 gagal: ${statementError || topError || `HTTP ${res.status}`}`);
+  }
+
+  return Array.isArray(first?.results) ? first.results : [];
+}
+
 // Generate folder arsip bernomor (01_slug, 02_slug, ...) — kini ada di
 // ./onboard-reuse (createArchiveDir) supaya portal & CLI memakai kebijakan yang sama.
 
@@ -109,6 +150,13 @@ async function provisionClient(
   const siteId = clientSlug;
   const dbName = `db-${clientSlug}`;
   const r2BucketName = `media-${clientSlug}`;
+
+  // Penjaga slug lintas klien (audit 2026-10-08, temuan #6): slug yang sudah
+  // terarkip untuk akun Cloudflare LAIN berarti milik klien berbeda — menimpanya
+  // = menghancurkan arsip & database klien lain. Dijaga di sini, SEBELUM ada
+  // resource yang dibuat, supaya gagal cepat dan jelas.
+  const existingArchive = findArchiveForSlug(ARCHIVE_DIR, clientSlug);
+  guardCrossClientSlug(existingArchive, accountId);
 
   // STEP 1: Verifikasi Kredensial
   onProgress(1, 'Memverifikasi kredensial Cloudflare...', 'Menghubungkan ke Cloudflare API v4');
@@ -160,46 +208,56 @@ async function provisionClient(
 
   // STEP 4: Migrasi Skema Tabel & Data Awal
   onProgress(4, 'Memasang Tabel & Template...', `Mengatur template: ${templateKey === 'os-desktop' ? 'macOS Desktop' : 'Infinite Canvas'}`);
-  for (const sql of SHARED_SCHEMA_QUERIES) {
-    await cfApi(`/accounts/${accountId}/d1/database/${databaseId}/query`, apiToken, {
-      method: 'POST',
-      body: JSON.stringify({ sql }),
-    });
+  // Dua skema dipasang berurutan (audit 2026-10-08, temuan #1 & #14):
+  //   1. SHARED_SCHEMA_QUERIES — inti site/login/konten (dipakai portal & auth).
+  //   2. D1_SCHEMA_QUERIES — tabel runtime yang dibaca aplikasi klien
+  //      (orders, site_analytics, platform_settings, project_narratives, ...).
+  // Dulu HANYA skema 1 yang dipasang → tabel orders dkk. tidak pernah ada di
+  // database klien sampai ada kode yang kebetulan menjalankan bootstrap.
+  // Urutan penting: SHARED dulu supaya bentuk kolom projects/media_assets milik
+  // SHARED yang menang; CREATE TABLE IF NOT EXISTS milik D1 otomatis skip.
+  // Setiap statement D1 dijalankan lewat d1Query yang LEMPAR ERROR saat gagal
+  // (audit temuan #2: dulu hasilnya diabaikan).
+  try {
+    for (const sql of [...SHARED_SCHEMA_QUERIES, ...D1_SCHEMA_QUERIES]) {
+      await d1Query(accountId, apiToken, databaseId, sql);
+    }
+  } catch (err) {
+    throw new Error(`STEP 4 gagal memasang tabel database: ${(err as Error).message}`);
   }
 
-  // Seed site row
+  // Seed site row — binding parameter (audit temuan #5: tanpa interpolasi SQL).
   const seedSiteSql = `
     INSERT INTO sites (id, slug, name, status, active_template_key, created_at, updated_at)
-    VALUES ('${siteId}', '${clientSlug}', '${clientName.replace(/'/g, "''")}', 'active', '${templateKey}', datetime('now'), datetime('now'))
+    VALUES (?, ?, ?, 'active', ?, datetime('now'), datetime('now'))
     ON CONFLICT(id) DO UPDATE SET
       name = excluded.name,
       active_template_key = excluded.active_template_key,
       updated_at = datetime('now');
   `;
-  await cfApi(`/accounts/${accountId}/d1/database/${databaseId}/query`, apiToken, {
-    method: 'POST',
-    body: JSON.stringify({ sql: seedSiteSql }),
-  });
+  await d1Query(accountId, apiToken, databaseId, seedSiteSql, [
+    siteId,
+    clientSlug,
+    clientName,
+    templateKey,
+  ]);
 
   // --- Penjagaan re-provision (audit MEDIUM M4, 2026-10-06) -----------------
   // Kalau slug ini sudah pernah onboarding: pakai arsip lama + password lama,
   // jangan rotasi diam-diam dan jangan gandakan folder arsip.
-  const existingArchive = findArchiveForSlug(ARCHIVE_DIR, clientSlug);
+  // (`existingArchive` sudah dibaca di awal fungsi — lihat guard slug di atas.)
   let adminExists = false;
   if (!explicitPassword) {
-    const adminCheckRes = await cfApi(`/accounts/${accountId}/d1/database/${databaseId}/query`, apiToken, {
-      method: 'POST',
-      body: JSON.stringify({
-        sql: `SELECT id FROM site_users WHERE site_id = '${siteId}' AND email = '${adminEmail.toLowerCase()}' LIMIT 1;`,
-      }),
-    });
-    if (!adminCheckRes.ok) {
-      // Gagal memeriksa = tidak boleh menebak: rotasi diam-diam lebih berbahaya daripada error.
-      throw new Error(
-        `Gagal memeriksa apakah admin sudah ada: ${adminCheckRes.data?.errors?.[0]?.message || 'query D1 gagal'}`
-      );
-    }
-    adminExists = pickD1Rows(adminCheckRes.data).length > 0;
+    // Gagal memeriksa = tidak boleh menebak: rotasi diam-diam lebih berbahaya
+    // daripada error. d1Query melempar error kalau query gagal.
+    const adminRows = await d1Query(
+      accountId,
+      apiToken,
+      databaseId,
+      `SELECT id FROM site_users WHERE site_id = ? AND email = ? LIMIT 1`,
+      [siteId, adminEmail.toLowerCase()]
+    );
+    adminExists = adminRows.length > 0;
   }
   const adminDecision = resolveProvisionedAdminPassword({
     explicitPassword,
@@ -216,17 +274,71 @@ async function provisionClient(
     const userId = `user-${crypto.randomUUID()}`;
     const seedUserSql = `
       INSERT INTO site_users (id, site_id, email, password_hash, password_salt, password_algorithm, role, created_at)
-      VALUES ('${userId}', '${siteId}', '${adminEmail.toLowerCase()}', '${passwordHash}', '${salt}', 'scrypt', 'admin', datetime('now'))
+      VALUES (?, ?, ?, ?, ?, 'scrypt', 'admin', datetime('now'))
       ON CONFLICT(site_id, email) DO UPDATE SET
         password_hash = excluded.password_hash,
         password_salt = excluded.password_salt;
     `;
-    await cfApi(`/accounts/${accountId}/d1/database/${databaseId}/query`, apiToken, {
-      method: 'POST',
-      body: JSON.stringify({ sql: seedUserSql }),
-    });
+    await d1Query(accountId, apiToken, databaseId, seedUserSql, [
+      userId,
+      siteId,
+      adminEmail.toLowerCase(),
+      passwordHash,
+      salt,
+    ]);
   } else {
     console.log('✓ Admin sudah ada — password lama dipertahankan (tidak dirotasi).');
+  }
+
+  // STEP 4c: VERIFIKASI hasil tulis (audit 2026-10-08, temuan #2).
+  // Dulu semua hasil query diabaikan → database kosong pun dilaporkan sukses,
+  // email "Website Sudah Online" tetap terkirim, lalu klien tidak bisa login.
+  // Kegagalan di sini menghentikan provisioning SEBELUM deploy & email.
+  const requiredTables = [
+    'sites',
+    'site_users',
+    'projects',
+    'project_narratives',
+    'media_assets',
+    'orders',
+    'platform_settings',
+  ];
+  const tableRows = await d1Query(
+    accountId,
+    apiToken,
+    databaseId,
+    `SELECT name FROM sqlite_master WHERE type = 'table'`
+  );
+  const presentTables = new Set(tableRows.map((row) => String(row.name || '')));
+  const missingTables = requiredTables.filter((name) => !presentTables.has(name));
+  if (missingTables.length > 0) {
+    throw new Error(
+      `Verifikasi STEP 4 gagal — tabel berikut tidak terbentuk di database: ${missingTables.join(', ')}`
+    );
+  }
+
+  const seededSiteRows = await d1Query(
+    accountId,
+    apiToken,
+    databaseId,
+    `SELECT id FROM sites WHERE id = ? LIMIT 1`,
+    [siteId]
+  );
+  if (seededSiteRows.length === 0) {
+    throw new Error('Verifikasi STEP 4 gagal — baris site tidak tersimpan di database.');
+  }
+
+  if (adminDecision.seedUser) {
+    const seededAdminRows = await d1Query(
+      accountId,
+      apiToken,
+      databaseId,
+      `SELECT id FROM site_users WHERE site_id = ? AND email = ? LIMIT 1`,
+      [siteId, adminEmail.toLowerCase()]
+    );
+    if (seededAdminRows.length === 0) {
+      throw new Error('Verifikasi STEP 4 gagal — akun admin tidak tersimpan di database.');
+    }
   }
 
   // STEP 5: Pengarsipan Folder Klien (Isolasi Total)

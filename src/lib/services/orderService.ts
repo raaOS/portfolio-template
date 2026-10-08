@@ -1000,6 +1000,7 @@ export async function uploadPaymentProof(
     }
   }
 
+  let updatedProofRows: Array<{ status: string }> = [];
   try {
     // SECURITY FIX (audit 2026-09-29): re-upload dari status
     // `waiting_verification` TIDAK me-reset `updated_at`, sehingga timer
@@ -1007,13 +1008,20 @@ export async function uploadPaymentProof(
     // berulang tidak lagi bisa mengunci slug & nominal unik tanpa bayar.
     // First upload (pending_payment) dan late payment (expired) tetap
     // memulai jendela 7 hari baru.
-    await queryD1(
+    //
+    // Guard status ATOMIK (audit 2026-10-08, temuan #4): WHERE ikut mengecek
+    // status yang diizinkan supaya order yang keburu diaktifkan/dibatalkan di
+    // antara pembacaan awal dan UPDATE ini tidak tertimpa kembali menjadi
+    // `waiting_verification` (dulu bisa membalik status order aktif + saldo).
+    updatedProofRows = await queryD1<{ status: string }>(
       `UPDATE orders
        SET payment_proof_url = ?,
            status = 'waiting_verification',
            expires_at = CASE WHEN ? THEN ? ELSE expires_at END,
            updated_at = CASE WHEN ? THEN updated_at ELSE ? END
-       WHERE id = ?`,
+       WHERE id = ?
+         AND status IN ('pending_payment', 'waiting_verification', 'expired')
+       RETURNING status`,
       [
         normalizedProofUrl,
         isLatePayment ? 1 : 0,
@@ -1037,6 +1045,20 @@ export async function uploadPaymentProof(
       };
     }
     throw err;
+  }
+
+  if (updatedProofRows.length === 0) {
+    // Status berubah di antara pembacaan awal dan UPDATE (mis. order baru saja
+    // diaktifkan/dibatalkan proses lain) — jangan menulis di atas status baru.
+    const freshRows = await queryD1<{ status: string }>(
+      'SELECT status FROM orders WHERE id = ?',
+      [orderId]
+    );
+    const freshStatus = freshRows[0]?.status || 'tidak ditemukan';
+    return {
+      success: false,
+      error: `Pesanan tidak bisa menerima bukti bayar — statusnya berubah menjadi "${freshStatus}" saat diproses. Muat ulang halaman untuk melihat status terbaru.`,
+    };
   }
 
   if (!isSameProof) {
@@ -1198,11 +1220,21 @@ export async function activateOrder(
     // Update Order status to activated
     // SQL literal: pakai quote tunggal ('activated') — D1 menolak identifer
     // quoted double-quote bila SQLITE_DQS=0 (temuan audit 2026-09-29).
-    await queryD1("UPDATE orders SET status = 'activated', site_id = ?, updated_at = ? WHERE id = ?", [
-      siteId,
-      now,
-      orderId
-    ]);
+    // Guard `status = 'activating'` (audit 2026-10-08, temuan #4): kunci yang
+    // baru diambil di atas harus masih berlaku — kalau status berubah di luar
+    // proses ini, jangan menimpa; lempar agar masuk jalur rollback di bawah.
+    const activatedRows = await queryD1<{ id: string }>(
+      `UPDATE orders
+       SET status = 'activated', site_id = ?, updated_at = ?
+       WHERE id = ? AND status = 'activating'
+       RETURNING id`,
+      [siteId, now, orderId]
+    );
+    if (activatedRows.length === 0) {
+      throw new Error(
+        'Order berubah status di luar proses aktivasi (kemungkinan dibatalkan proses lain) — aktivasi dibatalkan.'
+      );
+    }
 
     // Log Audit Event
     await queryD1(
@@ -1314,43 +1346,66 @@ export async function cancelOrder(
 
   const cancelReason = reason?.trim() || 'Dibatalkan oleh Admin (Bukti bayar tidak valid / mutasi tidak ditemukan)';
 
-  // SECURITY FIX (audit 2026-09-29): bersihkan objek bukti bayar di R2.
-  // Sebelumnya DB dibersihkan (payment_proof_url = NULL) tapi file di prefix
-  // `orders/{orderId}/` tetap tertinggal selamanya — PII bukti transfer
-  // masih bisa diakses siapa pun yang punya URL-nya.
-  await cleanupOrderProofObjects(orderId);
-
-  // Cleanup: clear sensitive payment proof URL.
-  // Keep `amount` intact for late-payment reconciliation and keep `access_token_hash`
-  // so the buyer can still view their order status page via their secret token link.
+  // Guard status ATOMIK + urutan yang benar (audit 2026-10-08, temuan #4):
+  //   1. UPDATE dengan syarat status dulu — order yang keburu diaktifkan /
+  //      sedang aktivasinya / sudah dibatalkan oleh proses lain TIDAK boleh
+  //      ditimpa jadi `canceled` (dulu WHERE-nya kosong, TOCTOU).
+  //   2. Bersihkan bukti bayar di R2 BARU SETELAH pembatalan terkonfirmasi —
+  //      dulu file dihapus sebelum status dicek, jadi kalau pembatalan batal
+  //      (race), file bukti hilang percuma (audit 2026-09-29 soal PII tetap
+  //      berlaku, hanya urutannya yang diperbaiki).
+  let canceledRows: OrderRecord[] = [];
   try {
-    await queryD1(
+    canceledRows = await queryD1<OrderRecord>(
       `UPDATE orders
        SET status = 'canceled',
            cancel_reason = ?,
            payment_proof_url = NULL,
            updated_at = ?
-       WHERE id = ?`,
+       WHERE id = ?
+         AND status NOT IN ('activated', 'activating', 'canceled')
+       RETURNING *`,
       [cancelReason, now, orderId]
     );
   } catch {
-    // Fallback: at minimum set status to canceled
-    await queryD1(
+    // Fallback: kolom `cancel_reason` mungkin belum ada di DB lama — tetap
+    // batalkan tanpa kolom itu, TAPI guard statusnya tetap dipertahankan.
+    canceledRows = await queryD1<OrderRecord>(
       `UPDATE orders
        SET status = 'canceled',
            payment_proof_url = NULL,
            updated_at = ?
-       WHERE id = ?`,
+       WHERE id = ?
+         AND status NOT IN ('activated', 'activating', 'canceled')
+       RETURNING *`,
       [now, orderId]
     );
   }
 
-  const updatedOrder: OrderRecord = {
-    ...order,
-    status: 'canceled' as const,
-    cancel_reason: cancelReason,
-    payment_proof_url: null,
-  };
+  const updatedOrder = canceledRows[0];
+  if (!updatedOrder) {
+    const freshRows = await queryD1<OrderRecord>('SELECT * FROM orders WHERE id = ?', [orderId]);
+    const fresh = freshRows[0];
+    if (fresh?.status === 'canceled') {
+      return {
+        success: true,
+        message: `Pesanan ${orderId} sudah dibatalkan sebelumnya.`,
+        order: fresh,
+      };
+    }
+    return {
+      success: false,
+      message: `Pesanan ${orderId} tidak bisa dibatalkan — statusnya berubah menjadi "${fresh?.status || 'tidak ditemukan'}" saat diproses.`,
+      order: fresh,
+    };
+  }
+
+  // Bersihkan objek bukti bayar di R2 (audit 2026-09-29: PII transfer harus
+  // ikut hilang saat pembatalan) — hanya setelah status terkunci 'canceled'.
+  // Keep `amount` intact for late-payment reconciliation and keep
+  // `access_token_hash` so the buyer can still view their order status page
+  // via their secret token link.
+  await cleanupOrderProofObjects(orderId);
 
   await logActivity('billing.order_cancel', {
     category: 'billing',

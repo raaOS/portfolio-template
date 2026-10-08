@@ -20,6 +20,7 @@ import {
   ScrollText,
   DatabaseBackup,
   Banknote,
+  Receipt,
 } from 'lucide-react';
 import type { AdminZone } from './types';
 
@@ -197,6 +198,15 @@ export const ADMIN_ZONES: AdminZone[] = [
         defaultWidth: 800,
         defaultHeight: 560,
       },
+      {
+        id: 'orders',
+        label: 'Order & Pembayaran',
+        icon: Receipt,
+        iconColor: 'text-emerald-600',
+        iconBg: 'bg-emerald-100',
+        defaultWidth: 1100,
+        defaultHeight: 720,
+      },
     ],
   },
   {
@@ -270,6 +280,7 @@ export const APP_ROUTE_MAP: Record<string, string> = {
   activityLog: '/admin/system/activity-log',
   backup: '/admin/system/backup',
   harga: '/admin/harga',
+  orders: '/admin/system/orders',
   notifications: '/admin/communications/notifications',
   messages: '/admin/communications/messages',
   feedback: '/admin/communications/feedback',

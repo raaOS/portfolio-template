@@ -426,14 +426,26 @@ export const SITE_ID = process.env.CUSTOMER_SITE_ID || 'default-site';
 
 Ada **dua** berkas DDL yang hidup berdampingan — jangan tertukar:
 
-**1. Skema runtime customer — `src/crud/shared/db/schema.ts` (`SHARED_SCHEMA_QUERIES`, 10 tabel).**
-Dipasang portal onboarding ke D1 milik klien (`scripts/onboarding/server.ts:172`, `scripts/onboarding/cloud-manager.ts:242`) dan dibuat ulang saat runtime lewat `src/crud/shared/db/connection.ts`.
+> **Invarian (audit 2026-10-08, temuan #1/#14):** portal onboarding menjalankan
+> **kedua** daftar berurutan — `SHARED_SCHEMA_QUERIES` dulu, lalu `D1_SCHEMA_QUERIES`
+> (CREATE IF NOT EXISTS; daftar kedua otomatis skip tabel yang sudah ada). Karena itu
+> **kolom 4 tabel bersama (`sites`, `projects`, `media_assets`, `audit_logs`) wajib
+> selaras antar kedua berkas** — khususnya kolom yang dibaca runtime `projectSqlService`:
+> `projects.order_index`, `projects.cover_media_id`, `media_assets.sort_order`,
+> `media_assets.alt_text`, `media_assets.updated_at`, plus tabel `project_narratives`
+> (wajib ada di SHARED). Self-heal `src/lib/cloudflareD1.ts` menambahkan kolom tersebut
+> lewat ALTER ter-guard untuk database lama. Kalau menambah kolom ke tabel bersama,
+> tambahkan di **kedua** berkas.
+
+**1. Skema runtime customer — `src/crud/shared/db/schema.ts` (`SHARED_SCHEMA_QUERIES`, 11 tabel).**
+Dipasang portal onboarding ke D1 milik klien (`scripts/onboarding/server.ts`, `scripts/onboarding/cloud-manager.ts` — disusul `D1_SCHEMA_QUERIES`), lalu diverifikasi hasilnya sebelum lanjut, dan dibuat ulang saat runtime lewat `src/crud/shared/db/connection.ts`.
 
 | # | Tabel | Fungsi |
 |---|---|---|
 | 1 | `sites` | Informasi site (id, slug, name, status, active_template_key) |
 | 2 | `site_users` | Login credentials (email, password_hash, role) |
 | 3 | `projects` | Data project portfolio |
+| 3b | `project_narratives` | Studi kasus per project (challenge/solution/impact) — dibaca runtime |
 | 4 | `media_assets` | Referensi file di R2 |
 | 5 | `site_settings` | Pengaturan site (key-value) |
 | 6 | `audit_logs` | Jejak aktivitas |
@@ -443,7 +455,7 @@ Dipasang portal onboarding ke D1 milik klien (`scripts/onboarding/server.ts:172`
 | 10 | `site_template_entitlements` | Hak pakai template per site (diisi oleh `seedDeployment()`) |
 
 **2. Skema bootstrap produk — `src/lib/d1-schema.ts` (`D1_SCHEMA_QUERIES`, 12 tabel).**
-Dipakai `npm run cf:bootstrap` (`scripts/cloudflare/product-bootstrap.ts`), backup/restore (`scripts/cloudflare/backup-d1.ts`, `restore-d1.ts`), dan readiness gate. Empat namanya sama dengan skema di atas (`sites`, `projects`, `media_assets`, `audit_logs`) tapi definisi kolomnya berbeda, plus 8 tabel lain: `site_quota_overrides`, `project_narratives`, `submissions`, `ai_generations`, `orders`, `site_custom_domains`, `site_analytics`, `platform_settings` (skema ini tidak punya `site_users`, `site_settings`, `rate_limits`, `app_kv`, `portfolio_templates`, `site_template_entitlements`).
+Dipakai `npm run cf:bootstrap` (`scripts/cloudflare/product-bootstrap.ts`), backup/restore (`scripts/cloudflare/backup-d1.ts`, `restore-d1.ts`), readiness gate, **dan dipasang portal setelah skema #1** (lihat invarian di atas). Empat namanya sama dengan skema di atas (`sites`, `projects`, `media_assets`, `audit_logs`) tapi definisi kolomnya berbeda, plus 8 tabel lain: `site_quota_overrides`, `project_narratives`, `submissions`, `ai_generations`, `orders`, `site_custom_domains`, `site_analytics`, `platform_settings` (skema ini tidak punya `site_users`, `site_settings`, `rate_limits`, `app_kv`, `portfolio_templates`, `site_template_entitlements`).
 
 > Tidak ada kolom `plan`/tier di tabel `sites` — paket Lite/Pro sudah dihapus (v1.3.15); harga tunggal Rp199.000.
 
@@ -468,9 +480,11 @@ Konten legacy disimpan sebagai JSON string di tabel `app_kv`:
 1. Owner daftarkan klien baru di portal: Gmail klien + Account ID & API Token
    dari akun Cloudflare MILIK KLIEN (disimpan di arsip-klien/<slug>/config.env)
 2. STEP 1-3: verifikasi kredensial → buat database D1 + bucket R2 di akun klien
-3. STEP 4: pasang skema tabel (SHARED_SCHEMA_QUERIES) → seed row `site`
-   (active_template_key sesuai pilihan template) dan admin user (scrypt)
-   (scripts/onboarding/server.ts:170-207)
+3. STEP 4: pasang skema tabel (`SHARED_SCHEMA_QUERIES` **lalu**
+   `D1_SCHEMA_QUERIES`) → seed row `site` (active_template_key sesuai pilihan
+   template) dan admin user (scrypt), semua lewat binding parameter — lalu
+   **verifikasi** tabel & baris benar-benar tersimpan sebelum lanjut
+   (audit 2026-10-08, temuan #1/#2/#5)
 4. STEP 5: arsipkan kredensial & dokumen ke arsip-klien/<slug>/ (config.env
    berisi ADMIN_EMAIL + ADMIN_PASSWORD)
 5. Build + deploy per klien lewat `deployClient()`
@@ -516,7 +530,7 @@ npx wrangler deploy --config .open-next/wrangler.client.<slug>.jsonc
 ```
 
 > Kenapa berubah (v1.3.20): `wrangler pages deploy` lama **tidak memasang env D1/R2 per klien** → semua deployment klien memakai database owner (celah audit 2026-10-04). Lihat `docs/tracker/logs/patch_celah_env_klien_2026_10_04.md`.
-> `scripts/deploy/build-customer.sh` dan `scripts/deploy/deploy-customer.sh` **tidak dipanggil oleh kode mana pun** — keduanya sisa jalur lama.
+> `scripts/deploy/build-customer.sh` dan `scripts/deploy/deploy-customer.sh` (sisa jalur lama, tidak dipanggil kode mana pun) **sudah dihapus** pada audit 2026-10-08.
 
 ### Admin UI Zones (3 Zones)
 

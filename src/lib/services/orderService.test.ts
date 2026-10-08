@@ -362,7 +362,7 @@ describe('orderService', () => {
             buyer_whatsapp: '62812345'
           }
         ]) // SELECT order
-        .mockResolvedValueOnce([]); // UPDATE orders
+        .mockResolvedValueOnce([{ status: 'waiting_verification' }]); // UPDATE ... RETURNING status
 
       const res = await uploadPaymentProof('ORD-123', 'https://proof.png');
       expect(res.success).toBe(true);
@@ -382,7 +382,7 @@ describe('orderService', () => {
           }
         ]) // SELECT order
         .mockResolvedValueOnce([]) // no active amount conflict
-        .mockResolvedValueOnce([]); // UPDATE orders
+        .mockResolvedValueOnce([{ status: 'waiting_verification' }]); // UPDATE ... RETURNING status
 
       const res = await uploadPaymentProof('ORD-124', 'https://proof.png');
       expect(res.success).toBe(true);
@@ -426,6 +426,20 @@ describe('orderService', () => {
       expect(res.success).toBe(false);
       expect(res.error).toContain('nominalnya sudah dipakai');
     });
+
+    it('tidak menimpa status order yang berubah di tengah jalan (race guard audit #4)', async () => {
+      vi.mocked(cloudflareD1.queryD1)
+        .mockResolvedValueOnce([
+          { id: 'ORD-RACE', status: 'pending_payment', desired_slug: 'race-site' }
+        ]) // SELECT order: saat itu status masih mengizinkan upload
+        .mockResolvedValueOnce([]) // UPDATE ... RETURNING status → 0 baris (status sudah berubah)
+        .mockResolvedValueOnce([{ status: 'activated' }]); // SELECT status terkini
+
+      const res = await uploadPaymentProof('ORD-RACE', 'https://proof.png');
+
+      expect(res.success).toBe(false);
+      expect(res.error).toContain('activated');
+    });
   });
 
   describe('activateOrder', () => {
@@ -452,7 +466,7 @@ describe('orderService', () => {
 
       vi.mocked(cloudflareD1.queryD1)
         .mockResolvedValueOnce([order]) // lock order with UPDATE RETURNING
-        .mockResolvedValueOnce([]) // update order activated
+        .mockResolvedValueOnce([{ id: 'ORD-LOCKED' }]) // update order activated (RETURNING id)
         .mockResolvedValueOnce([]); // insert audit_log
 
       const res = await activateOrder('ORD-123');
@@ -533,7 +547,7 @@ describe('orderService', () => {
 
       vi.mocked(cloudflareD1.queryD1)
         .mockResolvedValueOnce([order]) // lock order with UPDATE RETURNING
-        .mockResolvedValueOnce([]) // update order activated
+        .mockResolvedValueOnce([{ id: 'ORD-LOCKED' }]) // update order activated (RETURNING id)
         .mockResolvedValueOnce([]); // insert audit_log
     }
 
@@ -640,7 +654,7 @@ describe('orderService', () => {
 
       vi.mocked(cloudflareD1.queryD1)
         .mockResolvedValueOnce([order]) // lock order with UPDATE RETURNING
-        .mockResolvedValueOnce([]) // update order activated
+        .mockResolvedValueOnce([{ id: 'ORD-LOCKED' }]) // update order activated (RETURNING id)
         .mockResolvedValueOnce([]); // insert audit_log
 
       const res = await activateOrder('ORD-TKT');
@@ -682,7 +696,7 @@ describe('orderService', () => {
 
       vi.mocked(cloudflareD1.queryD1)
         .mockResolvedValueOnce([order])
-        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: 'ORD-NTG' }])
         .mockResolvedValueOnce([]);
 
       const res = await activateOrder('ORD-NTG');
@@ -704,6 +718,21 @@ describe('orderService', () => {
       const res = await cancelOrder('ORD-999');
       expect(res.success).toBe(false);
       expect(res.message).toContain('sudah aktif');
+    });
+
+    it('tidak membatalkan order yang keburu diaktifkan proses lain (race guard audit #4)', async () => {
+      vi.mocked(cloudflareD1.queryD1)
+        .mockResolvedValueOnce([{ id: 'ORD-RACE', status: 'waiting_verification' }]) // SELECT awal: boleh dibatalkan
+        .mockResolvedValueOnce([]) // UPDATE ... RETURNING → 0 baris (kalah cepat dari aktivasi)
+        .mockResolvedValueOnce([{ id: 'ORD-RACE', status: 'activated' }]); // SELECT status terkini
+
+      const res = await cancelOrder('ORD-RACE');
+
+      expect(res.success).toBe(false);
+      expect(res.message).toContain('activated');
+      // File bukti bayar TIDAK dibersihkan karena pembatalan tidak jadi terjadi.
+      const sqls = vi.mocked(cloudflareD1.queryD1).mock.calls.map(([sql]) => String(sql));
+      expect(sqls.some((sql) => sql.includes("SET status = 'canceled'"))).toBe(true);
     });
   });
 
@@ -868,7 +897,7 @@ describe('orderService', () => {
       vi.mocked(cloudflareD1.queryD1)
         .mockResolvedValueOnce([]) // expired -> waiting_verification update
         .mockResolvedValueOnce([order]) // lock order with UPDATE RETURNING
-        .mockResolvedValueOnce([]) // update order activated
+        .mockResolvedValueOnce([{ id: 'ORD-LOCKED' }]) // update order activated (RETURNING id)
         .mockResolvedValueOnce([]); // insert audit_log
 
       const res = await activateOrder('ORD-LATE', { allowExpired: true, proofUrl: 'https://proof.png' });

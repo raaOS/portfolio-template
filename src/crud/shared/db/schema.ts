@@ -41,6 +41,11 @@ export const SHARED_SCHEMA_QUERIES = [
   // ──────────────────────────────────────────────
   // 3. Projects — data project portfolio
   // ──────────────────────────────────────────────
+  // Kolom `cover_media_id` + `order_index` wajib ADA DI SINI: pembaca runtime
+  // (projectSqlService) memakai `ORDER BY order_index`, `INSERT ... order_index`,
+  // dan `UPDATE cover_media_id`. Tanpa kolom ini, query project meledak
+  // "no such column" di database hasil onboarding portal (audit 2026-10-08,
+  // temuan #1). Jangan dihapus tanpa menyesuaikan src/lib/d1-schema.ts.
   `CREATE TABLE IF NOT EXISTS projects (
     id TEXT PRIMARY KEY,
     site_id TEXT NOT NULL,
@@ -48,6 +53,8 @@ export const SHARED_SCHEMA_QUERIES = [
     slug TEXT NOT NULL DEFAULT '',
     description TEXT DEFAULT '',
     cover_url TEXT DEFAULT '',
+    cover_media_id TEXT,
+    order_index INTEGER NOT NULL DEFAULT 0,
     gallery TEXT DEFAULT '[]',
     tags TEXT DEFAULT '[]',
     year TEXT DEFAULT '',
@@ -63,7 +70,26 @@ export const SHARED_SCHEMA_QUERIES = [
   `CREATE INDEX IF NOT EXISTS idx_projects_site ON projects(site_id)`,
 
   // ──────────────────────────────────────────────
+  // 3b. Project Narratives — studi kasus per project
+  // (dibaca/ditulis projectSqlService; juga ada di d1-schema.ts)
+  // ──────────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS project_narratives (
+    id TEXT PRIMARY KEY,
+    site_id TEXT NOT NULL,
+    project_id TEXT NOT NULL,
+    challenge TEXT,
+    solution TEXT,
+    impact TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (site_id) REFERENCES sites(id)
+  ) STRICT`,
+  `CREATE INDEX IF NOT EXISTS idx_project_narratives_project ON project_narratives(project_id)`,
+
+  // ──────────────────────────────────────────────
   // 4. Media Assets — referensi file di R2
+  // `alt_text`/`sort_order`/`updated_at` wajib ada: INSERT pembaca runtime
+  // (projectSqlService) menulis ketiganya dan ORDER BY sort_order (audit #1).
   // ──────────────────────────────────────────────
   `CREATE TABLE IF NOT EXISTS media_assets (
     id TEXT PRIMARY KEY,
@@ -74,7 +100,10 @@ export const SHARED_SCHEMA_QUERIES = [
     content_type TEXT DEFAULT '',
     size INTEGER DEFAULT 0,
     entity_type TEXT DEFAULT 'project_gallery',
+    alt_text TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT,
     FOREIGN KEY (site_id) REFERENCES sites(id)
   ) STRICT`,
   `CREATE INDEX IF NOT EXISTS idx_media_assets_site ON media_assets(site_id)`,

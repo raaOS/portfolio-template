@@ -16,7 +16,21 @@ const RATE_WINDOW_MS = 10 * 60 * 1000;
 const RATE_BLOCK_MS = 30 * 60 * 1000;
 const GET_RATE_MAX = 30;
 
+// SECURITY FIX (audit): deployment managed service selalu punya env
+// CUSTOMER_SITE_ID (AGENTS.md §12) dan onboarding men-seed DB langsung lewat
+// portal PENGELOLA_KLIEN, bukan lewat /setup. Kalau POST tetap terbuka,
+// attacker bisa mengklaim site pada deployment yang DB-nya belum ada admin.
+function isManagedDeployment(): boolean {
+  return Boolean(process.env.CUSTOMER_SITE_ID?.trim());
+}
+
 export async function GET(request: NextRequest) {
+  // Managed deployment: balas status setup "selesai" tanpa memanggil
+  // verifyDeployment, supaya halaman /setup berhenti menawarkan setup.
+  if (isManagedDeployment()) {
+    return NextResponse.json({ isSetupComplete: true, hasSite: true, hasAdmin: true });
+  }
+
   try {
     const rateLimit = await checkDataRateLimit(
       `setup_status:${getClientIP(request)}`,
@@ -45,6 +59,15 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: Request) {
+  // Managed deployment: endpoint setup dimatikan sebelum logika lain
+  // (termasuk rate limit) supaya tidak ada jalur seeding sama sekali.
+  if (isManagedDeployment()) {
+    return NextResponse.json(
+      { error: 'Endpoint setup dinonaktifkan pada deployment ini.' },
+      { status: 404 }
+    );
+  }
+
   try {
     const rateLimit = await checkDataRateLimit(
       `setup_post:${getClientIP(request)}`,

@@ -130,6 +130,46 @@ export async function queryD1<T = Record<string, unknown>>(
   return firstResult?.results ?? [];
 }
 
+/**
+ * Tambahkan kolom projects/media_assets SEBELUM D1_SCHEMA_QUERIES dieksekusi.
+ *
+ * Audit 2026-10-08 (temuan #1, celah ketahuan saat verifikasi 2026-10-09):
+ * `D1_SCHEMA_QUERIES` membuat `idx_projects_site_status_order(order_index)` dan
+ * `idx_media_site_project_order(sort_order)`. Database hasil portal LAMA belum
+ * punya kolom itu → pembuatan index MELEMPAR lebih dulu, sehingga blok self-heal
+ * di bawah tidak pernah tercapai (bootstrap gagal = aplikasi mati total).
+ * Karena itu kolom project/media ditambahkan di sini — aman dijalankan berulang
+ * (PRAGMA cek dulu) dan ditoleransi bila tabelnya belum ada (database baru:
+ * PRAGMA kosong → dilewati, tabelnya menyusul dibuat D1_SCHEMA_QUERIES).
+ */
+async function healProjectMediaColumns(): Promise<void> {
+  const columns: Record<string, Array<[string, string]>> = {
+    projects: [
+      ['metadata_json', 'ALTER TABLE projects ADD COLUMN metadata_json TEXT'],
+      ['order_index', 'ALTER TABLE projects ADD COLUMN order_index INTEGER NOT NULL DEFAULT 0'],
+      ['cover_media_id', 'ALTER TABLE projects ADD COLUMN cover_media_id TEXT'],
+    ],
+    media_assets: [
+      ['sort_order', 'ALTER TABLE media_assets ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0'],
+      ['alt_text', 'ALTER TABLE media_assets ADD COLUMN alt_text TEXT'],
+      ['updated_at', 'ALTER TABLE media_assets ADD COLUMN updated_at TEXT'],
+    ],
+  };
+
+  for (const [table, defs] of Object.entries(columns)) {
+    let info: Array<{ name: string }> = [];
+    try {
+      info = await queryD1<{ name: string }>(`PRAGMA table_info(${table})`);
+    } catch {
+      continue; // tabel belum ada — biarkan D1_SCHEMA_QUERIES yang membuatnya
+    }
+    const have = new Set(info.map((col) => col.name));
+    for (const [name, alter] of defs) {
+      if (!have.has(name)) await queryD1(alter);
+    }
+  }
+}
+
 export async function bootstrapD1Schema() {
   if (!isD1Configured()) return;
   if (!schemaPromise) {
@@ -143,6 +183,10 @@ export async function bootstrapD1Schema() {
             ) STRICT
         `);
 
+      // Audit #1: kolom project/media dulu (lihat healProjectMediaColumns) —
+      // kalau di belakang, index ber-order_index di bawah gagal pada DB lama.
+      await healProjectMediaColumns();
+
       // New Relational Schema (Sprint B)
       for (const sql of D1_SCHEMA_QUERIES) {
         await queryD1(sql);
@@ -154,6 +198,31 @@ export async function bootstrapD1Schema() {
         const hasMetadata = info.some((col) => col.name === 'metadata_json');
         if (!hasMetadata) {
           await queryD1('ALTER TABLE projects ADD COLUMN metadata_json TEXT');
+        }
+        // Audit 2026-10-08 (temuan #1): database hasil onboarding portal lama
+        // memakai skema tanpa kolom berikut, sementara projectSqlService
+        // membacanya. Guard per kolom aman dijalankan berulang (PRAGMA cek dulu).
+        const hasOrderIndex = info.some((col) => col.name === 'order_index');
+        if (!hasOrderIndex) {
+          await queryD1('ALTER TABLE projects ADD COLUMN order_index INTEGER NOT NULL DEFAULT 0');
+        }
+        const hasCoverMediaId = info.some((col) => col.name === 'cover_media_id');
+        if (!hasCoverMediaId) {
+          await queryD1('ALTER TABLE projects ADD COLUMN cover_media_id TEXT');
+        }
+
+        const mediaInfo = await queryD1<{ name: string }>('PRAGMA table_info(media_assets)');
+        const hasSortOrder = mediaInfo.some((col) => col.name === 'sort_order');
+        if (!hasSortOrder) {
+          await queryD1('ALTER TABLE media_assets ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0');
+        }
+        const hasAltText = mediaInfo.some((col) => col.name === 'alt_text');
+        if (!hasAltText) {
+          await queryD1('ALTER TABLE media_assets ADD COLUMN alt_text TEXT');
+        }
+        const hasMediaUpdatedAt = mediaInfo.some((col) => col.name === 'updated_at');
+        if (!hasMediaUpdatedAt) {
+          await queryD1('ALTER TABLE media_assets ADD COLUMN updated_at TEXT');
         }
 
         const sitesInfo = await queryD1<{ name: string }>('PRAGMA table_info(sites)');

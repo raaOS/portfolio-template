@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const { checkAdminAuthMock, dbRefOnceMock } = vi.hoisted(() => ({
-  checkAdminAuthMock: vi.fn(),
+const { validateAdminRequestMock, dbRefOnceMock } = vi.hoisted(() => ({
+  validateAdminRequestMock: vi.fn(),
   dbRefOnceMock: vi.fn(),
 }));
 
@@ -13,7 +13,8 @@ const mockRef = {
 };
 
 vi.mock('@/lib/auth', () => ({
-  checkAdminAuth: checkAdminAuthMock,
+  validateAdminRequest: validateAdminRequestMock,
+  checkAdminAuth: vi.fn(() => false),
 }));
 
 vi.mock('@/lib/database', () => ({
@@ -31,18 +32,28 @@ function buildGetRequest(): NextRequest {
 describe('GET /api/admin/audit-logs', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    checkAdminAuthMock.mockReturnValue(true);
+    validateAdminRequestMock.mockResolvedValue(true);
     // Reset the chain mock
     mockRef.orderByChild.mockReturnValue(mockRef);
     mockRef.limitToLast.mockReturnValue(mockRef);
   });
 
   it('rejects unauthenticated requests', async () => {
-    checkAdminAuthMock.mockReturnValue(false);
+    validateAdminRequestMock.mockResolvedValue(false);
     const res = await GET(buildGetRequest());
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body.message).toBe('Unauthorized');
+  });
+
+  // Guard regresi 2026-10-08: wajib validateAdminRequest (mengenali sesi
+  // customer site_user_token), BUKAN checkAdminAuth polos yang 401.
+  it('authenticates via validateAdminRequest without CSRF (customer session friendly)', async () => {
+    dbRefOnceMock.mockResolvedValue({ val: () => null });
+    await GET(buildGetRequest());
+    expect(validateAdminRequestMock).toHaveBeenCalledWith(expect.anything(), {
+      checkCsrf: false,
+    });
   });
 
   it('returns empty logs when no data exists', async () => {

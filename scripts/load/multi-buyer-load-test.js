@@ -4,6 +4,10 @@
  *
  * Default mode is dry-run. Live writes require --run-live plus host confirmation,
  * and larger phases require explicit allow flags.
+ *
+ * Optional billing/order phase (--order-phase) is OFF by default: it creates
+ * real orders with unique slugs, reads their status page via the order access
+ * token, then cancels every order it created (cleanup runs in a finally block).
  */
 
 const crypto = require('crypto');
@@ -19,6 +23,13 @@ const CSRF_COOKIE = 'csrf_token';
 const CSRF_HEADER = 'x-csrf-token';
 const DEFAULT_OUT_DIR = '.audit-reports/load';
 const USER_AGENT = 'portfolio-os-load-test/1.0';
+// POST /api/billing/checkout di-rate-limit 5 request/menit per IP dengan block
+// 10 menit (src/app/api/billing/checkout/route.ts). Spacing minimal ini menjaga
+// fase order tetap jauh di bawah limit supaya tidak memicu 429 yang men-lock IP.
+const ORDER_CHECKOUT_MIN_INTERVAL_MS = 13000;
+// GET /api/billing/orders/:id di-rate-limit 30 request/menit per IP.
+const ORDER_STATUS_MIN_INTERVAL_MS = 2500;
+const ORDER_CANCEL_REASON = 'Load test cleanup (multi-buyer-load-test)';
 
 function makeRunId() {
   const stamp = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 12);
@@ -74,6 +85,8 @@ function parseArgs(argv) {
     skipMedia: false,
     skipVideoPut: false,
     cleanupAfter: false,
+    orderPhase: parseBoolean(process.env.LOAD_TEST_ORDER_PHASE, false),
+    orderCount: Number(process.env.LOAD_TEST_ORDER_COUNT || 5),
   };
   Object.assign(options, fileConfig);
 
@@ -127,6 +140,13 @@ function parseArgs(argv) {
       options.allow25 = true;
     } else if (arg === '--allow-50') {
       options.allow50 = true;
+    } else if (arg === '--order-phase') {
+      options.orderPhase = true;
+    } else if (arg === '--order-count') {
+      options.orderCount = Number(next || options.orderCount);
+      index += 1;
+    } else if (arg.startsWith('--order-count=')) {
+      options.orderCount = Number(arg.slice('--order-count='.length));
     } else if (arg === '--email-domain') {
       options.emailDomain = next || options.emailDomain;
       index += 1;
@@ -177,6 +197,12 @@ function parseArgs(argv) {
   if (!Number.isFinite(options.concurrency) || options.concurrency < 1) {
     throw new Error('--concurrency must be a positive number.');
   }
+  if (!Number.isFinite(options.orderCount) || options.orderCount < 1) {
+    throw new Error('--order-count must be a positive number.');
+  }
+  if (options.orderCount > 50) {
+    throw new Error('Refusing --order-count > 50.');
+  }
   if (!Number.isFinite(options.timeoutMs) || options.timeoutMs < 1000) {
     throw new Error('--timeout-ms must be at least 1000.');
   }
@@ -186,6 +212,7 @@ function parseArgs(argv) {
 
   options.tenants = Math.floor(options.tenants);
   options.concurrency = Math.floor(options.concurrency);
+  options.orderCount = Math.floor(options.orderCount);
   return options;
 }
 
@@ -216,6 +243,8 @@ Options:
   --skip-media                 Skip cover/gallery/video upload.
   --skip-video-put             Presign video but skip PUT body upload.
   --cleanup-after              Delete created sites after run.
+  --order-phase                Also run the billing/order phase (live only). Off by default.
+  --order-count <n>            Orders for the order phase. Default 5 (>5 needs --allow-25).
   --request-delay-ms <ms>      Delay between requests per tenant. Default 1500.
   --max-retries <n>            Retry count for 503/429 errors. Default 3.
 `);
@@ -261,6 +290,14 @@ function enforceSafety(options, baseUrl) {
   }
   if (options.tenants > 25 && !options.allow50) {
     throw new Error('Live run with tenants > 25 needs --allow-50.');
+  }
+  if (options.orderPhase) {
+    if (options.orderCount > 5 && !options.allow25) {
+      throw new Error('Live order phase with --order-count > 5 needs --allow-25.');
+    }
+    if (options.orderCount > 25 && !options.allow50) {
+      throw new Error('Live order phase with --order-count > 25 needs --allow-50.');
+    }
   }
 }
 
@@ -563,6 +600,32 @@ function makeTenantPlan(options) {
   });
 }
 
+/**
+ * Rencana buyer untuk fase order.
+ *
+ * Slug diawali nomor urut (bukan diakhiri) supaya tetap unik walau runId panjang
+ * terpotong oleh batas slug 30 karakter di validateSlugFormat. Email memakai
+ * LOAD_TEST_EMAIL_DOMAIN (default example.invalid) — satu email per order agar
+ * tidak kena rate limit 5 order/jam per email dan tidak pernah meng inbox
+ * pembeli nyata.
+ */
+function makeOrderPlan(options) {
+  return Array.from({ length: options.orderCount }, (_, index) => {
+    const n = String(index + 1).padStart(2, '0');
+    const slug = `o${n}-${options.runId}`
+      .replace(/-+/g, '-')
+      .slice(0, 30)
+      .replace(/-+$/g, '');
+    return {
+      index: index + 1,
+      slug,
+      name: `Load Test Order ${options.runId} ${n}`,
+      email: `order+${options.runId}-${n}@${options.emailDomain}`,
+      whatsapp: `6280000000${String(index + 1).padStart(4, '0')}`,
+    };
+  });
+}
+
 function projectPayload({ tenant, siteId, coverUrl, galleryItems, status, suffix }) {
   return {
     siteId,
@@ -857,6 +920,175 @@ async function cleanupSites(admin, results, options, metrics) {
   return cleanup;
 }
 
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Fase order/billing (opsional — default MATI, butuh --order-phase + --run-live).
+ *
+ * Kontrak API dibaca dari kode, bukan ditebak (READ-ONLY):
+ * - POST /api/billing/checkout — publik, guard same-origin (header Origin harus
+ *   cocok dengan host), rate limit 5/menit per IP + 5/jam per email. Amount TIDAK
+ *   boleh dikontrol klien: route tidak meneruskan amount, server menarik nominal
+ *   unik dari pool (idx_orders_amount_active), jadi amount tiap order selalu unik.
+ * - GET /api/billing/orders/:id?token= — halaman status order (token akses per-order).
+ * - POST /api/admin/orders { action: 'cancel' } — cleanup memakai sesi admin yang
+ *   sama dengan fase lain (auth Bearer + CSRF double-submit).
+ *
+ * Notifikasi: checkout mengirim pesan Telegram ke bot ADMIN (bukan pembeli) dan
+ * struk email hanya dikirim bila NOTIFICATION_PROVIDER=resend — alamat tiap order
+ * memakai LOAD_TEST_EMAIL_DOMAIN (default example.invalid) sehingga tidak pernah
+ * mengganggu pembeli nyata.
+ *
+ * Cleanup berjalan di blok finally: order yang sudah dibuat tetap dibatalkan
+ * walau phase gagal di tengah. Kalau proses mati sebelum cleanup, order sisa
+ * tetap pending_payment dan otomatis expire 24 jam (sweeper harian) sehingga
+ * nominal unik + slug dilepas kembali; manual cleanup: POST /api/admin/orders
+ * dengan action "cancel" (atau tombol batalkan di panel Orders admin).
+ */
+async function runOrderPhase(baseUrl, admin, options, metrics) {
+  const plan = makeOrderPlan(options);
+  const result = {
+    enabled: true,
+    requested: plan.length,
+    skipped: null,
+    basePrice: null,
+    created: 0,
+    readOk: 0,
+    canceled: 0,
+    failures: [],
+    remaining: [],
+  };
+  const delay = options.requestDelayMs;
+  // Sesi anonim khusus jalur publik checkout/status (tanpa cookie login),
+  // meniru pembeli asli yang membuka halaman order.
+  const buyer = new Session({
+    baseUrl,
+    metrics,
+    label: 'order.buyer',
+    timeoutMs: options.timeoutMs,
+    maxRetries: options.maxRetries,
+  });
+
+  // Preflight: baca info pembayaran publik. Kalau penerimaan pembayaran mati,
+  // checkout selalu membalas 400 "Pembayaran sedang tidak aktif" — phase
+  // dilewati dengan alasan jelas, bukan dihitung sebagai error.
+  try {
+    const paymentInfo = await buyer.request('GET', '/api/billing/payment-info', {
+      name: 'order.payment_info',
+      expectedStatuses: [200],
+    });
+    result.basePrice = paymentInfo.data?.basePrice ?? null;
+    if (paymentInfo.data && paymentInfo.data.isActive !== true) {
+      result.skipped = 'payment reception inactive (payment_config.isActive=false)';
+      metrics.note('Order phase skipped: payment reception inactive.', {
+        basePrice: result.basePrice,
+      });
+      return result;
+    }
+  } catch (error) {
+    result.failures.push({ step: 'payment_info', error: errorMessage(error) });
+    return result;
+  }
+
+  const created = [];
+  try {
+    for (const item of plan) {
+      await requestDelay(Math.max(delay, ORDER_CHECKOUT_MIN_INTERVAL_MS));
+      try {
+        const response = await buyer.request('POST', '/api/billing/checkout', {
+          tenant: item.slug,
+          name: 'order.checkout',
+          expectedStatuses: [200],
+          // Same-origin guard di route & middleware: kirim Origin seperti browser.
+          headers: { origin: baseUrl },
+          json: {
+            buyerName: item.name,
+            buyerEmail: item.email,
+            buyerWhatsapp: item.whatsapp,
+            desiredSlug: item.slug,
+          },
+        });
+        const orderId = response.data?.order?.id;
+        const accessToken = response.data?.accessToken;
+        if (!orderId || !accessToken) {
+          throw new Error('checkout response missing order.id/accessToken.');
+        }
+        created.push({ ...item, orderId, accessToken });
+        result.created += 1;
+        metrics.note('order.checkout created', { slug: item.slug, orderId, amount: response.data?.order?.amount });
+      } catch (error) {
+        // Order gagal dibuat tidak menyisakan sampah — lanjut ke order berikutnya.
+        result.failures.push({ step: 'checkout', slug: item.slug, error: errorMessage(error) });
+      }
+    }
+
+    // Halaman status order dibaca memakai token akses per-order (bukan sesi admin).
+    for (const order of created) {
+      await requestDelay(Math.max(delay, ORDER_STATUS_MIN_INTERVAL_MS));
+      try {
+        const response = await buyer.request(
+          'GET',
+          `/api/billing/orders/${order.orderId}?token=${order.accessToken}`,
+          {
+            tenant: order.slug,
+            name: 'order.status_read',
+            expectedStatuses: [200],
+          }
+        );
+        if (response.data?.order?.id !== order.orderId) {
+          throw new Error('status response mismatched order id.');
+        }
+        result.readOk += 1;
+      } catch (error) {
+        result.failures.push({
+          step: 'status_read',
+          orderId: order.orderId,
+          error: errorMessage(error),
+        });
+      }
+    }
+  } finally {
+    // Cleanup SELALU jalan, termasuk saat phase melempar error di tengah jalan.
+    for (const order of created) {
+      await requestDelay(delay);
+      try {
+        const response = await admin.request('POST', '/api/admin/orders', {
+          tenant: order.slug,
+          name: 'order.cleanup_cancel',
+          expectedStatuses: [200],
+          json: {
+            orderId: order.orderId,
+            action: 'cancel',
+            cancelReason: ORDER_CANCEL_REASON,
+          },
+        });
+        if (response.data?.success !== true || response.data?.order?.status !== 'canceled') {
+          throw new Error('cancel response did not confirm canceled status.');
+        }
+        result.canceled += 1;
+      } catch (error) {
+        result.failures.push({
+          step: 'cleanup_cancel',
+          orderId: order.orderId,
+          error: errorMessage(error),
+        });
+        result.remaining.push(order.orderId);
+      }
+    }
+
+    if (result.remaining.length > 0) {
+      metrics.note('MANUAL CLEANUP REQUIRED: order ids below are still open.', {
+        orderIds: result.remaining,
+        howTo: 'POST /api/admin/orders {"orderId":"<id>","action":"cancel"} with admin session, or wait for the 24h pending_payment sweeper.',
+      });
+    }
+  }
+
+  return result;
+}
+
 async function runPool(items, limit, worker) {
   const results = new Array(items.length);
   let nextIndex = 0;
@@ -871,17 +1103,19 @@ async function runPool(items, limit, worker) {
   return results;
 }
 
-function buildReport({ options, baseUrl, dryRunPlan, tenantResults, isolation, cleanup, metrics, startedAt, finishedAt }) {
+function buildReport({ options, baseUrl, dryRunPlan, tenantResults, isolation, cleanup, orders, metrics, startedAt, finishedAt }) {
   const summary = metrics.summary();
   const tenantOk = tenantResults.filter((r) => r.ok).length;
   const tenantFailed = tenantResults.length - tenantOk;
   const cleanupOk = cleanup ? cleanup.filter((r) => r.ok).length : 0;
   const cleanupFailed = cleanup ? cleanup.length - cleanupOk : 0;
+  const ordersOk = !orders || (orders.failures.length === 0 && orders.remaining.length === 0);
   const pass =
     options.runLive &&
     tenantFailed === 0 &&
     (!isolation || isolation.failed.length === 0) &&
     (!cleanup || cleanupFailed === 0) &&
+    ordersOk &&
     summary.errorRate < 0.01;
 
   return {
@@ -913,12 +1147,20 @@ function buildReport({ options, baseUrl, dryRunPlan, tenantResults, isolation, c
     tenantResults: tenantResults.map(({ client, ...result }) => result),
     isolation,
     cleanup,
+    orders,
     requests: metrics.requests,
     notes: metrics.notes,
   };
 }
 
+function orderPhaseSummary(orders) {
+  if (!orders) return null;
+  if (orders.skipped) return `skipped (${orders.skipped})`;
+  return `${orders.created}/${orders.requested} created, ${orders.readOk}/${orders.created} status reads, ${orders.canceled}/${orders.created} canceled, ${orders.failures.length} failures`;
+}
+
 function markdownReport(report) {
+  const orderLine = orderPhaseSummary(report.orders);
   const lines = [
     `# Multi Buyer Load Test - ${report.runId}`,
     '',
@@ -932,6 +1174,7 @@ function markdownReport(report) {
     `- Latency: p50 ${report.summary.p50Ms}ms, p95 ${report.summary.p95Ms}ms, p99 ${report.summary.p99Ms}ms`,
     `- Isolation failures: ${report.isolation?.failed?.length ?? 0}`,
     `- Cleanup failures: ${report.summary.cleanupFailed}`,
+    ...(orderLine ? [`- Orders: ${orderLine}`] : []),
     '',
   ];
 
@@ -953,6 +1196,23 @@ function markdownReport(report) {
     lines.push('## Isolation Failures', '');
     for (const failure of report.isolation.failed) {
       lines.push(`- ${failure.check}: ${failure.error}`);
+    }
+    lines.push('');
+  }
+
+  if (report.orders?.failures?.length) {
+    lines.push('## Order Phase Failures', '');
+    for (const failure of report.orders.failures) {
+      const subject = failure.orderId || failure.slug || '';
+      lines.push(`- ${failure.step}${subject ? ` ${subject}` : ''}: ${failure.error}`);
+    }
+    lines.push('');
+  }
+
+  if (report.orders?.remaining?.length) {
+    lines.push('## Orders Needing Manual Cleanup', '');
+    for (const orderId of report.orders.remaining) {
+      lines.push(`- ${orderId} (POST /api/admin/orders action "cancel", or wait for the 24h sweeper)`);
     }
     lines.push('');
   }
@@ -990,6 +1250,7 @@ async function main() {
   let tenantResults = [];
   let isolation = null;
   let cleanup = null;
+  let orders = null;
 
   if (!options.runLive) {
     tenantResults = tenants.map((tenant) => ({
@@ -1003,6 +1264,23 @@ async function main() {
     metrics.note('Dry-run only. No HTTP writes executed.', {
       blocker: 'Sprint 45 full-pass required before Sprint 46 live load test.',
     });
+    if (options.orderPhase) {
+      orders = {
+        enabled: true,
+        requested: options.orderCount,
+        skipped: 'dry-run',
+        basePrice: null,
+        created: 0,
+        readOk: 0,
+        canceled: 0,
+        failures: [],
+        remaining: [],
+      };
+      metrics.note('Order phase planned but skipped (dry-run).', {
+        count: options.orderCount,
+        plan: makeOrderPlan(options),
+      });
+    }
   } else {
     const admin = await createAdminSession(baseUrl, options, metrics);
     const siteUser = await createSiteUserSession(baseUrl, options, metrics);
@@ -1011,6 +1289,7 @@ async function main() {
     );
     isolation = await runIsolationChecks();
     if (options.cleanupAfter) cleanup = await cleanupSites(admin, tenantResults, options, metrics);
+    if (options.orderPhase) orders = await runOrderPhase(baseUrl, admin, options, metrics);
   }
 
   const finishedAt = new Date().toISOString();
@@ -1021,6 +1300,7 @@ async function main() {
     tenantResults,
     isolation,
     cleanup,
+    orders,
     metrics,
     startedAt,
     finishedAt,
@@ -1032,6 +1312,13 @@ async function main() {
   console.log(
     `Summary: tenants ${report.summary.tenantsPassed}/${report.tenantsRequested}, requests ${report.summary.totalRequests}, failed ${report.summary.failedRequests}, error ${(report.summary.errorRate * 100).toFixed(2)}%, p95 ${report.summary.p95Ms}ms`
   );
+  if (orders) {
+    const orderSummary = orderPhaseSummary(orders);
+    console.log(`Orders: ${orderSummary}`);
+    if (orders.remaining.length > 0) {
+      console.warn(`MANUAL CLEANUP REQUIRED for orders: ${orders.remaining.join(', ')}`);
+    }
+  }
 
   if (options.runLive && !report.pass) process.exitCode = 1;
 }

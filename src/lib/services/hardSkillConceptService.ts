@@ -36,7 +36,10 @@ export const hardSkillConceptService = {
     data.concepts.push(newConcept);
     data.lastUpdated = new Date().toISOString();
 
-    await service.saveData(data, `Add concept: ${newConcept.title}`, siteId);
+    const success = await service.saveData(data, `Add concept: ${newConcept.title}`, siteId);
+    if (!success) {
+      throw new Error('Failed to save new concept');
+    }
     return newConcept;
   },
 
@@ -52,7 +55,14 @@ export const hardSkillConceptService = {
     };
     data.lastUpdated = new Date().toISOString();
 
-    await service.saveData(data, `Update concept: ${data.concepts[index].title}`, siteId);
+    const success = await service.saveData(
+      data,
+      `Update concept: ${data.concepts[index].title}`,
+      siteId
+    );
+    if (!success) {
+      throw new Error('Failed to save concept update');
+    }
     return data.concepts[index];
   },
 
@@ -64,7 +74,10 @@ export const hardSkillConceptService = {
     if (data.concepts.length === initialLen) return false;
 
     data.lastUpdated = new Date().toISOString();
-    await service.saveData(data, `Delete concept ID: ${id}`, siteId);
+    const success = await service.saveData(data, `Delete concept ID: ${id}`, siteId);
+    if (!success) {
+      throw new Error('Failed to delete concept');
+    }
     return true;
   },
 };
