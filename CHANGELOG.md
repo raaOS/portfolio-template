@@ -3,6 +3,19 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.29] - 2026-10-08
+
+### 🐛 Perbaikan: app "Harga Jual" di desktop admin membuka window kosong
+
+- **Panel `harga` didaftarkan ke `PANEL_MAP`.** Akar masalah: app `harga` terdaftar di zona desktop (`registry.ts`) dan `APP_ROUTE_MAP`, halaman `/admin/harga` juga ada — tetapi `ClientAdminLayout` tidak me-render halaman route, semua isi window diambil dari `PANEL_MAP` di `WindowContentRenderer.tsx`. Karena key `harga` tidak pernah ditambahkan (terlewat saat fitur dibuat di v1.3.28), membuka "Harga Jual" selalu menampilkan _"Panel 'harga' belum tersedia"_ sehingga harga tidak bisa diatur.
+- **Konten dipisah jadi `desktop/panels/HargaPanel.tsx`** mengikuti pola panel lain (mis. `BackupPanel`): `page.tsx` kini pembungkus `AdminAuthGuard` + `AdminHeader` + `<HargaPanel />`, isi panel diekstraksi utuh tanpa perubahan logika (diff murni hapus impor guard/header + ganti nama fungsi).
+- **Catatan:** app `ai` (Asisten AI) tetap tidak didaftarkan — sesuai keputusan owner v1.3.28 (fitur AI dimatikan, janji fitur dihapus dari penjualan).
+- **Bug kedua: 4 endpoint GET admin selalu 401 "Unauthorized".** Route-route GET memakai `checkAdminAuth` polos yang hanya mengenali cookie legacy `admin_token`, padahal login admin saat ini hanya menerbitkan sesi customer `site_user_token` (`/api/auth/login` → `createLoginResponse`) — panel akhirnya menampilkan "Gagal memuat harga" / "Gagal memuat log". Diperbaiki memakai `validateAdminRequest(request, { checkCsrf: false })`, pola identik dengan GET route admin lain (backup, storage-stats) yang sudah berfungsi: **`/api/admin/pricing`** (dilaporkan owner), **`/api/admin/audit-logs`** (panel Log Aktivitas, dilaporkan owner), **`/api/admin/orders`** dan **`/api/admin/payment-config`** (endpoint dormant, disamakan sekalian supaya tidak jadi bom waktu). Handler PUT/POST di keempat route sudah benar sejak awal. +8 test (7 test route pricing baru + 1 guard regresi auth audit-logs).
+
+### ✅ Gerbang pengujian
+
+- **Semua hijau:** `tsc --noEmit` 0 error → ESLint 0 error pada file berubah → **124 file / 980 test PASS** (+8 test baru).
+
 ## [1.3.28] - 2026-10-08
 
 ### 🧾 Batch perbaikan hasil audit reviewer rilis 1.3.27 (F-01…F-11, semua temuan dieksekusi atas izin owner)
