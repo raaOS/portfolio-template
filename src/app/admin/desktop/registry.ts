@@ -25,7 +25,14 @@ import {
 } from 'lucide-react';
 import type { AdminZone } from './types';
 
-export const ADMIN_ZONES: AdminZone[] = [
+/**
+ * Nilai ter-inline saat build: site klien selalu `false` (pipeline deploy
+ * memaksa `NEXT_PUBLIC_OWNER_MODE='false'`), jadi app `ownerOnly` tidak
+ * pernah tampil di desktop admin klien.
+ */
+const IS_OWNER_DEPLOYMENT = process.env.NEXT_PUBLIC_OWNER_MODE === 'true';
+
+const ALL_ADMIN_ZONES: AdminZone[] = [
   {
     id: 'content',
     label: 'Konten & Berkas',
@@ -162,6 +169,7 @@ export const ADMIN_ZONES: AdminZone[] = [
         iconBg: 'bg-amber-100',
         defaultWidth: 800,
         defaultHeight: 560,
+        ownerOnly: true,
       },
       {
         id: 'orders',
@@ -171,6 +179,7 @@ export const ADMIN_ZONES: AdminZone[] = [
         iconBg: 'bg-emerald-100',
         defaultWidth: 1100,
         defaultHeight: 720,
+        ownerOnly: true,
       },
     ],
   },
@@ -269,6 +278,18 @@ export const ADMIN_ZONES: AdminZone[] = [
     ],
   },
 ];
+
+/**
+ * Zones yang ditampilkan ke admin deployment ini.
+ * Di site klien (`NEXT_PUBLIC_OWNER_MODE` != 'true') app `ownerOnly`
+ * disaring keluar; zone yang kehabisan app ikut hilang.
+ */
+export const ADMIN_ZONES: AdminZone[] = IS_OWNER_DEPLOYMENT
+  ? ALL_ADMIN_ZONES
+  : ALL_ADMIN_ZONES.map((zone) => ({
+      ...zone,
+      apps: zone.apps.filter((app) => !app.ownerOnly),
+    })).filter((zone) => zone.apps.length > 0);
 
 /**
  * Map from appId to the route path whose client content will be rendered

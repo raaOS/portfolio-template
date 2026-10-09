@@ -10,7 +10,12 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { collectOwnerBlankKeys, readOwnerEnvKeys, renderHandoverNote } from './client-deploy';
+import {
+  buildClientEnvPlan,
+  collectOwnerBlankKeys,
+  readOwnerEnvKeys,
+  renderHandoverNote,
+} from './client-deploy';
 
 let tempDirs: string[] = [];
 
@@ -57,6 +62,43 @@ describe('collectOwnerBlankKeys (STOREFRONT fail-closed)', () => {
     expect(blanks).toContain('STOREFRONT');
     expect(blanks).not.toContain('NEXT_PUBLIC_PRODUCT_NAME');
     expect(blanks).not.toContain('NODE_ENV');
+  });
+});
+
+describe('buildClientEnvPlan (Owner Mode fail-closed)', () => {
+  it('memaksa OWNER_MODE & NEXT_PUBLIC_OWNER_MODE=false meski config.env klien berisi true', () => {
+    const plan = buildClientEnvPlan({
+      CUSTOMER_SLUG: 'klien-satu',
+      CLOUDFLARE_ACCOUNT_ID: 'acc',
+      CLOUDFLARE_API_TOKEN: 'acctok',
+      CLOUDFLARE_D1_DATABASE_ID: 'db',
+      CLOUDFLARE_D1_API_TOKEN: 'tok',
+      CLOUDFLARE_R2_BUCKET: 'bucket',
+      JWT_SECRET: 'jwt',
+      PASSWORD_SALT: 'salt',
+      // Skenario salah-konfigurasi: klien "minta" jadi owner.
+      OWNER_MODE: 'true',
+      NEXT_PUBLIC_OWNER_MODE: 'true',
+    });
+
+    expect(plan.overrides.OWNER_MODE).toBe('false');
+    expect(plan.overrides.NEXT_PUBLIC_OWNER_MODE).toBe('false');
+    expect(plan.missing).toEqual([]);
+  });
+
+  it('OWNER_MODE ikut false tanpa disebut di config.env sama sekali', () => {
+    const plan = buildClientEnvPlan({
+      CUSTOMER_SLUG: 'klien-dua',
+      CLOUDFLARE_ACCOUNT_ID: 'acc',
+      CLOUDFLARE_D1_DATABASE_ID: 'db',
+      CLOUDFLARE_D1_API_TOKEN: 'tok',
+      CLOUDFLARE_R2_BUCKET: 'bucket',
+      JWT_SECRET: 'jwt',
+      PASSWORD_SALT: 'salt',
+    });
+
+    expect(plan.overrides.OWNER_MODE).toBe('false');
+    expect(plan.overrides.NEXT_PUBLIC_OWNER_MODE).toBe('false');
   });
 });
 

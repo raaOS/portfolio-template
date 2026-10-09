@@ -193,6 +193,13 @@ export function buildClientEnvPlan(config: EnvMap): ClientEnvPlan {
     // Provider milik owner tidak boleh dipakai klien.
     FEATURE_AI: 'false',
     FEATURE_NOTIFICATIONS: 'false',
+    // Owner Mode (superadmin) — identitas deployment. Klien SELALU false:
+    // app `ownerOnly` (Harga Jual, Order & Pembayaran) dan route API-nya
+    // tidak boleh hidup di site klien (src/lib/ownerMode.ts). Dipaksa di
+    // sini (bukan sekadar andalkan pembuangan) agar eksplisit dan aman
+    // meski ada di config.env.
+    OWNER_MODE: 'false',
+    NEXT_PUBLIC_OWNER_MODE: 'false',
     NEXT_PUBLIC_APP_URL: config.WEBSITE_URL || '',
     NEXT_PUBLIC_SITE_URL: config.WEBSITE_URL || '',
   };

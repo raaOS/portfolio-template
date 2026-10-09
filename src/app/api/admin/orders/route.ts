@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateAdminRequest } from '@/lib/auth';
+import { requireOwnerMode } from '@/lib/ownerMode';
 import { activateOrder, cancelOrder, getAdminOrders, reopenOrder, sweepExpiredOrders } from '@/lib/services/orderService';
 
 export async function GET(request: NextRequest) {
   try {
+    // Owner Mode: data bisnis owner (order pembelian site). Guard sebelum
+    // auth supaya site klien mendapat 404 — route ini seolah tidak ada di
+    // sana (lihat src/lib/ownerMode.ts).
+    const ownerDenied = requireOwnerMode();
+    if (ownerDenied) return ownerDenied;
+
     // validateAdminRequest (bukan checkAdminAuth polos) — mengenali sesi
     // customer site_user_token; checkAdminAuth hanya tahu cookie legacy
     // admin_token → 401. GET tanpa CSRF, pola route admin lain (2026-10-08).
@@ -34,6 +41,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Owner Mode: sama dengan GET — aksi aktivasi/batal adalah operasi
+    // bisnis owner atas pembelian site, bukan milik klien.
+    const ownerDenied = requireOwnerMode();
+    if (ownerDenied) return ownerDenied;
+
     // Audit HIGH: auth + CSRF (double-submit) + jejak audit dalam satu helper —
     // sebelumnya hanya checkAdminAuth (tanpa lapisan CSRF di handler).
     if (!(await validateAdminRequest(request))) {

@@ -3,6 +3,17 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.30] - 2026-10-09
+
+### 🔑 Owner Mode (superadmin): tool owner tidak lagi terlihat/terjangkar di site klien
+
+- **Sakelar identitas deployment baru `OWNER_MODE` + `NEXT_PUBLIC_OWNER_MODE`.** Keputusan owner: _"aku mau sistem dan project ini tau kalau aku sebagai superadmin, jadi ada beberapa tool gak ke-deploy karena tau ini punya superadmin"_. Site milik owner (produksi sendiri) menjalankan build dengan kedua kunci `true` di `.env.local`; **build klien memaksa keduanya `'false'`** di pipeline `deployClient()` (`scripts/onboarding/client-deploy.ts`) — fail-closed dua lapis, bahkan jika tertulis `true` di `config.env` klien sekalipun.
+- **App desktop admin kini bisa ditandai `ownerOnly`.** Dua app pertama yang dikunci: **"Harga Jual"** dan **"Order & Pembayaran"** — keduanya adalah sistem penjualan site milik owner (harga dasar jual + data pembeli: nama, email, WhatsApp, slug tujuan, jumlah bayar, status aktivasi). Sebelumnya kedua app ini ikut tampil (walau panelnya kosong/keliru) di desktop admin setiap klien. Di site klien app disaring keluar dari `ADMIN_ZONES` (`registry.ts`) — zona Sistem tetap ada berisi app klien lain.
+- **Route API-nya ikut dikunci:** `/api/admin/pricing` (GET/PUT) dan `/api/admin/orders` (GET/POST) kini membalas **404** (bukan 403 — seolah route memang tidak ada) di deployment non-owner, sebelum lapisan auth mana pun, via guard baru `requireOwnerMode()` (`src/lib/ownerMode.ts`). Data bisnis owner tidak pernah terjangkar dari site klien.
+- **Cara menambah tool superadmin berikutnya:** tandai app dengan `ownerOnly: true` di `registry.ts` + pasang `requireOwnerMode()` di route API-nya (panduan lengkap: `AGENTS.md` §8 "Owner Mode"). Fitur untuk klien TIDAK memakai flag ini.
+- **+test baru:** unit guard ownerMode (fail-closed 404), route pricing & orders (guard 404 tanpa menyentuh auth/service), dan `buildClientEnvPlan` memaksa `false` meski config.env klien meminta `true`.
+- **Catatan operasional:** site produksi owner perlu `OWNER_MODE="true"` + `NEXT_PUBLIC_OWNER_MODE="true"` di `.env.local` saat deploy — sudah diset; tanpa kunci ini kedua panel hilang dari admin owner (kembali dengan menambah kunci + deploy ulang). Klien yang sudah ada otomatis mendapat perlindungan ini pada update template berikutnya.
+
 ## [1.3.29] - 2026-10-08
 
 ### 🐛 Perbaikan: app "Harga Jual" di desktop admin membuka window kosong

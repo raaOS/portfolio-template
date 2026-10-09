@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { afterEach, describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
 // ── Mocks ────────────────────────────────────────────────────────────
@@ -41,8 +41,16 @@ function authMock() {
 describe('GET /api/admin/pricing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Owner Mode guard: harga adalah data bisnis owner — route hanya hidup
+    // di deployment OWNER_MODE=true (klien dibalas 404, diuji terpisah di
+    // bawah). Test jalur normal dijalankan seolah ini site owner.
+    vi.stubEnv('OWNER_MODE', 'true');
     authMock().mockResolvedValue(true);
     getBasePrice.mockResolvedValue(199000);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('rejects unauthenticated requests', async () => {
@@ -78,8 +86,13 @@ describe('GET /api/admin/pricing', () => {
 describe('PUT /api/admin/pricing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('OWNER_MODE', 'true');
     authMock().mockResolvedValue(true);
     updateBasePrice.mockResolvedValue({ success: true, basePrice: 250000 });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('rejects unauthenticated requests', async () => {
@@ -115,5 +128,44 @@ describe('PUT /api/admin/pricing', () => {
 
     const body = await res.json();
     expect(body.error).toBe('Harga di luar guardrail');
+  });
+});
+
+describe('Owner Mode guard /api/admin/pricing', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authMock().mockResolvedValue(true);
+    getBasePrice.mockResolvedValue(199000);
+    updateBasePrice.mockResolvedValue({ success: true, basePrice: 250000 });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  // Deployment klien selalu OWNER_MODE!=true → route harus seolah tidak
+  // ada (404, BUKAN 403/401) dan tidak menyentuh auth maupun service.
+  it('GET balas 404 di deployment klien tanpa memanggil auth/service', async () => {
+    vi.stubEnv('OWNER_MODE', 'false');
+    const res = await GET(buildRequest('http://localhost/api/admin/pricing', 'GET'));
+    expect(res.status).toBe(404);
+    expect(authMock()).not.toHaveBeenCalled();
+    expect(getBasePrice).not.toHaveBeenCalled();
+  });
+
+  it('PUT balas 404 di deployment klien tanpa memanggil auth/service', async () => {
+    vi.stubEnv('OWNER_MODE', 'false');
+    const res = await PUT(
+      buildRequest('http://localhost/api/admin/pricing', 'PUT', { basePrice: 250000 })
+    );
+    expect(res.status).toBe(404);
+    expect(authMock()).not.toHaveBeenCalled();
+    expect(updateBasePrice).not.toHaveBeenCalled();
+  });
+
+  it('OWNER_MODE tidak diset pun tetap 404 (fail-closed)', async () => {
+    delete (process.env as Record<string, string | undefined>).OWNER_MODE;
+    const res = await GET(buildRequest('http://localhost/api/admin/pricing', 'GET'));
+    expect(res.status).toBe(404);
   });
 });

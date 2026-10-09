@@ -287,6 +287,22 @@ Target akhir full Cloudflare: media public disajikan melalui Cloudflare Worker/R
 - Proteksi brute force dikendalikan secara persisten menggunakan database Cloudflare D1 sebagai pencatat rate limit (`src/lib/dataRateLimit.ts`).
 - Sistem fallback menggunakan cache memory lokal jika koneksi ke database D1 terputus atau saat menjalankan unit testing.
 
+### Owner Mode (Superadmin) — v1.3.30
+
+Sakelar identitas deployment: **site milik owner** (produksi sendiri) vs **site klien**.
+
+| Kunci | Dibaca oleh | Nilai owner | Nilai klien |
+|---|---|---|---|
+| `OWNER_MODE` | route API / komponen server (runtime) | `"true"` | `"false"` (dipaksa) |
+| `NEXT_PUBLIC_OWNER_MODE` | bundle client (ter-inline saat build) | `"true"` | `"false"` (dipaksa) |
+
+- **Aturan: kedua kunci SELALU di-set bersamaan** (lihat `.env.example`).
+- Pipeline `deployClient()` memaksa kedua kunci `'false'` di `overrides` (`scripts/onboarding/client-deploy.ts`) — fail-closed dua lapis: selain dipaksa false, kunci ini juga tidak ada di `INHERITED_OWNER_KEYS` sehingga nilai owner dibuang dari `next-env.mjs` build klien secara independen.
+- **App desktop admin `ownerOnly`** (flag di `src/app/admin/desktop/types.ts`, saat ini: **Harga Jual** & **Order & Pembayaran**) disaring keluar dari `ADMIN_ZONES` di `registry.ts` saat `NEXT_PUBLIC_OWNER_MODE` != true — app & zone-nya tidak tampil sama sekali di desktop admin klien.
+- **Route API owner-only** dijaga `requireOwnerMode()` (`src/lib/ownerMode.ts`) yang membalas **404** (bukan 403 — site klien tidak boleh tahu route ada) sebelum auth. Saat ini: `/api/admin/pricing` (GET/PUT) + `/api/admin/orders` (GET/POST).
+- **Menambah tool superadmin baru:** (1) beri `ownerOnly: true` pada app di `registry.ts`, (2) pasang `requireOwnerMode()` di route API-nya, (3) jangan lupa `vi.stubEnv('OWNER_MODE', 'true')` di test route tersebut. Fitur klien TIDAK perlu flag ini.
+- **Awas:** tanpa `OWNER_MODE=true` di `.env.local`, deploy site owner sendiri akan kehilangan panel Harga Jual & Order & Pembayaran (kembali normal dengan menambahkan kunci + deploy ulang).
+
 ---
 
 ## 9. Perintah Pengembangan & Pengujian

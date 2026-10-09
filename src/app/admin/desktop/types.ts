@@ -26,6 +26,12 @@ export interface AdminApp {
   /** default window dimensions */
   defaultWidth: number;
   defaultHeight: number;
+  /**
+   * App khusus deployment owner (superadmin). Hanya tampil di desktop admin
+   * saat `NEXT_PUBLIC_OWNER_MODE=true`; di site klien app disaring keluar
+   * dari `ADMIN_ZONES` (lihat `registry.ts` + `src/lib/ownerMode.ts`).
+   */
+  ownerOnly?: boolean;
 }
 
 // ─── Zone (folder) definition ───

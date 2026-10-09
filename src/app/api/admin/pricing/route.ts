@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateAdminRequest } from '@/lib/auth';
+import { requireOwnerMode } from '@/lib/ownerMode';
 import { getBasePrice, updateBasePrice } from '@/lib/services/pricingConfigService';
 
 /**
  * GET /api/admin/pricing
- * Membaca harga dasar template (admin-only).
+ * Membaca harga dasar template (owner-mode only + admin).
+ *
+ * Guard `requireOwnerMode` menahan route ini di deployment klien (404):
+ * harga dasar adalah data bisnis owner — penjualan site, bukan konten klien
+ * (lihat src/lib/ownerMode.ts).
  *
  * Auth memakai `validateAdminRequest` (bukan `checkAdminAuth` polos) karena
  * login admin saat ini hanya menerbitkan sesi customer `site_user_token`
@@ -15,6 +20,9 @@ import { getBasePrice, updateBasePrice } from '@/lib/services/pricingConfigServi
  */
 export async function GET(request: NextRequest) {
   try {
+    const ownerDenied = requireOwnerMode();
+    if (ownerDenied) return ownerDenied;
+
     if (!(await validateAdminRequest(request, { checkCsrf: false }))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -34,6 +42,9 @@ export async function GET(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
+    const ownerDenied = requireOwnerMode();
+    if (ownerDenied) return ownerDenied;
+
     const isValid = await validateAdminRequest(request);
     if (!isValid) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
