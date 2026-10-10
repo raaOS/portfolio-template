@@ -302,6 +302,7 @@ Sakelar identitas deployment: **site milik owner** (produksi sendiri) vs **site 
 - **Route API owner-only** dijaga `requireOwnerMode()` (`src/lib/ownerMode.ts`) yang membalas **404** (bukan 403 — site klien tidak boleh tahu route ada) sebelum auth. Saat ini: `/api/admin/pricing` (GET/PUT) + `/api/admin/orders` (GET/POST).
 - **Menambah tool superadmin baru:** (1) beri `ownerOnly: true` pada app di `registry.ts`, (2) pasang `requireOwnerMode()` di route API-nya, (3) jangan lupa `vi.stubEnv('OWNER_MODE', 'true')` di test route tersebut. Fitur klien TIDAK perlu flag ini.
 - **Awas:** tanpa `OWNER_MODE=true` di `.env.local`, deploy site owner sendiri akan kehilangan panel Harga Jual & Order & Pembayaran (kembali normal dengan menambahkan kunci + deploy ulang).
+- **Guard anti-human-error:** `scripts/deploy/pre-deploy-check.js` (dijalankan `npm run deploy` — hanya jalur site owner, build klien tidak lewat sini) kini **menolak deploy** kalau `OWNER_MODE`/`NEXT_PUBLIC_OWNER_MODE` tidak bernilai `"true"` — kunci terhapus/salah tidak lagi menyembunyikan panel secara diam-diam.
 
 ---
 

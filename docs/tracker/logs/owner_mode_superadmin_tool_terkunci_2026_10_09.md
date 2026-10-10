@@ -83,3 +83,24 @@ Kedua kunci **selalu di-set bersamaan**.
 ## 8. File yang Dimodifikasi
 
 Lihat tabel §4. Commit & push: lihat `git log` setelah entri ini (branch `main`).
+
+## 9. Penambahan 2026-10-10 — Guard anti-human-error pre-deploy
+
+Pertanyaan owner: _"apa ada kemungkinan celah dibobol atau skenario human error?"_ → audit skenario + verifikasi:
+
+**Terverifikasi aman:**
+- `.env.local` / `arsip-klien/` / `.open-next/` **tidak pernah ter-track di git & tak ada di history** (`.gitignore` baris 55/96/3; `git log --all -- .env.local` kosong).
+- Guard value rahasia ada di `scripts/release/audit-release-package.js` (pola `*_TOKEN/_SECRET/_KEY/_PASSWORD/_SALT` + daftar eksplisit) untuk paket rilis.
+- `config.env` klien yang berisi `OWNER_MODE=true` → dipaksa `false` oleh pipeline (sudah dites).
+- Boundary utama data owner = **pemisahan akun Cloudflare per klien** (1 klien 1 akun; D1/R2 owner tak terjangkar dari deployment klien mana pun) — `OWNER_MODE` = lapis kedua.
+- Klien yang iseng mengubah env deployment **mereka sendiri** → hanya membuka data D1/R2 **mereka sendiri** (orders mereka kosong).
+
+**Satu celah human-error nyata ditemukan & DIPERBAIKI:**
+- `scripts/deploy/pre-deploy-check.js` tidak memeriksa `OWNER_MODE` → skenario: kunci terhapus dari `.env.local` → `npm run deploy` sukses tapi kedua panel hilang diam-diam dari admin owner (fail-closed tanpa peringatan).
+- **Fix:** assert baru di pre-deploy-check — `OWNER_MODE === 'true' && NEXT_PUBLIC_OWNER_MODE === 'true'` wajib sebelum deploy site owner. Script ini **hanya** dipanggil `npm run deploy` (verifikasi: build klien `deployClient` → `npm run cf:build` langsung, tidak melewatinya) → aman untuk dikunci tegas.
+- **Bukti dijalankan:** run normal → exit 0 ("All Cloudflare pre-deploy checks passed"); simulasi `OWNER_MODE=false` → exit 1 dengan pesan `OWNER_MODE & NEXT_PUBLIC_OWNER_MODE must both be "true" before deploying the owner site…`.
+
+**Sisa risiko yang tersisa (bukan bug, keputusan/kebiasaan owner):**
+- `.env.local` berisi semua token → keamanan = keamanan fisik laptop/jangan paste isinya ke chat (rotasi token terbukti bisa, 2026-10-09).
+- Secret tertempel ke file sumber biasa (bukan `.env.example`) → tak ada full scanner track-file (guard rilis hanya paket jualan).
+- Klien lama **belum** dapat perlindungan sampai owner menjalankan Update Versi Template (proses, bukan kode).

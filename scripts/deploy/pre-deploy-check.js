@@ -124,6 +124,17 @@ assert(
   process.env.NEXT_PUBLIC_DATA_BACKEND === 'cloudflare-d1',
   'NEXT_PUBLIC_DATA_BACKEND must be "cloudflare-d1" for product Cloudflare deploy'
 );
+// Owner Mode (AGENTS.md §8): script ini HANYA dijalankan `npm run deploy`
+// (site owner sendiri) — build klien memakai `npm run cf:build` langsung.
+// Guard ini mencegah human error "kunci OWNER_MODE terhapus dari .env.local
+// lalu deploy" yang akan menyembunyikan panel Harga Jual & Order & Pembayaran
+// dari admin sendiri secara diam-diam (fail-closed by design, tanpa peringatan).
+assert(
+  process.env.OWNER_MODE === 'true' && process.env.NEXT_PUBLIC_OWNER_MODE === 'true',
+  'OWNER_MODE & NEXT_PUBLIC_OWNER_MODE must both be "true" before deploying the owner site ' +
+    '(otherwise "Harga Jual" & "Order & Pembayaran" vanish from your own admin). ' +
+    'Add both keys="true" to .env.local — see .env.example "Deployment role" section.'
+);
 console.log('OK required environment keys are present');
 
 console.log('\nChecking forbidden personal/legacy env keys...');

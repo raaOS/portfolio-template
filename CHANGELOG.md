@@ -13,6 +13,7 @@ Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **U
 - **Cara menambah tool superadmin berikutnya:** tandai app dengan `ownerOnly: true` di `registry.ts` + pasang `requireOwnerMode()` di route API-nya (panduan lengkap: `AGENTS.md` §8 "Owner Mode"). Fitur untuk klien TIDAK memakai flag ini.
 - **+test baru:** unit guard ownerMode (fail-closed 404), route pricing & orders (guard 404 tanpa menyentuh auth/service), dan `buildClientEnvPlan` memaksa `false` meski config.env klien meminta `true`.
 - **Catatan operasional:** site produksi owner perlu `OWNER_MODE="true"` + `NEXT_PUBLIC_OWNER_MODE="true"` di `.env.local` saat deploy — sudah diset; tanpa kunci ini kedua panel hilang dari admin owner (kembali dengan menambah kunci + deploy ulang). Klien yang sudah ada otomatis mendapat perlindungan ini pada update template berikutnya.
+- **+Guard anti-human-error:** `npm run deploy` kini **menolak build** bila `OWNER_MODE`/`NEXT_PUBLIC_OWNER_MODE` tidak `"true"` (`scripts/deploy/pre-deploy-check.js`) — mencegah panel Harga Jual & Order hilang diam-diam dari admin owner karena kunci tidak sengaja terhapus. Build klien tidak melewati script ini (jalur `deployClient` → `cf:build` langsung) sehingga klien tetap dipaksa `false` tanpa konflik.
 
 ## [1.3.29] - 2026-10-08
 
