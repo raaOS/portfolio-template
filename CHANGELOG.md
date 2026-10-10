@@ -3,6 +3,14 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.31] - 2026-10-10
+
+### 🛍️ Landing storefront kini menampilkan ketiga template demo (Spatial Gallery dicantumkan)
+
+- **Kartu template di halaman jualan `/` bertambah jadi 3.** Template `spatial-gallery` sebenarnya sudah lengkap sejak awal — tersedia di `/preview/spatial-gallery`, registry template, dan pilihan checkout — tetapi **tidak pernah dicantumkan di showcase landing** (`src/components/landing/LandingPage.tsx`, array `TEMPLATES` berhenti di 2 entri). Pengunjung hanya melihat OS Desktop & Infinite Canvas, sementara pembeli di checkout bisa memilih Spatial Gallery tanpa pernah melihat demo-nya. Kini kartu ketiga tampil dengan deskripsi selaras checkout ("curved grid dan orbital artwork") + live preview iframe.
+- **Hero disesuaikan:** "Dua pilihan template" → "Tiga pilihan template".
+- **Grid kartu dibuat adaptif** (`repeat(auto-fit, minmax(300px, 1fr))` di `landing.css`): 3 kolom di layar lebar, otomatis menyusut ke 2/1 kolom mengikuti lebar layar — tidak lagi hardcode 2 kolom sehingga aman untuk jumlah kartu berapa pun.
+
 ## [1.3.30] - 2026-10-09
 
 ### 🔑 Owner Mode (superadmin): tool owner tidak lagi terlihat/terjangkar di site klien

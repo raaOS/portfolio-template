@@ -22,6 +22,14 @@ const TEMPLATES = [
     previewUrl: '/preview/infinite-canvas',
     href: '/preview/infinite-canvas',
   },
+  {
+    id: 'spatial-gallery',
+    name: 'Spatial Gallery',
+    description:
+      'Galeri 3D dengan curved grid dan orbital artwork — jelajahi project dalam scene spatial.',
+    previewUrl: '/preview/spatial-gallery',
+    href: '/preview/spatial-gallery',
+  },
 ];
 
 const FEATURES = [
@@ -63,7 +71,7 @@ export default function LandingPage({ basePrice = BASE_PRICE }: { basePrice?: nu
       <section className="landing-hero" id="main-content">
         <h1>Template portfolio interaktif yang siap pakai</h1>
         <p>
-          Dua pilihan template — deploy ke Cloudflare, kelola lewat admin panel,
+          Tiga pilihan template — deploy ke Cloudflare, kelola lewat admin panel,
           sesuaikan sesuka hati.
         </p>
       </section>
