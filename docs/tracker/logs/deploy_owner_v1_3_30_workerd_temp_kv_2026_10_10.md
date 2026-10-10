@@ -86,7 +86,7 @@ Setara dengan `runWrangler(deploy.js)` — bedanya hanya **populasi KV cache dil
 
 Dengan izin itu, **`npm run deploy` penuh** (termasuk populasi cache) kembali jalan normal seperti masa token lama.
 
-**Opsional (butuh izin owner, belum dikerjakan):** membungkus kebutuhan redirect TEMP ke dalam `scripts/deploy/pre-deploy-check.js`/`cf:deploy` — usulan yang sama sejak log v1.3.27, sengaja tidak dieksekusi sendiri karena menyentuh kebiasaan deploy yang sudah mapan.
+**Opsional (butuh izin owner):** membungkus kebutuhan redirect TEMP ke dalam `scripts/deploy/pre-deploy-check.js`/`cf:deploy` — usulan yang sama sejak log v1.3.27, sengaja tidak dieksekusi sendiri karena menyentuh kebiasaan deploy yang sudah mapan. → **DILAKUKAN atas izin owner, lihat §7.**
 
 ---
 
@@ -97,3 +97,20 @@ Dengan izin itu, **`npm run deploy` penuh** (termasuk populasi cache) kembali ja
 - Tidak ada perubahan kode template sama sekali hari ini (repo bersih sebelum & sesudah; satu-satunya artefak = `.open-next`/`tmp` yang di-gitignore).
 - Log mentah (gitignored): `tmp/deploy-v1330-final.log`, `tmp/deploy-v1330-final2.log`, `tmp/wrangler-direct-deploy.log`, `tmp/tail-live.log`.
 - Repro (gitignored): `scratch/repro-proxy.mjs`.
+
+---
+
+## 7. UPDATE (2026-10-10, sesi kedua) — redirect TEMP otomatis via wrapper (poin opsional §5 DILAKUKAN atas izin owner)
+
+Owner menjawab "ya" atas usulan membungkus redirect TEMP. Perubahan (**2 file, satu-satunya perubahan kode sesi ini**):
+
+1. **Baru:** `scripts/cloudflare/run-opennext-cloudflare-deploy.js` — wrapper fase deploy, pola identik `run-opennext-cloudflare-build.js`: di Windows redirect `TEMP`/`TMP`/`TMPDIR` ke `tmp/deploy-temp` (di dalam repo, `mkdirSync` recursive) lalu spawn `node_modules/.bin/opennextjs-cloudflare deploy` dengan `stdio: inherit` (meneruskan argumen CLI & exit code).
+2. `package.json` → `"cf:deploy": "npm run cf:build && node scripts/cloudflare/run-opennext-cloudflare-deploy.js"` (sebelumnya `... && opennextjs-cloudflare deploy`). **Nama perintah tidak berubah** → semua runbook (`npm run deploy`, `npm run cf:deploy`) tetap valid tanpa revisi.
+
+**Uji nyata (kondisi jujur: TANPA set `TEMP` manual — wrapper yang harus menanganinya):** `npm run deploy` penuh → pre-deploy gate lolos (487 file, 0 blocker), build 72/72, **`Successfully populated cache with 62 entries`**, upload sukses, **`EXIT_CODE=0`**, Version ID baru **`f3c97d46-5a93-4f2f-8b9f-44240aa66720`** (cron `0 18 * * *` tetap).
+
+Pasca-deploy terverifikasi langsung: `/api/health` **200 = 1.3.30 + `database: connected`** (`uptime: 0` → worker baru aktif), `/` **200**, `/api/admin/pricing` **401** (Owner Mode aktif).
+
+**Konsekuensi:** syarat "redirect `TEMP` manual setiap deploy" (catatan wajib §2 & log v1.3.27) **resmi dihapus** — `npm run deploy` kini mandiri. Pintu lain yang memanggil `opennextjs-cloudflare deploy` tidak ada (verifikasi grep: hanya `cf:deploy`). Catatan jujur: warning `DEP0190` (child process shell) di output berasal dari CLI OpenNext-nya sendiri — sudah ada di log deploy lama **sebelum** wrapper ini — kosmetik, tidak terkait perubahan ini. `cf:preview` (`wrangler dev`) **tidak** dibungkus (di luar persetujuan; bila suatu saat crash di sana, pola wrapper yang sama bisa dipakai).
+
+Keputusan terkait: **tanpa bump versi/CHANGELOG** — perubahan murni tooling deploy, tidak mengubah perilaku site yang dikirim ke klien (konsisten dengan precedent guard `pre-deploy-check.js` yang masuk batch 1.3.30); dokumentasi = log ini + AGENTS.md §13.

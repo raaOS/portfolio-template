@@ -592,6 +592,10 @@ npm run clear-cache
 npm run fix-webpack
 ```
 
+### Crash workerd `CreateDirectory #5` saat deploy (Windows)
+
+Fase deploy (`opennextjs-cloudflare deploy` → `getPlatformProxy`) pernah crash berulang dengan `kj/filesystem-disk-win32.c++:773 CreateDirectory: #5 Access is denied` — binary workerd tidak bisa membuat folder sementara di `%TEMP%` sistem (`AppData\Local`) padahal selalu bisa di dalam repo; akar pasti belum teridentifikasi. Kedua fase kini **otomatis** menanganinya: build lewat `scripts/cloudflare/run-opennext-cloudflare-build.js`, deploy lewat `scripts/cloudflare/run-opennext-cloudflare-deploy.js` (dipanggil `cf:deploy`) — jadi cukup `npm run deploy` **tanpa** set `TEMP`/`TMP` manual. Jika crash itu muncul lagi, periksa wrapper tersebut lebih dulu. Rujukan: `docs/tracker/logs/deploy_owner_v1_3_30_workerd_temp_kv_2026_10_10.md`.
+
 ### Konflik Port Dev Server
 
 Jika port `3000` atau `3100` terdeteksi sedang digunakan oleh proses latar belakang yang menggantung, jalankan perintah ini di shell CLI:
