@@ -90,6 +90,8 @@ Dengan izin itu, **`npm run deploy` penuh** (termasuk populasi cache) kembali ja
 
 ---
 
+**UPDATE (2026-10-10, ± 00:11 WIB) — ACTION ITEM SELESAI:** owner menambahkan izin `Workers KV Storage — Edit` via dashboard. Terverifikasi: list KV namespace kini **200 (2 namespace)**, lalu **`npm run deploy` penuh dijalankan ulang dan hijau 100%** — `Successfully populated cache with 62 entries`, `DEPLOY_EXIT=0`, Version ID baru `f6381f44-e407-4a34-9767-7a5cea5bbda1`. Pasca-deploy: `/api/health` = **1.3.30** + connected, homepage **8/8 200**, `/syarat-ketentuan` & `/kebijakan-privasi` 200, `/api/admin/pricing` & `/api/admin/orders` tetap **401** (Owner Mode aktif). Jalur normal `npm run deploy` kembali utuh; satu-satunya syarat berikutnya tetap redirect `TEMP`/`TMP`/`TMPDIR` (rintangan #2 workerd, akar belum teridentifikasi).
+
 ## 6. File/jejak
 
 - Tidak ada perubahan kode template sama sekali hari ini (repo bersih sebelum & sesudah; satu-satunya artefak = `.open-next`/`tmp` yang di-gitignore).
