@@ -3,6 +3,16 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.33] - 2026-10-11
+
+### 🖼️ Spatial Gallery: panel detail disamakan persis dengan template demo macOS (mode gelap)
+
+- **Permintaan owner:** tampilan panel "klik cover project" Spatial Gallery disamakan dengan panel project di template demo macOS (OS Desktop), tapi mode gelap.
+- **Cara:** panel tidak lagi ditiru manual — kini **memakai komponen yang sama persis** dengan window project OS Desktop: `ProjectDetailTwoColumn` mode window, yaitu cover media + interaction bar (suka/bagikan/ulasan/terjemah), judul, **tab pill geser** Ringkasan/Proses/Galeri (dengan badge jumlah), meta project, "Tentang Proyek", **narrative folder-tabs** Tantangan/Solusi/Dampak, galeri + lightbox. Karena komponen dipakai bersama, perbaikan/tampilan OS Desktop berikutnya otomatis ikut.
+- **Mode gelap dipaksa** lewat kelas `dark` di root modal (`tailwind darkMode: 'class'`) — seluruh varian `dark:` OS Desktop aktif tanpa mengubah tema situs.
+- **Detail teknis:** cover/gallery disusun mengikuti pola `ProjectDetailWrapper` (ratio dari `coverWidth/Height`, poster video otomatis) dengan resolver URL pipeline spatial; Esc menutup panel kecuali lightbox galeri sedang terbuka (Esc pertama menutup lightbox saja); tombol ✕ gaya chrome window; penutup ✕/klik luar/Esc dan pause rotasi tabung tetap seperti sebelumnya.
+- **Tanpa perubahan CRUD/endpoint** dan **nol perubahan logika 3D** — hanya file `SpatialProjectModal.tsx` yang ditulis ulang.
+
 ## [1.3.32] - 2026-10-11
 
 ### 🖼️ Spatial Gallery: klik cover project → panel detail (Ringkasan + Proses) & cursor dibuat terlihat
