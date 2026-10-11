@@ -7,6 +7,7 @@ import type { Project } from '@/types/projects'
 import type { AboutData } from '@/types/about'
 import { resolveStorageUrl } from '@/lib/urlResolver'
 import { isVideoSource } from '@/lib/mediaPreview'
+import { SpatialProjectModal } from './SpatialProjectModal'
 
 // Tubuh 3D dimuat HANYA saat canvasReady (idle/interaksi) — chunk three.js
 // tidak menyentuh bundle hidrasi awal (P41->target, lihat SpatialScene.tsx).
@@ -34,6 +35,25 @@ export default function SpatialGalleryRenderer({ data }: { data?: { projects?: P
   const rotationSpeedScaleLerpRef = useRef(0.12)
 
   const [hoveredProject, setHoveredProject] = useState<string | null>(null)
+
+  // Panel detail project (v1.3.32): klik tile tabung → modal ringkasan+proses.
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
+
+  const onImageClick = useCallback(
+    (projectIndex: number) => {
+      const project = projects[projectIndex]
+      if (!project) return
+      setHoveredProject(null)
+      setSelectedProject(project)
+    },
+    [projects]
+  )
+
+  // Pause rotasi tabung selama modal terbuka — lewat ref kecepatan yang sudah
+  // ada; mesin rotasi/useFrame di SpatialScene TIDAK disentuh.
+  useEffect(() => {
+    rotationSpeedScaleTargetRef.current = selectedProject ? 0 : 1
+  }, [selectedProject])
 
   // LCP/FCP fix: WebGL Canvas tidak mem-paint konten sampai three.js mount +
   // texture tube selesai download (terukur 14s, NO_FCP di headless). Poster
@@ -94,31 +114,6 @@ export default function SpatialGalleryRenderer({ data }: { data?: { projects?: P
   const tooltipCurrent = useRef({ x: 0, y: 0 })
   const tooltipRaf = useRef<number | null>(null)
 
-  const cursorElRef = useRef<HTMLDivElement | null>(null)
-  const cursorTarget = useRef({ x: 0, y: 0 })
-  const cursorCurrent = useRef({ x: 0, y: 0 })
-  const cursorActive = useRef(false)
-  const cursorRaf = useRef<number | null>(null)
-
-  // Cursor RAF
-  useEffect(() => {
-    const tick = () => {
-      const el = cursorElRef.current
-      if (el) {
-        const lerp = 0.14
-        cursorCurrent.current.x += (cursorTarget.current.x - cursorCurrent.current.x) * lerp
-        cursorCurrent.current.y += (cursorTarget.current.y - cursorCurrent.current.y) * lerp
-        el.style.transform = `translate3d(${(cursorCurrent.current.x + 8).toFixed(2)}px, ${(cursorCurrent.current.y + 8).toFixed(2)}px, 0) translate(-50%, -50%)`
-        el.style.opacity = cursorActive.current ? '1' : '0'
-      }
-      cursorRaf.current = requestAnimationFrame(tick)
-    }
-    cursorRaf.current = requestAnimationFrame(tick)
-    return () => {
-      if (cursorRaf.current != null) cancelAnimationFrame(cursorRaf.current)
-    }
-  }, [])
-
   // Tooltip RAF
   useEffect(() => {
     const tick = () => {
@@ -127,7 +122,7 @@ export default function SpatialGalleryRenderer({ data }: { data?: { projects?: P
         const lerp = 0.18
         tooltipCurrent.current.x += (tooltipTarget.current.x - tooltipCurrent.current.x) * lerp
         tooltipCurrent.current.y += (tooltipTarget.current.y - tooltipCurrent.current.y) * lerp
-        el.style.transform = `translate3d(${(tooltipCurrent.current.x + 12).toFixed(2)}px, ${(tooltipCurrent.current.y - 18).toFixed(2)}px, 0)`
+        el.style.transform = `translate3d(${(tooltipCurrent.current.x + 12).toFixed(2)}px, ${(tooltipCurrent.current.y - 18).toFixed(2)}px)`
       }
       tooltipRaf.current = requestAnimationFrame(tick)
     }
@@ -167,17 +162,9 @@ export default function SpatialGalleryRenderer({ data }: { data?: { projects?: P
     rotationSpeedScaleTargetRef.current = 1
   }, [])
 
-  const onPointerEnter = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect()
-    cursorTarget.current = { x: event.clientX - rect.left, y: event.clientY - rect.top }
-    cursorCurrent.current = { ...cursorTarget.current }
-    cursorActive.current = true
-  }, [])
-
   const onPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect()
     if (rect.width <= 0 || rect.height <= 0) return
-    cursorTarget.current = { x: event.clientX - rect.left, y: event.clientY - rect.top }
 
     const nx = (event.clientX - rect.left) / rect.width
     const ny = (event.clientY - rect.top) / rect.height
@@ -193,7 +180,6 @@ export default function SpatialGalleryRenderer({ data }: { data?: { projects?: P
   const onPointerLeave = useCallback(() => {
     targetCenterUv.current.x = 0.5
     targetCenterUv.current.y = 0.5
-    cursorActive.current = false
     onImageHoverEnd()
   }, [onImageHoverEnd])
 
@@ -204,109 +190,106 @@ export default function SpatialGalleryRenderer({ data }: { data?: { projects?: P
     else if (event.deltaY > 0) tubeNaturalDir.current = 1
   }, [])
 
+  // Catatan v1.3.32: cursor kustom (cursor:none + bola putih RAF) dihapus atas
+  // laporan owner "cursor tidak terlihat" — kini pakai cursor native browser
+  // yang pasti terlihat; ornamen ±60 baris ikut dibuang.
   return (
-    <div
-      className="w-full h-screen relative overflow-hidden"
-      ref={containerRef}
-      onPointerEnter={(e) => {
-        setCanvasReady(true)
-        onPointerEnter(e)
-      }}
-      onPointerMove={onPointerMove}
-      onPointerLeave={onPointerLeave}
-      onWheel={(e) => {
-        setCanvasReady(true)
-        onWheel(e)
-      }}
-      style={{ background: '#000000', touchAction: 'none', cursor: 'none' }}
-    >
-      {canvasReady && (
-        <SpatialCanvas
-          targetCenterUv={targetCenterUv}
-          tubeScrollTarget={tubeScrollTarget}
-          tubeSpinVelocity={tubeSpinVelocity}
-          tubeNaturalDir={tubeNaturalDir}
-          tubeAngle={tubeAngle}
-          rotationSpeedScaleTargetRef={rotationSpeedScaleTargetRef}
-          rotationSpeedScaleLerpRef={rotationSpeedScaleLerpRef}
-          baseSpeedRef={baseSpeedRef}
-          tubeRows={tubeRows}
-          tubeCols={tubeCols}
-          projects={projects}
-          spatialGalleryConfig={spatialGalleryConfig}
-          onImageHoverStart={onImageHoverStart}
-          onImageHoverMove={onImageHoverMove}
-          onImageHoverEnd={onImageHoverEnd}
-          onReady={() => setSceneReady(true)}
+    <>
+      <div
+        className="w-full h-screen relative overflow-hidden"
+        ref={containerRef}
+        onPointerEnter={() => setCanvasReady(true)}
+        onPointerMove={onPointerMove}
+        onPointerLeave={onPointerLeave}
+        onWheel={(e) => {
+          setCanvasReady(true)
+          onWheel(e)
+        }}
+        style={{ background: '#000000', touchAction: 'none' }}
+      >
+        {canvasReady && (
+          <SpatialCanvas
+            targetCenterUv={targetCenterUv}
+            tubeScrollTarget={tubeScrollTarget}
+            tubeSpinVelocity={tubeSpinVelocity}
+            tubeNaturalDir={tubeNaturalDir}
+            tubeAngle={tubeAngle}
+            rotationSpeedScaleTargetRef={rotationSpeedScaleTargetRef}
+            rotationSpeedScaleLerpRef={rotationSpeedScaleLerpRef}
+            baseSpeedRef={baseSpeedRef}
+            tubeRows={tubeRows}
+            tubeCols={tubeCols}
+            projects={projects}
+            spatialGalleryConfig={spatialGalleryConfig}
+            onImageHoverStart={onImageHoverStart}
+            onImageHoverMove={onImageHoverMove}
+            onImageHoverEnd={onImageHoverEnd}
+            onImageClick={onImageClick}
+            onReady={() => setSceneReady(true)}
+          />
+        )}
+
+        {/* Poster SSR-friendly: ter-paint seketika jadi LCP element, fade-out
+            saat scene 3D pertama siap. Tanpa ini LCP tertunda 14s (terukur). */}
+        <img
+          src={posterSrc}
+          alt=""
+          aria-hidden="true"
+          fetchPriority="high"
+          onLoad={(e) => {
+            e.currentTarget.dataset.loaded = 'true'
+          }}
+          onError={(e) => {
+            const img = e.currentTarget
+            if (posterSrc !== '/tube/im1.jpg') {
+              img.src = '/tube/im1.jpg'
+            } else {
+              img.dataset.loaded = 'true'
+            }
+          }}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            zIndex: 5,
+            pointerEvents: 'none',
+            opacity: sceneReady ? 0 : 1,
+            transition: 'opacity 0.8s ease',
+          }}
+        />
+
+        {/* Brand overlay */}
+        <div className="absolute bottom-6 left-6 z-10 text-white/80 text-sm font-semibold tracking-wide select-none pointer-events-none">
+          Portfolio
+        </div>
+        <div className="absolute bottom-6 right-6 z-10 text-white/40 text-xs tracking-widest uppercase select-none pointer-events-none">
+          Scroll untuk memutar
+        </div>
+
+        {/* Tooltip */}
+        {hoveredProject && (
+          <div
+            className="fixed pointer-events-none z-50 text-white text-sm font-medium px-3 py-1.5 rounded-full"
+            ref={tooltipElRef}
+            style={{ background: 'rgba(0,0,0,0.72)', border: '1px solid rgba(255,255,255,0.22)' }}
+            role="status"
+            aria-live="polite"
+          >
+            {hoveredProject}
+          </div>
+        )}
+      </div>
+
+      {/* Panel detail project (klik tile tabung) */}
+      {selectedProject && (
+        <SpatialProjectModal
+          key={selectedProject.id}
+          project={selectedProject}
+          onClose={() => setSelectedProject(null)}
         />
       )}
-
-      {/* Poster SSR-friendly: ter-paint seketika jadi LCP element, fade-out
-          saat scene 3D pertama siap. Tanpa ini LCP tertunda 14s (terukur). */}
-      <img
-        src={posterSrc}
-        alt=""
-        aria-hidden="true"
-        fetchPriority="high"
-        onLoad={(e) => {
-          e.currentTarget.dataset.loaded = 'true'
-        }}
-        onError={(e) => {
-          const img = e.currentTarget
-          if (posterSrc !== '/tube/im1.jpg') {
-            img.src = '/tube/im1.jpg'
-          } else {
-            img.dataset.loaded = 'true'
-          }
-        }}
-        style={{
-          position: 'absolute',
-          inset: 0,
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          zIndex: 5,
-          pointerEvents: 'none',
-          opacity: sceneReady ? 0 : 1,
-          transition: 'opacity 0.8s ease',
-        }}
-      />
-
-      {/* Brand overlay */}
-      <div className="absolute bottom-6 left-6 z-10 text-white/80 text-sm font-semibold tracking-wide select-none pointer-events-none">
-        Portfolio
-      </div>
-      <div className="absolute bottom-6 right-6 z-10 text-white/40 text-xs tracking-widest uppercase select-none pointer-events-none">
-        Scroll untuk memutar
-      </div>
-
-      {/* Tooltip */}
-      {hoveredProject && (
-        <div
-          className="fixed pointer-events-none z-50 text-white text-sm font-medium px-3 py-1.5 rounded-full"
-          ref={tooltipElRef}
-          style={{ background: 'rgba(0,0,0,0.72)', border: '1px solid rgba(255,255,255,0.22)' }}
-          role="status"
-          aria-live="polite"
-        >
-          {hoveredProject}
-        </div>
-      )}
-
-      {/* Custom cursor */}
-      <div
-        className="fixed pointer-events-none z-[9999] rounded-full"
-        ref={cursorElRef}
-        aria-hidden="true"
-        style={{
-          background: 'rgba(255,255,255,0.9)',
-          mixBlendMode: 'difference',
-          width: '18px',
-          height: '18px',
-          opacity: 0,
-        }}
-      />
-
-    </div>
+    </>
   )
 }

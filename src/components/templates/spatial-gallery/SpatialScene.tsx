@@ -235,6 +235,7 @@ function ImageTube({
   onHoverStart,
   onHoverMove,
   onHoverEnd,
+  onImageClick,
   projects,
 }: {
   scrollTargetRef: React.MutableRefObject<number>
@@ -249,6 +250,7 @@ function ImageTube({
   onHoverStart: (projectName: string, event: ThreeEvent<PointerEvent>) => void
   onHoverMove: (event: ThreeEvent<PointerEvent>) => void
   onHoverEnd: () => void
+  onImageClick: (projectIndex: number) => void
   projects: Project[]
 }) {
   const groupRef = useRef<Object3D>(null)
@@ -257,12 +259,16 @@ function ImageTube({
   const angle = useRef(0)
   const rotationSpeedScale = useRef(1)
 
-  // Ekstrak semua gambar dari data project database
-  const { imageUrls, projectNames } = useMemo(() => {
+  // Ekstrak semua gambar dari data project database.
+  // projectIndexes[i] = index project pemilik imageUrls[i] — dipakai klik tile
+  // → membuka panel detail project yang benar (v1.3.32).
+  const { imageUrls, projectNames, projectIndexes } = useMemo(() => {
     const urls: string[] = []
     const names: string[] = []
+    const indexes: number[] = []
 
-    for (const project of projects) {
+    for (let projectIndex = 0; projectIndex < projects.length; projectIndex++) {
+      const project = projects[projectIndex]
       // Ambil cover image (atau poster .jpg bila cover adalah video)
       if (project.cover && project.cover !== 'https://via.placeholder.com/800x600') {
         const resolved = resolveStorageUrl(project.cover)
@@ -272,10 +278,12 @@ function ImageTube({
           if (poster) {
             urls.push(poster)
             names.push(project.title)
+            indexes.push(projectIndex)
           }
         } else {
           urls.push(resolved)
           names.push(project.title)
+          indexes.push(projectIndex)
         }
       }
       // Ambil gallery images (skip video — gunakan item.poster bila ada)
@@ -287,11 +295,13 @@ function ImageTube({
               if (item.poster) {
                 urls.push(resolveStorageUrl(item.poster))
                 names.push(project.title)
+                indexes.push(projectIndex)
               }
               continue
             }
             urls.push(resolved)
             names.push(project.title)
+            indexes.push(projectIndex)
           }
         }
       }
@@ -303,6 +313,7 @@ function ImageTube({
             if (isVideoSource(resolved)) continue
             urls.push(resolved)
             names.push(project.title)
+            indexes.push(projectIndex)
           }
         }
       }
@@ -324,10 +335,11 @@ function ImageTube({
       return {
         imageUrls: fallbackImages,
         projectNames: fallbackImages.map((_, i) => `Project ${i + 1}`),
+        projectIndexes: [] as number[],
       }
     }
 
-    return { imageUrls: urls, projectNames: names }
+    return { imageUrls: urls, projectNames: names, projectIndexes: indexes }
   }, [projects])
 
   const textures = useTexture(imageUrls)
@@ -432,6 +444,12 @@ function ImageTube({
                   e.stopPropagation()
                   onHoverEnd()
                 }}
+                onClick={(e) => {
+                  // Klik tile → buka panel detail project pemilik tile (v1.3.32)
+                  e.stopPropagation()
+                  const projectIndex = projectIndexes[texIndex]
+                  if (projectIndex !== undefined) onImageClick(projectIndex)
+                }}
               >
                 <planeGeometry args={[tileW, tileH]} />
                 {tex ? (
@@ -467,6 +485,7 @@ export function SpatialCanvas(props: {
   onImageHoverStart: (name: string, event: ThreeEvent<PointerEvent>) => void
   onImageHoverMove: (event: ThreeEvent<PointerEvent>) => void
   onImageHoverEnd: () => void
+  onImageClick: (projectIndex: number) => void
   onReady: () => void
 }) {
   const {
@@ -485,6 +504,7 @@ export function SpatialCanvas(props: {
     onImageHoverStart,
     onImageHoverMove,
     onImageHoverEnd,
+    onImageClick,
     onReady,
   } = props
 
@@ -518,6 +538,7 @@ export function SpatialCanvas(props: {
             onHoverStart={onImageHoverStart}
             onHoverMove={onImageHoverMove}
             onHoverEnd={onImageHoverEnd}
+            onImageClick={onImageClick}
             projects={projects}
           />
           <CenterModel tubeAngleRef={tubeAngle} config={spatialGalleryConfig} />

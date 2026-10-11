@@ -3,6 +3,15 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.32] - 2026-10-11
+
+### 🖼️ Spatial Gallery: klik cover project → panel detail (Ringkasan + Proses) & cursor dibuat terlihat
+
+- **Tile tabung 3D kini bisa diklik** — membuka panel detail project pemilik tile. Sebelumnya tile hanya punya hover (tooltip nama); klik tidak melakukan apa pun. Penambahan mengikuti pola event hover yang sudah ada (`onPointerOver/Move/Out` → `onImageClick(texIndex)` → index project lewat peta paralel `projectIndexes`); mesin rotasi/gulir/shader **tidak disentuh**. Rotasi tabung otomatis pause selama panel terbuka (via ref kecepatan yang sudah ada).
+- **File baru `SpatialProjectModal.tsx`** (folder spatial — panel tema gelap mengikuti karakter galeri, mengikuti desain tab milik owner): tab **Ringkasan** (media utama gambar/video + thumbnail strip dari `cover`/`galleryItems`/`gallery`, chips klien & tahun, meta Peran/Software/Waktu/Tim/Tipe, "Tentang Proyek", tag) dan tab **Proses** (sub-tab **Tantangan/Solusi/Dampak** untuk project komersial — legacy `result` didukung; **Konsep/Proses/Detail** untuk seni visual). Semua field conditional: kosong → bagian/tab tidak dirender; data diambil apa adanya dari CRUD admin yang sudah ada (`project_narratives` + gallery) — **tanpa CRUD/endpoint baru**. Tutup via ✕ / klik luar / Esc.
+- **Cursor Spatial Gallery dibuat terlihat:** cursor kustom (`cursor: none` + bola putih RAF ±60 baris) dilaporkan owner tidak muncul — diganti **cursor native browser** yang pasti tampil di semua environment. Tooltip hover, parallax pointer, dan lazy-load 3D tetap berfungsi seperti sebelumnya.
+- **Aman untuk template lain:** perubahan hanya di folder `spatial-gallery`; Infinite Canvas (`CanvasProjectModal`) dan OS Desktop tidak disentuh.
+
 ## [1.3.31] - 2026-10-10
 
 ### 🛍️ Landing storefront kini menampilkan ketiga template demo (Spatial Gallery dicantumkan)
