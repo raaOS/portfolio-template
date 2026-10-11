@@ -252,7 +252,10 @@ export default function SpatialGalleryRenderer({ data }: { data?: { projects?: P
             inset: 0,
             width: '100%',
             height: '100%',
-            objectFit: 'cover',
+            // contain (bukan cover): karya tampil utuh dengan letterbox hitam
+            // senada latar galeri — cover potret tidak lagi meregang/crop aneh
+            // saat loading (laporan owner 2026-10-11).
+            objectFit: 'contain',
             zIndex: 5,
             pointerEvents: 'none',
             opacity: sceneReady ? 0 : 1,

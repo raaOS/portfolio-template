@@ -3,6 +3,14 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.34] - 2026-10-11
+
+### 🖼️ Spatial Gallery: poster awal loading diperbaiki (tidak lagi meregang/crop)
+
+- **Laporan owner:** saat halaman baru dibuka (sebelum scene 3D siap), gambar cover yang tampil sebagai poster loading terlihat bug — foto potret dipaksa meregang fullscreen dan ter-crop aneh.
+- **Perbaikan:** poster kini tampil `object-contain` — karya tampil utuh dan terpusat dengan letterbox hitam yang senada dengan latar galeri, bukan dipaksa meregang. Fungsi teknisnya tidak berubah: poster tetap elemen LCP yang ter-paint seketika (mencegah layar hitam ±14 detik sampai aset 3D termuat) dan tetap fade-out 0.8s saat scene pertama siap.
+- Perubahan 1 baris di `SpatialGalleryRenderer.tsx`; nol perubahan logika 3D.
+
 ## [1.3.33] - 2026-10-11
 
 ### 🖼️ Spatial Gallery: panel detail disamakan persis dengan template demo macOS (mode gelap)
