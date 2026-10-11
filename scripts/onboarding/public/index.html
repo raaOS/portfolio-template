@@ -1307,6 +1307,7 @@
     if (prevSvgB) prevSvgB.remove();
     alurEl.textContent = 'Memuat...';
     asetEl.textContent = 'Memuat...';
+    let stage = 'mengambil data diagram dari portal';
     try {
       const res = await fetch('/api/diagrams?t=' + Date.now());
       const data = await res.json();
@@ -1315,6 +1316,7 @@
       if (!alurEl.textContent || !asetEl.textContent) {
         throw new Error('File diagram belum tersedia di docs/diagrams/.');
       }
+      stage = 'memuat pustaka diagram (CDN)';
       if (!mermaidLib) {
         mermaidLib = (await import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs')).default;
       }
@@ -1353,15 +1355,26 @@
           useMaxWidth: true,
         },
       });
-      await mermaidLib.run({ nodes: [alurEl, asetEl] });
-      straightenEdges(alurEl);
-      straightenEdges(asetEl);
+      // Render terpisah per diagram: satu file .mmd rusak tidak ikut
+      // mematikan diagram sebelahnya (audit 2026-10-11 — sebelumnya satu
+      // run() bersama bikin keduanya gagal sekaligus).
+      for (const el of [alurEl, asetEl]) {
+        try {
+          await mermaidLib.run({ nodes: [el] });
+          straightenEdges(el);
+        } catch (renderErr) {
+          const detail = (renderErr && (renderErr.str || renderErr.message)) || String(renderErr);
+          console.error('[PetaBisnis] Gagal merender ' + el.id + ':', detail);
+          el.textContent = 'Teks diagram tidak valid di docs/diagrams/*.mmd (' + String(detail).split('\n')[0] + ').';
+        }
+      }
     } catch (err) {
-      console.error('[PetaBisnis] Gagal memuat diagram:', err);
+      const detail = (err && (err.str || err.message)) || String(err);
+      console.error('[PetaBisnis] Gagal memuat diagram:', detail, '(tahap: ' + stage + ')');
       ['diagram-alur', 'diagram-aset'].forEach(id => {
         const el = document.getElementById(id);
         if (el && !el.textContent.trim().startsWith('flowchart')) {
-          el.textContent = 'Diagram gagal dimuat. Pastikan internet aktif, lalu muat ulang halaman.';
+          el.textContent = 'Gagal ' + stage + '. Pastikan portal berjalan dan internet aktif, lalu muat ulang halaman.';
         }
       });
     }

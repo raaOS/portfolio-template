@@ -3,6 +3,14 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.39] - 2026-10-12
+
+### 🛠️ Portal Onboarding: Tab "Peta Bisnis" Kembali Menampilkan Kedua Diagram
+
+- **Perbaikan Diagram Gagal Dimuat (temuan owner 2026-10-12):** Tab "Peta Bisnis" menampilkan "Diagram gagal dimuat. Pastikan internet aktif…" padahal internet normal. Penyebab sebenarnya: `docs/diagrams/alur-bisnis.mmd` baris 21 memakai kutip lurus `\"` gaya JavaScript di dalam label Mermaid — sintaks itu tidak sah bagi Mermaid sehingga render gagal (masuk sejak commit `ab27f5b`, teks email aktivasi). Kedua diagram ikut blank karena sebelumnya dirender dalam satu panggilan `run()` bersama.
+- **Perbaikan:** kutip liar dihapus (arti teks tetap sama); render kini **terpisah per diagram** (file rusak tidak mematikan diagram sebelahnya); pesan error kini menjelaskan tahap yang benar-benar gagal (mengambil data portal / memuat pustaka CDN / teks diagram tidak valid + baris error Mermaid apa adanya) — tidak lagi otomatis menyalahkan "internet".
+- **Sama seperti catatan v1.3.24:** perubahan hanya `docs/diagrams/*.mmd` + `scripts/onboarding/public/index.html` (alat portal owner) — tidak memengaruhi situs klien.
+
 ## [1.3.38] - 2026-10-11
 
 ### 🚀 Portal Onboarding & Checkout: 3D Spatial Gallery, Saran Slug Pintar & Penjagaan Render OS

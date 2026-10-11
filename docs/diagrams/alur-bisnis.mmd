@@ -18,7 +18,7 @@ flowchart TB
     S2{"Dibayar<br/>dalam 24 jam?"}
     S3["Order kedaluwarsa:<br/>nominal dilepas +<br/>email pembatalan"]
     S4{"Bukti bayar<br/>diterima?"}
-    S5["Aktivasi: tandai order<br/>aktif + email \"pembayaran<br/>terverifikasi\" (janji online<br/>maks 1×24 jam), kirim tiket<br/>kerja 6 langkah ke<br/>Telegram owner"]
+    S5["Aktivasi: tandai order<br/>aktif + email pembayaran<br/>terverifikasi (janji online<br/>maks 1×24 jam), kirim tiket<br/>kerja 6 langkah ke<br/>Telegram owner"]
     S6["Setiap hari 01:00 WIB:<br/>backup database<br/>(simpan 7 terbaru) +<br/>bersihkan order kadaluarsa"]
     S1 --> S2
     S2 -->|tidak| S3
