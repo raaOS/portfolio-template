@@ -18,7 +18,12 @@ interface StartScreenProps {
 type ScreenState = 'idle' | 'booting' | 'done';
 
 const BOOT_CONFIG = {
-  autoStartDelay: 1200,
+  // Jaring pengaman BUKAN penentu durasi: animasi HELLO hitam diputar sampai
+  // SELESAI satu putaran (sinyal onComplete lottie, durasi animasi 6 detik)
+  // baru layar slide ke desktop — permintaan owner v1.3.37. Timer ini hanya
+  // menjamin halaman tidak tersangkut kalau chunk lottie gagal dimuat atau
+  // tab tersembunyi menunda rAF (animasi dilanjutkan saat tab terlihat).
+  safetyFallbackDelay: 15000,
   revealDelay: 0,
   slideDuration: 600,
   completeDelay: 650,
@@ -88,9 +93,11 @@ const StartScreen = ({ onStart, isActive, onReady, onReveal }: StartScreenProps)
       return;
     }
 
+    // Jaring pengaman saja — jalur normal selesai lewat onComplete lottie
+    // (animasi HELLO 6 detik) di JSX bawah.
     const timer = setTimeout(() => {
       handleStart({ playSound: false });
-    }, BOOT_CONFIG.autoStartDelay);
+    }, BOOT_CONFIG.safetyFallbackDelay);
 
     return () => clearTimeout(timer);
   }, [handleStart, isActive, screenState]);
@@ -139,7 +146,17 @@ const StartScreen = ({ onStart, isActive, onReady, onReveal }: StartScreenProps)
         }}
         transition={{ duration: 0.6, ease: [0.32, 0.72, 0, 1] }}
       >
-        <Lottie animationData={helloAnimationData} loop autoplay className="h-full w-full" />
+        {/* HELLO hitam diputar SATU PUTARAN PENUH (tanpa loop) — saat animasi
+            selesai (onComplete) layar baru slide ke desktop. Sebelumnya
+            auto-start 1,2 detik memotong animasi sehingga tulisan HELLO sering
+            tak sempat tampil (laporan owner v1.3.37). */}
+        <Lottie
+          animationData={helloAnimationData}
+          loop={false}
+          autoplay
+          onComplete={() => handleStart({ playSound: false })}
+          className="h-full w-full"
+        />
       </m.div>
     </m.button>
   );

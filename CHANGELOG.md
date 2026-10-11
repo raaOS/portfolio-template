@@ -3,6 +3,15 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.37] - 2026-10-11
+
+### 💻 OS Desktop: HELLO hitam kini diputar sampai selesai baru ke halaman utama
+
+- **Laporan owner:** di template os-desktop, animasi awal tulisan HELLO hitam sering tidak terlihat / terpotong — layar langsung pindah ke halaman utama sebelum animasi selesai. Durasi harus disesuaikan: biarkan tulisan HELLO selesai animasinya, baru transisi.
+- **Akar masalah:** `StartScreen` os-desktop auto-start setelah **1,2 detik** (`autoStartDelay`) sementara animasi `hello hitam.json` butuh **6 detik** satu putaran — dan chunk `lottie-react` (dynamic import) sering baru tiba menjelang 1,2 detik, sehingga HELLO tak sempat tampil sama sekali.
+- **Perubahan (`src/components/os/ui/StartScreen.tsx`):** lottie HELLO hitam kini `loop={false}` + `onComplete` → saat animasi **selesai satu putaran penuh**, layar slide ke desktop (jalur suara klik/skip tidak berubah). Timer lama diganti `safetyFallbackDelay: 15000` — jaring pengaman agar halaman tidak tersangkut bila chunk lottie gagal atau tab tersembunyi menunda rAF, **bukan** penentu durasi.
+- **Unit test baru** `StartScreen.test.tsx` (5 kasus): tidak auto-mulai sebelum selesai, onComplete → boot, jaring pengaman 15 dtk, klik = skip, layar dilepas setelah boot.
+
 ## [1.3.36] - 2026-10-11
 
 ### 👋 Intro HELLO bersama: spatial-gallery & infinite-canvas putar sampai selesai
