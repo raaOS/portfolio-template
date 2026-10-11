@@ -3,6 +3,24 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.36] - 2026-10-11
+
+### 👋 Intro HELLO bersama: spatial-gallery & infinite-canvas putar sampai selesai
+
+- **Permintaan owner:** animasi lottie HELLO di **infinite-canvas** dan **spatial-gallery** diputar **sampai selesai satu putaran penuh**, baru transisi menampilkan halaman utama (sebelumnya overlay langsung memudar begitu scene siap / tidak ada intro sama sekali di infinite-canvas).
+- **Komponen baru `src/components/shared/HelloIntro.tsx`** dipakai bersama kedua template: layar hitam penuh + HELLO oranye (loop), satu putaran selesai (`onComplete`/`onLoopComplete`) → fade-out 700ms → halaman utama tampil. Prop opsional `ready` memungkinkan intro bertahan kalau konten belum siap.
+- **spatial-gallery:** overlay loading v1.3.35 diganti `<HelloIntro ready={sceneReady} />` — intro baru mulai memudar setelah HELLO selesai **dan** scene 3D siap, jadi tidak ada layar hitam antar-intro ke galeri.
+- **infinite-canvas:** `<HelloIntro />` dipasang di root renderer — sebelumnya kanvas langsung tampil tanpa pembuka.
+- Logo intro memakai `pointer-events-none` (interaksi tetap tembus ke kanvas di belakangnya untuk pemanasan aset).
+
+## [1.3.35] - 2026-10-11
+
+### 👋 Spatial Gallery: poster cover awal dihapus, diganti animasi lottie HELLO
+
+- **Permintaan owner:** poster gambar cover yang tampil saat awal loading dihapus saja, diganti **animasi lottie HELLO** yang sudah ada di template lain (varian `hello orange.json` — oranye, terlihat jelas di latar galeri hitam; varian "hitam" hanya untuk latar terang).
+- **Perubahan:** `<img>` poster cover (LCP fix) di `SpatialGalleryRenderer.tsx` diganti overlay lottie HELLO (`dynamic import`, ssr:false — mengikuti pola infinite-canvas & OS Desktop StartScreen). Animasi lottie berbasis SVG terpaint seketika sehingga fungsinya tetap sama: mengisi layar selagi chunk three.js + texture dimuat (mencegah layar hitam), lalu fade-out 0.8s saat scene 3D pertama siap. Pemilihan cover project + fallback `/tube/im1.jpg` ikut dihapus (tidak dipakai lagi).
+- **Tanpa perubahan logika 3D** — hanya overlay loading yang berganti.
+
 ## [1.3.34] - 2026-10-11
 
 ### 🖼️ Spatial Gallery: poster awal loading diperbaiki (tidak lagi meregang/crop)

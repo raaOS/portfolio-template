@@ -5,8 +5,7 @@ import type { ThreeEvent } from '@react-three/fiber'
 import dynamic from 'next/dynamic'
 import type { Project } from '@/types/projects'
 import type { AboutData } from '@/types/about'
-import { resolveStorageUrl } from '@/lib/urlResolver'
-import { isVideoSource } from '@/lib/mediaPreview'
+import { HelloIntro } from '@/components/shared/HelloIntro'
 import { SpatialProjectModal } from './SpatialProjectModal'
 
 // Tubuh 3D dimuat HANYA saat canvasReady (idle/interaksi) — chunk three.js
@@ -95,19 +94,6 @@ export default function SpatialGalleryRenderer({ data }: { data?: { projects?: P
       if (tid) clearTimeout(tid)
     }
   }, [])
-
-  const posterCandidates = useMemo(() => {
-    const urls: string[] = []
-    for (const project of projects) {
-      if (!project.cover) continue
-      const resolved = resolveStorageUrl(project.cover)
-      if (isVideoSource(resolved)) continue
-      urls.push(resolved)
-      if (urls.length >= 1) break
-    }
-    return urls
-  }, [projects])
-  const posterSrc = posterCandidates[0] ?? '/tube/im1.jpg'
 
   const tooltipElRef = useRef<HTMLDivElement | null>(null)
   const tooltipTarget = useRef({ x: 0, y: 0 })
@@ -229,39 +215,10 @@ export default function SpatialGalleryRenderer({ data }: { data?: { projects?: P
           />
         )}
 
-        {/* Poster SSR-friendly: ter-paint seketika jadi LCP element, fade-out
-            saat scene 3D pertama siap. Tanpa ini LCP tertunda 14s (terukur). */}
-        <img
-          src={posterSrc}
-          alt=""
-          aria-hidden="true"
-          fetchPriority="high"
-          onLoad={(e) => {
-            e.currentTarget.dataset.loaded = 'true'
-          }}
-          onError={(e) => {
-            const img = e.currentTarget
-            if (posterSrc !== '/tube/im1.jpg') {
-              img.src = '/tube/im1.jpg'
-            } else {
-              img.dataset.loaded = 'true'
-            }
-          }}
-          style={{
-            position: 'absolute',
-            inset: 0,
-            width: '100%',
-            height: '100%',
-            // contain (bukan cover): karya tampil utuh dengan letterbox hitam
-            // senada latar galeri — cover potret tidak lagi meregang/crop aneh
-            // saat loading (laporan owner 2026-10-11).
-            objectFit: 'contain',
-            zIndex: 5,
-            pointerEvents: 'none',
-            opacity: sceneReady ? 0 : 1,
-            transition: 'opacity 0.8s ease',
-          }}
-        />
+        {/* Intro HELLO (v1.3.36): animasi diputar sampai selesai satu putaran
+            penuh — baru fade-out menampilkan galeri. Disembunyikan lebih awal
+            kalau scene 3D sudah siap sebelum animasi selesai (ready). */}
+        <HelloIntro ready={sceneReady} />
 
         {/* Brand overlay */}
         <div className="absolute bottom-6 left-6 z-10 text-white/80 text-sm font-semibold tracking-wide select-none pointer-events-none">

@@ -5,6 +5,7 @@ import type { TemplateRendererProps } from '@/types/template';
 import type { Project } from '@/types/projects';
 import { Languages } from 'lucide-react';
 import LanguageSwitch from '@/components/shared/LanguageSwitch';
+import { HelloIntro } from '@/components/shared/HelloIntro';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { useCanvasControls } from './hooks/useCanvasControls';
 import { CornerBrackets } from './components/CornerBrackets';
@@ -313,6 +314,10 @@ export default function InfiniteCanvasRenderer({ data }: TemplateRendererProps) 
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerUp}
     >
+      {/* Intro HELLO (v1.3.36): animasi diputar sampai selesai satu putaran
+          penuh, baru fade-out menampilkan kanvas. */}
+      <HelloIntro />
+
       {/* Corner decorative brackets */}
       <CornerBrackets />
 
