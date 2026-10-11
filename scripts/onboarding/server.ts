@@ -70,7 +70,7 @@ function runCommandStreaming(
 interface ProvisionPayload {
   clientName: string;
   clientSlug: string;
-  templateKey: 'os-desktop' | 'infinite-canvas';
+  templateKey: 'os-desktop' | 'infinite-canvas' | 'spatial-gallery';
   accountId: string;
   apiToken: string;
   adminEmail: string;
@@ -207,7 +207,17 @@ async function provisionClient(
   }
 
   // STEP 4: Migrasi Skema Tabel & Data Awal
-  onProgress(4, 'Memasang Tabel & Template...', `Mengatur template: ${templateKey === 'os-desktop' ? 'macOS Desktop' : 'Infinite Canvas'}`);
+  onProgress(
+    4,
+    'Memasang Tabel & Template...',
+    `Mengatur template: ${
+      templateKey === 'spatial-gallery'
+        ? '3D Spatial Gallery'
+        : templateKey === 'os-desktop'
+        ? 'macOS Desktop'
+        : 'Infinite Canvas'
+    }`
+  );
   // Dua skema dipasang berurutan (audit 2026-10-08, temuan #1 & #14):
   //   1. SHARED_SCHEMA_QUERIES — inti site/login/konten (dipakai portal & auth).
   //   2. D1_SCHEMA_QUERIES — tabel runtime yang dibaca aplikasi klien
@@ -408,7 +418,7 @@ async function provisionClient(
     `         SURAT SERAH TERIMA PORTOFOLIO WEBSITE (RESMI)`,
     `==================================================================`,
     `Nama Klien        : ${clientName}`,
-    `Template Dipilih  : ${templateKey === 'os-desktop' ? 'macOS Desktop OS Simulator' : 'Infinite Canvas (Interactive Gallery)'}`,
+    `Template Dipilih  : ${templateKey === 'os-desktop' ? 'macOS Desktop OS Simulator' : templateKey === 'spatial-gallery' ? '3D Spatial Gallery' : 'Infinite Canvas (Interactive Gallery)'}`,
     `Tanggal Aktivasi  : ${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}`,
     ``,
     `ALAMAT WEBSITE & LOGIN:`,
@@ -961,9 +971,11 @@ const server = http.createServer(async (req, res) => {
       const sections = latestRelease.sections || [];
 
       // Klasifikasikan seksi dan butir pembaruan rilis terbaru
-      const isCanvasSec = (t: string) => /canvas|kanvas|3d|🎨/i.test(t);
+      const isSpatialSec = (t: string) => /spatial|spasial|gallery|galeri/i.test(t);
+      const isCanvasSec = (t: string) => /canvas|kanvas/i.test(t) && !isSpatialSec(t);
       const isDesktopSec = (t: string) => /macos|desktop|mac os|🖥️/i.test(t);
 
+      const spatialPoints: string[] = [];
       const canvasPoints: string[] = [];
       const desktopPoints: string[] = [];
       const systemPoints: string[] = [];
@@ -975,7 +987,9 @@ const server = http.createServer(async (req, res) => {
           const point = `• ${shortItem}`;
           allPoints.push(point);
 
-          if (isCanvasSec(sec.title)) {
+          if (isSpatialSec(sec.title)) {
+            spatialPoints.push(point);
+          } else if (isCanvasSec(sec.title)) {
             canvasPoints.push(point);
           } else if (isDesktopSec(sec.title)) {
             desktopPoints.push(point);
@@ -1002,10 +1016,12 @@ const server = http.createServer(async (req, res) => {
       // Gabungkan poin spesifik template dengan poin sistem global
       const waDesktopPoints = [...desktopPoints, ...systemPoints];
       const waCanvasPoints = [...canvasPoints, ...systemPoints];
+      const waSpatialPoints = [...spatialPoints, ...systemPoints];
 
       const whatsappMessages = {
         'os-desktop': createWaMessage('macOS Desktop', waDesktopPoints),
         'infinite-canvas': createWaMessage('Infinite Canvas', waCanvasPoints),
+        'spatial-gallery': createWaMessage('3D Spatial Gallery', waSpatialPoints),
         'general': createWaMessage('', allPoints),
       };
 

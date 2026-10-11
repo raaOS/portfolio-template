@@ -332,6 +332,55 @@ describe('orderService', () => {
       expect(res.success).toBe(false);
       expect(res.error).toContain('ORD-OLD-001');
     });
+
+    it('melepas slot kode unik dari pesanan pending tua saat kolam penuh (audit MEDIUM 2026-10-10)', async () => {
+      vi.mocked(slugService.isSlugAvailable).mockResolvedValueOnce(true);
+
+      // maxOffset sengaja kecil (2) agar kolam "penuh" bisa disimulasikan
+      // dengan 2 baris query saja; input.amount mengunci baseAmount = 199000.
+      const tinyPoolConfig = [
+        {
+          value: JSON.stringify({
+            isActive: true,
+            qrisUniqueAmountEnabled: true,
+            qrisUniqueAmountMaxOffset: 2,
+          }),
+        },
+      ];
+
+      vi.mocked(cloudflareD1.queryD1)
+        .mockResolvedValueOnce([]) // expire stale: activating-recovery sweep
+        .mockResolvedValueOnce([]) // expire stale: 7-day auto-cancel sweep
+        .mockResolvedValueOnce([]) // expire stale pending orders (cutoff waktu nyata)
+        .mockResolvedValueOnce(tinyPoolConfig)
+        .mockResolvedValueOnce([]) // M5: duplicate order check
+        .mockResolvedValueOnce([]) // harga dasar (fallback)
+        .mockResolvedValueOnce([{ amount: 199001 }, { amount: 199002 }]) // kolam penuh (2/2)
+        .mockResolvedValueOnce([]) // sapuan darurat: activating-recovery
+        .mockResolvedValueOnce([]) // sapuan darurat: 7-day auto-cancel
+        .mockResolvedValueOnce([
+          {
+            id: 'ORD-TUA-001',
+            buyer_name: 'Lama',
+            buyer_email: 'lama@test.com',
+            desired_slug: 'lama-site',
+          },
+        ]) // sapuan darurat: pending tua terdeteksi (cutoff now+18h)
+        .mockResolvedValueOnce([]) // sapuan darurat: UPDATE expired
+        .mockResolvedValueOnce([{ amount: 199001 }]) // alokasi ulang: hanya offset 1 terpakai
+        .mockResolvedValueOnce([]); // INSERT order
+
+      const res = await createOrder({
+        buyerName: 'Nanda',
+        buyerEmail: 'nanda@test.com',
+        buyerWhatsapp: '628123456789',
+        desiredSlug: 'nanda-design',
+        amount: 199000,
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.order?.amount).toBe(199002); // offset 2 (baru dibebaskan) dipakai
+    });
   });
 
   describe('uploadPaymentProof', () => {

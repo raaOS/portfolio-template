@@ -57,6 +57,13 @@ function hashAccessToken(token: string): string {
 
 const ACTIVE_PAYMENT_STATUSES = ['pending_payment', 'waiting_verification', 'activating'] as const;
 const DEFAULT_UNIQUE_AMOUNT_MAX_OFFSET = 999;
+// Kolam kode unik QRIS hanya punya 999 slot per nominal dasar/24 jam (audit
+// MEDIUM 2026-10-10): pesanan pending_payment yang tidak pernah dibayar bisa
+// mengunci slot sampai expires_at (created+24h) sehingga checkout baru bisa
+// ditolak "Nominal unik sedang penuh". Ambang usia ini dipakai sapuan DARURAT
+// (hanya saat kolam penuh) untuk membebaskan slot pesanan pending tua tanpa
+// menunggu24 jam penuh.
+const UNIQUE_POOL_RELEASE_AGE_HOURS = 6;
 
 // ---------------------------------------------------------------------------
 // Expiry Window & Sweeper
@@ -64,7 +71,14 @@ const DEFAULT_UNIQUE_AMOUNT_MAX_OFFSET = 999;
 const SWEEP_GUARD_KEY = 'billing_expire_sweep_at';
 const SWEEP_GUARD_INTERVAL_MS = 10 * 60 * 1000;
 
-async function expireStalePendingOrders(nowIso: string): Promise<void> {
+/**
+ * Sapuan expiry umum. `pendingCutoffIso` (opsional) hanya menggeser ambang
+ * expires_at untuk pesanan `pending_payment` — dipakai sapuan DARURAT saat
+ * kolam kode unik penuh (bebaskan slot pesanan tua tanpa menyentuh perilaku
+ * sapuan aktivasi macet & batal-7-hari yang tetap memakai `nowIso`).
+ */
+async function expireStalePendingOrders(nowIso: string, pendingCutoffIso?: string): Promise<void> {
+  const pendingCutoff = pendingCutoffIso ?? nowIso;
   // Recovery lock activation yang macet: jika aktivasi berlangsung > 10 menit,
   // besar kemungkinan Worker crash saat memproses. Kembalikan ke waiting_verification
   // agar admin bisa klik ulang tombol Aktivasi (idempoten, tanpa row nyangkut).
@@ -130,7 +144,7 @@ async function expireStalePendingOrders(nowIso: string): Promise<void> {
      FROM orders
      WHERE status = 'pending_payment'
        AND datetime(expires_at) <= datetime(?)`,
-    [nowIso]
+    [pendingCutoff]
   );
 
   const pendingStale = staleOrders || [];
@@ -141,7 +155,7 @@ async function expireStalePendingOrders(nowIso: string): Promise<void> {
      SET status = 'expired', updated_at = ?
      WHERE status = 'pending_payment'
        AND datetime(expires_at) <= datetime(?)`,
-    [nowIso, nowIso]
+    [nowIso, pendingCutoff]
   );
 
   // FIX #39: Dedupe notifikasi expired berdasarkan email buyer agar tidak
@@ -256,6 +270,12 @@ function escapeTelegramHtml(value: string | number | null | undefined): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function formatTemplateName(templateId?: string | null): string {
+  if (templateId === 'spatial-gallery') return '3D Spatial Gallery';
+  if (templateId === 'infinite-canvas') return 'Infinite Canvas';
+  return 'macOS Desktop';
 }
 
 function normalizePaymentProofUrl(proofUrl: string): string | null {
@@ -824,6 +844,7 @@ export async function createOrder(
   const baseAmount = input.amount ?? (await getBasePrice());
   let amount = baseAmount;
   let forceUniqueAmount = false;
+  let releasedStaleUniqueSlots = false;
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     // Regenerate id/token per attempt: jika UNIQUE constraint orders.id tabrakan
@@ -835,6 +856,20 @@ export async function createOrder(
       amount = Math.floor(await resolveOrderAmount(baseAmount, paymentConfig, forceUniqueAmount));
     } catch (err) {
       if (err instanceof Error && err.message.includes('Kode unik nominal')) {
+        // Kolam kode unik penuh (audit MEDIUM 2026-10-10 / keputusan owner):
+        // sekali saja per order, bebaskan slot dari pesanan pending_payment
+        // tua (usia > 6 jam; expires_at = created+24h → cutoff now+18h) lewat
+        // sapuan darurat, lalu alokasi ulang pada attempt berikutnya. Sapuan
+        // ini HANYA menyentuh pending_payment — aktivasi macet & batal-7-hari
+        // tetap memakai waktu sebenarnya (lihat signature expireStalePendingOrders).
+        if (!releasedStaleUniqueSlots && attempt < 2) {
+          releasedStaleUniqueSlots = true;
+          await expireStalePendingOrders(
+            createdAt,
+            new Date(now.getTime() + (24 - UNIQUE_POOL_RELEASE_AGE_HOURS) * 60 * 60 * 1000).toISOString()
+          );
+          continue;
+        }
         return { success: false, error: 'Nominal unik sedang penuh. Silakan coba lagi.' };
       }
       throw err;
@@ -902,6 +937,7 @@ export async function createOrder(
   // Notify Telegram Admin (Information only)
   const tgMsg = `🛒 <b>ORDER BARU (BELUM DIBAYAR)</b>\n\n` +
     `ID: <code>${escapeTelegramHtml(orderId)}</code>\n` +
+    `Template: <b>${escapeTelegramHtml(formatTemplateName(input.templateId))}</b>\n` +
     `Slug: <code>${escapeTelegramHtml(slugLower)}</code>\n` +
     `Buyer: ${escapeTelegramHtml(input.buyerName)}\n` +
     `WA: ${escapeTelegramHtml(input.buyerWhatsapp)}\n` +
@@ -1078,6 +1114,7 @@ export async function uploadPaymentProof(
     })();
     const tgMsg = `${headerTitle}\n\n` +
       `ID: <code>${escapeTelegramHtml(order.id)}</code>\n` +
+      `Template: <b>${escapeTelegramHtml(formatTemplateName(order.template_id))}</b>\n` +
       `Slug: <code>${escapeTelegramHtml(order.desired_slug)}</code>\n` +
       `Buyer: ${escapeTelegramHtml(order.buyer_name)}\n` +
       `WA: ${escapeTelegramHtml(order.buyer_whatsapp)}\n` +

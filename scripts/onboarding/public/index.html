@@ -222,7 +222,7 @@
     /* Template Radio Cards */
     .template-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 0.75rem;
       margin-bottom: 0.5rem;
     }
@@ -775,6 +775,11 @@
               <span class="template-name">Infinite Canvas</span>
               <span class="template-desc">Kanvas spasial bebas dengan kluster profil, proyek, keahlian, dan riwayat.</span>
               <span class="template-badge">Spasial Kanvas</span>
+            </div>
+            <div class="template-card" data-template="spatial-gallery" id="card-spatial">
+              <span class="template-name">Spatial Gallery</span>
+              <span class="template-desc">Galeri 3D spasial dengan curved grid, orbital artwork, dan detail interaktif.</span>
+              <span class="template-badge">3D Spasial</span>
             </div>
           </div>
         </div>
@@ -1369,18 +1374,30 @@
   // Template card click
   const cardOs = document.getElementById('card-os');
   const cardCanvas = document.getElementById('card-canvas');
+  const cardSpatial = document.getElementById('card-spatial');
 
   cardOs.addEventListener('click', () => {
     selectedTemplate = 'os-desktop';
     cardOs.classList.add('active');
     cardCanvas.classList.remove('active');
+    if (cardSpatial) cardSpatial.classList.remove('active');
   });
 
   cardCanvas.addEventListener('click', () => {
     selectedTemplate = 'infinite-canvas';
     cardCanvas.classList.add('active');
     cardOs.classList.remove('active');
+    if (cardSpatial) cardSpatial.classList.remove('active');
   });
+
+  if (cardSpatial) {
+    cardSpatial.addEventListener('click', () => {
+      selectedTemplate = 'spatial-gallery';
+      cardSpatial.classList.add('active');
+      cardOs.classList.remove('active');
+      cardCanvas.classList.remove('active');
+    });
+  }
 
   // Auto slugify name
   const nameInput = document.getElementById('clientName');
@@ -1388,6 +1405,8 @@
   const slugPreview = document.getElementById('slug-preview');
 
   nameInput.addEventListener('input', (e) => {
+    // Jangan timpa slug jika kotak slug sudah diisi manual atau dipilih dari saran order!
+    if (slugInput.dataset.manual === 'true' && slugInput.value.trim() !== '') return;
     const slug = e.target.value
       .toLowerCase()
       .trim()
@@ -1398,6 +1417,7 @@
   });
 
   slugInput.addEventListener('input', (e) => {
+    slugInput.dataset.manual = e.target.value.trim() !== '' ? 'true' : 'false';
     slugPreview.textContent = `https://${e.target.value || 'nama-klien'}.workers.dev`;
   });
 

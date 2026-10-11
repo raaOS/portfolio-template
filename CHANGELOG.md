@@ -3,6 +3,20 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.38] - 2026-10-11
+
+### 🚀 Portal Onboarding & Checkout: 3D Spatial Gallery, Saran Slug Pintar & Penjagaan Render OS
+
+- **Spatial Gallery di Portal Onboarding:** Template ke-3 `spatial-gallery` resmi didaftarkan ke portal visual `PENGELOLA_KLIEN.bat` (`index.html`, `server.ts`, dan `cloud-manager.ts`). Kartu pilihan 3D Spatial Gallery kini tersedia di form pendaftaran, pesan serah terima WhatsApp otomatis dibuat per-template, dan layout grid menyesuaikan 3 opsi.
+- **Pencegahan Human Error Form Portal:** Pengetikan nama klien tidak lagi menimpa (`overwrite`) kotak slug yang sudah dipilih dari saran order pembeli.
+- **Saran Slug Pintar ala Gmail di Checkout:** Halaman `/checkout` kini menampilkan kolom isian slug dengan pratinjau alamat live `https://[slug].workers.dev` dan 3 tombol saran cerdas (contoh: `budi`, `budi-portfolio`, `karya-budi`) yang dibuat otomatis saat pembeli mengetik nama.
+- **Transparansi Template di Notifikasi & Admin:** Notifikasi Telegram untuk pesanan baru dan bukti transfer kini secara eksplisit mencantumkan baris `Template: 3D Spatial Gallery / macOS Desktop / Infinite Canvas`. Panel pesanan admin (`OrdersPanel.tsx`) juga menampilkan label template di setiap kartu order.
+- **Penjagaan Render `useOSOverlays`:** Menambahkan hook aman `useOSOverlaysOptional` di `OSSystemContext.tsx` untuk `HomeOSWrapperInner` agar transisi antar-halaman preview tidak crash saat berada di luar provider.
+- **Sapuan Darurat Kolam Kode Unik QRIS (audit MEDIUM):** Saat kolam 999 kode unik penuh (pesanan pending tak terbayar mengunci slot), `createOrder` kini **sekali saja** melepas slot pesanan `pending_payment` tua (>6 jam) lewat `expireStalePendingOrders` dengan cutoff khusus — lalu alokasi ulang. Sapuan lain (aktivasi macet, batal 7 hari) tetap memakai waktu sebenarnya. Ada unit test baru (pool 2 slot disimulasikan).
+- **Label Serah Terima Portal:** Ringkasan "Template Dipilih" di surat serah terima kini menulis **"3D Spatial Gallery"** (sebelumnya salah cetak "Infinite Canvas" untuk template spatial).
+- **Info Alamat di Checkout (audit LOW):** Di bawah pratinjau slug kini dijelaskan bahwa alamat `*.workers.dev` sudah aktif & gratis selamanya dan bisa disambungkan ke domain pribadi (.com/.id) kapan saja.
+- **SOP Tertulis:** `docs/operations/GLADI_RESIK_KLIEN_PERDANA.md` §9 — SOP pembuatan akun Cloudflare klien (owner buatkan, email klien, incognito, jeda 1–2 akun/hari; jalur klien daftar sendiri untuk skala besar) + checklist anti struk palsu (wajib cocokkan mutasi bank asli sebelum Verifikasi & Aktifkan).
+
 ## [1.3.37] - 2026-10-11
 
 ### 💻 OS Desktop: HELLO hitam kini diputar sampai selesai baru ke halaman utama

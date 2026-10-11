@@ -66,6 +66,10 @@ export const useOSOverlays = (): OSOverlaysContextType => {
   return ctx;
 };
 
+export const useOSOverlaysOptional = (): OSOverlaysContextType | undefined => {
+  return useContext(OSOverlaysContext);
+};
+
 /**
  * Hook for media controls only (brightness, volume).
  * Use this for components like ControlCenter that only manipulate media state.

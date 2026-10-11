@@ -128,6 +128,43 @@ Baru** — detail langkah ada di `docs/release/CLIENT_OPERATIONS.md`:
 | Login admin gagal | Cek `arsip-klien/<slug>/config.env`; lupa password → `reset-customer-password.ts` |
 | Ada yang belum tahu harus ke mana | `docs/operations/support-playbook.md` §9 (Daftar Eskalasi) |
 
+## 9. SOP Khusus: Akun Cloudflare Klien & Verifikasi Pembayaran (keputusan owner 2026-10-11)
+
+### 9a. Siapa mendaftarkan akun Cloudflare klien
+
+**Keputusan: owner yang membuatkan** akun Cloudflare baru untuk tiap klien (target
+awal 50–100 klien, semuanya tier gratis — 1 klien = 1 akun).
+
+Prosedur per klien:
+
+1. Pakai **email asli milik klien** — akun legal milik klien sejak awal dan bisa
+   diserahkan kelak bila klien memintanya.
+2. Daftar lewat jendela **Incognito / profil browser terpisah**, tutup setelah selesai.
+3. **Jeda wajar: 1–2 akun per hari.** Yang diblokir Cloudflare adalah pola massal
+   (puluhan akun beruntun dari 1 IP) — bukan pembuatan akun satu per satu saat ada order.
+4. Setelah akun jadi, owner membuat **API Token** (template *Edit Cloudflare Workers*:
+   D1 Edit + R2 Edit + Workers Edit) + mencatat **Account ID** → langsung dipakai di
+   portal STEP 1–3 seperti gladi resik.
+5. Saat serah terima, sertakan juga **akses login akun Cloudflare** (email + password
+   yang tadi dibuat) bila klien menginginkannya — kredensial website `/admin` tetap
+   dibahas terpisah seperti biasa.
+
+Jalur alternatif untuk skala di atas ±100 klien atau klien yang melek teknis: klien
+**mendaftar sendiri** — owner mengirim panduan 3 langkah bergambar (1. daftar akun
+gratis, 2. buat API Token dari template yang sama, 3. kirim balik Account ID + Token).
+
+### 9b. Checklist verifikasi pembayaran manual (anti struk palsu)
+
+Gambar bukti transfer bisa diedit di HP — **hanya mutasi rekening asli yang jadi
+sumber kebenaran.** Sebelum menekan "Verifikasi & Aktifkan":
+
+- [ ] Buka **mutasi rekening asli** di m-Banking (jangan melihat gambar struk yang
+      diunggah pembeli).
+- [ ] Cocokkan **nominal persis** (termasuk 3 digit kode unik), tanggal/jam, dan
+      nama pengirim.
+- [ ] Nominal tidak ada di mutasi / meleset → **jangan aktifkan**; minta bukti ulang
+      atau biarkan order kedaluwarsa otomatis.
+
 ---
 
 **Selesai gladi = semua centang di atas terpenuhi dua kali berturut-turut (sekali dengan

@@ -34,6 +34,7 @@ interface OrderItem {
   buyer_whatsapp: string;
   amount: number;
   status: OrderStatus;
+  template_id?: string | null;
   payment_proof_url?: string | null;
   cancel_reason?: string | null;
   expires_at: string;
@@ -379,6 +380,15 @@ export default function OrdersPanel() {
                       <p className="text-xs text-gray-500">
                         Slug:{' '}
                         <span className="font-mono text-gray-700">{order.desired_slug || '-'}</span>
+                        <span className="mx-2 text-gray-300">·</span>
+                        Template:{' '}
+                        <span className="font-medium text-blue-700">
+                          {order.template_id === 'spatial-gallery'
+                            ? '3D Spatial Gallery'
+                            : order.template_id === 'infinite-canvas'
+                            ? 'Infinite Canvas'
+                            : 'macOS Desktop'}
+                        </span>
                       </p>
 
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">

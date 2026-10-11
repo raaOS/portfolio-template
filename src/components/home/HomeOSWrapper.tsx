@@ -6,7 +6,7 @@ import DesktopBackground from '@/components/os/ui/DesktopBackground';
 import type { DesktopEnvironmentProps } from '@/components/os/core/DesktopEnvironment';
 import { BackgroundEffectProvider, useBackgroundEffect } from './BackgroundEffectContext';
 import { GhostCursorsLayer } from '@/components/os/layers/GhostCursorsLayer';
-import { useOSOverlays } from '@/components/os/context/OSSystemContext';
+import { useOSOverlaysOptional } from '@/components/os/context/OSSystemContext';
 
 type DesktopComponent = React.ComponentType<DesktopEnvironmentProps>;
 const BOOT_SESSION_KEY = 'portfolio_os_booted';
@@ -71,7 +71,8 @@ export default function HomeOSWrapper(props: DesktopEnvironmentProps) {
 
 function HomeOSWrapperInner(props: DesktopEnvironmentProps) {
   const { isWindowOpen } = useBackgroundEffect();
-  const { showGhostCursors } = useOSOverlays();
+  const osOverlays = useOSOverlaysOptional();
+  const showGhostCursors = osOverlays?.showGhostCursors ?? false;
 
   // Keep the first client render identical to SSR. Reading window.innerWidth
   // in the state initializer makes mobile hydrate with a different background

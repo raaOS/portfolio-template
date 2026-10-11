@@ -10,12 +10,44 @@ function CheckoutForm() {
   const [buyerName, setBuyerName] = useState('');
   const [buyerEmail, setBuyerEmail] = useState('');
   const [buyerWhatsapp, setBuyerWhatsapp] = useState('');
+  const [desiredSlug, setDesiredSlug] = useState('');
+  const [slugTouched, setSlugTouched] = useState(false);
+  const [slugSuggestions, setSlugSuggestions] = useState<string[]>([]);
   const [templateId, setTemplateId] = useState('os-desktop');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [paymentActive, setPaymentActive] = useState(true);
+
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const name = e.target.value;
+    setBuyerName(name);
+
+    const clean = name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 24);
+
+    if (clean) {
+      const suggestions = [
+        clean,
+        `${clean}-portfolio`,
+        `karya-${clean}`,
+      ];
+      setSlugSuggestions(suggestions);
+      if (!slugTouched) {
+        setDesiredSlug(clean);
+      }
+    } else {
+      setSlugSuggestions([]);
+      if (!slugTouched) {
+        setDesiredSlug('');
+      }
+    }
+  };
   // Harga tampil dari payment-info (satu fetch untuk QRIS + harga);
   // nominal diorders tetap dihitung server dari D1. Fallback: BASE_PRICE.
   const [basePrice, setBasePrice] = useState(BASE_PRICE);
@@ -75,6 +107,7 @@ function CheckoutForm() {
           buyerName: buyerName.trim(),
           buyerEmail: buyerEmail.trim(),
           buyerWhatsapp: buyerWhatsapp.trim(),
+          desiredSlug: desiredSlug.trim().toLowerCase(),
           templateId,
         }),
       });
@@ -129,8 +162,69 @@ function CheckoutForm() {
               required
               placeholder="Nama Anda"
               value={buyerName}
-              onChange={(e) => setBuyerName(e.target.value)}
+              onChange={handleNameChange}
             />
+          </div>
+
+          <div className="checkout-field">
+            <label htmlFor="checkout-slug">Alamat website yang diinginkan (Slug URL)</label>
+            <input
+              id="checkout-slug"
+              type="text"
+              required
+              placeholder="contoh: budi-kreatif"
+              value={desiredSlug}
+              onChange={(e) => {
+                setSlugTouched(true);
+                setDesiredSlug(
+                  e.target.value
+                    .toLowerCase()
+                    .replace(/[^a-z0-9-]/g, '')
+                    .replace(/^-+/, '')
+                );
+              }}
+            />
+            <div style={{ marginTop: '0.35rem', fontSize: '0.75rem', color: '#666' }}>
+              Alamat website Anda nantinya:{' '}
+              <code style={{ background: '#f1f5f9', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 600, color: '#0f172a' }}>
+                https://{desiredSlug || 'nama-anda'}.workers.dev
+              </code>
+              <br />
+              Alamat di atas sudah aktif dan gratis selamanya. Nanti bisa
+              disambungkan ke domain pribadi (.com / .id) kapan saja bila
+              diperlukan.
+            </div>
+
+            {slugSuggestions.length > 0 && (
+              <div style={{ marginTop: '0.5rem' }}>
+                <span style={{ fontSize: '0.75rem', color: '#666', marginRight: '0.5rem' }}>Pilihan saran:</span>
+                <div style={{ display: 'inline-flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.25rem' }}>
+                  {slugSuggestions.map((sug) => (
+                    <button
+                      key={sug}
+                      type="button"
+                      onClick={() => {
+                        setDesiredSlug(sug);
+                        setSlugTouched(true);
+                      }}
+                      style={{
+                        fontSize: '0.72rem',
+                        padding: '0.2rem 0.55rem',
+                        borderRadius: '9999px',
+                        border: desiredSlug === sug ? '1px solid #1e40af' : '1px solid #cbd5e1',
+                        background: desiredSlug === sug ? '#eff6ff' : '#ffffff',
+                        color: desiredSlug === sug ? '#1e40af' : '#475569',
+                        fontWeight: desiredSlug === sug ? 600 : 500,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {sug}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="checkout-field">

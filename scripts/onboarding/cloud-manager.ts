@@ -193,7 +193,7 @@ async function handleOnboard() {
 
   const clientName = getParam('--name', 'CLIENT_NAME');
   let clientSlug = getParam('--slug', 'CLIENT_SLUG');
-  const templateKey = (getParam('--template', 'TEMPLATE_KEY', 'os-desktop') as 'os-desktop' | 'infinite-canvas');
+  const templateKey = (getParam('--template', 'TEMPLATE_KEY', 'os-desktop') as 'os-desktop' | 'infinite-canvas' | 'spatial-gallery');
   const adminEmail = getParam('--email', 'ADMIN_EMAIL');
   const accountId = getParam('--account-id', 'CLOUDFLARE_ACCOUNT_ID');
   const apiToken = getParam('--api-token', 'CLOUDFLARE_API_TOKEN');
