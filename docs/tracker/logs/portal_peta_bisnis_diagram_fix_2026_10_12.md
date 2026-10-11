@@ -41,6 +41,22 @@ Tab **Peta Bisnis** di portal `PENGELOLA_KLIEN.bat` menampilkan dua kotak merah 
 - File `.mmd` adalah teks yang di-edit AI/owner manual — **tanda kutip lurus di dalam label adalah jebakan Mermaid yang tidak diberi peringatan**. Jangan pakai `\"`; hapus kutip atau pakai tanda lain.
 - Pesan error yang menunjuk penyebab paling "terasa" (internet) padahal gagal di tahap lain membuat bug sulit dilaporkan — sejak perbaikan ini setiap tahap punya pesan sendiri.
 
+## Putaran 2 — Visual garis tebal (permintaan owner 2026-10-12)
+
+> Laporan: _"perbaiki visual diagram, garis hitam tebal sudut 90°-nya banyak yang berkelok-kelok, seharusnya cukup 1; segitiga petunjuknya tidak simetris"_
+
+**Diagnosis (inspeksi DOM SVG live):** garis tebal `edge-thickness-thick` (3.5px) lolos dari perbaikan `straightenEdges` karena fungsi itu hanya merapikan EKOR jalur — badan staircase mermaid dibiarkan. Segitiga panah sebenarnya simetris (marker `orient=auto`) tetapi tampak miring karena segmen terakhir mendekati kotak tidak lurus sumbu / masuk off-center.
+
+**Perbaikan (`straightenEdges`, `scripts/onboarding/public/index.html`):**
+- Jalur tebal dirangkum jadi **1 belokan**: kandidat A (mendatar lalu tegak, masuk **tengah atas** kotak) dan kandidat B (tegak lalu mendatar, masuk samping menghadap sumber); kandidat C (2 belokan lewat koridor bebas) untuk jalur padat; semua kandidat diuji **bebas tabrak** terhadap seluruh kotak (kecuali sumber/tujuan) — bila semua tabrak, jalur mermaid dipertahankan.
+- Toleransi deteksi tepi samping 6px → 10px (pangkasan mermaid untuk garis tebal ~8px).
+- Jangkar keluar/masuk mermaid dipertahankan sebagai basis perhitungan → rute baru tetap melewati ruang aman yang sudah dipilih layout.
+
+**Verifikasi (browser harness, kedua diagram):**
+- Alur bisnis: **6/6 garis tebal = 1 belokan**, Peta Aset: 3 garis = 1 belokan + CF3→PB2 = 2 belokan (koridor padat AU1/AU2/CF1).
+- **10/10 nol tabrakan kotak** (pemeriksa numerik per segmen), 10/10 segmen penutup lurus sumbu → panah simetris.
+- Konsol browser: 0 error. Screenshot visual: kedua diagram bersih.
+
 ## File yang Dimodifikasi
 
 - `docs/diagrams/alur-bisnis.mmd`
