@@ -5,10 +5,14 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Copy,
+  Link2,
+  Plus,
   Receipt,
   RefreshCw,
   RotateCcw,
   Search,
+  X,
   XCircle,
 } from 'lucide-react';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
@@ -126,6 +130,19 @@ export default function OrdersPanel() {
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  // Alur B (chat-first): form buat order dari panel + link checkout hasil
+  // pembuatan (hanya tampil sekali — token mentah tidak disimpan di server).
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    buyerName: '',
+    buyerEmail: '',
+    buyerWhatsapp: '',
+    desiredSlug: '',
+    templateId: '',
+  });
+  const [isCreating, setIsCreating] = useState(false);
+  const [createdLink, setCreatedLink] = useState<{ orderId: string; url: string } | null>(null);
+
   const totalPages = Math.max(1, Math.ceil(total / PAGE_LIMIT));
 
   const loadOrders = useCallback(async () => {
@@ -236,6 +253,65 @@ export default function OrdersPanel() {
     }
   };
 
+  const submitCreateOrder = async (event: React.FormEvent): Promise<void> => {
+    event.preventDefault();
+    if (isCreating) return;
+
+    setIsCreating(true);
+    setError('');
+    try {
+      const res = await fetch('/api/admin/orders', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-csrf-token': getWritableCsrfToken(csrfToken),
+        },
+        body: JSON.stringify({
+          action: 'create',
+          buyerName: createForm.buyerName.trim(),
+          buyerEmail: createForm.buyerEmail.trim(),
+          buyerWhatsapp: createForm.buyerWhatsapp.trim(),
+          desiredSlug: createForm.desiredSlug.trim() || undefined,
+          templateId: createForm.templateId.trim() || undefined,
+        }),
+      });
+      const payload = (await res.json()) as OrderActionPayload & {
+        order?: OrderItem;
+        checkoutUrl?: string;
+      };
+      if (!res.ok || !payload.success || !payload.order) {
+        throw new Error(payload.error || 'Gagal membuat order');
+      }
+
+      showSuccess(payload.message || `Order ${payload.order.id} dibuat`);
+      setCreateForm({ buyerName: '', buyerEmail: '', buyerWhatsapp: '', desiredSlug: '', templateId: '' });
+      // Link checkout hanya bisa ditampilkan sekali (token tidak disimpan mentah
+      // di server) — tampilkan di kotak salin, jangan ditutup sembarangan.
+      setCreatedLink({ orderId: payload.order.id, url: payload.checkoutUrl || '' });
+      setShowCreateForm(false);
+      setPage(1);
+      await loadOrders();
+    } catch (err) {
+      console.error('[OrdersPanel] Buat order gagal:', err);
+      const message = err instanceof Error ? err.message : 'Gagal membuat order';
+      setError(message);
+      showError(message);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const copyCheckoutLink = async (): Promise<void> => {
+    if (!createdLink?.url) return;
+    try {
+      await navigator.clipboard.writeText(createdLink.url);
+      showSuccess('Link checkout disalin');
+    } catch {
+      showError('Gagal menyalin — salin manual dari kotak di bawah');
+    }
+  };
+
   const applySearch = (event: React.FormEvent) => {
     event.preventDefault();
     setPage(1);
@@ -318,6 +394,14 @@ export default function OrdersPanel() {
               <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
               Segarkan
             </button>
+            <button
+              type="button"
+              onClick={() => setShowCreateForm((value) => !value)}
+              className="flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
+            >
+              <Plus size={14} />
+              Buat Pesanan
+            </button>
           </div>
         </div>
         <p className="mt-2 text-xs text-gray-400">
@@ -326,6 +410,129 @@ export default function OrdersPanel() {
             : `${orders.length} order ditampilkan · ${total} total`}
         </p>
       </div>
+
+      {/* Alur B: buat order dari panel (chat-first) + kotak link checkout */}
+      {showCreateForm && (
+        <form
+          onSubmit={submitCreateOrder}
+          className="shrink-0 border-b border-gray-100 bg-blue-50/40 px-6 py-4"
+        >
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-gray-800">Buat Pesanan Baru (Alur Chat)</p>
+            <button
+              type="button"
+              onClick={() => setShowCreateForm(false)}
+              aria-label="Tutup form buat pesanan"
+              className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-white hover:text-gray-600"
+            >
+              <X size={16} />
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-gray-500">
+            Setelah deal di WhatsApp: isi data pembeli di sini, lalu <b>salin link checkout</b> dan
+            kirim ke pembeli. Link hanya tampil satu kali.
+          </p>
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <label className="block text-xs text-gray-600">
+              Nama pembeli *
+              <input
+                required
+                value={createForm.buyerName}
+                onChange={(event) => setCreateForm((prev) => ({ ...prev, buyerName: event.target.value }))}
+                placeholder="Budi Santoso"
+                className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-800 outline-none transition-colors focus:border-blue-500"
+              />
+            </label>
+            <label className="block text-xs text-gray-600">
+              Email pembeli *
+              <input
+                required
+                type="email"
+                value={createForm.buyerEmail}
+                onChange={(event) => setCreateForm((prev) => ({ ...prev, buyerEmail: event.target.value }))}
+                placeholder="budi@mail.com"
+                className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-800 outline-none transition-colors focus:border-blue-500"
+              />
+            </label>
+            <label className="block text-xs text-gray-600">
+              WhatsApp pembeli *
+              <input
+                required
+                value={createForm.buyerWhatsapp}
+                onChange={(event) => setCreateForm((prev) => ({ ...prev, buyerWhatsapp: event.target.value }))}
+                placeholder="0812xxxxxxx"
+                className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-800 outline-none transition-colors focus:border-blue-500"
+              />
+            </label>
+            <label className="block text-xs text-gray-600">
+              Slug (opsional — otomatis dari nama)
+              <input
+                value={createForm.desiredSlug}
+                onChange={(event) => setCreateForm((prev) => ({ ...prev, desiredSlug: event.target.value }))}
+                placeholder="budi-portfolio"
+                className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-800 outline-none transition-colors focus:border-blue-500"
+              />
+            </label>
+            <label className="block text-xs text-gray-600">
+              Template
+              <select
+                value={createForm.templateId}
+                onChange={(event) => setCreateForm((prev) => ({ ...prev, templateId: event.target.value }))}
+                className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-800 outline-none transition-colors focus:border-blue-500"
+              >
+                <option value="">macOS Desktop</option>
+                <option value="infinite-canvas">Infinite Canvas</option>
+                <option value="spatial-gallery">3D Spatial Gallery</option>
+              </select>
+            </label>
+            <div className="flex items-end">
+              <button
+                type="submit"
+                disabled={isCreating}
+                className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isCreating ? 'Membuat…' : 'Buat & Dapatkan Link'}
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
+
+      {/* Link checkout baru dibuat — satu-satunya kesempatan menyalinnya */}
+      {createdLink && (
+        <div className="shrink-0 border-b border-emerald-200 bg-emerald-50 px-6 py-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-emerald-800">
+                <Link2 size={14} />
+                Link checkout {createdLink.orderId} — salin & kirim ke pembeli via WhatsApp
+              </p>
+              <p className="mt-0.5 truncate font-mono text-xs text-emerald-700" title={createdLink.url}>
+                {createdLink.url || 'Link tidak tersedia — buat ulang pesanan'}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              {createdLink.url && (
+                <button
+                  type="button"
+                  onClick={() => void copyCheckoutLink()}
+                  className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-700"
+                >
+                  <Copy size={13} />
+                  Salin Link
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setCreatedLink(null)}
+                className="rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+              >
+                Sudah Disalin
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       <div className="min-h-0 flex-1 overflow-y-auto p-6" data-lenis-prevent>

@@ -562,6 +562,8 @@ npx wrangler deploy --config .open-next/wrangler.client.<slug>.jsonc
 
 > Zone "Manajemen Sistem & Klien" (clientDashboard, paymentConfig, orders) sudah dihapus sepenuhnya (registry bersih + berkas panel `ClientDashboardPanel`/`PaymentConfigPanel` dihapus pada v1.3.20; panel `OrdersPanel` dihapus lalu **dibuat ulang** di v1.3.29 sebagai app "Pesanan" — `/admin/system/orders`). Endpoint `orders` tetap hidup (dipakai panel Pesanan, script load-test, support-playbook); endpoint `payment-config` **sudah dihapus total** 2026-10-09 (route + fungsi service `getAdminPaymentConfig`/`updatePaymentConfig` — nol pemanggil, billing baca `paymentConfigService` langsung, bukan lewat API); endpoint `sites` tetap hidup untuk tooling.
 
+**Alur order chat-first (v1.3.40):** penjualan utama lewat WhatsApp — owner **membuat order dari panel Pesanan** (`POST /api/admin/orders` dengan `action: 'create'`) lalu menyalin link checkout ke pembeli. `createOrder` hanya mengembalikan token mentah saat pembuatan (D1 menyimpan `access_token_hash`), jadi link **tidak bisa dibaca ulang** — hanya tampil sekali di respons. Jalur ini sengaja tidak kena rate-limit publik `billing_checkout` (pemanggil = owner, sudah `requireOwnerMode` + auth + CSRF). Checkout publik `/checkout` **tetap terbuka** sebagai jalur sekunder & fondasi otomasi masa depan — jangan dihapus. Aturan operasional: **cek mutasi → aktifkan → deploy** (urutan wajib, lihat `docs/operations/support-playbook.md` §0).
+
 ### Test Mock Pattern
 
 Saat menulis test untuk routes yang pakai auth:

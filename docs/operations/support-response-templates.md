@@ -135,22 +135,62 @@ Salam,
 
 ---
 
-## Billing / Payment (Placeholder)
+## Billing / Payment
 
-### Template
+Alur order utama = chat-first (v1.3.40): deal di WhatsApp → owner buat order di panel
+Pesanan → kirim link checkout → pembeli bayar & upload bukti → owner cek mutasi →
+aktivasi. Template di bawah disusun mengikuti alur itu.
+
+### A. Kirim Link Checkout (setelah deal, sebelum bayar)
 
 ```
 Halo [nama buyer],
 
-Terima kasih sudah menghubungi kami terkait pembayaran.
+Siap ya, pesanan kakak sudah kami buat. Berikut link checkout-nya (berlaku 24 jam):
 
-[Bagian ini akan dilengkapi setelah sistem billing otomatis aktif di Sprint 47.]
+[link checkout]
 
-Untuk sementara, jika ada masalah terkait aktivasi pesanan atau status pembayaran, silakan hubungi kami langsung dan kami akan bantu secara manual.
+Mohon transfer sesuai nominal unik yang tertera supaya otomatis tercatat, lalu
+upload bukti bayarnya di halaman yang sama. Kalau ada kendala, balas pesan ini aja.
 
 Salam,
 [nama operator]
 ```
+
+### B. Bukti Bayar Diterima, Menunggu Verifikasi
+
+```
+Halo [nama buyer],
+
+Bukti pembayaran kakak sudah kami terima dan sedang kami verifikasi di rekening kami.
+Estimasi selesai maksimal 1x24 jam — kalau sudah aktif, kakak akan langsung
+mendapat email pemberitahuan.
+
+Terima kasih sudah sabar menunggu.
+
+Salam,
+[nama operator]
+```
+
+### C. Pembayaran Telat (order sudah kedaluwarsa)
+
+```
+Halo [nama buyer],
+
+Terima kasih infonya. Pesanan kakak kebetulan sudah lewat masa 24 jam sehingga
+statusnya kedaluwarsa, tapi tenang — kami sudah mengecek dan pembayaran kakak
+masuk. Kami buka kembali pesanannya, ya.
+
+Mohon upload ulang bukti bayarnya di link yang sama, lalu akan kami verifikasi
+dan langsung diproses.
+
+Salam,
+[nama operator]
+```
+
+> Aturan internal (playbook §0): **cek mutasi rekening sendiri dulu** sebelum memakai
+> template B atau C. Jangan pernah mengklaim "sedang diverifikasi" atas dasar unggahan
+> bukti semata, dan jangan deploy sebelum order berstatus aktif.
 
 ---
 

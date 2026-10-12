@@ -354,7 +354,11 @@ describe('orderService', () => {
         .mockResolvedValueOnce([]) // expire stale pending orders (cutoff waktu nyata)
         .mockResolvedValueOnce(tinyPoolConfig)
         .mockResolvedValueOnce([]) // M5: duplicate order check
-        .mockResolvedValueOnce([]) // harga dasar (fallback)
+        // NB: TIDAK ada mock "harga dasar" — input.amount (199000) membuat
+        // `input.amount ?? getBasePrice()` short-circuit sehingga query harga
+        // dasar tak pernah terjadi; mock sisa di sini akan menggeser seluruh
+        // antrian queryD1 berikutnya (dulu: flaky 50%, skenario kolam penuh
+        // tak pernah benar-benar terjalani).
         .mockResolvedValueOnce([{ amount: 199001 }, { amount: 199002 }]) // kolam penuh (2/2)
         .mockResolvedValueOnce([]) // sapuan darurat: activating-recovery
         .mockResolvedValueOnce([]) // sapuan darurat: 7-day auto-cancel

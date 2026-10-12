@@ -3,6 +3,27 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.40] - 2026-10-12
+
+### 💬 Alur Pesanan Chat-First (Alur B): Buat Order dari Panel + Link Checkout Sekali Salin
+
+Keputusan owner setelah kajian kepercayaan pembeli: penjualan lewat **percakapan WhatsApp dulu, checkout belakangan** — keputusan deal dan data pembeli diverifikasi owner sebelum order dibuat. Mekanisme pembayaran (QRIS nominal unik, upload bukti, verifikasi, aktivasi) **tidak berubah sama sekali**; yang berubah hanya siapa yang mengisi form checkout.
+
+- **Endpoint baru `action=create` di `POST /api/admin/orders`:** owner membuat order atas nama pembeli (nama, email, WA wajib; slug opsional — auto-generate dari nama, sama seperti checkout publik). Sengaja **tidak melewati rate-limit publik** `billing_checkout` (5/menit per IP) karena pemanggilnya owner sendiri — anti-spam publik tidak relevan di jalur admin. Route tetap terkunci `requireOwnerMode()` (404 di site klien) + auth + CSRF.
+- **Link checkout sekali salin:** `createOrder` hanya mengembalikan token mentah saat pembuatan (di D1 tersimpan `access_token_hash`), jadi panel menampilkan kotak hijau berisi link + tombol **Salin Link** sesaat setelah order dibuat, lengkap dengan peringatan bahwa link hanya tampil satu kali. Token dicetak ke respons admin (bukan publik), dibatasi owner-mode + CSRF.
+- **Panel Pesanan (`/admin/system/orders`):** tombol **Buat Pesanan** di toolbar membuka form ringkas (nama, email, WA, slug, pilihan template) — alur owner kini: chat deal → buat order → salin link → kirim WA ke pembeli.
+- **Perilaku checkout publik TIDAK dihapus.** `/checkout` tetap terbuka sebagai jalur mandiri pembeli yang mengisi sendiri, dan sebagai persiapan otomasi penuh (bayar → deploy) di masa depan. Alur chat-first hanya memindahkan *default*, bukan menghapus pilihan.
+- **+3 test route** (`action=create` sukses + slug auto-generate, validasi data wajib, error service diteruskan 400). Total route orders: 10/10 PASS.
+- **Perbaikan test flaky `orderService` (temuan review 2026-10-12):** test "melepas slot kode unik dari pesanan pending tua" menyediakan mock "harga dasar" yang tak pernah dipanggil (`input.amount` membuat `input.amount ?? getBasePrice()` short-circuit) → seluruh antrian `queryD1` bergeser satu posisi: test gagal ~50% (flaky) **dan** skenario kolam penuh tak pernah benar-benar terjalani bahkan saat lulus. Mock sisa dihapus + komentar penjelas; kini deterministik 37/37 PASS (dijalankan 6× berturut-turut).
+
+- **Menu di jendela `PENGELOLA_KLIEN.bat` diperbarui:** daftar menu di layar kini mencantumkan tab **[5] Peta Bisnis** — sebelumnya daftar berhenti di [4] padahal tab-nya sudah ada sejak v1.3.32, sehingga owner pemula tidak tahu diagram alur jualan itu ada di mana. (File `.bat` sendiri hanya peluncur — teks alur bisnis tetap tersentral di `docs/diagrams/*.mmd`, yang dibaca portal saat tab Peta Bisnis dibuka.)
+
+### 📚 Dokumentasi Alur Baru
+
+- **Diagram alur bisnis** (`docs/diagrams/alur-bisnis.mmd`, tampil di tab Peta Bisnis portal): node P1/P2/S1/O1–O2 ditulis ulang — pembeli kini chat WhatsApp dulu, order dibuat owner dari panel, link checkout dikirim via WA, verifikasi mutasi sebelum aktivasi.
+- **Playbook dukungan** (`docs/operations/support-playbook.md`): alur order baru + kebiasaan wajib **"cek mutasi → aktifkan → deploy"** (jangan deploy dari notifikasi) + penanganan pembayaran telat via Buka Kembali.
+- **Panduan owner** & **sales guide** disesuaikan ke alur chat-first; template balasan WhatsApp siap pakai ditambahkan.
+
 ## [1.3.39] - 2026-10-12
 
 ### 🛠️ Portal Onboarding: Tab "Peta Bisnis" Kembali Menampilkan Kedua Diagram

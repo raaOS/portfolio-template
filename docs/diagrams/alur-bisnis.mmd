@@ -1,10 +1,11 @@
 %% Peta alur bisnis Portfolio OS — milik owner, bahasa non-IT.
 %% Sumber kebenaran tunggal: dirender portal PENGELOLA_KLIEN (tab "Peta Bisnis").
 %% Ubah file ini saja bila alur berubah; portal otomatis menampilkan versi terbaru.
+%% CATATAN EDIT: jangan pakai kutip lurus di dalam label ["..."] — Mermaid gagal parse.
 flowchart TB
   subgraph PEMBELI["PEMBELI (klien)"]
-    P1["1. Pesan lewat website<br/>isi nama, email,<br/>alamat situs"]
-    P2["2. Bayar Rp199.000 sekali<br/>QRIS/transfer -<br/>nominal unik - 24 jam"]
+    P1["1. Chat WhatsApp:<br/>tanya-tanya, lihat demo,<br/>deal harga & pilih template"]
+    P2["2. Terima link checkout<br/>dari owner, lalu bayar<br/>QRIS/transfer -<br/>nominal unik - 24 jam"]
     P3["3. Upload bukti bayar<br/>di halaman order"]
     P4["4. Terima email serah-terima +<br/>pesan WhatsApp berisi<br/>akses login"]
     P5["5. Login /admin - isi konten<br/>sendiri: profil, project,<br/>kontak, testimoni"]
@@ -14,11 +15,11 @@ flowchart TB
   end
 
   subgraph SISTEM["SISTEM (otomatis, 24 jam)"]
-    S1["Terima pesanan: buat order,<br/>kirim email struk,<br/>catat log, anti-spam"]
+    S1["Terima pesanan dari panel<br/>owner: buat order +<br/>nominal unik, kirim struk<br/>email, catat log, anti-spam"]
     S2{"Dibayar<br/>dalam 24 jam?"}
     S3["Order kedaluwarsa:<br/>nominal dilepas +<br/>email pembatalan"]
     S4{"Bukti bayar<br/>diterima?"}
-    S5["Aktivasi: tandai order<br/>aktif + email pembayaran<br/>terverifikasi (janji online<br/>maks 1×24 jam), kirim tiket<br/>kerja 6 langkah ke<br/>Telegram owner"]
+    S5["Aktivasi: tandai order<br/>aktif + email pembayaran<br/>terverifikasi (janji online<br/>maks 1x24 jam), kirim tiket<br/>kerja 6 langkah ke<br/>Telegram owner"]
     S6["Setiap hari 01:00 WIB:<br/>backup database<br/>(simpan 7 terbaru) +<br/>bersihkan order kadaluarsa"]
     S1 --> S2
     S2 -->|tidak| S3
@@ -27,18 +28,20 @@ flowchart TB
   end
 
   subgraph OWNER["ANDA (owner)"]
-    O1["Terima notifikasi<br/>Telegram"]
-    O2["Cek bukti bayar -<br/>aktifkan order"]
-    O3["Bengkel 6 langkah:<br/>Gmail klien, akun<br/>Cloudflare, portal<br/>PENGELOLA_KLIEN,<br/>pasang skema,<br/>deploy ke akun klien"]
-    O4["Kirim WhatsApp<br/>serah terima"]
-    O5["Dampingi: reset password<br/>klien, pasang custom domain"]
-    O1 --> O2 --> O3 --> O4 --> O5
+    O1["1. Chat WhatsApp:<br/>jawab tanya, sepakati<br/>harga, template & slug"]
+    O2["2. Buat order di panel<br/>Pesanan, salin link<br/>checkout, kirim ke<br/>pembeli via WhatsApp"]
+    O3["3. Terima notifikasi<br/>Telegram - cek mutasi<br/>rekening - BARU<br/>aktifkan order"]
+    O4["4. Bengkel 6 langkah:<br/>Gmail klien, akun<br/>Cloudflare, portal<br/>PENGELOLA_KLIEN,<br/>pasang skema,<br/>deploy ke akun klien"]
+    O5["5. Kirim WhatsApp<br/>serah terima"]
+    O6["6. Dampingi: reset password<br/>klien, pasang custom domain"]
+    O1 --> O2 --> O3 --> O4 --> O5 --> O6
   end
 
-  P1 ==> S1
-  S1 -.-> O1
+  P1 ==> O1
+  O2 ==> S1
+  S1 -.-> O3
   P3 ==> S4
-  O2 ==> S5
+  O3 ==> S5
   S5 ==> P4
-  O3 ==> P5
-  P6 ==> O5
+  O4 ==> P5
+  P6 ==> O6
