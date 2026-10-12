@@ -12,7 +12,13 @@ import { SpatialProjectModal } from './SpatialProjectModal'
 // tidak menyentuh bundle hidrasi awal (P41->target, lihat SpatialScene.tsx).
 const SpatialCanvas = dynamic(() => import('./SpatialScene'), { ssr: false })
 
-export default function SpatialGalleryRenderer({ data }: { data?: { projects?: Project[]; about?: AboutData } }) {
+export default function SpatialGalleryRenderer({
+  data,
+  suppressIntro = false,
+}: {
+  data?: { projects?: Project[]; about?: AboutData };
+  suppressIntro?: boolean;
+}) {
   const containerRef = useRef<HTMLDivElement>(null)
   const targetCenterUv = useRef({ x: 0.5, y: 0.5 })
   const projectsRaw = data?.projects
@@ -217,8 +223,11 @@ export default function SpatialGalleryRenderer({ data }: { data?: { projects?: P
 
         {/* Intro HELLO (v1.3.36): animasi diputar sampai selesai satu putaran
             penuh — baru fade-out menampilkan galeri. Disembunyikan lebih awal
-            kalau scene 3D sudah siap sebelum animasi selesai (ready). */}
-        <HelloIntro ready={sceneReady} />
+            kalau scene 3D sudah siap sebelum animasi selesai (ready).
+            `suppressIntro`: saat loader app aktif dengan gaya deck-reveal,
+            gate homepage yang memegang animasi boot → intro ini disenyapkan
+            supaya tidak dobel. */}
+        {!suppressIntro && <HelloIntro ready={sceneReady} />}
 
         {/* Brand overlay */}
         <div className="absolute bottom-6 left-6 z-10 text-white/80 text-sm font-semibold tracking-wide select-none pointer-events-none">

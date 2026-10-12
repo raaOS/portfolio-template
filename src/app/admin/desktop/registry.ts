@@ -22,6 +22,7 @@ import {
   DatabaseBackup,
   Banknote,
   Receipt,
+  MonitorPlay,
 } from 'lucide-react';
 import type { AdminZone } from './types';
 
@@ -228,6 +229,15 @@ const ALL_ADMIN_ZONES: AdminZone[] = [
         defaultWidth: 800,
         defaultHeight: 550,
       },
+      {
+        id: 'loader',
+        label: 'Loader Animasi',
+        icon: MonitorPlay,
+        iconColor: 'text-violet-600',
+        iconBg: 'bg-violet-100',
+        defaultWidth: 950,
+        defaultHeight: 700,
+      },
     ],
   },
   {
@@ -308,6 +318,7 @@ export const APP_ROUTE_MAP: Record<string, string> = {
   dock: '/admin/system/dock',
   widgets: '/admin/system/widgets',
   sounds: '/admin/system/sounds',
+  loader: '/admin/system/loader',
   ai: '/admin/system/ai',
   analytics: '/admin/system/analytics',
   activityLog: '/admin/system/activity-log',

@@ -48,6 +48,7 @@ export function HelloIntro({ ready = true }: HelloIntroProps) {
   return (
     <div
       aria-hidden="true"
+      data-testid="hello-intro"
       className="pointer-events-none fixed inset-0 z-[200] flex items-center justify-center bg-black"
       style={{ opacity: leaving ? 0 : 1, transition: `opacity ${FADE_MS / 1000}s ease` }}
     >

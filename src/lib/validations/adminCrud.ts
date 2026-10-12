@@ -317,6 +317,21 @@ const spatialGalleryConfigSchema = z
   })
   .strict();
 
+const loaderConfigSchema = z
+  .object({
+    enabled: z.boolean(),
+    style: z.enum(['deck-reveal', 'hello']),
+    imageProjectIds: z.array(shortText(200)).max(10),
+    durationMs: z.coerce.number().int().min(1000).max(10000).optional(),
+    accentColor: z
+      .string()
+      .trim()
+      .regex(/^#[0-9a-fA-F]{3,8}$/, 'Harus berupa hex color valid')
+      .optional(),
+    showCounter: z.boolean().optional(),
+  })
+  .strict();
+
 export const updateAboutSchema = z
   .object({
     hero: aboutHeroSchema.partial().optional(),
@@ -331,6 +346,7 @@ export const updateAboutSchema = z
     soundConfig: z.record(z.string(), soundSettingSchema).optional(),
     labels: aboutLabelsSchema.optional(),
     spatialGalleryConfig: spatialGalleryConfigSchema.optional(),
+    loaderConfig: loaderConfigSchema.optional(),
   })
   .strict()
   .refine(

@@ -370,6 +370,14 @@
     ],
     "blur": 0
   },
+  "loaderConfig": {
+    "enabled": false,
+    "style": "deck-reveal",
+    "imageProjectIds": [],
+    "durationMs": 2800,
+    "accentColor": "#1500E1",
+    "showCounter": true
+  },
   "dockConfig": {
     "whatsapp": {
       "iconUrl": "/assets/icons-library/1769438534384-c2qoxrffhwv2-icnsfile-bd87257a063e75f0f7d799a64ab43302-whatsapp-business.webp",

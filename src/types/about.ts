@@ -184,6 +184,25 @@ export interface SoundConfig {
   [key: string]: SoundSetting;
 }
 
+export type LoaderStyle = 'deck-reveal' | 'hello';
+
+export interface LoaderConfig {
+  enabled: boolean;
+  /** Gaya loader — enum supaya nanti bisa tambah gaya lain tanpa breaking change. */
+  style: LoaderStyle;
+  /**
+   * ID project yang cover-nya dipakai sebagai layer gambar loader (maks 10).
+   * Hanya dipakai gaya `deck-reveal`; diabaikan untuk `hello`.
+   */
+  imageProjectIds: string[];
+  /** Total durasi animasi dalam ms (hanya gaya `deck-reveal`). */
+  durationMs?: number;
+  /** Warna placeholder layer (hex) (hanya gaya `deck-reveal`). */
+  accentColor?: string;
+  /** Tampilkan counter [0]→[100] (hanya gaya `deck-reveal`). */
+  showCounter?: boolean;
+}
+
 export interface AboutData {
   hero: AboutHero;
   professional: AboutProfessional;
@@ -198,6 +217,7 @@ export interface AboutData {
   islandNotifications?: AboutIslandNotification[];
   soundConfig?: SoundConfig;
   spatialGalleryConfig?: SpatialGalleryConfig;
+  loaderConfig?: LoaderConfig;
 
   labels?: {
     experienceTitle?: string;
@@ -230,6 +250,7 @@ export interface UpdateAboutData {
   islandNotifications?: AboutIslandNotification[];
   soundConfig?: SoundConfig;
   spatialGalleryConfig?: SpatialGalleryConfig;
+  loaderConfig?: LoaderConfig;
 
   labels?: Partial<AboutData['labels']>;
 }

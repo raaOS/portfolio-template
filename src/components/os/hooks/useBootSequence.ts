@@ -5,6 +5,13 @@ import { soundManager } from '../utils/SoundManager';
 
 interface BootSequenceConfig {
   allowSkip: boolean;
+  /**
+   * Loader homepage aktif (dikirim server-side dari page.tsx lewat
+   * DesktopEnvironment.suppressIntro): boot native os-desktop (StartScreen
+   * HELLO) dipaksa skip sejak awal supaya tidak dobel dengan overlay
+   * DeckReveal/HelloIntro. false/absen → perilaku native apa adanya.
+   */
+  forceSkip?: boolean;
 }
 
 const DEFAULT_CONFIG: BootSequenceConfig = {
@@ -100,7 +107,9 @@ export function useBootSequence(config: Partial<BootSequenceConfig> = {}) {
   // The OS desktop is loaded client-side after HomeOSWrapper mounts. Reading
   // the beforeInteractive fast-path here prevents a one-frame black skeleton
   // when the current tab already completed boot and the page is refreshed.
-  const [needsPowerOn, setNeedsPowerOn] = useState(() => !isBootedFastPath());
+  const [needsPowerOn, setNeedsPowerOn] = useState(
+    () => !(finalConfig.forceSkip || isBootedFastPath())
+  );
 
   const [isBooting, setIsBooting] = useState(false);
 
@@ -116,13 +125,12 @@ export function useBootSequence(config: Partial<BootSequenceConfig> = {}) {
 
   // Client-side synchronization after hydration
   useEffect(() => {
-    const shouldSkip = checkShouldSkipBoot();
-    if (shouldSkip) {
+    if (finalConfig.forceSkip || checkShouldSkipBoot()) {
       startTransition(() => {
         setNeedsPowerOn(false);
       });
     }
-  }, []);
+  }, [finalConfig.forceSkip]);
 
   const powerOn = useCallback(() => {
     soundManager.unlock();

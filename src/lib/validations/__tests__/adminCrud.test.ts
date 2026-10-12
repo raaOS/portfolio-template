@@ -413,3 +413,75 @@ describe('wallpaperSchema', () => {
     expect(result.success).toBe(false);
   });
 });
+
+describe('updateAboutSchema loaderConfig', () => {
+  const validLoader = {
+    enabled: true,
+    style: 'deck-reveal' as const,
+    imageProjectIds: ['p-1', 'p-2'],
+    durationMs: 2800,
+    accentColor: '#1500E1',
+    showCounter: true,
+  };
+
+  it('accepts valid loaderConfig', () => {
+    const result = updateAboutSchema.safeParse({ loaderConfig: validLoader });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts minimal loaderConfig (tanpa field optional)', () => {
+    const result = updateAboutSchema.safeParse({
+      loaderConfig: { enabled: false, style: 'deck-reveal', imageProjectIds: [] },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts hello style (imageProjectIds boleh kosong — tidak dipakai)', () => {
+    const result = updateAboutSchema.safeParse({
+      loaderConfig: { enabled: true, style: 'hello', imageProjectIds: [] },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects more than 10 image ids', () => {
+    const result = updateAboutSchema.safeParse({
+      loaderConfig: {
+        ...validLoader,
+        imageProjectIds: Array.from({ length: 11 }, (_, i) => `p-${i}`),
+      },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects invalid accent color', () => {
+    const result = updateAboutSchema.safeParse({
+      loaderConfig: { ...validLoader, accentColor: 'biru' },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects durationMs out of range', () => {
+    const low = updateAboutSchema.safeParse({
+      loaderConfig: { ...validLoader, durationMs: 500 },
+    });
+    const high = updateAboutSchema.safeParse({
+      loaderConfig: { ...validLoader, durationMs: 20000 },
+    });
+    expect(low.success).toBe(false);
+    expect(high.success).toBe(false);
+  });
+
+  it('rejects unknown style (strict enum)', () => {
+    const result = updateAboutSchema.safeParse({
+      loaderConfig: { ...validLoader, style: 'confetti' },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects unknown extra fields (strict mode)', () => {
+    const result = updateAboutSchema.safeParse({
+      loaderConfig: { ...validLoader, extraField: 'nope' },
+    });
+    expect(result.success).toBe(false);
+  });
+});

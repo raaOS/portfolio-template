@@ -159,6 +159,10 @@ export const aboutService = {
           updates.spatialGalleryConfig !== undefined
             ? updates.spatialGalleryConfig
             : current.spatialGalleryConfig,
+        loaderConfig:
+          updates.loaderConfig !== undefined
+            ? updates.loaderConfig
+            : current.loaderConfig,
 
         lastUpdated: new Date().toISOString(),
       };

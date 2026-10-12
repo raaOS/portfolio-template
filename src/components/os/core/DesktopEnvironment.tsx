@@ -79,6 +79,12 @@ const NOTES_ENTRANCE_AFTER_WINDOWS_MS = 220;
 
 export interface DesktopEnvironmentProps {
   children?: React.ReactNode;
+  /**
+   * Loader homepage aktif (dikirim server-side dari page.tsx): boot native
+   * os-desktop (StartScreen HELLO) dipaksa skip supaya tidak dobel dengan
+   * overlay DeckReveal/HelloIntro. Default false → perilaku native apa adanya.
+   */
+  suppressIntro?: boolean;
   siteId?: string;
   aboutData?: AboutData | null;
   experienceData?: ExperienceData | null;
@@ -123,9 +129,10 @@ export default function DesktopEnvironment({
   projects,
   testimonialsData,
   contactData,
+  suppressIntro = false,
 }: DesktopEnvironmentProps) {
   const { mounted, isMobile } = useDesktopLock();
-  const bootSequence = useBootSequence();
+  const bootSequence = useBootSequence({ forceSkip: suppressIntro });
   const { needsPowerOn, isBooting } = bootSequence;
   const { isAdmin, csrfToken, logout: originalLogout, isLoading: isAuthLoading } = useClientSiteAuth(siteId);
   const isWhatsAppEnabled = aboutData?.dockConfig?.whatsapp?.isHidden !== true;

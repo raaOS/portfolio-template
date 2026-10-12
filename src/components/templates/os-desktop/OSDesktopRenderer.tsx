@@ -4,7 +4,10 @@ import React from 'react';
 import HomeOSWrapper from '@/components/home/HomeOSWrapper';
 import type { TemplateRendererProps } from '@/types/template';
 
-export default function OSDesktopRenderer({ data }: TemplateRendererProps) {
+export default function OSDesktopRenderer({
+  data,
+  suppressIntro,
+}: TemplateRendererProps & { suppressIntro?: boolean }) {
   const { site, about, projects, experiences, events, hardSkills, testimonials, contact, lastUpdated } = data;
 
   const experienceData = {
@@ -36,6 +39,7 @@ export default function OSDesktopRenderer({ data }: TemplateRendererProps) {
       className="relative h-screen w-full overflow-hidden bg-[#050505]"
     >
       <HomeOSWrapper
+        suppressIntro={suppressIntro}
         siteId={site.id}
         aboutData={about}
         experienceData={experienceData}

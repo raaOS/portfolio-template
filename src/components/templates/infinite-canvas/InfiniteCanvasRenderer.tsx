@@ -66,7 +66,10 @@ function getProjectPosition(index: number): { offsetX: number; offsetY: number; 
  * 5. Ketika ikon dock diklik, panel meluncur dari sisi KIRI (Left Slide-Over Drawer).
  * 6. Mode Admin & Visitor: Admin dapat men-drag kartu proyek dan menyimpan posisinya ke database D1.
  */
-export default function InfiniteCanvasRenderer({ data }: TemplateRendererProps) {
+export default function InfiniteCanvasRenderer({
+  data,
+  suppressIntro = false,
+}: TemplateRendererProps & { suppressIntro?: boolean }) {
   const { about, projects, hardSkills, experiences, contact, testimonials, site } = data;
 
   // Batasi tepat 10 aset proyek dari 21 proyek yang tersedia
@@ -315,8 +318,9 @@ export default function InfiniteCanvasRenderer({ data }: TemplateRendererProps) 
       onPointerLeave={handlePointerUp}
     >
       {/* Intro HELLO (v1.3.36): animasi diputar sampai selesai satu putaran
-          penuh, baru fade-out menampilkan kanvas. */}
-      <HelloIntro />
+          penuh, baru fade-out menampilkan kanvas. Disenyapkan saat loader app
+          aktif dengan gaya deck-reveal (gate homepage yang memegang boot). */}
+      {!suppressIntro && <HelloIntro />}
 
       {/* Corner decorative brackets */}
       <CornerBrackets />
