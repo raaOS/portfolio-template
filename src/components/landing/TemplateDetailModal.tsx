@@ -2,10 +2,13 @@
 
 import React, { useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { X, ExternalLink, MessageCircle, ShoppingBag, CheckCircle2 } from 'lucide-react';
 import { formatIdr, BASE_PRICE } from '@/constants/pricing';
 import type { TemplateItem } from './templates';
+
+/** Viewport desain iframe demo (16:9 — sama dengan aspek area media). */
+const DESIGN_WIDTH = 1440;
+const DESIGN_HEIGHT = 810;
 
 interface TemplateDetailModalProps {
   template: TemplateItem | null;
@@ -20,6 +23,8 @@ export function TemplateDetailModal({
   adminWhatsapp,
   onClose,
 }: TemplateDetailModalProps) {
+  const mediaRef = React.useRef<HTMLDivElement>(null);
+
   // Tutup dengan Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -41,6 +46,23 @@ export function TemplateDetailModal({
     return () => {
       document.body.style.overflow = '';
     };
+  }, [template]);
+
+  // Skala iframe live: viewport desain tetap 1440×810 lalu di-scale pas
+  // lebar area media lewat `--fit` (diukur saat mount + resize). Halaman
+  // demo SELALU melihat desktop 1440px seperti aslinya → tata letak
+  // identik & tidak pernah numpuk di mode device mana pun. Menulis
+  // langsung ke node DOM (tanpa setState → lolos react-hooks lint).
+  useEffect(() => {
+    const media = mediaRef.current;
+    if (!template || !media) return;
+    const fitIframe = () => {
+      const width = media.offsetWidth;
+      if (width > 0) media.style.setProperty('--fit', String(width / DESIGN_WIDTH));
+    };
+    fitIframe();
+    window.addEventListener('resize', fitIframe);
+    return () => window.removeEventListener('resize', fitIframe);
   }, [template]);
 
   if (!template) return null;
@@ -71,17 +93,18 @@ export function TemplateDetailModal({
           <X size={18} />
         </button>
 
-        {/* Media Preview Mockup */}
-        <div className="wave-modal-media">
-          <Image
-            src={template.imageUrl}
-            alt={`Mockup ${template.name}`}
-            fill
-            className="wave-modal-img"
-            sizes="(max-width: 768px) 100vw, 680px"
-            priority
+        {/* Media Preview: iframe LIVE (bukan gambar mockup) — 1440×810
+            di-scale ke area media; badge tetap di atasnya. Tepi keras ke
+            konten (tanpa overlay gradient — gaya sticker datar). */}
+        <div className="wave-modal-media" ref={mediaRef}>
+          <iframe
+            key={template.id}
+            src={template.previewUrl}
+            title={`Demo live ${template.name}`}
+            width={DESIGN_WIDTH}
+            height={DESIGN_HEIGHT}
+            className="wave-modal-iframe"
           />
-          <div className="wave-modal-media-overlay" />
           <span className="wave-modal-badge">{template.badge}</span>
         </div>
 
@@ -115,7 +138,7 @@ export function TemplateDetailModal({
 
           {/* Garansi & Keamanan */}
           <div className="wave-modal-guarantee">
-            <span>✨ Sekali Bayar • Termasuk Source Code, Admin Panel Mandiri, & Setup Cloudflare.</span>
+            <span>Sekali Bayar • Termasuk Source Code, Admin Panel Mandiri, & Setup Cloudflare.</span>
           </div>
 
           {/* Aksi Bisnis */}

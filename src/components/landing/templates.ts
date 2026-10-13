@@ -6,7 +6,6 @@ export interface TemplateItem {
   description: string;
   features: string[];
   previewUrl: string;
-  imageUrl: string;
 }
 
 export const TEMPLATES_DATA: TemplateItem[] = [
@@ -24,7 +23,6 @@ export const TEMPLATES_DATA: TemplateItem[] = [
       'Admin panel mandiri & AI Chatbot',
     ],
     previewUrl: '/preview/os-desktop',
-    imageUrl: '/images/mockup-os-desktop.jpg',
   },
   {
     id: 'infinite-canvas',
@@ -40,7 +38,6 @@ export const TEMPLATES_DATA: TemplateItem[] = [
       'Ringan dan responsif di mobile & desktop',
     ],
     previewUrl: '/preview/infinite-canvas',
-    imageUrl: '/images/mockup-infinite-canvas.jpg',
   },
   {
     id: 'spatial-gallery',
@@ -56,6 +53,5 @@ export const TEMPLATES_DATA: TemplateItem[] = [
       'Dukungan media video loop & poster',
     ],
     previewUrl: '/preview/spatial-gallery',
-    imageUrl: '/images/mockup-spatial-gallery.jpg',
   },
 ];

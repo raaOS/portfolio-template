@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { ArrowUpRight, Sparkles } from 'lucide-react';
 import { BASE_PRICE } from '@/constants/pricing';
+import { archivoBlack } from '@/app/fonts';
 import { TEMPLATES_DATA, type TemplateItem } from './templates';
 import LiveStage from './LiveStage';
 import { TemplateDetailModal } from './TemplateDetailModal';
@@ -22,7 +23,7 @@ export default function LandingPage({
   const [activeIndex, setActiveIndex] = useState(0);
 
   return (
-    <main className="wave-landing-viewport">
+    <main className={`wave-landing-viewport ${archivoBlack.variable}`}>
       {/* Satu h1 tetap ada untuk SEO/a11y, disembunyikan secara visual —
           hero besar & hub bawah sudah dihapus atas permintaan owner. */}
       <h1 className="sr-only">PORTFOLIO OS</h1>
@@ -56,7 +57,7 @@ export default function LandingPage({
 
         <div className="wave-nav-center">
           <div className="wave-badge-pill">
-            <Sparkles size={13} className="text-sky-400" />
+            <Sparkles size={13} className="text-[#0008FF]" />
             <span>Interactive 3D Portfolio OS</span>
           </div>
         </div>

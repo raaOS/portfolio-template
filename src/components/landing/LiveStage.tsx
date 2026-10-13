@@ -18,7 +18,16 @@ import * as React from 'react';
  * Iframe tidak pernah berganti `src` (tak pernah reload): kartu hanya
  * berpindah slot lewat class CSS. `prefers-reduced-motion` mematikan
  * seluruh gerak ambient — panggung diam rapi, demo tetap hidup.
+ *
+ * Skala iframe: tiap iframe dirender pada viewport DESAIN tetap
+ * 1440×810 lalu di-`scale(--fit)` pas selebar kartu — halaman demo
+ * selalu melihat desktop 1440px seperti aslinya (tata letak identik,
+ * tidak pernah numpuk di kartu kecil/ponsel). `--fit` diukur di effect
+ * berikut entrance & di-update saat resize.
  * ─────────────────────────────────────────────────────────────── */
+
+/** Viewport desain iframe (16:9) — cocok dengan `aspect-ratio` kartu. */
+const DESIGN_WIDTH = 1440;
 
 export type LiveStageItem = {
   id: string;
@@ -45,12 +54,27 @@ export default function LiveStage({
   const stageRef = React.useRef<HTMLDivElement>(null);
   const parallaxRef = React.useRef<HTMLDivElement>(null);
 
-  // Entrance: `is-live` dipasang setelah paint pertama supaya transisi
-  // scale+opacity kartu benar-benar beranimasi (bukan terpotong).
-  // Class dipasang langsung ke node DOM (bukan setState → tanpa render
-  // berantai, lolos rule react-hooks/set-state-in-effect).
+  // Entrance + pasang skala iframe, dalam satu effect:
+  // - `is-live` dipasang setelah paint pertama supaya transisi
+  //   scale+opacity kartu benar-benar beranimasi (bukan terpotong).
+  // - `--fit` = lebar kartu / 1440 → iframe 1440×810 selalu pas
+  //   selebar kartu; diukur ulang saat viewport berubah (resize).
+  // Keduanya menulis langsung ke node DOM (bukan setState → tanpa
+  // render berantai, lolos rule react-hooks/set-state-in-effect).
   React.useEffect(() => {
-    stageRef.current?.classList.add('is-live');
+    const stage = stageRef.current;
+    if (!stage) return;
+    stage.classList.add('is-live');
+
+    const slot = stage.querySelector<HTMLElement>('.stage-slot');
+    if (!slot) return;
+    const fitIframe = () => {
+      const width = slot.offsetWidth;
+      if (width > 0) stage.style.setProperty('--fit', String(width / DESIGN_WIDTH));
+    };
+    fitIframe();
+    window.addEventListener('resize', fitIframe);
+    return () => window.removeEventListener('resize', fitIframe);
   }, []);
 
   // Mouse parallax lembut — translate murni (tanpa rotateY → tanpa pusing).
