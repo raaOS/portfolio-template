@@ -65,7 +65,6 @@ const nextConfig = {
     optimizePackageImports: [
       'lucide-react',
       '@tabler/icons-react',
-      'date-fns',
       'motion',
       'fuse.js',
       '@dnd-kit/core',
