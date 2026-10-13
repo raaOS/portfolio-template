@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateAdminRequest } from '@/lib/auth';
 import { requireOwnerMode } from '@/lib/ownerMode';
-import { getBasePrice, updateBasePrice } from '@/lib/services/pricingConfigService';
+import {
+  getBasePrice,
+  getOwnerWhatsapp,
+  updateBasePrice,
+  updateOwnerWhatsapp,
+} from '@/lib/services/pricingConfigService';
 
 /**
  * GET /api/admin/pricing
@@ -27,8 +32,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const basePrice = await getBasePrice();
-    return NextResponse.json({ success: true, basePrice });
+    const [basePrice, adminWhatsapp] = await Promise.all([
+      getBasePrice(),
+      getOwnerWhatsapp(),
+    ]);
+    return NextResponse.json({ success: true, basePrice, adminWhatsapp });
   } catch (error: unknown) {
     console.error('GET /api/admin/pricing error:', error);
     return NextResponse.json({ error: 'Gagal memuat harga' }, { status: 500 });
@@ -37,8 +45,10 @@ export async function GET(request: NextRequest) {
 
 /**
  * PUT /api/admin/pricing
- * Mengubah harga dasar template (admin-only + CSRF).
- * Body: { basePrice: number }
+ * Mengubah harga dasar template dan/atau nomor WhatsApp owner (admin + CSRF).
+ * Body: { basePrice?: number, adminWhatsapp?: string }
+ * Kedua field opsional — minimal satu harus ada. Field yang tidak dikirim
+ * tidak diubah (konsumen lama yang hanya mengirim `basePrice` tetap aman).
  */
 export async function PUT(request: NextRequest) {
   try {
@@ -51,16 +61,49 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const result = await updateBasePrice(body?.basePrice);
+    const hasPrice = body?.basePrice !== undefined;
+    const hasWhatsapp = body?.adminWhatsapp !== undefined;
 
-    if (!result.success) {
-      return NextResponse.json({ error: result.error || 'Gagal menyimpan harga' }, { status: 400 });
+    if (!hasPrice && !hasWhatsapp) {
+      return NextResponse.json(
+        { error: 'Tidak ada data yang disimpan (basePrice / adminWhatsapp).' },
+        { status: 400 }
+      );
+    }
+
+    let basePrice: number | undefined;
+    let adminWhatsapp: string | undefined;
+    const saved: string[] = [];
+
+    if (hasPrice) {
+      const priceResult = await updateBasePrice(body?.basePrice);
+      if (!priceResult.success) {
+        return NextResponse.json(
+          { error: priceResult.error || 'Gagal menyimpan harga' },
+          { status: 400 }
+        );
+      }
+      basePrice = priceResult.basePrice;
+      saved.push('Harga');
+    }
+
+    if (hasWhatsapp) {
+      const waResult = await updateOwnerWhatsapp(body?.adminWhatsapp);
+      if (!waResult.success) {
+        return NextResponse.json(
+          { error: waResult.error || 'Gagal menyimpan nomor WhatsApp' },
+          { status: 400 }
+        );
+      }
+      adminWhatsapp = waResult.adminWhatsapp;
+      saved.push('Nomor WhatsApp');
     }
 
     return NextResponse.json({
       success: true,
-      basePrice: result.basePrice,
-      message: 'Harga berhasil disimpan',
+      ...(basePrice !== undefined ? { basePrice } : {}),
+      ...(adminWhatsapp !== undefined ? { adminWhatsapp } : {}),
+      message: `${saved.join(' & ')} berhasil disimpan`,
     });
   } catch (error: unknown) {
     console.error('PUT /api/admin/pricing error:', error);

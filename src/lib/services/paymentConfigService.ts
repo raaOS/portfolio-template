@@ -9,6 +9,7 @@
 
 import { queryD1 } from '@/lib/cloudflareD1';
 import { normalizeQRISPayload, validateStaticMerchantQRIS } from '@/lib/billing/qris';
+import { getOwnerWhatsapp } from './pricingConfigService';
 
 export interface QRISAccount {
   id: string;
@@ -204,7 +205,11 @@ export async function getPublicPaymentInfo(): Promise<{
     bankAccountName: config.bankAccountName,
     paymentInstructions: config.paymentInstructions,
     verificationHours: config.verificationHours,
-    adminWhatsapp: config.adminWhatsapp,
+    // Satu sumber nomor WA milik owner: field baru di panel "Harga Jual"
+    // (D1 `owner_whatsapp`) → env `NEXT_PUBLIC_ADMIN_WA` → field legacy
+    // `payment_config.adminWhatsapp` (tanpa UI sejak 2026-10-09). Tanpa rantai
+    // ini halaman order bisa menampilkan nomor lama/beda dari tombol "Pesan".
+    adminWhatsapp: (await getOwnerWhatsapp()) || config.adminWhatsapp,
     isActive: config.isActive,
   };
 }

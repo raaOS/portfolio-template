@@ -5,6 +5,7 @@ import { queryD1 } from '@/lib/cloudflareD1';
 import { loadHomepageData } from '@/lib/loaders';
 import { loadAboutData } from '@/lib/about';
 import { getBasePrice } from '@/lib/services/pricingConfigService';
+import { getPublicPaymentInfo } from '@/lib/services/paymentConfigService';
 import { mapD1ToTemplateData } from '@/lib/templates/dataMapper';
 import SoundConfigLoader from '@/components/layout/SoundConfigLoader';
 import LayoutClient from '@/components/layout/LayoutClient';
@@ -37,10 +38,16 @@ interface SiteRow {
  */
 export default async function Home() {
   if (isStorefrontDeployment()) {
-    // Harga jual dibaca dari D1 (panel admin "Harga Jual") — dirender server
-    // dan di-cache ISR (revalidate 60 dtk). Gagal baca → fallback BASE_PRICE
-    // di dalam getBasePrice(); tidak pernah menjatuhkan build.
-    return <LandingPage basePrice={await getBasePrice()} />;
+    // Harga jual & kontak WhatsApp dibaca dari D1 (panel admin) — dirender server
+    // dan di-cache ISR (revalidate 60 dtk). Gagal baca → fallback aman.
+    let adminWhatsapp = '';
+    try {
+      const paymentInfo = await getPublicPaymentInfo();
+      adminWhatsapp = paymentInfo.adminWhatsapp;
+    } catch {
+      // Abaikan kegagalan baca kontak
+    }
+    return <LandingPage basePrice={await getBasePrice()} adminWhatsapp={adminWhatsapp} />;
   }
 
   // --- Mode klien: render portofolio deployment ini ---

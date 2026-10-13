@@ -1,316 +1,658 @@
 /* ==========================================================================
-   Landing Page — Minimalist Showcase
-   Monochrome, no gradients, no shadows, solid colors.
+   Live Stage Storefront — Cinematic 1-Section Viewport (tanpa scroll)
+   Panggung tiga demo live (iframe): kartu tengah besar + dua kartu samping,
+   semuanya menghadap lurus depan (tanpa putaran silinder) — geraknya di
+   `.stage-*` (float, parallax, tukar posisi FLIP-spring) di file ini.
    ========================================================================== */
 
-.landing {
-  --lp-bg: #0a0a0a;
-  --lp-fg: #e5e5e5;
-  --lp-muted: #888;
-  --lp-border: #222;
-  --lp-surface: #111;
-  --lp-accent: #fff;
-
-  background: var(--lp-bg);
-  color: var(--lp-fg);
-  min-height: 100vh;
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+:root {
+  --wr-bg: #07080c;
+  --wr-card-bg: #10121a;
+  --wr-border: rgba(255, 255, 255, 0.08);
+  --wr-border-hover: rgba(56, 189, 248, 0.4);
+  --wr-text-primary: #f8fafc;
+  --wr-text-secondary: #94a3b8;
+  --wr-accent: #38bdf8;
+  --wr-accent-glow: rgba(56, 189, 248, 0.25);
+  --wr-wa-green: #25d366;
 }
 
-/* ---------- Legal docs (Syarat & Ketentuan / Kebijakan Privasi) ---------- */
-.landing-doc {
-  font-size: 15px;
-  line-height: 1.7;
-}
-
-.landing-doc h2 {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: var(--lp-accent);
-  margin: 32px 0 10px;
-}
-
-.landing-doc p {
-  margin: 0 0 12px;
-}
-
-.landing-doc ul {
-  margin: 0 0 12px;
-  padding-left: 22px;
-  list-style: disc;
-}
-
-.landing-doc li {
-  margin-bottom: 8px;
-}
-
-.landing-doc a {
-  color: var(--lp-accent);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-/* ---------- Nav ---------- */
-.landing-nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20px 32px;
-  max-width: 1120px;
-  margin: 0 auto;
-}
-
-.landing-logo {
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--lp-accent);
-  text-decoration: none;
-}
-
-.landing-nav-link {
-  font-size: 14px;
-  color: var(--lp-muted);
-  text-decoration: none;
-  transition: color 0.15s;
-}
-
-.landing-nav-link:hover {
-  color: var(--lp-accent);
-}
-
-/* ---------- Hero ---------- */
-.landing-hero {
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: 80px 32px 48px;
-  text-align: center;
-}
-
-.landing-hero h1 {
-  font-size: clamp(32px, 5vw, 56px);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
-  color: var(--lp-accent);
-  margin: 0 0 16px;
-}
-
-.landing-hero p {
-  font-size: 17px;
-  color: var(--lp-muted);
-  margin: 0 auto 40px;
-  max-width: 520px;
-  line-height: 1.6;
-}
-
-/* ---------- Templates Grid ---------- */
-.landing-templates {
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: 0 32px 80px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 24px;
-}
-
-@media (max-width: 720px) {
-  .landing-templates {
-    grid-template-columns: 1fr;
-  }
-}
-
-.landing-card {
-  border: 1px solid var(--lp-border);
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--lp-surface);
-  transition: border-color 0.2s;
-}
-
-.landing-card:hover {
-  border-color: #444;
-}
-
-.landing-card-preview {
+/* ---------- 1-Section Viewport (normal, tanpa scroll) ---------- */
+.wave-landing-viewport {
   position: relative;
+  /* `100%` (bukan 100vw): tanpa overflow hidden, 100vw akan memicu scroll
+     horizontal tipis karena lebar scrollbar. */
   width: 100%;
-  aspect-ratio: 16 / 9;
+  max-width: 100%;
+  height: 100vh;
+  height: 100svh;
   overflow: hidden;
-  background: #0a0a0a;
+  background-color: var(--wr-bg);
+  color: var(--wr-text-primary);
+  user-select: none;
+  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
 }
 
-.landing-card-iframe {
+/* ---------- Stage (panggung demo live — satu-satunya konten utama) ---------- */
+.wave-stage {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  /* Gradient ambient di belakang panggung. */
+  background-image:
+    radial-gradient(circle at 50% 45%, rgba(20, 24, 38, 0.8) 0%, rgba(7, 8, 12, 1) 75%),
+    radial-gradient(circle at 10% 20%, rgba(56, 189, 248, 0.03) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(139, 92, 246, 0.04) 0%, transparent 40%);
+}
+
+/* ==========================================================================
+   Live Stage — panggung tiga demo live: kartu tengah besar, dua kartu
+   samping mengecil + redup di belakangnya. Semua menghadap lurus depan
+   (tanpa putaran silinder); geraknya ada di `.stage-*` di bawah.
+   ========================================================================== */
+.live-stage {
+  --stage-card-w: min(86vw, 720px);
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 1440px;
-  height: 900px;
-  border: none;
-  transform-origin: top left;
-  /* Scale: card is ~548px wide in 2-col grid (1120 - 24 gap) / 2 ≈ 548 */
-  /* 548 / 1440 ≈ 0.38 */
-  transform: scale(0.38);
+  inset: 0;
+  z-index: 5;
+}
+
+/* Glow biru-ungu samar di belakang panggung, bernapas pelan. */
+.live-stage::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--stage-card-w) * 1.3);
+  height: calc(var(--stage-card-w) * 0.78);
+  transform: translate(-50%, -50%);
+  background:
+    radial-gradient(ellipse at center, rgba(56, 189, 248, 0.10) 0%, transparent 62%),
+    radial-gradient(ellipse at 60% 55%, rgba(139, 92, 246, 0.08) 0%, transparent 66%);
+  filter: blur(28px);
+  animation: stageGlow 7s ease-in-out infinite;
   pointer-events: none;
 }
 
-@media (max-width: 720px) {
-  .landing-card-iframe {
-    /* Mobile: card is full width ~100vw - 64px padding ≈ ~356px min */
-    /* Use slightly smaller scale and let overflow hidden crop */
-    transform: scale(0.25);
-  }
+/* Lapisan parallax: mengikuti kursor dengan easing lembut (translate saja). */
+.stage-parallax {
+  position: absolute;
+  inset: 0;
+  transform: translate(calc(var(--px, 0) * 10px), calc(var(--py, 0) * 7px));
+  transition: transform 0.5s ease-out;
 }
 
-.landing-card-body {
-  padding: 24px;
+/*
+ * Slot kartu — posisi & ukuran murni lewat custom properties supaya
+ * tukar posisi (FLIP) cukup mengganti class: transform beranimasi
+ * sendiri dengan spring overshoot (efek jelly).
+ */
+.stage-slot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--stage-card-w);
+  aspect-ratio: 16 / 9;
+  transform: translate(calc(-50% + var(--slot-x, 0px)), -50%)
+    scale(var(--slot-s, 1));
+  opacity: var(--slot-o, 1);
+  z-index: var(--slot-z, 3);
+  transition:
+    transform 0.52s cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 0.4s ease,
+    filter 0.5s ease;
 }
 
-.landing-card-body h2 {
-  font-size: 20px;
+.stage-slot.is-center {
+  --slot-x: 0px;
+  --slot-s: 1;
+  --slot-o: 1;
+  --slot-z: 3;
+  filter: none;
+}
+
+.stage-slot.is-left,
+.stage-slot.is-right {
+  --slot-s: 0.6;
+  --slot-o: 0.55;
+  --slot-z: 2;
+  /* Kedalaman: samping sedikit redup + sedikit lembut (blur tipis). */
+  filter: brightness(0.72) blur(1.2px);
+}
+
+.stage-slot.is-left { --slot-x: -46%; }
+.stage-slot.is-right { --slot-x: 46%; }
+
+/* Entrance: kartu masuk bertahap (stagger) dengan spring yang sama. */
+.live-stage:not(.is-live) .stage-slot {
+  --slot-s: 0.82;
+  --slot-o: 0;
+}
+
+.stage-slot:nth-child(1) { transition-delay: 0s; }
+.stage-slot:nth-child(2) { transition-delay: 0.08s; }
+.stage-slot:nth-child(3) { transition-delay: 0.16s; }
+
+/* Ambient float: tiap kartu bergoyang pelan dengan fase beda. */
+.stage-float {
+  width: 100%;
+  height: 100%;
+  animation: stageBob 5.4s ease-in-out infinite;
+}
+
+.stage-slot.is-left .stage-float { animation-delay: -1.8s; }
+.stage-slot.is-right .stage-float { animation-delay: -3.6s; }
+
+.stage-card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--wr-card-bg);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.stage-card:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.stage-card.is-active:hover {
+  border-color: rgba(56, 189, 248, 0.45);
+  box-shadow:
+    0 24px 90px rgba(56, 189, 248, 0.18),
+    0 24px 70px rgba(0, 0, 0, 0.55);
+}
+
+/* Iframe mengisi kartu penuh pada ukuran piksel asli (tajam, tanpa scale). */
+.stage-iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--wr-card-bg);
+  pointer-events: none;
+}
+
+/* Zona klik menutupi kartu (iframe `pointer-events: none`). */
+.stage-hit {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.stage-hit:focus-visible {
+  outline: 2px solid var(--wr-accent);
+  outline-offset: -3px;
+}
+
+/* Badge nama demo + titik "live" berdenyut di kartu aktif. */
+.stage-badge {
+  position: absolute;
+  left: 14px;
+  bottom: 12px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  background: rgba(7, 8, 12, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  font-size: 11px;
   font-weight: 600;
-  color: var(--lp-accent);
-  margin: 0 0 6px;
+  color: #e2e8f0;
+  pointer-events: none;
 }
 
-.landing-card-body p {
-  font-size: 14px;
-  color: var(--lp-muted);
-  margin: 0 0 20px;
-  line-height: 1.5;
+.stage-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 8px #4ade80;
+  animation: stagePulse 1.6s ease-in-out infinite;
 }
 
-.landing-card-link {
-  display: inline-block;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--lp-accent);
+@keyframes stageBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+
+@keyframes stageGlow {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+@keyframes stagePulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+/* ---------- Floating Navbar (Top) ---------- */
+.wave-nav-floating {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 36px;
+  pointer-events: none;
+}
+
+.wave-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
   text-decoration: none;
-  border-bottom: 1px solid var(--lp-border);
-  padding-bottom: 2px;
-  transition: border-color 0.15s;
+  color: var(--wr-text-primary);
 }
 
-.landing-card-link:hover {
-  border-color: var(--lp-accent);
+.wave-brand-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--wr-accent);
+  box-shadow: 0 0 12px var(--wr-accent);
 }
 
-/* ---------- Features ---------- */
-.landing-features {
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: 0 32px 80px;
-}
-
-.landing-features-heading {
-  font-size: 14px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--lp-muted);
-  margin: 0 0 32px;
-}
-
-.landing-features-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
-}
-
-@media (max-width: 720px) {
-  .landing-features-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.landing-feature {
-  padding: 24px;
-  border: 1px solid var(--lp-border);
-  border-radius: 8px;
-}
-
-.landing-feature h3 {
+.wave-brand-title {
   font-size: 15px;
-  font-weight: 600;
-  color: var(--lp-fg);
-  margin: 0 0 8px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
-.landing-feature p {
+.wave-nav-center {
+  pointer-events: auto;
+}
+
+.wave-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--wr-border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #cbd5e1;
+}
+
+.wave-nav-actions {
+  pointer-events: auto;
+}
+
+.wave-nav-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  background: #ffffff;
+  color: #07080c;
   font-size: 13px;
-  color: var(--lp-muted);
-  margin: 0;
-  line-height: 1.6;
+  font-weight: 600;
+  border-radius: 999px;
+  text-decoration: none;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
 }
 
-/* ---------- CTA / Pricing ---------- */
-.landing-cta {
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: 0 32px 80px;
+.wave-nav-cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(255, 255, 255, 0.2);
+}
+
+/* ==========================================================================
+   Modal Detail Template (Popup)
+   ========================================================================== */
+.wave-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 5, 8, 0.82);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: waveFadeIn 0.2s ease forwards;
+}
+
+.wave-modal-card {
+  position: relative;
+  width: 100%;
+  max-width: 660px;
+  max-height: 92vh;
+  overflow-y: auto;
+  background: #0f111a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.85);
+  color: #fff;
+  animation: waveSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.wave-modal-card::-webkit-scrollbar {
+  width: 6px;
+}
+
+.wave-modal-card::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+.wave-modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 10;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.wave-modal-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: rotate(90deg);
+}
+
+.wave-modal-media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  overflow: hidden;
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+}
+
+.wave-modal-img {
+  object-fit: cover;
+  transition: transform 0.4s ease;
+}
+
+.wave-modal-media:hover .wave-modal-img {
+  transform: scale(1.02);
+}
+
+.wave-modal-media-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 40%, rgba(15, 17, 26, 0.95) 100%);
+}
+
+.wave-modal-badge {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  padding: 5px 12px;
+  background: rgba(15, 17, 26, 0.8);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--wr-accent);
+}
+
+.wave-modal-content {
+  padding: 24px 28px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.wave-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.wave-modal-subtitle {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--wr-accent);
+  margin: 0 0 4px;
+}
+
+.wave-modal-title {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin: 0;
+  color: #fff;
+}
+
+.wave-modal-price-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.wave-modal-price-label {
+  font-size: 11px;
+  color: var(--wr-text-secondary);
+}
+
+.wave-modal-price {
+  font-size: 20px;
+  font-weight: 800;
+  color: #38bdf8;
+  letter-spacing: -0.02em;
+}
+
+.wave-modal-desc {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #cbd5e1;
+  margin: 0;
+}
+
+/* Features List */
+.wave-modal-features {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+}
+
+.wave-modal-features-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--wr-text-secondary);
+  margin: 0;
+}
+
+.wave-modal-features-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px 16px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.wave-modal-feature-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #e2e8f0;
+}
+
+.wave-feature-icon {
+  color: #38bdf8;
+  flex-shrink: 0;
+}
+
+.wave-modal-guarantee {
+  font-size: 12px;
+  color: #94a3b8;
+  background: rgba(56, 189, 248, 0.06);
+  border: 1px dashed rgba(56, 189, 248, 0.25);
+  padding: 10px 14px;
+  border-radius: 10px;
   text-align: center;
 }
 
-.landing-cta-divider {
-  width: 100%;
-  height: 1px;
-  background: var(--lp-border);
-  margin: 0 0 64px;
-  border: none;
+/* Modal Actions */
+.wave-modal-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr 1.3fr;
+  gap: 10px;
+  margin-top: 4px;
 }
 
-.landing-price-label {
-  font-size: 14px;
-  color: var(--lp-muted);
-  margin: 0 0 8px;
-}
-
-.landing-price {
-  font-size: clamp(36px, 5vw, 52px);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  color: var(--lp-accent);
-  margin: 0 0 8px;
-}
-
-.landing-price-note {
-  font-size: 14px;
-  color: var(--lp-muted);
-  margin: 0 0 32px;
-}
-
-.landing-btn {
-  display: inline-block;
-  padding: 14px 40px;
-  font-size: 15px;
+.wave-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 13px;
   font-weight: 600;
-  color: #0a0a0a;
-  background: var(--lp-accent);
-  border: none;
-  border-radius: 8px;
   text-decoration: none;
   cursor: pointer;
-  transition: opacity 0.15s;
-}
-
-.landing-btn:hover {
-  opacity: 0.85;
-}
-
-/* ---------- Footer ---------- */
-.landing-footer {
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: 32px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   text-align: center;
-  border-top: 1px solid var(--lp-border);
 }
 
-.landing-footer p {
-  font-size: 13px;
-  color: var(--lp-muted);
-  margin: 0;
+.wave-btn-preview {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.wave-btn-preview:hover {
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateY(-2px);
+}
+
+.wave-btn-order {
+  background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+  color: #fff;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  box-shadow: 0 4px 16px rgba(2, 132, 199, 0.3);
+}
+
+.wave-btn-order:hover {
+  background: linear-gradient(135deg, #0369a1 0%, #1d4ed8 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(2, 132, 199, 0.45);
+}
+
+.wave-btn-wa {
+  background: rgba(37, 211, 102, 0.12);
+  color: #4ade80;
+  border: 1px solid rgba(37, 211, 102, 0.35);
+}
+
+.wave-btn-wa:hover {
+  background: #25d366;
+  color: #07080c;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(37, 211, 102, 0.35);
+}
+
+@keyframes waveFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes waveSlideUp {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* ---------- Responsive Adjustments ---------- */
+@media (max-width: 768px) {
+  .wave-nav-floating {
+    padding: 16px 20px;
+  }
+
+  .wave-badge-pill {
+    display: none;
+  }
+
+  .wave-modal-features-list {
+    grid-template-columns: 1fr;
+  }
+
+  .wave-modal-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .wave-btn {
+    padding: 14px 16px;
+  }
+}
+
+/* ==========================================================================
+   Reduced motion: panggung membeku rapi — seluruh gerak ambient (float,
+   glow, denyut, parallax, transisi FLIP) dimatikan; halaman tetap satu
+   viewport normal tanpa scroll; animasi popup dimatikan. Demo live tetap
+   hidup (iframe tidak pernah dijeda).
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .wave-modal-backdrop,
+  .wave-modal-card {
+    animation: none;
+  }
+
+  .stage-float,
+  .live-stage::before,
+  .stage-badge-dot {
+    animation: none !important;
+  }
+
+  .stage-parallax {
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .stage-slot {
+    transition: none !important;
+  }
 }

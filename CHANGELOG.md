@@ -3,6 +3,20 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.41] - 2026-10-13
+
+### 🎭 Redesain Total Storefront: Panggung Demo Live (LiveStage) + Modal Konversi
+
+Pembaruan tampilan homepage storefront (`/`) menjadi halaman super-minimal **1 section tanpa scroll**: hanya navbar melayang + **panggung tiga kartu demo live** — satu kartu besar di tengah (demo aktif) dan dua kartu samping mengecil + redup di kiri-kanan, semuanya menghadap lurus depan tanpa efek berputar. Blok lama dihapus atas permintaan owner: **judul raksasa `PORTFOLIO OS` + tagline, spotlight hub bawah, pill 01–03, teks panduan, dan baris harga** ikut dibuang (h1 tetap ada secara `sr-only` untuk SEO/a11y).
+
+- **Isi kartu = 3 DEMO LIVE (iframe), bukan gambar.** `os-desktop`, `infinite-canvas`, dan `spatial-gallery` ditampilkan lewat iframe `/preview/[template]` (ISR 60 detik) — pengunjung melihat site berjalan sungguhan. Ketiganya ter-mount sekaligus; kartu hanya berpindah slot lewat class CSS (**tanpa penukar `src` → tidak pernah reload**).
+- **Gerak yang hidup tapi tidak kaku — tanpa putaran silinder.** Komponen baru `landing/LiveStage.tsx` (menggantikan sepenuhnya `ui/tilted-grid-hero.tsx` yang efek silinder `rotateY`-nya ditolak owner): (1) **ambient float** — tiap kartu bergoyang pelan sine ±7px dengan fase berbeda, (2) **mouse parallax** — panggung mengikuti kursor dengan easing lembut (translate murni), (3) **tukar posisi FLIP-spring** — klik kartu samping, kartu terbang tukar dengan overshoot jelly `cubic-bezier(0.34, 1.56, 0.64, 1)` ~520ms, (4) **entrance stagger** bertahap saat load, (5) kartu samping diberi `brightness + blur` tipis untuk kesan kedalaman; glow biru-ungu bernapas pelan di belakang panggung + badge nama demo berdenyut "live" di kartu aktif.
+- **Semua gerak = transform/opacity murni di kompositor (60fps, tanpa layout thrash), tanpa dependency baru, tanpa scroll-coupling, tanpa rAF.** Halaman normal 100vh/100svh; bug "stack macet setelah scroll", "animasi kaku", & "pusing berputar" dari versi sebelumnya hilang secara struktural.
+- **Interaksi (jalur konversi setelah hapus hub):** klik **kartu tengah** (demo aktif) → popup detail; klik **kartu samping** → panggung menukar posisi kartu; navbar CTA **"Pesan Template"** → `/checkout`. Popup tetap menawarkan Live Preview / Pesan Sekarang (`/checkout?template=[id]`) / Tanya via WhatsApp (prefill `adminWhatsapp`).
+- **Bersih-bersih kode:** mesin scroll (`landing/reel/*` + test-nya), arsip WebGL sisa Gemini (`WaveReelCanvas/Scene/Mesh/Shader`), fork silinder `ui/tilted-grid-hero.tsx` (5 test lama ikut dihapus), serta CSS hero/hub/pill/guide/spotlight **dihapus bersih**; katalog template di `landing/templates.ts`.
+- **Nomor WhatsApp owner bisa diganti tanpa deploy:** panel **Harga Jual** kini punya kartu "Nomor WhatsApp owner" → D1 `platform_settings` key `owner_whatsapp` (cache 60 dtk, fallback env `NEXT_PUBLIC_ADMIN_WA` → field legacy `payment_config`) — dipakai tombol WA di popup order (`GET/PUT /api/admin/pricing` membawa `adminWhatsapp`, field opsional).
+- **Aksesibilitas & reduced-motion:** satu `h1` (`sr-only` — "PORTFOLIO OS"), zona klik kartu ber-`aria-label` jelas (samping = "Tampilkan demo …", tengah = "Lihat detail template …") + `iframe` ber-`title`; `prefers-reduced-motion` mematikan seluruh gerak ambient (float, glow, denyut, parallax, transisi FLIP) → panggung diam rapi tapi demo tetap hidup; test unit baru `live-stage.test.tsx` (5 test: guardrail 3 iframe + src tak pernah berubah, tepat 1 kartu tengah, rotasi slot, klik → callback, entrance/label).
+
 ## [1.3.40] - 2026-10-12
 
 ### 💬 Alur Pesanan Chat-First (Alur B): Buat Order dari Panel + Link Checkout Sekali Salin
