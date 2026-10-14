@@ -51,7 +51,10 @@ export async function POST(request: NextRequest) {
     }
 
     return createLoginResponse(result.token!);
-  } catch {
+  } catch (error) {
+    // Tanpa baris ini, kegagalan login tidak meninggalkan jejak apa pun di
+    // log worker — penyebabnya harus dilacak manual lewat reproduksi.
+    console.error('[Auth] /api/auth/login gagal:', error);
     return NextResponse.json({ error: 'Gagal memproses login' }, { status: 500 });
   }
 }

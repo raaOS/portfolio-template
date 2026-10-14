@@ -3,6 +3,25 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.42] - 2026-10-14
+
+### 🔧 Hotfix Login Admin: Server Tidak Lagi "Mengunci" Diri Sendiri Setelah Gagal Sekali
+
+Perbaikan bug login `/admin/login` yang membalas **500 "Gagal memproses login"** secara intermiten (terdeteksi tepat setelah deploy v1.3.41, tapi akar masalahnya bukan perubahan v1.3.41).
+
+- **Gejala:** login gagal, padahal pengecekan kesehatan sistem (`/api/health`) melaporkan database **terhubung**. Berulang-ulang dan tidak bisa diatasi dengan mencoba lagi.
+- **Akar masalah (3 lapis saling mengunci):**
+  1. Setiap kali server Cloudflare memulai "isolate" baru untuk melayani login, ia menjalankan **19 query pengecekan/ pembuatan tabel berurutan** ke D1 lewat REST — makan waktu **4–8 detik** untuk database produksi yang skemanya sudah lama lengkap.
+  2. Hasil 19 query itu disimpan dalam satu `Promise` modul. Saat satu query **gagal sesaat** (mis. burst limit D1), Promise itu tersimpan **selamanya rejected** → semua login berikutnya langsung ditolak **tanpa mencoba lagi** sampai isolate didaur ulang. Terbukti dari pola latensi: 8.451 ms → 527 ms → 664 ms.
+  3. `catch {}` pada route login **tidak mencatat apa pun**, sehingga kegagalan tidak meninggalkan jejak di log worker (`wrangler tail` menunjukkan `"exceptions": [], "logs": []`) — penyebab hanya bisa ditemukan lewat reproduksi manual.
+- **Bukti bahwa skema/data/token sehat:** jalur login yang identik dijalankan dari Node → membalas "Email atau password salah" dengan benar; tulisan worker ke D1 tetap berfungsi (`app_kv` tertulis 2026-10-14T17:33Z); `site_users.last_login_at` menunjukkan login terakhir sukses 2026-10-08. Docs Cloudflare juga memastikan `node:crypto` (termasuk `scrypt`) didukung penuh di Workers dengan `nodejs_compat`.
+- **Perbaikan (2 file, tanpa perubahan perilaku login):**
+  - `src/crud/shared/db/connection.ts` — tiap statement `bootstrapD1Schema()` dibungkus `try/catch` **best-effort**: kegagalan sesaat dicatat (`[D1] bootstrapD1Schema: statement dilewati ->`) dan dilanjutkan. Promise tidak pernah lagi reject → isolate tidak bisa terkunci. Kegagalan skema yang benar-benar nyata tetap terlihat sebagai error SQL `no such table` pada query berikutnya.
+  - `src/app/api/auth/login/route.ts` — `catch {}` → `catch (error)` + `console.error('[Auth] /api/auth/login gagal:', error)` agar kegagalan masa depan langsung terlihat di log worker (fix observabilitas: sebelumnya butuh berjam-jam pelacakan manual).
+  - `src/lib/constants.ts` — `APP_VERSION` → **1.3.42**.
+- **Verifikasi:** `tsc --noEmit` 0 error, `npm run lint` bersih, `npm test` **133 file / 1.069 test PASS** (identik baseline — nol test patah), smoke live `POST /api/auth/login` (password salah) **401 konsisten, nol 500**.
+- **Tindak lanjut yang disarankan (belum dikerjakan, butuh izin owner):** pola `schemaPromise` yang sama masih ada di `src/lib/cloudflareD1.ts:173` (risiko jauh kecil — hanya ±3 statement); dan bootstrap 19 statement per isolate dingin tetap membebani login ~4–8 detik (kandidat optimasi).
+
 ## [1.3.41] - 2026-10-13
 
 ### 🎭 Redesain Total Storefront: Panggung Demo Live (LiveStage) + Modal Konversi + Restyle "Sticker on Paper"

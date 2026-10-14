@@ -107,7 +107,19 @@ export async function bootstrapD1Schema() {
   if (!schemaPromise) {
     schemaPromise = (async () => {
       for (const sql of SHARED_SCHEMA_QUERIES) {
-        await queryD1(sql);
+        try {
+          await queryD1(sql);
+        } catch (error) {
+          // Best-effort: skema produksi sudah lengkap, jadi satu statement yang
+          // gagal sesaat (mis. burst limit D1) tidak boleh menggagalkan request
+          // apalagi mengunci isolate lewat promise yang selamanya rejected.
+          // Kegagalan yang nyata tetap terlihat: query berikutnya melempar
+          // error SQL "no such table" yang jelas.
+          console.error(
+            '[D1] bootstrapD1Schema: statement dilewati ->',
+            error instanceof Error ? error.message : error
+          );
+        }
       }
     })();
   }
