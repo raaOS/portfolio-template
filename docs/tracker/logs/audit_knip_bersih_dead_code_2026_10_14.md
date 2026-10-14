@@ -66,3 +66,13 @@ Tidak ada bug. Tiga kali klaim awal saya **dikoreksi oleh verifikasi** (dicatat 
 - Guard `npm run build` (`scripts/utils/ensure-next-dev-not-running.js`) memeriksa port 3000 **global**; saat itu dipakai dev server proyek lain (`Documents\tamplate-portofolio`, PID 22728, mulai 00:45) → false positive untuk worktree ini. Dev server proyek lain sengaja **tidak dimatikan**; build dijalankan via `npx next build` langsung.
 - Kalau suatu saat butuh komponen `CanvasProfile`/`CanvasProjectModal` lama di Infinite Canvas, ambil dari git history (`git show HEAD~1:src/components/...`).
 - `npm run deploy` di site owner butuh `OWNER_MODE=true` (guard `pre-deploy-check.js`).
+
+## 🚀 Integrasi ke `main` & Deploy Produksi (2026-10-14, final)
+
+- Merge ke `C:\Users\USER\Documents\tamplate-portofolio` (`main`) — **satu-satunya konflik** di `docs/tracker/INDEX_TRACKER.md` (kedua sisi memakai nomor #160/#161); diselesaikan dengan **menggabungkan kedua entri** dan menaikkan entri cleanup ke **#162/#163**. Merge commit `8b6f590`.
+- Verifikasi pasca-merge **di salinan utama**: `tsc --noEmit` **0 error**, pre-commit ESLint bersih, `npm test` **133 file / 1.069 test PASS** (naik dari 131/1.047 — bertambah test dari fitur Loader; nol yang patah).
+- Pre-push hook menjalankan audit penuh otomatis (env, **D1 reachable**, R2, TypeScript, ESLint) — **semua PASS**. Push: `origin/main` → `8b6f590`.
+- **Deploy produksi hijau:** `npm run deploy` → 22 aset statis baru terunggah, **Version ID `23269e20-f298-4174-a70b-7a0f37027b7c`**, worker `portfolio-os-template.m4keitbetter.workers.dev`.
+- **Smoke test live:** `/api/health` = `version 1.3.41` + `database: connected` (D1, 143 ms); `/`, `/checkout`, `/projects`, `/preview/{os-desktop,infinite-canvas,spatial-gallery}` **semua 200**; `/api/admin/pricing` & `/api/admin/orders` **401** (Owner Mode aktif).
+- **Insiden yang dicatat apa adanya:** dev server lokal owner (port 3000, PID 22728) **mati** saat `npm install` dijalankan di salinan utama (mengganti `node_modules` selagi server memuat modul). Hanya berdampak ke lingkungan lokal — produksi tidak tersentuh. Port 3000 kini bebas sehingga `npm run deploy` tidak lagi tersendat guard-nya. Owner tinggal `npm run dev` kalau ingin dev server hidup lagi.
+- **Satu-satunya verifikasi yang belum tuntas:** cek visual panel admin **Loader** (`/admin` → zona Tampilan) — browser harness tidak terhubung ke mesin owner, jadi harus dibuka manual.
