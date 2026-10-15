@@ -3,6 +3,26 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.44] - 2026-10-16
+
+### 🔐 Perbaikan Login: Login Sukses Kini Mengembalikan Saldo Percobaan (+ Pesan yang Jujur)
+
+Perbaikan atas insiden owner 2026-10-16: sukses mengganti password, logout, lalu mencoba login lagi **langsung kena "Terlalu banyak percobaan login. Coba lagi nanti."** — dan saat memakai password lama muncul notif "kesalahan database". Semua angka di bawah diambil dari jejak nyata di `app_kv.rateLimits` produksi, bukan perkiraan.
+
+- **Bukti dari produksi (WIB, 16 Okt):** key `login_114_12_6_45` mencapai `attempts=3` dan diblokir **00:20:47–00:50:47** (30 menit); kunci `chpwd_...` membuktikan ganti password sukses sekitar 00:19:48. Seluruh rangkaian hanya berjarak ±3 menit. Pemilik mencoba lagi 00:49:55 (masih diblokir) dan baru bisa masuk setelah blokir berakhir.
+- **Cacat 1 — login SUKSES ikut dihitung dan tidak pernah di-reset:** `POST /api/auth/login` memanggil `checkDataRateLimit` (mode "catat") **sebelum** password diperiksa, dan **tidak ada satu pun** fungsi reset di seluruh codebase (`resetDataRateLimit` = nol kemunculan). Akibatnya "3 percobaan / 5 menit" berarti "3 kali menekan tombol login apa pun hasilnya" — alur normal (login → ganti password → uji login baru) memakai 2 dari 3 slot, lalu satu kali coba password lama mengunci owner **30 menit**. Pelindung brute-force justru menghukum pemilik.
+- **Cacat 2 — pesan 500 menyesatkan:** `useAdminLogin.ts` menerjemahkan semua 500 jadi *"⚠️ Backend Error: Masalah koneksi database… Pastikan server stabil."* Padahal 500 = segala gangguan sesaat setelah lolos rate limit (termasuk satu kali kegagalan REST D1 sesaat yang terbukti terjadi di produksi). Password salah seharusnya cukup membalas 401 "Email atau password salah".
+- **Cacat 3 — dua situasi tampil identik:** 429 bisa berarti "diblokir 30 menit" **atau** "transaksi pencatatan gagal menulis ke D1, coba lagi 60 detik" (jalur fail-closed `dataRateLimit.ts`) — keduanya menampilkan kalimat sama; angka `retryAfter` yang sudah tersedia tidak pernah ditampilkan layar.
+- **Perbaikan:**
+  - `src/lib/dataRateLimit.ts` — fungsi baru **`resetDataRateLimit(key)`**: menghapus catatan satu key lewat transaksi CAS `db.ref('rateLimits')` (best-effort, kegagalan hanya dicatat).
+  - `src/app/api/auth/login/route.ts` — **reset dipanggil saat login sukses** (guard kini menghitung hanya kegagalan: 3 gagal → blokir 30 menit); pesan 429 kini menyertakan lamanya penantian ("Coba lagi dalam ±X menit"); pesan 500 diringkas jujur tanpa menyalahkan database.
+  - `src/app/admin/login/_hooks/useAdminLogin.ts` — pesan 500 → *"Layanan login sedang bermasalah di sisi server. Coba lagi beberapa saat lagi."* (berhenti menuduh "database" di depan pengguna).
+  - `src/crud/shared/auth/login.ts` — UPDATE `last_login_at` dan upgrade hash password kini **best-effort** (`try/catch` + log): kegagalan tulis catatan sampingan tidak lagi menggagalkan login yang passwordnya benar.
+  - `src/app/api/auth/login/route.test.ts` — **test baru (sebelumnya route ini tidak punya test sama sekali)**: 6 kasus — 429 menyebut lamanya waktu, retryAfter pendek dibulatkan, 401 tidak mereset counter, sukses mereset counter, reset gagal tidak menggagalkan login sah, dan 500 tidak menyalahkan database.
+  - `src/lib/constants.ts` — `APP_VERSION` → **1.3.44**.
+- **Perilaku hasil:** peretas tetap terhambat (3 kegagalan berturut-turut → blokir 30 menit, kredensial tidak bisa ditebak); pemilik yang login sukses kembali dengan saldo penuh sehingga alur "ganti password lalu uji login" tidak lagi bisa mengunci dirinya sendiri.
+- **Verifikasi:** `tsc --noEmit` 0 error, `npm run lint` bersih, `npm test` seluruhnya hijau (nol test patah), pre-commit + pre-push audit lolos; smoke live pasca-deploy.
+
 ## [1.3.43] - 2026-10-16
 
 ### ⚡ Optimasi Kecepatan Homepage: Query Project Batch (N+1 → 3 Query) + Cache Demo 5 Menit

@@ -105,8 +105,10 @@ export function useAdminLogin(_location: LocationData | null) {
 
         let message = 'Login failed. Please try again.';
         if (response.status === 500) {
-          message =
-            '⚠️ Backend Error: Masalah koneksi database (Internal Server Error). Pastikan server stabil.';
+          // Jangan menuduh "database" di depan pengguna: 500 bisa berasal dari
+          // apa pun (baca body gagal, koneksi sesaat, dsb.) dan pengguna tidak
+          // bisa "membuat server stabil" — cukup sampaikan bahwa ini sementara.
+          message = 'Layanan login sedang bermasalah di sisi server. Coba lagi beberapa saat lagi.';
         } else {
           try {
             const data = await response.json();

@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SITE_ID } from '@/crud/shared/config';
 import { authenticateUser, createLoginResponse } from '@/crud/shared/auth/login';
-import { checkDataRateLimit } from '@/lib/dataRateLimit';
+import { checkDataRateLimit, resetDataRateLimit } from '@/lib/dataRateLimit';
 import { getClientIP } from '@/lib/security/request';
 
 export const dynamic = 'force-dynamic';
@@ -21,22 +21,28 @@ export async function POST(request: NextRequest) {
     // di /api/admin/login. Key tidak memakai User-Agent agar rotasi
     // UA tidak bisa me-reset counter.
     const rateLimitIp = getClientIP(request);
+    const rateLimitKey = `login_${rateLimitIp}`;
     const rateLimit = await checkDataRateLimit(
-      `login_${rateLimitIp}`,
+      rateLimitKey,
       MAX_ATTEMPTS_PER_WINDOW,
       RATE_LIMIT_WINDOW,
       BLOCK_DURATION
     );
 
     if (!rateLimit.allowed) {
+      // 429 bisa berarti "diblokir 30 menit" ATAU "transaksi pencatatan
+      // gagal menulis ke D1 (retryAfter 60 detik)" — keduanya jangan tampil
+      // dengan pesan identik; sampaikan lamanya penantian.
+      const retryAfterSeconds = rateLimit.retryAfter ?? 60;
+      const retryMinutes = Math.max(1, Math.ceil(retryAfterSeconds / 60));
       return NextResponse.json(
         {
-          error: 'Terlalu banyak percobaan login. Coba lagi nanti.',
-          retryAfter: rateLimit.retryAfter,
+          error: `Terlalu banyak percobaan login. Coba lagi dalam ±${retryMinutes} menit.`,
+          retryAfter: retryAfterSeconds,
         },
         {
           status: 429,
-          headers: { 'Retry-After': String(rateLimit.retryAfter ?? 60) },
+          headers: { 'Retry-After': String(retryAfterSeconds) },
         }
       );
     }
@@ -50,11 +56,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: result.error }, { status: 401 });
     }
 
+    // Login SUKSES: kembalikan saldo percobaan. Guard brute-force hanya
+    // boleh menghitung kegagalan — tanpa reset ini, alur normal pemilik
+    // (login -> ganti password -> uji login baru) mengunci dirinya sendiri
+    // 30 menit (insiden 2026-10-16; lihat CHANGELOG 1.3.44).
+    // Best-effort: kegagalan reset tidak boleh menggagalkan login sah.
+    try {
+      await resetDataRateLimit(rateLimitKey);
+    } catch (error) {
+      console.error('[Auth] Reset rate limit login gagal (diabaikan):', error);
+    }
+
     return createLoginResponse(result.token!);
   } catch (error) {
     // Tanpa baris ini, kegagalan login tidak meninggalkan jejak apa pun di
     // log worker — penyebabnya harus dilacak manual lewat reproduksi.
     console.error('[Auth] /api/auth/login gagal:', error);
-    return NextResponse.json({ error: 'Gagal memproses login' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Layanan login sedang bermasalah. Coba lagi beberapa saat.' },
+      { status: 500 }
+    );
   }
 }

@@ -209,3 +209,38 @@ export async function checkDataRateLimit(
     return checkLocalRateLimit(safePath, maxAttempts, windowMs, blockMs, shouldRecord);
   }
 }
+
+/**
+ * Menghapus catatan rate-limit untuk satu key (dipanggil saat login SUKSES).
+ *
+ * Pelindung brute-force hanya boleh menghitung KEGAGALAN. Tanpa reset ini,
+ * login yang berhasil ikut memakan kuota "3 percobaan / 5 menit" sehingga
+ * alur normal pemilik (login -> ganti password -> uji login baru) bisa
+ * mengunci dirinya sendiri 30 menit — insiden owner 2026-10-16.
+ *
+ * Best-effort: kegagalan menghapus counter TIDAK boleh menggagalkan login
+ * yang sudah sah.
+ */
+export async function resetDataRateLimit(key: string): Promise<void> {
+  const safePath = key.replace(/[.#$/[\]]/g, '_');
+
+  if (!isD1Configured()) {
+    localLimits.delete(safePath);
+    return;
+  }
+
+  try {
+    await db.ref('rateLimits').transaction((store: unknown) => {
+      if (!store || typeof store !== 'object' || Array.isArray(store)) {
+        return undefined; // tidak ada apa-apa untuk dihapus
+      }
+      const records = store as Record<string, RateLimitRecord>;
+      if (!(safePath in records)) return undefined; // sudah bersih
+      const next = { ...records };
+      delete next[safePath];
+      return next;
+    });
+  } catch (error) {
+    console.error('[RateLimit] Reset counter gagal (diabaikan):', error);
+  }
+}

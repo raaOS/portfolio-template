@@ -69,19 +69,32 @@ export async function authenticateUser(
     return { success: false, error: 'Email atau password salah' };
   }
 
-  // Upgrade password if needed (sha256 → scrypt)
+  // Upgrade password if needed (sha256 → scrypt). Best-effort: kegagalan
+  // tulis TIDAK boleh menggagalkan login yang passwordnya sudah benar —
+  // upgrade akan dicoba lagi pada login berikutnya.
   if (needsUpgrade && upgradedRecord) {
-    await queryD1(
-      `UPDATE site_users SET password_hash = ?, password_salt = ?, password_algorithm = 'scrypt' WHERE id = ?`,
-      [upgradedRecord.passwordHash, upgradedRecord.passwordSalt || '', user.id]
-    );
+    try {
+      await queryD1(
+        `UPDATE site_users SET password_hash = ?, password_salt = ?, password_algorithm = 'scrypt' WHERE id = ?`,
+        [upgradedRecord.passwordHash, upgradedRecord.passwordSalt || '', user.id]
+      );
+    } catch (error) {
+      console.error('[Auth] Upgrade hash password dilewati (diabaikan):', error);
+    }
   }
 
-  // Update last_login_at
-  await queryD1(
-    `UPDATE site_users SET last_login_at = datetime('now') WHERE id = ?`,
-    [user.id]
-  );
+  // Update last_login_at — jejak audit, best-effort dengan alasan yang sama:
+  // sekali lagi, login yang sah tidak boleh digagalkan oleh kegagalan tulis
+  // catatan sampingan (insiden 2026-10-16: "password benar tapi dapat
+  // kesalahan database").
+  try {
+    await queryD1(
+      `UPDATE site_users SET last_login_at = datetime('now') WHERE id = ?`,
+      [user.id]
+    );
+  } catch (error) {
+    console.error('[Auth] last_login_at gagal dicatat (diabaikan):', error);
+  }
 
   // Sign JWT
   const token = await signSiteUserJWT({
