@@ -158,3 +158,82 @@ describe('projectSqlService media cleanup lifecycle', () => {
     });
   });
 });
+
+describe('projectSqlService.getProjectsSql (batch, bukan N+1)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  const projRow = (id: string, title: string, order: number) => ({
+    id,
+    site_id: 'default-site',
+    slug: id,
+    title,
+    cover_media_id: null,
+    status: 'published',
+    order_index: order,
+    metadata_json: '{}',
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+  });
+
+  it('memuat semua project hanya dengan 3 query (1 projects + 2 batch paralel)', async () => {
+    queryD1Mock.mockImplementation((sql: string) => {
+      if (sql.startsWith('SELECT * FROM projects WHERE site_id = ?')) {
+        return Promise.resolve([projRow('p1', 'Satu', 1), projRow('p2', 'Dua', 2)]);
+      }
+      if (sql.startsWith('SELECT * FROM project_narratives')) {
+        return Promise.resolve([
+          { id: 'n2', project_id: 'p2', challenge: 'Tantangan Dua', solution: '', impact: '' },
+          { id: 'n1', project_id: 'p1', challenge: 'Tantangan Satu', solution: '', impact: '' },
+        ]);
+      }
+      if (sql.startsWith('SELECT * FROM media_assets')) {
+        return Promise.resolve([
+          {
+            id: 'm2',
+            project_id: 'p2',
+            sort_order: 1,
+            public_url: 'https://cdn.example.com/two.jpg',
+            alt_text: '',
+            r2_key: 'k/two.jpg',
+          },
+          {
+            id: 'm1',
+            project_id: 'p1',
+            sort_order: 1,
+            public_url: 'https://cdn.example.com/one.mp4',
+            alt_text: '',
+            r2_key: 'k/one.mp4',
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    const { projects } = await projectSqlService.getProjectsSql('default-site', 'published');
+
+    // REGRESI N+1: tanpa batch ini, 2 project = 5 query; di produksi (20 project)
+    // pola lama menghasilkan ±41 query REST berurutan ≈ 8 detik render ulang.
+    expect(queryD1Mock).toHaveBeenCalledTimes(3);
+
+    expect(projects.map((p) => p.id)).toEqual(['p1', 'p2']);
+    expect(projects[0].narrative?.challenge).toBe('Tantangan Satu');
+    expect(projects[1].narrative?.challenge).toBe('Tantangan Dua');
+    expect(projects[0].galleryItems).toEqual([
+      { kind: 'video', src: 'https://cdn.example.com/one.mp4', alt: 'Satu' },
+    ]);
+    expect(projects[1].galleryItems).toEqual([
+      { kind: 'image', src: 'https://cdn.example.com/two.jpg', alt: 'Dua' },
+    ]);
+  });
+
+  it('berhenti di 1 query saat tidak ada project sama sekali', async () => {
+    queryD1Mock.mockResolvedValue([]);
+
+    const { projects } = await projectSqlService.getProjectsSql('default-site', 'published');
+
+    expect(projects).toEqual([]);
+    expect(queryD1Mock).toHaveBeenCalledTimes(1);
+  });
+});

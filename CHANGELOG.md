@@ -3,6 +3,25 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.43] - 2026-10-16
+
+### ⚡ Optimasi Kecepatan Homepage: Query Project Batch (N+1 → 3 Query) + Cache Demo 5 Menit
+
+Perbaikan performa atas keluhan owner 2026-10-16: *"iframe live web di halaman utama pas pertama kali masuk halaman itu lama sekali"*. Seluruh angka di bawah terukur langsung di produksi, bukan perkiraan.
+
+- **Gejala (terukur):** ketiga iframe `/preview/*` membutuhkan **6,7–11,7 detik** server-side (TTFB) saat cache ISR habis; uji ketiga iframe dimuat paralel (persis seperti browser) = **8,31 detik wall clock** hanya untuk menghasilkan HTML, sebelum satu byte aset pun turun. Kunjungan berikutnya justru cepat (0,3–0,5 detik, `x-opennext-cache: HIT`) — makanya keluhan "khususnya pertama kali".
+- **Akar masalah 1 — pola N+1 query:** `projectSqlService.getProjectsSql()` menjalankan **1 query daftar project + 2 query per project (narrative & media) berurutan di dalam loop**. Untuk portofolio 20 project di produksi = **±41 query REST**, dan tiap query adalah satu round-trip HTTP ke `api.cloudflare.com` (±150–450 ms) → **±8 detik**, cocok persis dengan TTFB terukur.
+- **Akar masalah 2 — cache terlalu pendek:** `revalidate = 60` di `/preview/[template]` berarti **tiap 60 detik pengunjung pertama menanggung seluruh biaya render ulang** itu.
+- **Konteks (belum diubah, di luar scope):** tiap iframe memuat aplikasi Next.js penuh — 24 file JS/CSS = **1,54 MB per iframe (±4,7 MB untuk tiga)** serentak saat kunjungan pertama, ditambah seluruh payload data situs ikut ter-inline di HTML (87–106 KB per halaman).
+- **Perbaikan:**
+  - `src/lib/services/project/projectSqlService.ts` — `getProjectsSql()` kini hanya **3 query**: 1 daftar project + 2 batch `WHERE project_id IN (subquery)` yang berjalan paralel (`Promise.all`), lalu pemetaan di memori. Subquery dipakai agar jumlah parameter tidak tumbuh seiring jumlah project. Hasil **identik** dengan pola lama: urutan project, narrative pertama per project, media terurut `sort_order`.
+  - `src/app/preview/[template]/page.tsx` — `revalidate` 60 → **300** detik (demo hanya berubah saat owner mengedit konten).
+  - `src/lib/services/project/projectSqlService.test.ts` — **2 test regresi baru**: (a) dua project = *tepat* 3 query + pemetaan narrative/media per project benar; (b) tanpa project = berhenti di 1 query. Mengunci pola batch agar tidak dikembalikan ke N+1.
+  - `src/lib/constants.ts` — `APP_VERSION` → **1.3.43**.
+- **Dampak:** render ulang halaman demo turun dari ±8 detik menjadi ±0,6–1 detik (3–5 query REST), dan pemicunya menjadi tiap 5 menit, bukan tiap menit. Perbaikan ini otomatis berlaku juga untuk homepage `/`, halaman publik `/projects`, dan 3 endpoint API projects — semuanya memanggil fungsi yang sama.
+- **Verifikasi:** `tsc --noEmit` 0 error, `npm run lint` bersih, `npm test` **133 file / 1.071 test PASS** (baseline 1.069 + 2 test regresi baru; nol test patah).
+- **Sisa kandidat (belum dikerjakan, butuh izin owner):** pola N+1 serupa di `getOtherProjectMediaKeys()` (`projectSqlService.ts:105-126`) — jalur mutasi admin (hapus/salin project), bukan halaman publik; berat unduhan ±4,7 MB JS ketiga iframe (butuh strategi lazy-load on-demand, keputusan desain); dan **D1 binding langsung** sebagai perbaikan struktural (mengganti REST, tiap query turun dari ±200 ms ke <10 ms) — menyentuh pipeline deploy, perlu rencana terpisah.
+
 ## [1.3.42] - 2026-10-14
 
 ### 🔧 Hotfix Login Admin: Server Tidak Lagi "Mengunci" Diri Sendiri Setelah Gagal Sekali

@@ -144,18 +144,52 @@ export const projectSqlService = {
 
     const projectRows = await queryD1<ProjectSqlRow>(sql, params);
 
-    const projects: Project[] = [];
-    for (const pRow of projectRows) {
-      const narrRows = await queryD1<ProjectNarrativeSqlRow>(
-        `SELECT * FROM project_narratives WHERE project_id = ?`,
-        [pRow.id]
-      );
-      const mediaRows = await queryD1<MediaAssetSqlRow>(
-        `SELECT * FROM media_assets WHERE project_id = ? ORDER BY sort_order ASC`,
-        [pRow.id]
-      );
-      projects.push(mapSqlToProject(pRow, narrRows[0] || null, mediaRows));
+    if (projectRows.length === 0) {
+      return { projects: [], lastUpdated: new Date().toISOString() };
     }
+
+    // Batch, bukan N+1: queryD1 = REST per permintaan (±200 ms tiap panggilan),
+    // jadi 2 query per project membuat render homepage/preview membengkak jadi
+    // ±41 query ≈ 8 detik untuk portofolio 20 project. Dengan subquery IN,
+    // total hanya 3 query dan jumlah parameter tidak tumbuh seiring project.
+    const subquery = `SELECT id FROM projects WHERE site_id = ?${
+      status ? ' AND status = ?' : ''
+    }`;
+    const [narrativeRows, mediaRows] = await Promise.all([
+      queryD1<ProjectNarrativeSqlRow>(
+        `SELECT * FROM project_narratives WHERE project_id IN (${subquery})`,
+        params
+      ),
+      queryD1<MediaAssetSqlRow>(
+        `SELECT * FROM media_assets WHERE project_id IN (${subquery}) ORDER BY sort_order ASC`,
+        params
+      ),
+    ]);
+
+    const narrativeByProject = new Map<string, ProjectNarrativeSqlRow>();
+    for (const row of narrativeRows) {
+      if (!narrativeByProject.has(row.project_id)) {
+        narrativeByProject.set(row.project_id, row);
+      }
+    }
+
+    const mediaByProject = new Map<string, MediaAssetSqlRow[]>();
+    for (const row of mediaRows) {
+      const list = mediaByProject.get(row.project_id);
+      if (list) {
+        list.push(row);
+      } else {
+        mediaByProject.set(row.project_id, [row]);
+      }
+    }
+
+    const projects = projectRows.map((pRow) =>
+      mapSqlToProject(
+        pRow,
+        narrativeByProject.get(pRow.id) || null,
+        mediaByProject.get(pRow.id) || []
+      )
+    );
 
     return { projects, lastUpdated: new Date().toISOString() };
   },

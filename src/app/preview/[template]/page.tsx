@@ -7,12 +7,13 @@ import { SITE_ID } from '@/crud/shared/config';
 import { DEFAULT_SITE_URL } from '@/lib/constants';
 import InfiniteCanvasRenderer from '@/components/templates/infinite-canvas/InfiniteCanvasRenderer';
 
-export const revalidate = 60;
+export const revalidate = 300;
 
 const PREVIEW_SLUGS = ['os-desktop', 'infinite-canvas', 'spatial-gallery'] as const;
 
 // Tanpa ini /preview/* selalu render penuh per-request (TTFB 6.3s terukur di
-// produksi). Dengan gSP, halaman jadi ISR: pre-render saat build + cache 60s.
+// produksi). Dengan gSP, halaman jadi ISR: pre-render saat build + cache 300s
+// (60s dulu: tiap menit pengunjung pertama menanggung render ulang ±8 dtk).
 export function generateStaticParams() {
   return PREVIEW_SLUGS.map((template) => ({ template }));
 }
