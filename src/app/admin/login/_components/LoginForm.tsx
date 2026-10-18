@@ -1,6 +1,7 @@
 'use client';
 
 import { Eye, EyeOff, Lock, Mail } from 'lucide-react';
+import Link from 'next/link';
 
 interface LoginFormProps {
   email: string;
@@ -77,6 +78,15 @@ export function LoginForm({
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
+      </div>
+
+      <div className="text-right">
+        <Link
+          href="/admin/lupa-password"
+          className="text-xs text-blue-600 hover:text-blue-500 hover:underline"
+        >
+          Lupa password?
+        </Link>
       </div>
 
       {error && (

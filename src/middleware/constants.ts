@@ -32,6 +32,8 @@ export const protectedRoutes = ['/admin', '/api/admin'];
 // karena endpoint itu memang menjawab status auth untuk visitor/admin.
 export const publicRoutes = [
   '/admin/login',
+  '/admin/lupa-password',
+  '/admin/reset-password',
   '/api/admin/check-auth',
   '/api/admin/login',
   '/api/admin/logout',
@@ -40,6 +42,8 @@ export const publicRoutes = [
   '/api/auth/login',
   '/api/auth/logout',
   '/api/auth/check-auth',
+  '/api/auth/forgot-password',
+  '/api/auth/reset-password',
 ];
 
 // Catatan: `/api/cron/*` sengaja TIDAK didaftarkan di sini. Path itu memang

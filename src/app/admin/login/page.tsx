@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import AdminLoginClient from './_components/AdminLoginClient';
 import { verifySiteUserJWT } from '@/crud/shared/auth/session';
+import { isSessionRevoked } from '@/crud/shared/auth/guard';
 
 export const metadata: Metadata = {
   title: 'Admin Login | Portfolio OS',
@@ -42,7 +43,9 @@ export default async function AdminLoginPage({ searchParams }: AdminLoginPagePro
 
   if (token) {
     const session = await verifySiteUserJWT(token);
-    if (session) {
+    // Sesi yang sudah dicabut (password pernah diganti setelah token terbit)
+    // jangan dianggap login — pemiliknya harus masuk ulang dengan password baru.
+    if (session && !(await isSessionRevoked(session))) {
       const params = await searchParams;
       redirect(getSafeRedirectTarget(params?.redirect));
     }

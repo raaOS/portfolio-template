@@ -6,7 +6,23 @@
  */
 import { verifySiteUserJWT, type SiteUserSession } from './session';
 import { AUTH_COOKIE_NAME } from './session';
+import { getSessionNotBefore } from '@/lib/services/passwordResetService';
 import { NextResponse } from 'next/server';
+
+// Toleransi pembulatan: `iat` JWT dalam detik sedangkan tanda keamanan dalam
+// milidetik — sesi yang terbit maksimal 5 detik sebelum password diganti tidak
+// ditolak (login tepat setelah reset tidak boleh ikut terkena).
+const SESSION_CLOCK_SKEW_MS = 5_000;
+
+/**
+ * True bila sesi ini terbit SEBELUM pencabutan terakhir (password diganti
+ * lewat reset lupa-password maupun ganti-password mandiri).
+ */
+export async function isSessionRevoked(session: SiteUserSession): Promise<boolean> {
+  const notBefore = await getSessionNotBefore(session.userId);
+  if (!notBefore || session.issuedAt === undefined) return false;
+  return session.issuedAt * 1000 < notBefore - SESSION_CLOCK_SKEW_MS;
+}
 
 /**
  * Extract and verify the site user session from a request.
@@ -21,7 +37,15 @@ export async function getSiteUserSession(request: Request): Promise<SiteUserSess
   }
 
   const token = tokenMatch[1];
-  return verifySiteUserJWT(token);
+  const session = await verifySiteUserJWT(token);
+  if (!session) return null;
+
+  // Cookie JWT stateless tidak bisa dihapus dari sisi server, jadi sesi yang
+  // terbit sebelum password terakhir diganti ditolak DI SINI (lapisan
+  // pengaman setelah tanda `securityNotBefore` ditulis oleh reset/ganti password).
+  if (await isSessionRevoked(session)) return null;
+
+  return session;
 }
 
 /**

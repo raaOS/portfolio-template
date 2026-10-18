@@ -72,6 +72,8 @@ export function checkCSRF(request: NextRequest) {
       '/api/admin/logout',
       '/api/auth/login',
       '/api/auth/logout',
+      '/api/auth/forgot-password',
+      '/api/auth/reset-password',
       '/api/setup',
       '/api/chat/send',
       '/api/chat/voice',

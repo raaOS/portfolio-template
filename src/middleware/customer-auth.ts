@@ -21,7 +21,7 @@ function getJwtSecret(): Uint8Array | null {
 }
 
 async function maybeRefreshToken(
-  payload: { exp?: number; siteId?: string; email?: string; role?: string; sub?: string },
+  payload: { exp?: number; iat?: number; siteId?: string; email?: string; role?: string; sub?: string },
   response: NextResponse
 ): Promise<void> {
   const baseSecret = getJwtSecret();
@@ -45,7 +45,10 @@ async function maybeRefreshToken(
       .setSubject(payload.sub || '')
       .setIssuer('portfolio-site-user')
       .setAudience('site-dashboard')
-      .setIssuedAt(nowSec)
+      // Pertahankan `iat` ASLI saat memperpanjang umur token. Kalau diganti
+      // waktu baru, sesi yang sudah dicabut (password diganti) bisa
+      // "diperpanjang" selamanya dan lolos dari guard — pencabutan jadi sia-sia.
+      .setIssuedAt(payload.iat || nowSec)
       .setExpirationTime(nowSec + TOKEN_TTL_SECONDS)
       .sign(derivedSecret);
 

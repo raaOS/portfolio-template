@@ -11,6 +11,8 @@ export interface SiteUserSession {
   siteId: string;
   email: string;
   role: string;
+  /** Waktu terbit JWT (epoch detik) — dipakai guard untuk pencabutan sesi lama. */
+  issuedAt?: number;
 }
 
 export interface SiteUserJWTPayload extends JWTPayload {
@@ -106,6 +108,7 @@ export async function verifySiteUserJWT(token: string): Promise<SiteUserSession 
       siteId: typed.siteId,
       email: typed.email,
       role: typed.role,
+      issuedAt: typed.iat,
     };
   } catch {
     return null;

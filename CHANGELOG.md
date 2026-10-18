@@ -3,6 +3,22 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.45] - 2026-10-19
+
+### 🔑 Fitur Baru: Lupa Password — Tautan Reset Lewat Email (+ Pencabutan Sesi Login Lama)
+
+Permintaan owner (2026-10-18): klien harus bisa mengatur ulang password sendiri seperti website lain. Alur OTP-dulu-baru-link yang diajukan direvisi menjadi **tautan saja** (bukti identik, cukup 1 email, 2 langkah — standar Gmail/GitHub).
+
+- **Alur baru:** halaman login → tautan **"Lupa password?"** → `/admin/lupa-password` (isi email) → 1 email berisi tautan `/admin/reset-password?token=…` (**berlaku 30 menit, sekali pakai**) → buat password baru (min. 8 karakter) → semua sesi login lama otomatis dicabut.
+- **Dua endpoint baru:** `POST /api/auth/forgot-password` + `POST /api/auth/reset-password` (terdaftar di `publicRoutes` middleware + allowlist CSRF).
+- **Anti email-enumeration:** respons layar **identik** untuk email terdaftar maupun tidak ("Jika email terdaftar, tautan sudah dikirim…"); kegagalan internal juga tidak pernah bocor ke layar.
+- **Keamanan token:** acak 32 byte, disimpan **ter-hash SHA-256** di `app_kv.passwordResets` (bocor database ≠ akun jebol), kadaluarsa 30 menit, sekali pakai lewat transaksi CAS, permintaan baru membatalkan token lama; rate-limit 3 kirim/10 menit per IP (anti email-bombing) dan 5 percobaan tebak token/10 menit.
+- **Pencabutan sesi lama (`securityNotBefore`):** JWT stateless 2 jam tidak bisa dihapus dari sisi server — kini setiap ganti password (reset **maupun** ganti mandiri di `changePassword.ts`) menulis tanda waktu di `app_kv`; `getSiteUserSession` menolak sesi yang terbit sebelum tanda itu (cache baca 60 detik, toleransi pembulatan 5 detik, fail-open terbatas agar login tidak ikut mati saat D1 sesat). **Celah kritis ikut ditutup:** sliding-refresh di `middleware/customer-auth.ts` kini mempertahankan `iat` ASLI token — sebelumnya token yang sudah dicabut bisa "diperpanjang" selamanya dan lolos dari guard.
+- **Aktivasi otomatis per deployment:** fitur hidup hanya bila `NOTIFICATION_PROVIDER`+API key+`NOTIFICATION_DEFAULT_FROM` terisi (jalur email struk pesanan yang sama, `src/lib/services/passwordResetService.ts`). Site owner sudah lengkap; deployment **klien tanpa kunci otomatis dapat pesan jujur** "Fitur … belum aktif. Hubungi owner Anda." (503) — tanpa perubahan pipeline deploy. Jalur reset via owner (`reset-customer-password.ts`) tetap ada sebagai fallback.
+- **UI:**2 halaman baru bergaya halaman login (`/admin/lupa-password`, `/admin/reset-password` dengan status token hilang/kedaluwarsa/sukses), tautan "Lupa password?" di `LoginForm`.
+- **Test baru (23 kasus):** `passwordResetService.test.ts` (single-use, kadaluarsa, hash-only, pembatalan token lama, pencabutan), `guard.test.ts` (sesi lama ditolak / login baru lolos / toleransi 5 detik), route test kedua endpoint (429 berdurasi, 503 provider mati, respons identik anti-enumeration, kegagalan internal tetap 200 generik).
+- `src/lib/constants.ts` — `APP_VERSION` → **1.3.45**.
+
 ## [1.3.44] - 2026-10-16
 
 ### 🔐 Perbaikan Login: Login Sukses Kini Mengembalikan Saldo Percobaan (+ Pesan yang Jujur)

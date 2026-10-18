@@ -6,6 +6,7 @@
  */
 import { queryD1, bootstrapD1Schema } from '@/crud/shared/db/connection';
 import { verifyStoredPassword, createScryptPasswordRecord, type StoredPasswordConfig } from './password';
+import { setSessionNotBefore } from '@/lib/services/passwordResetService';
 
 export interface ChangePasswordRequest {
   currentPassword: string;
@@ -89,6 +90,10 @@ export async function changeSiteUserPassword(
      WHERE id = ?`,
     [record.passwordHash, record.passwordSalt || '', user.id]
   );
+
+  // Cabut semua sesi login lama (cookie stateless tidak bisa dihapus dari
+  // sisi server) — guard menolak sesi yang terbit sebelum saat ini.
+  await setSessionNotBefore(userId);
 
   return { success: true };
 }
