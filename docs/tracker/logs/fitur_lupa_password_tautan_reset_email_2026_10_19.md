@@ -40,3 +40,35 @@ Alur diajukan: klik lupa password â†’ OTP ke email â†’ masukkan OTP â†’ baru kir
 - Jangan pernah menampilkan pesan berbeda untuk email terdaftar vs tidak di jalur publik mana pun (enumeration).
 - `securityNotBefore` = satu-satunya mekanisme pencabutan sesi; jika kelak ada endpoint logout-semua-device, tulis tanda yang sama untuk semua user.
 - Sliding refresh WAJIB mempertahankan `iat` asli â€” kembalikan ke `nowSec` = membuka kembali celah #5.
+
+---
+
+## Audit Ulang (v1.3.46, 2026-10-19) — permintaan owner "cek lagi cacat logika"
+
+Audit ulang menyeluruh dengan membaca ulang kode terpasang (guard, session, middleware, kedua route, service, halaman admin). **3 cacat NYATA ditemukan & diperbaiki**, beberapa risiko ditinjau dan diterima:
+
+### Diperbaiki (semua teruji, suite 138 file / 1.110 test PASS)
+
+1. **Tautan mati bisa terkirim lewat email** — `storeResetToken` mengabaikan hasil transaksi; `database.ts:272` bisa mengembalikan `committed:false` (CAS sibuk, 3 kali gagal-saing) ? token tidak pernah tersimpan padahal dikembalikan untuk di-email. **Fix:** cek `result.committed`; gagal ? return null ? `requestPasswordReset` tidak mengirim email (log error, respons generik tetap 200). Test baru: CAS gagal ? email tidak dikirim.
+2. **Dua halaman admin lolos pencabutan sesi** — `src/app/admin/page.tsx` & `src/app/admin/projects/explorer/page.tsx` memanggil `verifySiteUserJWT` **langsung** tanpa `isSessionRevoked` (hanya `guard.ts` + `login/page.tsx` yang sudah benar; `check-auth` lewat guard juga benar) ? sesi tercabut masih me-render kerangka dashboard. **Fix:** kedua halaman kini cek `isSessionRevoked` (3 baris tiap halaman).
+3. **Ganti password sendiri = langsung logout (regresi UX)** — `setSessionNotBefore` di `changePassword.ts` menangkap SEMUA sesi lama termasuk pelaku; sebelum v1.3.45 pemilik tetap login setelah sukses. **Fix:** `POST /api/auth/change-password` menerbitkan **cookie segar** (`signSiteUserJWT` + `AUTH_COOKIE_NAME`/`AUTH_COOKIE_OPTIONS`) setelah sukses — pelaku lanjut mulus, sesi LAIN tetap mati (iat token baru = tanda pencabutan ? lolos guard). Test baru: sukses ? cookie segar; gagal ? tanpa cookie.
+
+### Ditinjau & DITERIMA (dicatat, tanpa perbaikan)
+
+- **Sisi-waktu (timing) forgot-password:** email terdaftar = SELECT+transaksi+fetch lebih berat dari cabang awal. Rate-limit 3/10 menit membuat sampling statistik tidak praktis ? risiko rendah diterima (industri juga umum begini).
+- **Token tanpa klaim `iat` dianggap tidak tercabut** (`isSessionRevoked`: `issuedAt === undefined ? false`) — token selalu terbit dengan iat; memalsukan butuh `JWT_SECRET`.
+- **Jendela =60 detik** akibat cache per-isolat `securityNotBefore` — by design, sudah didokumentasi.
+
+### Backlog (belum dikerjakan)
+
+- **`scripts/cloudflare/reset-customer-password.ts` tidak menulis `securityNotBefore`** — reset password via jalur owner (script) tidak mencabut sesi lama korban (jendela maksimum = sisa TTL cookie 2 jam). Perlu penulisan baris `app_kv.securityNotBefore` dari script bila owner ingin jalur ini juga mencabut sesi.
+
+### File yang diubah pada audit ini (v1.3.46)
+
+- `src/lib/services/passwordResetService.ts` — `storeResetToken` cek `committed`, return `string | null`.
+- `src/app/admin/page.tsx`, `src/app/admin/projects/explorer/page.tsx` — cek `isSessionRevoked`.
+- `src/app/api/auth/change-password/route.ts` — terbitkan cookie segar setelah sukses.
+- `src/app/api/auth/change-password/route.test.ts` — mock modul sesi + 2 test baru.
+- `src/lib/services/passwordResetService.test.ts` — sakelar `forceCasFail` + 1 test baru.
+- `src/middleware/customer-auth.ts` — anotasi tipe `verifiedPayload` ikutkan `iat` (murni kejelasan).
+- `src/lib/constants.ts` — APP_VERSION 1.3.46.

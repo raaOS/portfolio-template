@@ -1,16 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const { requireAuthMock, changeSiteUserPasswordMock, checkDataRateLimitMock, validateCSRFTokenMock } =
-  vi.hoisted(() => ({
-    requireAuthMock: vi.fn(),
-    changeSiteUserPasswordMock: vi.fn(),
-    checkDataRateLimitMock: vi.fn(),
-    validateCSRFTokenMock: vi.fn(),
-  }));
+const {
+  requireAuthMock,
+  changeSiteUserPasswordMock,
+  checkDataRateLimitMock,
+  validateCSRFTokenMock,
+  signSiteUserJWTMock,
+} = vi.hoisted(() => ({
+  requireAuthMock: vi.fn(),
+  changeSiteUserPasswordMock: vi.fn(),
+  checkDataRateLimitMock: vi.fn(),
+  validateCSRFTokenMock: vi.fn(),
+  signSiteUserJWTMock: vi.fn(),
+}));
 
 vi.mock('@/crud/shared/auth/guard', () => ({
   requireAuth: requireAuthMock,
+}));
+
+vi.mock('@/crud/shared/auth/session', () => ({
+  signSiteUserJWT: signSiteUserJWTMock,
+  AUTH_COOKIE_NAME: 'site_user_token',
+  AUTH_COOKIE_OPTIONS: { httpOnly: true, sameSite: 'strict', path: '/', maxAge: 7200 },
 }));
 
 vi.mock('@/crud/shared/auth/changePassword', () => ({
@@ -63,6 +75,7 @@ describe('POST /api/auth/change-password', () => {
     checkDataRateLimitMock.mockResolvedValue({ allowed: true });
     requireAuthMock.mockResolvedValue({ session: SESSION });
     changeSiteUserPasswordMock.mockResolvedValue({ success: true });
+    signSiteUserJWTMock.mockResolvedValue('fresh.jwt.token');
   });
 
   it('rejects missing CSRF token with 403', async () => {
@@ -125,6 +138,35 @@ describe('POST /api/auth/change-password', () => {
       5 * 60 * 1000,
       15 * 60 * 1000
     );
+  });
+
+  it('menerbitkan cookie SEGAR setelah sukses — pelaku ganti password tidak ikut terkunci', async () => {
+    // Pencabutan sesi lama (securityNotBefore) menangkap SEMUA sesi lama,
+    // termasuk milik pelaku; route menebusnya dengan token baru (audit #168).
+    const req = buildRequest({ currentPassword: 'Lama12345', newPassword: 'Baru12345' });
+    stubCookie(req, 'a'.repeat(64));
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    expect(signSiteUserJWTMock).toHaveBeenCalledTimes(1);
+    expect(res.cookies.get('site_user_token')?.value).toBe('fresh.jwt.token');
+  });
+
+  it('gagal ganti password -> TIDAK menerbitkan cookie baru', async () => {
+    changeSiteUserPasswordMock.mockResolvedValue({
+      success: false,
+      error: 'Password saat ini salah',
+      status: 401,
+    });
+    const req = buildRequest({ currentPassword: 'Salah12345', newPassword: 'Baru12345' });
+    stubCookie(req, 'a'.repeat(64));
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(401);
+    expect(signSiteUserJWTMock).not.toHaveBeenCalled();
+    expect(res.cookies.get('site_user_token')).toBeUndefined();
   });
 
   it('forwards service errors with the mapped status', async () => {

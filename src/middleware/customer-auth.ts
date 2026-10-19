@@ -73,7 +73,7 @@ export async function checkCustomerAuth(request: NextRequest) {
     const token = request.cookies.get(SITE_USER_COOKIE)?.value;
 
     let isValid = false;
-    let verifiedPayload: { exp?: number; siteId?: string; email?: string; role?: string; sub?: string } | null = null;
+    let verifiedPayload: { exp?: number; iat?: number; siteId?: string; email?: string; role?: string; sub?: string } | null = null;
 
     if (token) {
       try {

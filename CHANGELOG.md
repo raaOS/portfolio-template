@@ -3,6 +3,21 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.46] - 2026-10-19
+
+### 🔍 Audit Ulang Fitur Lupa Password: 3 Cacat Logika Ditemukan & Diperbaiki
+
+Permintaan owner: *"cek lagi cacat logika"* — audit ulang menyeluruh terhadap v1.3.45 dengan membaca ulang kode terpasang (bukan mengulang klaim). Tiga cacat NYATA ditemukan, semuanya diperbaiki + diuji:
+
+1. **Tautan mati bisa terkirim lewat email.** `storeResetToken` mengabaikan hasil transaksi CAS — `database.ts:272` bisa mengembalikan `committed:false` setelah3 kali gagal-saing, artinya token TIDAK tersimpan padahal dikembalikan untuk email. **Perbaikan:** cek `result.committed`; gagal → token tidak dikirim (log error, respons generik tetap 200). Test baru: CAS gagal → email tidak dikirim.
+2. **Dua halaman admin lolos dari pencabutan sesi.** `/admin` dan `/admin/projects/explorer` memanggil `verifySiteUserJWT` **langsung** (bukan lewat guard) — sesi yang sudah dicabut (password diganti) masih me-render kerangka dashboard (data API tetap ditolak guard, tapi halaman menampilkan diri sebagai login). **Perbaikan:** kedua halaman kini memeriksa `isSessionRevoked` (konsisten dengan halaman login).
+3. **Ganti password sendiri = langsung dilempar keluar (regresi UX).** `setSessionNotBefore` di `changePassword.ts` menangkap SEMUA sesi — termasuk sesi pelaku ganti-password, padahal sebelum v1.3.45 pemilik tetap login setelah sukses. **Perbaikan:** `POST /api/auth/change-password` kini menerbitkan **cookie segar** setelah sukses (`signSiteUserJWT` + set cookie) — pelaku lanjut mulus, sesi-sesi LAIN tetap mati (iu token baru ≥ tanda pencabutan → lolos guard). Test baru: sukses → cookie segar terbit; gagal → tidak ada cookie.
+
+**Risiko yang ditinjau dan DITERIMA (dicatat, bukan diperbaiki):** sisi-waktu (timing) permintaan lupa-password — email terdaftar = kerja lebih berat dari tidak terdaftar, tapi rate-limit 3/10 menit membuat serangan statistik tidak praktis; token tanpa klaim `iat` dianggap tidak tercabut (memalsukan butuh `JWT_SECRET`); jendela ≤60 detik akibat cache per-isolat (by design, dokumentasi); **backlog:** `reset-customer-password.ts` (jalur owner) tidak menulis `securityNotBefore` — sesi lama korban bisa hidup ≤2 jam setelah owner mereset dari script.
+
+- **Test:** +3 (cookie segar, gagal-ganti-tanpa-cookie, CAS gagal) → total suite hijau.
+- `src/lib/constants.ts` — `APP_VERSION` → **1.3.46**.
+
 ## [1.3.45] - 2026-10-19
 
 ### 🔑 Fitur Baru: Lupa Password — Tautan Reset Lewat Email (+ Pencabutan Sesi Login Lama)

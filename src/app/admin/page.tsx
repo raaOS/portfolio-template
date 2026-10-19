@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { verifyAdminToken } from '@/lib/auth';
 import { verifySiteUserJWT } from '@/crud/shared/auth/session';
+import { isSessionRevoked } from '@/crud/shared/auth/guard';
 import AdminDashboardClient from './AdminDashboardClient';
 
 export default async function AdminPage() {
@@ -14,7 +15,10 @@ export default async function AdminPage() {
   let isAuthenticated = false;
   if (siteUserToken) {
     const session = await verifySiteUserJWT(siteUserToken);
-    isAuthenticated = session?.role === 'admin';
+    // Sesi tercabut (password diganti setelah token terbit) = bukan login.
+    if (session?.role === 'admin' && !(await isSessionRevoked(session))) {
+      isAuthenticated = true;
+    }
   }
   if (!isAuthenticated && adminToken) {
     isAuthenticated = verifyAdminToken(adminToken);

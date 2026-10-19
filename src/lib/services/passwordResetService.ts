@@ -54,12 +54,12 @@ function hashResetToken(token: string): string {
  * Token mentah hanya dikembalikan lewat nilai kembalian (untuk email) —
  * yang tersimpan di database hanyalah hash-nya.
  */
-export async function storeResetToken(userId: string): Promise<string> {
+export async function storeResetToken(userId: string): Promise<string | null> {
   const token = crypto.randomBytes(32).toString('base64url');
   const tokenHash = hashResetToken(token);
   const now = Date.now();
 
-  await db.ref('passwordResets').transaction((store: unknown) => {
+  const result = await db.ref('passwordResets').transaction((store: unknown) => {
     const records =
       store && typeof store === 'object' && !Array.isArray(store)
         ? (store as Record<string, ResetTokenRecord>)
@@ -75,6 +75,13 @@ export async function storeResetToken(userId: string): Promise<string> {
     next[tokenHash] = { userId, expiresAt: now + RESET_TOKEN_TTL_MS };
     return next;
   });
+
+  // Transaksi gagal men-commit (CAS sibuk, database.ts:272) = token TIDAK
+  // tersimpan. Jangan kirim email berisi tautan yang pasti mati.
+  if (!result.committed) {
+    console.error('[PasswordReset] Gagal menyimpan token (transaksi CAS sibuk) — email tidak dikirim.');
+    return null;
+  }
 
   return token;
 }
@@ -236,6 +243,8 @@ export async function requestPasswordReset(
   if (!user) return { emailSent: false };
 
   const token = await storeResetToken(user.id);
+  if (!token) return { emailSent: false }; // gagal simpan → jangan kirim tautan mati
+
   const resetUrl = `${getPublicBaseUrl()}/admin/reset-password?token=${encodeURIComponent(token)}`;
   const emailSent = await sendPasswordResetEmail(email, resetUrl);
   return { emailSent };

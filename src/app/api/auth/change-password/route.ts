@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/crud/shared/auth/guard';
 import { changeSiteUserPassword } from '@/crud/shared/auth/changePassword';
+import { signSiteUserJWT, AUTH_COOKIE_NAME, AUTH_COOKIE_OPTIONS } from '@/crud/shared/auth/session';
 import { checkDataRateLimit } from '@/lib/dataRateLimit';
 import { getClientIP } from '@/lib/security/request';
 import { validateCSRFToken } from '@/lib/security/token';
@@ -74,7 +75,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }
 
-    return NextResponse.json({ success: true, message: 'Password berhasil diganti' });
+    // Pencabutan sesi lama (di dalam changeSiteUserPassword) juga menangkap
+    // sesi pelaku ganti-password sendiri — terbitkan cookie SEGAR di sini
+    // supaya pemilik tidak langsung dilempar keluar setelah sukses; sesi-sesi
+    // LAIN tetap mati. Iat token baru ≥ tanda pencabutan → lolos guard.
+    const freshToken = await signSiteUserJWT(auth.session);
+    const response = NextResponse.json({ success: true, message: 'Password berhasil diganti' });
+    response.cookies.set(AUTH_COOKIE_NAME, freshToken, AUTH_COOKIE_OPTIONS);
+    return response;
   } catch {
     return NextResponse.json({ error: 'Gagal memproses permintaan' }, { status: 500 });
   }

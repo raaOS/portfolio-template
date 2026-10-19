@@ -7,6 +7,9 @@ const { queryD1Mock } = vi.hoisted(() => ({
 // Transaksi CAS tiruan: simpan per-path di memori, ikuti semantik
 // database.ts (callback dapat nilai lama; return undefined = batal tanpa tulis).
 const stores: Record<string, Record<string, unknown>> = {};
+// Sakelar uji: memaksa transaksi berikutnya GAGAL men-commit (CAS sibuk,
+// database.ts:272) — untuk membuktikan token tidak dikirim bila gagal simpan.
+let forceCasFail = false;
 
 vi.mock('@/crud/shared/db/connection', () => ({
   queryD1: queryD1Mock,
@@ -16,6 +19,7 @@ vi.mock('@/lib/database', () => ({
   db: {
     ref: (path: string) => ({
       transaction: async (cb: (current: unknown) => unknown) => {
+        if (forceCasFail) return { committed: false, snapshot: null };
         const current = stores[path] ?? null;
         const next = cb(current ? structuredClone(current) : current);
         if (next === undefined) return { committed: false, snapshot: null };
@@ -39,6 +43,7 @@ import {
 describe('passwordResetService', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    forceCasFail = false;
     for (const key of Object.keys(stores)) delete stores[key];
     // Query DB tiruan yang melayani SEMUA jalur baca: baris app_kv dibaca
     // dari store transaksi yang sama (nyambung dengan mock db di atas),
@@ -63,7 +68,7 @@ describe('passwordResetService', () => {
 
   describe('token', () => {
     it('token yang di-store bisa dikonsumsi SEKALI lalu mati (single-use)', async () => {
-      const token = await storeResetToken('user-1');
+      const token = (await storeResetToken('user-1'))!;
 
       const first = await consumeResetToken(token);
       expect(first).toEqual({ userId: 'user-1' });
@@ -73,7 +78,7 @@ describe('passwordResetService', () => {
     });
 
     it('token kedaluwarsa ditolak', async () => {
-      const token = await storeResetToken('user-1');
+      const token = (await storeResetToken('user-1'))!;
       const hash = Object.keys(stores['passwordResets'])[0];
       stores['passwordResets'][hash] = { userId: 'user-1', expiresAt: Date.now() - 1000 };
 
@@ -81,15 +86,15 @@ describe('passwordResetService', () => {
     });
 
     it('permintaan baru membatalkan token lama milik user yang sama', async () => {
-      const tokenLama = await storeResetToken('user-1');
-      const tokenBaru = await storeResetToken('user-1');
+      const tokenLama = (await storeResetToken('user-1'))!;
+      const tokenBaru = (await storeResetToken('user-1'))!;
 
       expect(await consumeResetToken(tokenLama)).toBeNull();
       expect(await consumeResetToken(tokenBaru)).toEqual({ userId: 'user-1' });
     });
 
     it('token mentah TIDAK pernah tersimpan — yang disimpan hanya hash-nya', async () => {
-      const token = await storeResetToken('user-1');
+      const token = (await storeResetToken('user-1'))!;
 
       const tersimpan = JSON.stringify(stores['passwordResets']);
       expect(tersimpan).not.toContain(token);
@@ -131,6 +136,16 @@ describe('passwordResetService', () => {
       expect(result.emailSent).toBe(false);
       expect(global.fetch).not.toHaveBeenCalled();
     });
+
+    it('transaksi CAS gagal men-commit -> token TIDAK dikirim (tak ada tautan mati di email)', async () => {
+      queryD1Mock.mockResolvedValue([{ id: 'user-9' }]);
+      forceCasFail = true;
+
+      const result = await requestPasswordReset('site-a', 'pemilik@contoh.com');
+
+      expect(result.emailSent).toBe(false);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
   });
 
   describe('isEmailProviderConfigured', () => {
@@ -157,7 +172,7 @@ describe('passwordResetService', () => {
     });
 
     it('sukses -> password diganti, token terpakai, sesi lama DICABUT', async () => {
-      const token = await storeResetToken('user-7');
+      const token = (await storeResetToken('user-7'))!;
 
       const result = await resetPasswordWithToken('site-a', token, 'password-baru-99');
 
