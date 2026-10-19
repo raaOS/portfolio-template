@@ -6,7 +6,7 @@ import { ArrowUpRight, Sparkles } from 'lucide-react';
 import { BASE_PRICE } from '@/constants/pricing';
 import { archivoBlack } from '@/app/fonts';
 import { TEMPLATES_DATA, type TemplateItem } from './templates';
-import LiveStage from './LiveStage';
+import MagazineShowcase from './MagazineShowcase';
 import { TemplateDetailModal } from './TemplateDetailModal';
 import './landing.css';
 
@@ -20,7 +20,6 @@ export default function LandingPage({
   adminWhatsapp,
 }: LandingPageProps) {
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateItem | null>(null);
-  const [activeIndex, setActiveIndex] = useState(0);
 
   return (
     <main className={`wave-landing-viewport ${archivoBlack.variable}`}>
@@ -29,22 +28,19 @@ export default function LandingPage({
       <h1 className="sr-only">PORTFOLIO OS</h1>
 
       {/*
-        Panggung demo live (satu-satunya konten utama): tiga iframe preview
-        template menghadap lurus depan — kartu tengah besar (demo aktif),
-        dua kartu samping mengecil & redup. Geraknya ambient float +
-        parallax + tukar posisi FLIP-spring (LiveStage). Klik kartu tengah
-        → popup detail; klik kartu samping → tukar demo.
+        Panggung majalah (MagazineShowcase, pengganti LiveStage v1.3.47):
+        koridor lembaran WebGL berisi tangkapan layar 3 template yang
+        berjalan tanpa henti — drag/geser menjelajah, ketuk lembaran →
+        terangkat → popup detail (iframe LIVE interaktif, v1.3.41).
+        Ringan: 3 gambar ±102 KB, tanpa 3 iframe live (±4,7 MB) di hero.
       */}
-      <div className="wave-stage">
-        <LiveStage
-          items={TEMPLATES_DATA.map((tpl) => ({
-            id: tpl.id,
-            name: tpl.name,
-            src: tpl.previewUrl,
+      <div className="mag-stage">
+        <MagazineShowcase
+          images={TEMPLATES_DATA.map((tpl) => ({
+            src: tpl.screenshot,
+            alt: tpl.name,
           }))}
-          activeIndex={activeIndex}
-          onActiveChange={setActiveIndex}
-          onActivate={(index) => setSelectedTemplate(TEMPLATES_DATA[index])}
+          onSheetActivate={(index) => setSelectedTemplate(TEMPLATES_DATA[index])}
         />
       </div>
 

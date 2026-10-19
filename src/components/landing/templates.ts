@@ -6,6 +6,8 @@ export interface TemplateItem {
   description: string;
   features: string[];
   previewUrl: string;
+  /** Tangkapan layar demo (hero MagazineShowcase) — diperebutkan dari preview live. */
+  screenshot: string;
 }
 
 export const TEMPLATES_DATA: TemplateItem[] = [
@@ -23,6 +25,7 @@ export const TEMPLATES_DATA: TemplateItem[] = [
       'Admin panel mandiri & AI Chatbot',
     ],
     previewUrl: '/preview/os-desktop',
+    screenshot: '/landing/os-desktop.webp',
   },
   {
     id: 'infinite-canvas',
@@ -38,6 +41,7 @@ export const TEMPLATES_DATA: TemplateItem[] = [
       'Ringan dan responsif di mobile & desktop',
     ],
     previewUrl: '/preview/infinite-canvas',
+    screenshot: '/landing/infinite-canvas.webp',
   },
   {
     id: 'spatial-gallery',
@@ -53,5 +57,6 @@ export const TEMPLATES_DATA: TemplateItem[] = [
       'Dukungan media video loop & poster',
     ],
     previewUrl: '/preview/spatial-gallery',
+    screenshot: '/landing/spatial-gallery.webp',
   },
 ];

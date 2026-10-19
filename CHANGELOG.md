@@ -3,6 +3,22 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.47] - 2026-10-19
+
+### ✨ Hero Baru: Koridor Majalah WebGL (Magazine Flip) — Pengganti 3 Iframe Live
+
+Permintaan owner: *"efek iframe live web… aku tidak suka yang sekarang"* → ditemukan komponen **"Magazine Flip"** dari Originkit (originkit.dev, lisensi **MIT**). Kode sumbernya disertakan penuh di dalam prompt AI mereka, jadi **tanpa CLI/registry/API key** — kode disalin, diaudit, dan disesuaikan langsung. Hasil: hero kini koridor lembaran majalah 3D yang berjalan tanpa henti (drag/geser menjelajah; ketuk lembaran → terangkat → **popup detail dengan iframe LIVE interaktif** — permintaan v1.3.41 tetap).
+
+**Keuntungan performa:** hero sebelumnya memuat **3 iframe situs live (±4,7 MB JS)**; kini hanya **3 tangkapan layar WebP (±102 KB total)**. `three` sudah ada di project → **nol dependensi baru**.
+
+**Penyesuaian atas kode asli (5):** (1) sel atlas 512→1024px (ketajaman saat zoom); (2) `images` wajib tanpa default foto Unsplash; (3) callback `onSheetActivate` dipanggil saat animasi terangkat tuntas → membuka popup; (4) `prefers-reduced-motion` / gagal WebGL → grid kartu statis yang tetap bisa diklik; (5) latar transparan (mengambang di atas split off-white/biru) + nav keyboard sr-only untuk aksesibilitas.
+
+**Bersih-bersih:** `LiveStage.tsx` (kartu ifloat/parallax/FLIP, 142 baris) + CSS stage lama (±170 baris) + test lama dihapus; riwayat git tetap jadi cadangan. Tangkapan layar demo diambil dari preview produksi (`/preview/*`) → `public/landing/`.
+
+- **Uji:** 5 test baru (`magazine-showcase.test.tsx` — fallback klik, nav keyboard, reduced-motion, sumber gambar); suite penuh **138 file / 1.110 test PASS**; tsc 0; lint bersih.
+- **File:** baru `MagazineShowcase.tsx` + test; ubah `LandingPage.tsx`, `templates.ts` (+field `screenshot`), `landing.css`, `constants.ts` (1.3.47); hapus `LiveStage.tsx` + testnya; aset `public/landing/*.webp`.
+- **Catatan:** komponen pihak ketiga (MIT) wajib tetap teratribusi di kepala file — jangan hapus catatan provenance.
+
 ## [1.3.46] - 2026-10-19
 
 ### 🔍 Audit Ulang Fitur Lupa Password: 3 Cacat Logika Ditemukan & Diperbaiki
