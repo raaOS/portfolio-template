@@ -7,26 +7,31 @@
  * lisensi MIT, kode disalin dari prompt AI-nya atas permintaan owner
  * (2026-10-19) — TANPA CLI/registry/key: seluruh kode sudah disertakan
  * dalam prompt, jadi tidak ada dependensi runtime baru (three sudah ada
- * di project). Pengganti `LiveStage` (3 iframe live ±4,7 MB) — koridor
- * ini hanya memuat 3 gambar tangkapan layar (±102 KB total).
+ * di project). Pengganti `LiveStage` (3 iframe live ±4,7 MB).
  *
- * Penyesuaian atas kode asli (semua dicatat di tracker #170):
+ * Penyesuaian atas kode asli (tracker #170/#171):
  * 1. CELL_MAX 512 → 1024 — ketajaman atlas saat lembaran di-zoom.
- * 2. `images` wajib (tanpa default foto Unsplash) + `onSheetActivate`.
- * 3. Ketuk lembaran → animasi terangkat → `onSheetActivate(index)`
- *    dipanggil SAAT animasi tuntas → pembuka popup detail (live iframe
- *    interaktif, permintaan v1.3.41 tetap di popup).
- * 4. `prefers-reduced-motion` / gagal WebGL → grid kartu statis yang
- *    tetap bisa diklik (alias jalur aksesibilitas & fallback teknis).
- * 5. Latar transparan — koridor mengambang di atas split off-white/biru
- *    hero (bukan kotak hitam penuh).
- * 6. Nav keyboard sr-only (3 tombol) — aksesibilitas: tanpa mouse,
- *    template tetap bisa dibuka.
+ * 2. `images` wajib (tanpa default foto Unsplash) + `previewUrl` per
+ *    lembaran (alamat demo live).
+ * 3. Mesin gerak: drift konstan DIGANTI luncur → snap → jeda (v1.3.48);
+ *    setiap kali koridor tenang, lembaran terdekat ditarik terangkat
+ *    menghadap kamera, lalu sebuah iframe DEMO LIVE sungguhan
+ *    ditumpangkan presisi di atasnya (bisa scroll/klik di dalamnya).
+ *    LIVE_HOLD_SEC otomatis lanjut ke lembaran berikut; pemilik
+ *    berinteraksi dengan demo (klik/scroll di iframe) → siklus berhenti
+ *    sampai ditutup (✕/Esc/ketuk luar). Tanpa popup — lembarannya
+ *    sendiri yang menjadi live (keputusan owner v1.3.48, menggantikan
+ *    TemplateDetailModal).
+ * 4. `prefers-reduced-motion` / gagal WebGL → grid kartu statis; klik
+ *    kartu membuka demo di TAB BARU.
+ * 5. Latar transparan — koridor mengambang di atas split off-white/biru.
+ * 6. Nav keyboard sr-only (3 tombol) — aksesibilitas tanpa mouse.
  *
  * Interaksi bawaan terjaga: drag/scroll menjelajah koridor (guliran
- * halaman TIDAK tertelan — touchAction pan-y), Esc menutup lembaran
- * yang terangkat, gambar gagal muat digambar ulang sebagai kartu
- * bernomor.
+ * halaman TIDAK tertelan — touchAction pan-y; drag berakhir = snap ke
+ * posisi lembaran terdekat), Esc menutup lembaran terangkat, gambar
+ * gagal muat digambar ulang sebagai kartu bernomor. Saat tab
+ * tersembunyi browser menghentikan rAF → seluruh siklus ikut jeda.
  */
 
 import * as React from 'react';
@@ -49,7 +54,7 @@ const PLACEHOLDER_ASPECTS = [0.72, 1.5, 0.78, 1.33, 1.0, 1.62, 0.68, 1.2, 0.86, 
 /* Default hero (disetel mengikuti preset Originkit; speed 8 = angkat
    lembaran lebih ringkas ~0,56 dtk sebelum popup terbuka). */
 const DEFAULT_VIEW = { tap: true, zoom: 5, speed: 8 };
-const DEFAULT_TRAVEL = { drift: 2, smoothing: 5, wave: 5 };
+const DEFAULT_TRAVEL = { smoothing: 5, wave: 5 };
 const DEFAULTS = {
   pages: 20,
   spacing: 5,
@@ -64,19 +69,27 @@ const CORRIDOR_DIM = 0.22;
 const TAP_SLOP = 6;
 const TAP_MS = 600;
 const PICK_MAX = 1600;
+/** Jeda tenang koridor sebelum satu lembaran ditarik menghadap (dtk). */
+const REST_DELAY_SEC = 0.8;
+/** Lamanya demo live tayang otomatis sebelum siklus lanjut (dtk). */
+const LIVE_HOLD_SEC = 5.5;
 
-export type MagazineImage = { src: string; alt?: string; offsetY?: number };
+export type MagazineImage = {
+  src: string;
+  alt?: string;
+  offsetY?: number;
+  /** Alamat demo live — ditayangkan sebagai iframe di lembaran terangkat. */
+  previewUrl?: string;
+};
 
 export interface MagazineShowcaseProps {
   images: MagazineImage[];
-  /** Lembaran selesai terangkat ATAU kartu fallback diklik. */
-  onSheetActivate?: (index: number) => void;
   background?: string;
   style?: React.CSSProperties;
 }
 
 type View = { tap: boolean; zoom: number; speed: number };
-type Travel = { drift: number; smoothing: number; wave: number };
+type Travel = { smoothing: number; wave: number };
 type Config = {
   images: MagazineImage[];
   pages: number;
@@ -106,6 +119,21 @@ function altOf(image: MagazineImage): string {
 function offsetOf(entry: MagazineImage): number {
   const n = entry?.offsetY;
   return typeof n === 'number' && isFinite(n) ? n : 0;
+}
+
+function previewUrlOf(image: MagazineImage): string {
+  return image?.previewUrl ?? '';
+}
+
+/** Modulo gaya GLSL (hasil selalu non-negatif untuk y > 0). */
+function glmod(x: number, y: number): number {
+  return x - y * Math.floor(x / y);
+}
+
+/** Buka demo di tab baru (jalur fallback statis & nav keyboard). */
+function openDemo(image: MagazineImage) {
+  const url = previewUrlOf(image);
+  if (url) window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 function power2InOut(t: number): number {
@@ -141,7 +169,6 @@ function settingsFor(cfg: Config, viewWidthPx: number, viewHeightPx: number) {
   const spacing = clamp(cfg.spacing, 0, 10, DEFAULTS.spacing);
   const smoothing = clamp(cfg.travel.smoothing, 0, 10, DEFAULT_TRAVEL.smoothing);
   const wave = clamp(cfg.travel.wave, 0, 10, DEFAULT_TRAVEL.wave);
-  const drift = clamp(cfg.travel.drift, -10, 10, DEFAULT_TRAVEL.drift);
 
   const focusZ = Math.min(CAM_Z * 0.55, pageWidth * 0.75);
   const planeHeight = (VIEW_HEIGHT * (CAM_Z - focusZ)) / CAM_Z;
@@ -161,7 +188,6 @@ function settingsFor(cfg: Config, viewWidthPx: number, viewHeightPx: number) {
     turn: (clamp(cfg.turn, -60, 60, DEFAULTS.turn) * Math.PI) / 180,
     wave: pageWidth * 0.04 * wave,
     lerp: 0.35 * Math.pow(0.82, smoothing),
-    driftPerSecond: drift * pageWidth * 0.15,
     wheel: 0.4 + clamp(cfg.scrollSens, 0, 10, DEFAULTS.scrollSens) * 0.16,
     tapToView: cfg.view.tap !== false,
     focusZ,
@@ -470,8 +496,34 @@ class MagazineScene {
 
   private settingsCache: ReturnType<typeof settingsFor> | null = null;
 
-  /** Penyesuaian #3: dipanggil saat animasi terangkat tuntas. */
-  onFocusSettle: ((index: number) => void) | null = null;
+  /** Mesin luncur-berhenti + tayang live (v1.3.48). */
+  private liveActive = false;
+  private liveShownT = 0;
+  private userOwnsLive = false;
+  private pendingGlide = false;
+  private restT = 0;
+
+  /** Dipanggil saat lembaran siap menayangkan demo live (rect dalam piksel). */
+  onLive:
+    | ((index: number, rect: { left: number; top: number; width: number; height: number }) => void)
+    | null = null;
+  /** Dipanggil saat live ditutup (lembaran kembali jadi biasa). */
+  onLiveEnd: (() => void) | null = null;
+
+  /** Pemilik demo menyentuh iframe (klik/scroll) → siklus auto berhenti. */
+  claimLive() {
+    this.userOwnsLive = true;
+  }
+
+  /** Tutup lembaran terangkat (dipanggil ✕/Esc/ketuk luar). */
+  releaseFocus() {
+    if (this.focus.index < 0) return;
+    this.focus.target = 0;
+    if (this.liveActive) {
+      this.liveActive = false;
+      this.onLiveEnd?.();
+    }
+  }
 
   constructor(container: HTMLElement, cfg: Config) {
     this.container = container;
@@ -592,6 +644,10 @@ class MagazineScene {
     this.focus.fired = false;
     this.material.uniforms.uFocusIndex.value = -1;
     this.material.uniforms.uFocusProgress.value = 0;
+    if (this.liveActive) {
+      this.liveActive = false;
+      this.onLiveEnd?.();
+    }
   }
 
   private writeOffsets() {
@@ -694,21 +750,56 @@ class MagazineScene {
   private onTap(hit: number) {
     if (!this.settings().tapToView) return;
     if (this.focus.index >= 0) {
-      this.focus.target = 0;
+      this.releaseFocus();
       return;
     }
     if (hit >= 0) {
       this.focus.index = hit;
       this.focus.target = 1;
       this.focus.fired = false;
+      this.userOwnsLive = false;
     }
   }
 
   private onKeyDown = (event: KeyboardEvent) => {
     if (event.key === 'Escape' && this.focus.index >= 0) {
-      this.focus.target = 0;
+      this.releaseFocus();
     }
   };
+
+  /** Indeks lembaran paling dekat dengan kamera — "yang menghadap". */
+  private facingIndex(): number {
+    const S = this.settings();
+    const maxZ = (S.pages * (S.pageSpacing + S.thickness)) / 2;
+    if (maxZ <= 0) return -1;
+    const middle = (S.pages - 1) / 2;
+    let best = -1;
+    let bestAbs = Infinity;
+    for (let i = 0; i < S.pages; i++) {
+      const boxCenterZ = S.pageSpacing * (-(i - middle));
+      const z = glmod(boxCenterZ - this.scroll.current + maxZ, 2 * maxZ) - maxZ;
+      const az = Math.abs(z);
+      if (az < bestAbs) {
+        bestAbs = az;
+        best = i;
+      }
+    }
+    return best;
+  }
+
+  /** Rect layar lembaran terangkat (proyeksi 2 sudut via kamera WebGL). */
+  private computeFocusRect() {
+    const S = this.settings();
+    const hw = (S.pageWidth * S.focusScale) / 2;
+    const hh = (S.pageHeight * S.focusScale) / 2;
+    const a = new THREE.Vector3(-hw, -hh, S.focusZ).project(this.camera);
+    const b = new THREE.Vector3(hw, hh, S.focusZ).project(this.camera);
+    const left = (a.x * 0.5 + 0.5) * this.width;
+    const top = (-a.y * 0.5 + 0.5) * this.height;
+    const right = (b.x * 0.5 + 0.5) * this.width;
+    const bottom = (-b.y * 0.5 + 0.5) * this.height;
+    return { left, top, width: right - left, height: bottom - top };
+  }
 
   private wheelScale(event: WheelEvent): number {
     if (event.deltaMode === 1) return 16;
@@ -762,6 +853,12 @@ class MagazineScene {
     if (event.pointerId === this.drag.id) {
       this.drag.active = false;
       this.drag.id = -1;
+      // Snap ala carousel: koridor berhenti tepat di posisi satu lembaran.
+      const S = this.settings();
+      if (S.pageSpacing > 0) {
+        this.scroll.target =
+          Math.round(this.scroll.target / S.pageSpacing) * S.pageSpacing;
+      }
     }
     if (event.pointerId !== this.tap.id) return;
     this.container.releasePointerCapture?.(event.pointerId);
@@ -824,6 +921,10 @@ class MagazineScene {
     this.camera.updateProjectionMatrix();
     this.settingsCache = null;
     this.applyConfig();
+    // Live terbuka → sesuaikan tumpangan iframe dengan lembaran baru.
+    if (this.liveActive && this.focus.index >= 0) {
+      this.onLive?.(this.focus.index, this.computeFocusRect());
+    }
   }
 
   updateConfig(cfg: Config) {
@@ -861,19 +962,60 @@ class MagazineScene {
     const S = this.settings();
     const u = this.material.uniforms;
 
+    // Live terbuka → jeda render (hemat GPU/baterai); siklus hanya menghitung
+    // tayang lalu menunggu pemilik menutup. Saat tab tersembunyi browser
+    // menghentikan rAF sehingga seluruh siklus ikut diam dengan gratis.
+    if (this.liveActive) {
+      this.liveShownT += dt;
+      if (!this.userOwnsLive && this.liveShownT > LIVE_HOLD_SEC) {
+        this.releaseFocus();
+        this.pendingGlide = true;
+      }
+      return;
+    }
+
     if (this.focus.index >= 0) {
       const rate = dt / Math.max(0.05, S.viewDuration);
       this.focus.t = Math.min(
         1,
         Math.max(0, this.focus.t + (this.focus.target ? rate : -rate))
       );
-      // Penyesuaian #3: angkat tuntas → beritahu pemilik (buka popup).
+      // Angkat tuntas → tayangkan demo LIVE sungguhan di atas lembaran.
       if (this.focus.t === 1 && this.focus.target === 1 && !this.focus.fired) {
         this.focus.fired = true;
-        this.onFocusSettle?.(this.focus.index);
+        const list = this.cfg.images;
+        const img = list.length
+          ? list[this.focus.index % list.length]
+          : undefined;
+        if (img && previewUrlOf(img)) {
+          this.liveActive = true;
+          this.liveShownT = 0;
+          this.userOwnsLive = false;
+          this.onLive?.(this.focus.index, this.computeFocusRect());
+        }
       }
       if (this.focus.t === 0 && this.focus.target === 0) {
         this.focus.index = -1;
+      }
+    } else if (!this.drag.active) {
+      // Mesin luncur-berhenti (v1.3.48): koridor tenang → lembaran
+      // terdekat ditarik menghadap (REST_DELAY) → live → setelah
+      // LIVE_HOLD dilepas → meluncur SATU langkah → ulangi.
+      if (this.pendingGlide) {
+        this.pendingGlide = false;
+        this.restT = 0;
+        this.push(S.pageSpacing);
+      } else if (
+        Math.abs(this.scroll.target - this.scroll.current) <
+        S.pageSpacing * 0.002
+      ) {
+        this.restT += dt;
+        if (this.restT >= REST_DELAY_SEC) {
+          this.restT = 0;
+          this.onTap(this.facingIndex());
+        }
+      } else {
+        this.restT = 0;
       }
     }
     u.uFocusIndex.value = this.focus.index;
@@ -882,10 +1024,6 @@ class MagazineScene {
     this.setCursor(
       this.focus.index >= 0 && this.focus.target === 1 ? 'zoom-out' : 'grab'
     );
-
-    if (S.driftPerSecond !== 0 && this.focus.index < 0) {
-      this.push(S.driftPerSecond * dt);
-    }
 
     const k = dt * 60;
     const ease = 1 - Math.pow(1 - S.lerp, k);
@@ -922,14 +1060,9 @@ class MagazineScene {
   }
 }
 
-/** Penyesuaian #4: kartu statis — dipakai saat reduced-motion/gagal WebGL. */
-function FallbackGrid({
-  images,
-  onPick,
-}: {
-  images: MagazineImage[];
-  onPick: (index: number) => void;
-}) {
+/** Penyesuaian #4: kartu statis — dipakai saat reduced-motion/gagal WebGL;
+    klik kartu membuka demo live di tab baru (tanpa popup). */
+function FallbackGrid({ images }: { images: MagazineImage[] }) {
   return (
     <div
       style={{
@@ -946,7 +1079,7 @@ function FallbackGrid({
         <button
           key={img.src}
           type="button"
-          onClick={() => onPick(i)}
+          onClick={() => openDemo(img)}
           aria-label={`Buka demo ${altOf(img) || i + 1}`}
           style={{
             position: 'relative',
@@ -984,20 +1117,23 @@ const SR_ONLY: React.CSSProperties = {
 
 export default function MagazineShowcase({
   images,
-  onSheetActivate,
   background = 'transparent',
   style,
 }: MagazineShowcaseProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<MagazineScene | null>(null);
   const [fallback, setFallback] = useState(false);
+  // Tumpangan demo live di atas lembaran terangkat (rect dari kamera WebGL).
+  const [live, setLive] = useState<{
+    index: number;
+    rect: { left: number; top: number; width: number; height: number };
+  } | null>(null);
+  const [liveReady, setLiveReady] = useState(false);
 
   // Ref agar callback terbaru terpakai tanpa meresefkan scene (disinkronkan
   // di effect — pola wajib React Compiler; lihat Dock.tsx isClientHydrated).
-  const activateRef = useRef(onSheetActivate);
   const imagesRef = useRef(images);
   useEffect(() => {
-    activateRef.current = onSheetActivate;
     imagesRef.current = images;
   });
 
@@ -1032,7 +1168,11 @@ export default function MagazineShowcase({
       return;
     }
     /* eslint-enable react-hooks/set-state-in-effect */
-    scene.onFocusSettle = (index) => activateRef.current?.(index);
+    scene.onLive = (index, rect) => {
+      setLiveReady(false);
+      setLive({ index, rect });
+    };
+    scene.onLiveEnd = () => setLive(null);
     sceneRef.current = scene;
     scene.setSize(container.clientWidth, container.clientHeight);
     scene.start();
@@ -1057,16 +1197,22 @@ export default function MagazineShowcase({
   // Penyesuaian #6: jalur keyboard — tanpa mouse, template tetap terbuka.
   const firstAlt = images[0] ? altOf(images[0]) : '';
 
+  const closeLive = () => {
+    sceneRef.current?.releaseFocus();
+    setLive(null);
+  };
+  const claimLive = () => sceneRef.current?.claimLive();
+  const liveImage = live
+    ? images[live.index % Math.max(1, images.length)]
+    : null;
+
   if (fallback) {
     return (
       <>
-        <FallbackGrid
-          images={images}
-          onPick={(i) => activateRef.current?.(i)}
-        />
+        <FallbackGrid images={images} />
         <nav aria-label="Pilih template" style={SR_ONLY}>
           {images.map((img, i) => (
-            <button key={img.src} type="button" onClick={() => activateRef.current?.(i)}>
+            <button key={img.src} type="button" onClick={() => openDemo(img)}>
               {altOf(img) || `Template ${i + 1}`}
             </button>
           ))}
@@ -1098,36 +1244,97 @@ export default function MagazineShowcase({
           ...style,
         }}
       >
-        <span
-          aria-hidden="true"
-          style={{
-            position: 'absolute',
-            left: '50%',
-            bottom: 'clamp(14px, 4vh, 34px)',
-            transform: 'translateX(-50%)',
-            zIndex: 2,
-            pointerEvents: 'none',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '6px 14px',
-            borderRadius: 999,
-            background: 'rgba(10,10,14,0.42)',
-            color: 'rgba(255,255,255,0.92)',
-            fontSize: 12,
-            letterSpacing: '0.02em',
-            whiteSpace: 'nowrap',
-            backdropFilter: 'blur(6px)',
-          }}
-        >
-          <span style={{ opacity: 0.7 }}>geser</span>
-          <span>·</span>
-          <span>ketuk lembaran untuk membuka demo</span>
-        </span>
+        {!live && (
+          <span
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              left: '50%',
+              bottom: 'clamp(14px, 4vh, 34px)',
+              transform: 'translateX(-50%)',
+              zIndex: 2,
+              pointerEvents: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '6px 14px',
+              borderRadius: 999,
+              background: 'rgba(10,10,14,0.42)',
+              color: 'rgba(255,255,255,0.92)',
+              fontSize: 12,
+              letterSpacing: '0.02em',
+              whiteSpace: 'nowrap',
+              backdropFilter: 'blur(6px)',
+            }}
+          >
+            <span style={{ opacity: 0.7 }}>geser</span>
+            <span>·</span>
+            <span>lembaran yang berhenti = demo live</span>
+          </span>
+        )}
+
+        {/* Demo LIVE sungguhan ditumpangkan presisi di atas lembaran
+            terangkat (v1.3.48). Transparan sampai iframe siap → tidak ada
+            kedipan putih; ✕ / Esc / ketuk luar menutup. */}
+        {live && liveImage && (
+          <div
+            style={{
+              position: 'absolute',
+              left: live.rect.left,
+              top: live.rect.top,
+              width: live.rect.width,
+              height: live.rect.height,
+              zIndex: 3,
+              overflow: 'hidden',
+              background: 'transparent',
+            }}
+          >
+            <iframe
+              src={previewUrlOf(liveImage)}
+              title={`Demo live: ${altOf(liveImage) || 'template'}`}
+              onPointerDown={claimLive}
+              onFocus={claimLive}
+              onLoad={() => setLiveReady(true)}
+              style={{
+                width: '100%',
+                height: '100%',
+                border: 0,
+                display: 'block',
+                background: '#fff',
+                opacity: liveReady ? 1 : 0,
+                transition: 'opacity 0.35s ease',
+              }}
+            />
+            <button
+              type="button"
+              onClick={closeLive}
+              aria-label="Tutup demo live"
+              style={{
+                position: 'absolute',
+                top: 10,
+                right: 10,
+                width: 34,
+                height: 34,
+                borderRadius: 999,
+                border: '1px solid rgba(255,255,255,0.35)',
+                background: 'rgba(10,10,14,0.62)',
+                color: '#fff',
+                fontSize: 15,
+                lineHeight: 1,
+                cursor: 'pointer',
+                display: 'grid',
+                placeItems: 'center',
+                backdropFilter: 'blur(4px)',
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
       </div>
       <nav aria-label="Pilih template" style={SR_ONLY}>
         {images.map((img, i) => (
-          <button key={img.src} type="button" onClick={() => activateRef.current?.(i)}>
+          <button key={img.src} type="button" onClick={() => openDemo(img)}>
             {altOf(img) || `Template ${i + 1}`}
           </button>
         ))}

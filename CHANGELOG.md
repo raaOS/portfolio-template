@@ -3,6 +3,22 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.48] - 2026-10-20
+
+### ✨ Hero "Jungkir-balik Majalah": Koridor Berhenti → Demo LIVE Sungguhan (Tanpa Popup)
+
+Permintaan owner setelah melihat hasil v1.3.47: *"hasil gambar screenshot kurang bagus… lembaran yang bergerak harus live web"* — dengan syarat **efek koridor majalah tidak berubah** dan **tanpa popup**. Solusi: **ritme luncur → berhenti → terangkat → LIVE** (gaya hybrid "live saat berhenti" yang direkomendasikan; opsi CSS3D & live-penuh ditolak dengan angka terukur: 6–8 iframe Next.js serentak = freeze HP, halaman demo ±1,5 MB JS).
+
+**Perilaku baru:** koridor meluncur satu lembaran (±1 dtk) → berhenti (±0,8 dtk) → lembaran terdekat **terangkat & berputar menghadap** (animasi flip bawaan) → **iframe demo live sungguhan ditumpangkan presisi di atasnya** (bisa scroll & klik) → setelah ±5,5 dtk otomatis lanjut ke lembaran berikutnya. Geser manual → snap ke lembaran terdekat → live. Ketuk lembaran mana pun → terangkat → live. **✕ / Esc / ketuk luar** menutup. Pengunjung yang menyentuh demo (klik/scroll di iframe) tidak akan diganggu siklus otomatis. Saat tab tersembunyi, rAF browser berhenti → seluruh siklus ikut jeda (hemat baterai). Selalu **1 iframe dalam satu waktu** (±1,5 MB JS pertama, sisanya hangat di cache) — bukan berbagai gambar statis yang dikeluhkan.
+
+**Teknis:** mesin drift konstan diganti state-machine luncur–snap–jeda di `MagazineShowcase.step()` (snap ala carousel saat drag berakhir; `facingIndex()` memakai rumus `zCorridor` shader yang sama; rect tumpangan dihitung dari proyeksi kamera WebGL `computeFocusRect()` sehingga presisi di segala ukuran layar + recompute saat resize); tumpangan transparan sampai `onLoad` iframe (tanpa kedip putih); render WebGL dijeda saat live tayang; `previewUrl` kini melekat pada tiap gambar lembaran.
+
+**Dihapus (riwayat git = cadangan):** `TemplateDetailModal.tsx` + testnya (popup digantikan lembaran live; jalur fallback kini buka demo di **tab baru**), props `basePrice`/`adminWhatsapp` LandingPage + pembacaan D1 `getBasePrice`/`getPublicPaymentInfo` di `page.tsx` (hanya dipakai popup), state `activeIndex`, mesin drift (`travel.drift`).
+
+- **Uji:** 6 test (`magazine-showcase.test.tsx` — kartu fallback, window.open previewUrl, nav keyboard, reduced-motion, tanpa previewUrl = tanpa tab kosong); suite penuh lihat tracker #171; tsc 0; lint bersih.
+- **File:** ubah `MagazineShowcase.tsx`, `LandingPage.tsx`, `page.tsx`, `constants.ts` (1.3.48); hapus `TemplateDetailModal.tsx` + testnya.
+- **Belum teruji otomatis:** jalur live-on-focus butuh WebGL nyata (jsdom tidak punya) — diverifikasi via pemeriksaan DOM produksi + mata owner.
+
 ## [1.3.47] - 2026-10-19
 
 ### ✨ Hero Baru: Koridor Majalah WebGL (Magazine Flip) — Pengganti 3 Iframe Live
