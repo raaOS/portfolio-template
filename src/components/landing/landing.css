@@ -67,6 +67,10 @@
   z-index: 5;
 }
 
+body.mag-live-active .mag-stage {
+  z-index: 35;
+}
+
 /* ==========================================================================
    (Blok CSS LiveStage lama dihapus v1.3.47 — panggung kini kanvas WebGL
    MagazineShowcase; gaya kartu/parallax/FLIP/badge tidak lagi dipakai.)

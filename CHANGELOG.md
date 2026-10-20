@@ -3,6 +3,21 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.49] - 2026-10-20
+
+### ✨ Video Preview Hidup di Lembaran Hero + Panel Admin "Video Hero" (Owner Rekam & Upload Sendiri)
+
+Lembaran koridor majalah di hero halaman jualan kini bisa **menampilkan video rekaman demo** (muted, loop) yang menempel presisi pada lembaran sambil bergerak — kesan "hidup" tanpa membebani browser (maksimal 2 lembaran paling terbaca sekaligus; video disembunyikan otomatis saat lembaran terangkat/demo live tayang, tab tersembunyi, atau video gagal dimuat — kembali ke gambar seperti biasa).
+
+**Alur untuk owner (tanpa script, tanpa IT):** rekam layar demo (HP/laptop, durasi pendek ±15–30 detik, tanpa suara) → login `/admin` → zone **Tampilan** → buka **Video Hero** → upload rekaman ke slot template yang sesuai (OS Desktop / Infinite Canvas / Spatial Gallery). Rekaman **dikompres otomatis di browser** (MP4 H.264 720p, audio dibuang, faststart — jadi ringan & mulai diputar sambil masih diunduh), file mentah besar pun aman (batas 500 MB). Bisa **Ganti** atau **Hapus** kapan saja; hero ter-update otomatis dalam ±1 menit. Slot kosong otomatis memakai video default bawaan / gambar screenshot — tidak pernah ada kotak kosong.
+
+**Khusus pemilik (owner-only):** aplikasi "Video Hero" dan API-nya hanya hidup di site owner — di site klien aplikasi tidak tampil sama sekali dan API membalas 404 (guard `ownerMode`, diuji test). Data tersimpan di D1 `platform_settings`, file video di R2.
+
+- **Catatan wajib (tracker #172):** jika tampilan demo template berubah (wallpaper/layout baru), rekam ulang video hero & upload lewat panel Video Hero supaya preview selalu akurat.
+- **Uji:** 15 test baru (service D1 + route API owner-mode + fallback aman); suite penuh lihat tracker #172; tsc 0; lint bersih.
+- **File:** baru `heroVideoService.ts` (+test), `api/admin/hero-videos/route.ts` (+test), `HeroVideosPanel.tsx`, `admin/hero-videos/page.tsx`; ubah `registry.ts` (app ownerOnly), `page.tsx`, `LandingPage.tsx`, `MagazineShowcase.tsx`, `constants.ts` (1.3.49); `public/landing/os-desktop.mp4` = video default contoh.
+- **Bersih-bersih:** script rekam otomatis `rekam:demo` (percobaan sebelumnya) dihapus — alur resmi = rekam manual + upload via admin.
+
 ## [1.3.48] - 2026-10-20
 
 ### ✨ Hero "Jungkir-balik Majalah": Koridor Berhenti → Demo LIVE Sungguhan (Tanpa Popup)

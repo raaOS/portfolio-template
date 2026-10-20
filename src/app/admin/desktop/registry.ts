@@ -23,6 +23,7 @@ import {
   Banknote,
   Receipt,
   MonitorPlay,
+  Clapperboard,
 } from 'lucide-react';
 import type { AdminZone } from './types';
 
@@ -238,6 +239,21 @@ const ALL_ADMIN_ZONES: AdminZone[] = [
         defaultWidth: 950,
         defaultHeight: 700,
       },
+      {
+        // Video preview lembaran hero halaman jualan (storefront milik
+        // owner) — rekaman demo yang di-upload owner. Konten bisnis owner,
+        // jadi ownerOnly: app & zone-nya tidak tampil di desktop admin klien
+        // (saringan getAdminZones membuang app ownerOnly), dan API-nya
+        // dibalas 404 di deployment klien (requireOwnerMode).
+        id: 'heroVideos',
+        label: 'Video Hero',
+        icon: Clapperboard,
+        iconColor: 'text-rose-600',
+        iconBg: 'bg-rose-100',
+        defaultWidth: 860,
+        defaultHeight: 620,
+        ownerOnly: true,
+      },
     ],
   },
   {
@@ -323,6 +339,7 @@ export const APP_ROUTE_MAP: Record<string, string> = {
   analytics: '/admin/system/analytics',
   activityLog: '/admin/system/activity-log',
   backup: '/admin/system/backup',
+  heroVideos: '/admin/hero-videos',
   harga: '/admin/harga',
   orders: '/admin/system/orders',
   notifications: '/admin/communications/notifications',

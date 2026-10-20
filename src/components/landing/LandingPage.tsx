@@ -13,8 +13,16 @@ import './landing.css';
  * (MagazineShowcase): koridor luncur → berhenti → lembaran terdekat
  * terangkat → DEMO LIVE sungguhan tayang di atasnya (bisa scroll/klik;
  * ✕/Esc menutup; v1.3.48 tanpa popup — lembarannya sendiri yang live).
+ *
+ * `heroVideos` (v1.3.49): peta { id template → URL video preview } dari D1
+ * (panel admin "Video Hero", owner-only). Slot tanpa entry otomatis memakai
+ * video default bawaan / gambar screenshot.
  */
-export default function LandingPage() {
+export default function LandingPage({
+  heroVideos,
+}: {
+  heroVideos?: Record<string, string>;
+}) {
   return (
     <main className={`wave-landing-viewport ${archivoBlack.variable}`}>
       {/* Satu h1 tetap ada untuk SEO/a11y, disembunyikan secara visual —
@@ -27,6 +35,7 @@ export default function LandingPage() {
             src: tpl.screenshot,
             alt: tpl.name,
             previewUrl: tpl.previewUrl,
+            previewVideo: heroVideos?.[tpl.id],
           }))}
         />
       </div>

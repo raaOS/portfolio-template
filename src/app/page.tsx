@@ -2,6 +2,7 @@ import LandingPage from '@/components/landing/LandingPage';
 import { isStorefrontDeployment } from '@/lib/storefront';
 import { SITE_ID } from '@/crud/shared/config';
 import { queryD1 } from '@/lib/cloudflareD1';
+import { getHeroPreviewVideos } from '@/lib/services/heroVideoService';
 import { loadHomepageData } from '@/lib/loaders';
 import { loadAboutData } from '@/lib/about';
 import { mapD1ToTemplateData } from '@/lib/templates/dataMapper';
@@ -37,10 +38,13 @@ interface SiteRow {
  */
 export default async function Home() {
   if (isStorefrontDeployment()) {
-    // Hero storefront = koridor majalah WebGL (MagazineShowcase) tanpa
-    // data D1 — harga & CTA "Pesan Template" mengarah ke /checkout
-    // (dulu dibaca di sini untuk popup detail; popup dihapus v1.3.48).
-    return <LandingPage />;
+    // Hero storefront = koridor majalah WebGL (MagazineShowcase). Harga &
+    // CTA "Pesan Template" mengarah ke /checkout (popup detail dihapus
+    // v1.3.48). Video preview lembaran hero (v1.3.49) dibaca dari D1
+    // (panel admin "Video Hero", owner-only); kegagalan apa pun jatuh ke
+    // `{}` di dalam service — hero tetap tampil dengan video default/gambar.
+    const heroVideos = await getHeroPreviewVideos();
+    return <LandingPage heroVideos={heroVideos} />;
   }
 
   // --- Mode klien: render portofolio deployment ini ---

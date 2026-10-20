@@ -26,6 +26,16 @@
  *    kartu membuka demo di TAB BARU.
  * 5. Latar transparan — koridor mengambang di atas split off-white/biru.
  * 6. Nav keyboard sr-only (3 tombol) — aksesibilitas tanpa mouse.
+ * 7. (v1.3.49) **Video preview di lembaran bergerak**: hingga
+ *    VIDEO_LAYERS lembaran yang paling terbaca (kiri & kanan pusat)
+ *    dilapisi video rekaman demo (muted, loop) yang mengikuti persis
+ *    gerak & lengkungan lembaran — kesan "hidup" saat koridor meluncur,
+ *    tanpa iframe berat. Sumber video: `previewVideo` per slot dari D1
+ *    (panel admin "Video Hero" — owner upload rekaman sendiri, route
+ *    API owner-only), fallback video default bawaan `/landing/*.mp4`,
+ *    lalu fallback gambar screenshot. Sembunyi otomatis saat lembaran
+ *    terangkat/live tayang, tab tersembunyi, atau video gagal dimuat
+ *    (kembali ke gambar).
  *
  * Interaksi bawaan terjaga: drag/scroll menjelajah koridor (guliran
  * halaman TIDAK tertelan — touchAction pan-y; drag berakhir = snap ke
@@ -37,6 +47,7 @@
 import * as React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { ExternalLink } from 'lucide-react';
 
 const CAM_FOV = 75;
 const CAM_Z = 6;
@@ -51,17 +62,16 @@ const CELL_MAX = 1024;
 const ATLAS_MAX = 4096;
 const PLACEHOLDER_ASPECTS = [0.72, 1.5, 0.78, 1.33, 1.0, 1.62, 0.68, 1.2, 0.86, 1.45];
 
-/* Default hero (disetel mengikuti preset Originkit; speed 8 = angkat
-   lembaran lebih ringkas ~0,56 dtk sebelum popup terbuka). */
+/* Default hero: tap to focus ke depan, drift halus 1.2, rasio layar 16:10 */
 const DEFAULT_VIEW = { tap: true, zoom: 5, speed: 8 };
-const DEFAULT_TRAVEL = { smoothing: 5, wave: 5 };
+const DEFAULT_TRAVEL = { drift: 1.2, smoothing: 5, wave: 5 };
 const DEFAULTS = {
   pages: 20,
   spacing: 5,
   tilt: 0,
   turn: 0,
-  pageWidth: 600,
-  pageHeight: 500,
+  pageWidth: 720,
+  pageHeight: 450,
   scrollSens: 5,
 };
 
@@ -69,17 +79,23 @@ const CORRIDOR_DIM = 0.22;
 const TAP_SLOP = 6;
 const TAP_MS = 600;
 const PICK_MAX = 1600;
-/** Jeda tenang koridor sebelum satu lembaran ditarik menghadap (dtk). */
-const REST_DELAY_SEC = 0.8;
-/** Lamanya demo live tayang otomatis sebelum siklus lanjut (dtk). */
-const LIVE_HOLD_SEC = 5.5;
+/** v1.3.49: maksimal lembaran paling terbaca yang dilapisi video preview. */
+const VIDEO_LAYERS = 2;
+/** Lembaran di dekat pusat (sliver) dilewati — tidak terbaca, tak layak video. */
+const VIDEO_SKIP_CENTER = 0.35;
 
 export type MagazineImage = {
   src: string;
   alt?: string;
   offsetY?: number;
-  /** Alamat demo live — ditayangkan sebagai iframe di lembaran terangkat. */
+  /** Alamat demo live — ditayarkan sebagai iframe di lembaran terangkat. */
   previewUrl?: string;
+  /**
+   * URL video preview (v1.3.49) — dari panel admin "Video Hero" (D1).
+   * Kosong → fallback video default bawaan (`/landing/<screenshot>.mp4`),
+   * lalu gambar screenshot.
+   */
+  previewVideo?: string;
 };
 
 export interface MagazineShowcaseProps {
@@ -89,7 +105,7 @@ export interface MagazineShowcaseProps {
 }
 
 type View = { tap: boolean; zoom: number; speed: number };
-type Travel = { smoothing: number; wave: number };
+type Travel = { drift: number; smoothing: number; wave: number };
 type Config = {
   images: MagazineImage[];
   pages: number;
@@ -125,9 +141,51 @@ function previewUrlOf(image: MagazineImage): string {
   return image?.previewUrl ?? '';
 }
 
+/** Video preview rekaman demo (v1.3.49): URL dari panel admin "Video Hero"
+    (D1) menang; tanpa itu, diturunkan otomatis dari path screenshot
+    (os-desktop.webp → os-desktop.mp4 — video default bawaan). Hasil akhir
+    bisa '' (tanpa video) — lapisan video disembunyikan, lembaran tetap
+    menampilkan gambar screenshot seperti biasa. */
+function previewVideoOf(image: MagazineImage): string {
+  if (image?.previewVideo) return image.previewVideo;
+  const src = srcOf(image);
+  return src.endsWith('.webp') ? src.replace(/\.webp$/, '.mp4') : '';
+}
+
 /** Modulo gaya GLSL (hasil selalu non-negatif untuk y > 0). */
 function glmod(x: number, y: number): number {
   return x - y * Math.floor(x / y);
+}
+
+/** v1.3.49 — pemilih lembaran ber-video (murni, diuji unit test).
+    Memakai rumus `zCorridor` yang SAMA dengan shader: pilih hingga `max`
+    lembaran dengan |z| terkecil tetapi ≥ minAbs (sliver pusat dilewati). */
+export function videoSlotIndices(
+  scrollY: number,
+  pages: number,
+  pageSpacing: number,
+  thickness: number,
+  max: number = VIDEO_LAYERS,
+  minAbs: number = 0
+): number[] {
+  if (!isFinite(scrollY) || pages <= 0 || pageSpacing <= 0) return [];
+  const maxZ = (pages * (pageSpacing + thickness)) / 2;
+  if (maxZ <= 0) return [];
+  const middle = (pages - 1) / 2;
+  const entries: { i: number; z: number }[] = [];
+  for (let i = 0; i < pages; i++) {
+    const boxCenterZ = pageSpacing * (-(i - middle));
+    const z = glmod(boxCenterZ - scrollY + maxZ, 2 * maxZ) - maxZ;
+    entries.push({ i, z });
+  }
+  entries.sort((a, b) => Math.abs(a.z) - Math.abs(b.z));
+  const out: number[] = [];
+  for (const e of entries) {
+    if (Math.abs(e.z) < minAbs) continue;
+    out.push(e.i);
+    if (out.length >= max) break;
+  }
+  return out;
 }
 
 /** Buka demo di tab baru (jalur fallback statis & nav keyboard). */
@@ -167,6 +225,7 @@ function settingsFor(cfg: Config, viewWidthPx: number, viewHeightPx: number) {
   const pageWidth = pageWidthPx * worldPerPx;
   const pageHeight = pageHeightPx * worldPerPx;
   const spacing = clamp(cfg.spacing, 0, 10, DEFAULTS.spacing);
+  const drift = clamp(cfg.travel.drift, -10, 10, DEFAULT_TRAVEL.drift);
   const smoothing = clamp(cfg.travel.smoothing, 0, 10, DEFAULT_TRAVEL.smoothing);
   const wave = clamp(cfg.travel.wave, 0, 10, DEFAULT_TRAVEL.wave);
 
@@ -189,6 +248,7 @@ function settingsFor(cfg: Config, viewWidthPx: number, viewHeightPx: number) {
     wave: pageWidth * 0.04 * wave,
     lerp: 0.35 * Math.pow(0.82, smoothing),
     wheel: 0.4 + clamp(cfg.scrollSens, 0, 10, DEFAULTS.scrollSens) * 0.16,
+    driftPerSecond: drift * pageWidth * 0.12,
     tapToView: cfg.view.tap !== false,
     focusZ,
     focusScale: Math.min(
@@ -325,6 +385,100 @@ const PICK_FRAGMENT = `
  }
 `;
 
+/** v1.3.49 — shader lapisan video: salinan 1:1 fisika PAGE_VERTEX (gerak,
+    lengkungan bow, rumus zCorridor yang sama) supaya video menempel presisi
+    pada lembaran sambil meluncur. Dua pembeda: (1) ketebalan ×1.6 supaya
+    kedua muka kotak video menonjol ±0.3 ketebalan dari lembaran induk —
+    bebas z-fighting dari sisi kiri maupun kanan; (2) sumber warna = video
+    texture, bukan atlas. */
+const VIDEO_VERTEX = `
+ attribute float aIndex;
+
+ uniform float uPageThickness;
+ uniform float uPageWidth;
+ uniform float uPageHeight;
+ uniform float uMeshCount;
+ uniform float uPageSpacing;
+ uniform float uScrollY;
+ uniform float uSpeedY;
+ uniform float uWave;
+ uniform float uTilt;
+ uniform float uTurn;
+
+ varying vec2 vUv;
+
+ const float TAU_HALF = 3.14159265359;
+
+ mat3 rotY(float a) {
+     return mat3(cos(a), 0.0, sin(a), 0.0, 1.0, 0.0, -sin(a), 0.0, cos(a));
+ }
+ mat3 rotX(float a) {
+     return mat3(1.0, 0.0, 0.0, 0.0, cos(a), -sin(a), 0.0, sin(a), cos(a));
+ }
+
+ void main() {
+     float PI = TAU_HALF;
+
+     vec3 basePos = vec3(
+         position.x * uPageWidth,
+         position.y * uPageHeight,
+         position.z * uPageThickness * 1.6
+     );
+
+     vec3 rotationCenter = vec3(-uPageWidth * 0.5, 0.0, 0.0);
+
+     float fromMiddle = aIndex - (uMeshCount - 1.0) * 0.5;
+
+     float yAngle = -PI * 0.5 + uTurn;
+     float xAngle = uTilt;
+
+     float boxCenterZ = uPageSpacing * (-fromMiddle);
+     float maxZ = uMeshCount * (uPageSpacing + uPageThickness) * 0.5;
+
+     float bow = sin((position.y + 0.5) * 2.0) * uWave;
+     float speed = clamp(uSpeedY / uPageWidth * 4.0, -2.0, 2.0);
+
+     float zCorridor = mod(boxCenterZ - uScrollY + maxZ, 2.0 * maxZ) - maxZ
+         - bow * speed;
+
+     vec3 vertexLocal = basePos - rotationCenter;
+     vertexLocal.z += zCorridor;
+
+     vec3 rotated = rotY(yAngle) * vertexLocal + rotationCenter;
+
+     rotated.z -= uPageWidth * 0.5;
+     rotated.x += uPageWidth * 0.5;
+
+     vec3 newPosition = rotX(xAngle) * rotated;
+
+     vec4 modelPosition = modelMatrix * vec4(newPosition, 1.0);
+     gl_Position = projectionMatrix * viewMatrix * modelPosition;
+
+     vUv = uv;
+ }
+`;
+
+const VIDEO_FRAGMENT = `
+ uniform sampler2D uVideoTex;
+ uniform float uPageAspect;
+ uniform float uVideoAspect;
+
+ varying vec2 vUv;
+
+ void main() {
+     vec2 uv = vUv;
+     float s = uVideoAspect / uPageAspect;
+     float band = min(s, 1.0 / s);
+     if (s >= 1.0) {
+         uv.x = (uv.x - 0.5) * band + 0.5;
+     } else {
+         uv.y = (uv.y - 0.5) * band + 0.5;
+     }
+     vec4 color = texture2D(uVideoTex, clamp(uv, 0.0, 1.0));
+     gl_FragColor = vec4(color.rgb, 1.0);
+ }
+`;
+
 interface Cell {
   rect: [number, number, number, number];
   aspect: number;
@@ -344,7 +498,9 @@ function loadImage(url: string): Promise<HTMLImageElement | null> {
   if (pending) return pending;
   const p = new Promise<HTMLImageElement | null>((resolve) => {
     const img = new window.Image();
-    img.crossOrigin = 'anonymous';
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      img.crossOrigin = 'anonymous';
+    }
     img.onload = () => {
       imageCache.set(url, img);
       resolve(img);
@@ -495,25 +651,25 @@ class MagazineScene {
   private tap = { x: 0, y: 0, at: 0, id: -1, hit: -1 };
 
   private settingsCache: ReturnType<typeof settingsFor> | null = null;
-
-  /** Mesin luncur-berhenti + tayang live (v1.3.48). */
   private liveActive = false;
-  private liveShownT = 0;
-  private userOwnsLive = false;
-  private pendingGlide = false;
-  private restT = 0;
 
+  /** v1.3.49 — lapisan video preview (maks VIDEO_LAYERS lembaran terbaca). */
+  private videoMeshes: THREE.InstancedMesh[] = [];
+  private videoAttrs: THREE.InstancedBufferAttribute[] = [];
+  private videoEls: HTMLVideoElement[] = [];
+  private videoTextures: THREE.VideoTexture[] = [];
+  private videoUrls: string[] = [];
+  private videoDead = new Set<string>();
+  private videoTabHidden = false;
+
+  /** Dipanggil saat lembaran mulai diketuk/fokus ke depan (untuk preload iframe). */
+  onFocusStart: ((index: number) => void) | null = null;
   /** Dipanggil saat lembaran siap menayangkan demo live (rect dalam piksel). */
   onLive:
     | ((index: number, rect: { left: number; top: number; width: number; height: number }) => void)
     | null = null;
   /** Dipanggil saat live ditutup (lembaran kembali jadi biasa). */
   onLiveEnd: (() => void) | null = null;
-
-  /** Pemilik demo menyentuh iframe (klik/scroll) → siklus auto berhenti. */
-  claimLive() {
-    this.userOwnsLive = true;
-  }
 
   /** Tutup lembaran terangkat (dipanggil ✕/Esc/ketuk luar). */
   releaseFocus() {
@@ -615,6 +771,7 @@ class MagazineScene {
 
     this.applyConfig();
     this.loadAtlas();
+    this.setupVideos();
   }
 
   private applyConfig() {
@@ -703,6 +860,146 @@ class MagazineScene {
       .catch(() => {});
   }
 
+  /** v1.3.49 — bangun elemen <video> (muted, loop, off-screen) + tekstur
+      VideoTexture + mesh lapisan video per slot (berbagi uniform objek
+      dengan material utama → otomatis sinkron nol biaya per frame). */
+  private setupVideos() {
+    const seen = new Set<string>();
+    for (const img of this.cfg.images) {
+      const url = previewVideoOf(img);
+      if (!url || seen.has(url)) continue;
+      seen.add(url);
+      const el = document.createElement('video');
+      el.muted = true;
+      el.loop = true;
+      el.playsInline = true;
+      el.preload = 'auto';
+      el.setAttribute('aria-hidden', 'true');
+      el.src = url;
+      el.style.cssText =
+        'position:fixed;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none';
+      document.body.appendChild(el);
+      el.addEventListener('error', () => {
+        this.videoDead.add(url);
+        this.updateVideos(this.settings());
+      });
+      this.videoEls.push(el);
+      this.videoTextures.push(new THREE.VideoTexture(el));
+      this.videoUrls.push(url);
+    }
+    if (!this.videoEls.length) return;
+
+    const shared = this.material.uniforms;
+    for (let layer = 0; layer < VIDEO_LAYERS; layer++) {
+      const geo = new THREE.BoxGeometry(
+        1,
+        1,
+        1,
+        PAGE_SEGMENTS,
+        PAGE_SEGMENTS,
+        1
+      );
+      geo.setAttribute(
+        'aIndex',
+        new THREE.InstancedBufferAttribute(new Float32Array([-1]), 1)
+      );
+      const mat = new THREE.ShaderMaterial({
+        vertexShader: VIDEO_VERTEX,
+        fragmentShader: VIDEO_FRAGMENT,
+        uniforms: {
+          // Berbagi objek uniform dengan material utama: gerak & lengkungan
+          // tersinkron otomatis tanpa disalin tiap frame.
+          uPageThickness: shared.uPageThickness,
+          uPageWidth: shared.uPageWidth,
+          uPageHeight: shared.uPageHeight,
+          uMeshCount: shared.uMeshCount,
+          uPageSpacing: shared.uPageSpacing,
+          uScrollY: shared.uScrollY,
+          uSpeedY: shared.uSpeedY,
+          uWave: shared.uWave,
+          uTilt: shared.uTilt,
+          uTurn: shared.uTurn,
+          uPageAspect: shared.uPageAspect,
+          uVideoTex: { value: this.videoTextures[0] },
+          uVideoAspect: { value: 16 / 10 },
+        },
+      });
+      const mesh = new THREE.InstancedMesh(geo, mat, 1);
+      mesh.frustumCulled = false;
+      mesh.visible = false;
+      this.scene.add(mesh);
+      this.videoMeshes.push(mesh);
+      this.videoAttrs.push(
+        geo.getAttribute('aIndex') as THREE.InstancedBufferAttribute
+      );
+    }
+  }
+
+  /** Perbarui slot video paling terbaca + play/pause (dipanggil tiap frame). */
+  private updateVideos(S: ReturnType<typeof settingsFor>) {
+    if (!this.videoMeshes.length) return;
+    const count = Math.max(1, this.cfg.images.length);
+    // Lembaran terangkat / live tayang → seluruh lapisan video mundur.
+    const slots =
+      this.focus.index >= 0
+        ? []
+        : videoSlotIndices(
+            this.scroll.current,
+            S.pages,
+            S.pageSpacing,
+            S.thickness,
+            this.videoMeshes.length,
+            S.pageSpacing * VIDEO_SKIP_CENTER
+          );
+    const wantPlaying = new Set<number>();
+
+    for (let layer = 0; layer < this.videoMeshes.length; layer++) {
+      const mesh = this.videoMeshes[layer];
+      const slot = slots[layer];
+      const img =
+        typeof slot === 'number' ? this.cfg.images[slot % count] : undefined;
+      const url = img ? previewVideoOf(img) : '';
+      const v = url ? this.videoUrls.indexOf(url) : -1;
+      if (v < 0 || this.videoDead.has(url)) {
+        mesh.visible = false;
+        continue;
+      }
+      mesh.visible = true;
+      this.videoAttrs[layer].setX(0, slot);
+      this.videoAttrs[layer].needsUpdate = true;
+      const mat = mesh.material as THREE.ShaderMaterial;
+      mat.uniforms.uVideoTex.value = this.videoTextures[v];
+      const el = this.videoEls[v];
+      mat.uniforms.uVideoAspect.value =
+        el.videoWidth > 0 && el.videoHeight > 0
+          ? el.videoWidth / el.videoHeight
+          : 16 / 10;
+      wantPlaying.add(v);
+    }
+
+    for (let v = 0; v < this.videoEls.length; v++) {
+      this.setVideoPlaying(v, wantPlaying.has(v) && !this.videoTabHidden);
+    }
+  }
+
+  private setVideoPlaying(v: number, play: boolean) {
+    const el = this.videoEls[v];
+    if (!el || el.paused === !play) return; // hindari spam play()/pause()
+    if (play) {
+      el.play().catch(() => {});
+    } else {
+      el.pause();
+    }
+  }
+
+  /** Tab tersembunyi → jeda semua video (hemat baterai); saat kembali
+      tampil, updateVideos (tiap frame) otomatis memutarnya lagi. */
+  private onVisibilityChange = () => {
+    this.videoTabHidden = document.hidden;
+    if (!document.hidden) return;
+    for (const el of this.videoEls) el.pause();
+  };
+
   private settings() {
     if (!this.settingsCache) {
       this.settingsCache = settingsFor(this.cfg, this.width, this.height);
@@ -757,7 +1054,7 @@ class MagazineScene {
       this.focus.index = hit;
       this.focus.target = 1;
       this.focus.fired = false;
-      this.userOwnsLive = false;
+      this.onFocusStart?.(hit);
     }
   }
 
@@ -767,26 +1064,6 @@ class MagazineScene {
     }
   };
 
-  /** Indeks lembaran paling dekat dengan kamera — "yang menghadap". */
-  private facingIndex(): number {
-    const S = this.settings();
-    const maxZ = (S.pages * (S.pageSpacing + S.thickness)) / 2;
-    if (maxZ <= 0) return -1;
-    const middle = (S.pages - 1) / 2;
-    let best = -1;
-    let bestAbs = Infinity;
-    for (let i = 0; i < S.pages; i++) {
-      const boxCenterZ = S.pageSpacing * (-(i - middle));
-      const z = glmod(boxCenterZ - this.scroll.current + maxZ, 2 * maxZ) - maxZ;
-      const az = Math.abs(z);
-      if (az < bestAbs) {
-        bestAbs = az;
-        best = i;
-      }
-    }
-    return best;
-  }
-
   /** Rect layar lembaran terangkat (proyeksi 2 sudut via kamera WebGL). */
   private computeFocusRect() {
     const S = this.settings();
@@ -794,11 +1071,23 @@ class MagazineScene {
     const hh = (S.pageHeight * S.focusScale) / 2;
     const a = new THREE.Vector3(-hw, -hh, S.focusZ).project(this.camera);
     const b = new THREE.Vector3(hw, hh, S.focusZ).project(this.camera);
-    const left = (a.x * 0.5 + 0.5) * this.width;
-    const top = (-a.y * 0.5 + 0.5) * this.height;
-    const right = (b.x * 0.5 + 0.5) * this.width;
-    const bottom = (-b.y * 0.5 + 0.5) * this.height;
-    return { left, top, width: right - left, height: bottom - top };
+    const minX = Math.min(a.x, b.x);
+    const maxX = Math.max(a.x, b.x);
+    const minY = Math.min(a.y, b.y);
+    const maxY = Math.max(a.y, b.y);
+
+    const left = (minX * 0.5 + 0.5) * this.width;
+    const right = (maxX * 0.5 + 0.5) * this.width;
+    // In NDC: +1 is top, -1 is bottom. In screen space: 0 is top, this.height is bottom.
+    const top = (-maxY * 0.5 + 0.5) * this.height;
+    const bottom = (-minY * 0.5 + 0.5) * this.height;
+
+    return {
+      left,
+      top,
+      width: Math.max(10, right - left),
+      height: Math.max(10, bottom - top),
+    };
   }
 
   private wheelScale(event: WheelEvent): number {
@@ -899,6 +1188,7 @@ class MagazineScene {
     node.addEventListener('pointercancel', this.onPointerCancel);
 
     window.addEventListener('keydown', this.onKeyDown);
+    document.addEventListener('visibilitychange', this.onVisibilityChange);
   }
 
   private detach() {
@@ -910,6 +1200,7 @@ class MagazineScene {
     node.removeEventListener('pointercancel', this.onPointerCancel);
 
     window.removeEventListener('keydown', this.onKeyDown);
+    document.removeEventListener('visibilitychange', this.onVisibilityChange);
   }
 
   setSize(width: number, height: number) {
@@ -964,58 +1255,39 @@ class MagazineScene {
 
     // Live terbuka → jeda render (hemat GPU/baterai); siklus hanya menghitung
     // tayang lalu menunggu pemilik menutup. Saat tab tersembunyi browser
-    // menghentikan rAF sehingga seluruh siklus ikut diam dengan gratis.
+    // Live terbuka → jeda render WebGL untuk hemat GPU & baterai
     if (this.liveActive) {
-      this.liveShownT += dt;
-      if (!this.userOwnsLive && this.liveShownT > LIVE_HOLD_SEC) {
-        this.releaseFocus();
-        this.pendingGlide = true;
-      }
       return;
     }
 
     if (this.focus.index >= 0) {
       const rate = dt / Math.max(0.05, S.viewDuration);
-      this.focus.t = Math.min(
-        1,
-        Math.max(0, this.focus.t + (this.focus.target ? rate : -rate))
-      );
-      // Angkat tuntas → tayangkan demo LIVE sungguhan di atas lembaran.
-      if (this.focus.t === 1 && this.focus.target === 1 && !this.focus.fired) {
-        this.focus.fired = true;
-        const list = this.cfg.images;
-        const img = list.length
-          ? list[this.focus.index % list.length]
-          : undefined;
-        if (img && previewUrlOf(img)) {
-          this.liveActive = true;
-          this.liveShownT = 0;
-          this.userOwnsLive = false;
-          this.onLive?.(this.focus.index, this.computeFocusRect());
-        }
-      }
-      if (this.focus.t === 0 && this.focus.target === 0) {
-        this.focus.index = -1;
-      }
-    } else if (!this.drag.active) {
-      // Mesin luncur-berhenti (v1.3.48): koridor tenang → lembaran
-      // terdekat ditarik menghadap (REST_DELAY) → live → setelah
-      // LIVE_HOLD dilepas → meluncur SATU langkah → ulangi.
-      if (this.pendingGlide) {
-        this.pendingGlide = false;
-        this.restT = 0;
-        this.push(S.pageSpacing);
-      } else if (
-        Math.abs(this.scroll.target - this.scroll.current) <
-        S.pageSpacing * 0.002
-      ) {
-        this.restT += dt;
-        if (this.restT >= REST_DELAY_SEC) {
-          this.restT = 0;
-          this.onTap(this.facingIndex());
+      if (this.focus.target === 1) {
+        this.focus.t = Math.min(1, this.focus.t + rate);
+        // Angkat tuntas → tayangkan demo LIVE sungguhan di atas lembaran
+        if (this.focus.t >= 0.999 && !this.focus.fired) {
+          this.focus.t = 1;
+          this.focus.fired = true;
+          const list = this.cfg.images;
+          const img = list.length
+            ? list[this.focus.index % list.length]
+            : undefined;
+          if (img && previewUrlOf(img)) {
+            this.liveActive = true;
+            this.onLive?.(this.focus.index, this.computeFocusRect());
+          }
         }
       } else {
-        this.restT = 0;
+        this.focus.t = Math.max(0, this.focus.t - rate);
+        if (this.focus.t <= 0.001) {
+          this.focus.t = 0;
+          this.focus.index = -1;
+        }
+      }
+    } else {
+      // Normal: hanya drift lambat jika tidak sedang di-drag
+      if (S.driftPerSecond !== 0 && !this.drag.active) {
+        this.push(S.driftPerSecond * dt);
       }
     }
     u.uFocusIndex.value = this.focus.index;
@@ -1040,6 +1312,8 @@ class MagazineScene {
     u.uScrollY.value = this.scroll.current;
     u.uSpeedY.value = this.scroll.speed;
 
+    this.updateVideos(S);
+
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -1054,6 +1328,19 @@ class MagazineScene {
     this.blank.dispose();
     this.atlas?.texture.dispose();
     this.mesh.dispose();
+    // v1.3.49 — bersihkan aset video preview.
+    for (const el of this.videoEls) {
+      el.pause();
+      el.removeAttribute('src');
+      el.load();
+      el.remove();
+    }
+    for (const t of this.videoTextures) t.dispose();
+    for (const m of this.videoMeshes) {
+      m.geometry.dispose();
+      (m.material as THREE.Material).dispose();
+      m.dispose();
+    }
     this.renderer.dispose();
     const canvas = this.renderer.domElement;
     canvas.parentNode?.removeChild(canvas);
@@ -1123,12 +1410,12 @@ export default function MagazineShowcase({
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<MagazineScene | null>(null);
   const [fallback, setFallback] = useState(false);
-  // Tumpangan demo live di atas lembaran terangkat (rect dari kamera WebGL).
   const [live, setLive] = useState<{
     index: number;
     rect: { left: number; top: number; width: number; height: number };
   } | null>(null);
   const [liveReady, setLiveReady] = useState(false);
+  const [preloadingIndex, setPreloadingIndex] = useState<number | null>(null);
 
   // Ref agar callback terbaru terpakai tanpa meresefkan scene (disinkronkan
   // di effect — pola wajib React Compiler; lihat Dock.tsx isClientHydrated).
@@ -1168,11 +1455,18 @@ export default function MagazineShowcase({
       return;
     }
     /* eslint-enable react-hooks/set-state-in-effect */
+    scene.onFocusStart = (index) => {
+      setPreloadingIndex(index);
+    };
     scene.onLive = (index, rect) => {
       setLiveReady(false);
       setLive({ index, rect });
     };
-    scene.onLiveEnd = () => setLive(null);
+    scene.onLiveEnd = () => {
+      setLive(null);
+      setPreloadingIndex(null);
+      setLiveReady(false);
+    };
     sceneRef.current = scene;
     scene.setSize(container.clientWidth, container.clientHeight);
     scene.start();
@@ -1194,14 +1488,27 @@ export default function MagazineShowcase({
     scene.updateConfig(makeConfig(imagesRef.current));
   }, [imageKey]);
 
+  // Elevasi panggung ke atas navbar saat live demo aktif
+  useEffect(() => {
+    if (live) {
+      document.body.classList.add('mag-live-active');
+    } else {
+      document.body.classList.remove('mag-live-active');
+    }
+    return () => {
+      document.body.classList.remove('mag-live-active');
+    };
+  }, [live]);
+
   // Penyesuaian #6: jalur keyboard — tanpa mouse, template tetap terbuka.
   const firstAlt = images[0] ? altOf(images[0]) : '';
 
   const closeLive = () => {
     sceneRef.current?.releaseFocus();
     setLive(null);
+    setPreloadingIndex(null);
+    setLiveReady(false);
   };
-  const claimLive = () => sceneRef.current?.claimLive();
   const liveImage = live
     ? images[live.index % Math.max(1, images.length)]
     : null;
@@ -1220,6 +1527,9 @@ export default function MagazineShowcase({
       </>
     );
   }
+
+  const DESIGN_WIDTH = 1440;
+  const DESIGN_HEIGHT = 900;
 
   return (
     <>
@@ -1269,68 +1579,199 @@ export default function MagazineShowcase({
           >
             <span style={{ opacity: 0.7 }}>geser</span>
             <span>·</span>
-            <span>lembaran yang berhenti = demo live</span>
+            <span>ketuk lembaran untuk mencoba web live</span>
           </span>
         )}
 
-        {/* Demo LIVE sungguhan ditumpangkan presisi di atas lembaran
-            terangkat (v1.3.48). Transparan sampai iframe siap → tidak ada
-            kedipan putih; ✕ / Esc / ketuk luar menutup. */}
-        {live && liveImage && (
-          <div
+        {/* Preload iframe di background saat lembaran mulai terangkat */}
+        {preloadingIndex !== null && !live && images[preloadingIndex % images.length] && (
+          <iframe
+            src={previewUrlOf(images[preloadingIndex % images.length])}
+            title="Preload live demo"
+            tabIndex={-1}
+            aria-hidden="true"
+            onLoad={() => setLiveReady(true)}
             style={{
               position: 'absolute',
-              left: live.rect.left,
-              top: live.rect.top,
-              width: live.rect.width,
-              height: live.rect.height,
-              zIndex: 3,
-              overflow: 'hidden',
-              background: 'transparent',
+              width: '1px',
+              height: '1px',
+              opacity: 0,
+              pointerEvents: 'none',
+              border: 0,
             }}
-          >
-            <iframe
-              src={previewUrlOf(liveImage)}
-              title={`Demo live: ${altOf(liveImage) || 'template'}`}
-              onPointerDown={claimLive}
-              onFocus={claimLive}
-              onLoad={() => setLiveReady(true)}
-              style={{
-                width: '100%',
-                height: '100%',
-                border: 0,
-                display: 'block',
-                background: '#fff',
-                opacity: liveReady ? 1 : 0,
-                transition: 'opacity 0.35s ease',
-              }}
-            />
-            <button
-              type="button"
-              onClick={closeLive}
-              aria-label="Tutup demo live"
-              style={{
-                position: 'absolute',
-                top: 10,
-                right: 10,
-                width: 34,
-                height: 34,
-                borderRadius: 999,
-                border: '1px solid rgba(255,255,255,0.35)',
-                background: 'rgba(10,10,14,0.62)',
-                color: '#fff',
-                fontSize: 15,
-                lineHeight: 1,
-                cursor: 'pointer',
-                display: 'grid',
-                placeItems: 'center',
-                backdropFilter: 'blur(4px)',
-              }}
-            >
-              ✕
-            </button>
-          </div>
+          />
         )}
+
+        {/* Demo LIVE sungguhan ditumpangkan presisi di atas lembaran
+            terangkat (Opsi 2). Scaled 1440x900 desktop viewport utuh (16:10 rasio asli);
+            header bar elegan di atas frame sehingga isi website 100% utuh tanpa kepotong;
+            klik di luar / ✕ / Esc menutup demo. */}
+        {live && liveImage && (() => {
+          const scale = live.rect.width / DESIGN_WIDTH;
+          const isTightTop = live.rect.top < 46;
+
+          return (
+            <>
+              {/* Backdrop untuk klik di luar menutup */}
+              <div
+                onClick={closeLive}
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  zIndex: 2,
+                  background: 'rgba(0,0,0,0.4)',
+                  backdropFilter: 'blur(3px)',
+                  cursor: 'zoom-out',
+                }}
+              />
+
+              {/* Kontainer frame live tepat di atas lembaran 3D */}
+              <div
+                style={{
+                  position: 'absolute',
+                  left: live.rect.left,
+                  top: live.rect.top,
+                  width: live.rect.width,
+                  height: live.rect.height,
+                  zIndex: 3,
+                  borderRadius: 14,
+                  background: '#0d0d12',
+                  boxShadow:
+                    '0 25px 60px -15px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.18)',
+                }}
+              >
+                {/* Top Header Bar di atas frame agar tidak memotong isi viewport */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    ...(isTightTop
+                      ? { top: 8, right: 8, height: 32 }
+                      : { bottom: 'calc(100% + 8px)', left: 0, right: 0, height: 38 }),
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: isTightTop ? 'flex-end' : 'space-between',
+                    padding: '0 12px',
+                    background: 'rgba(15, 15, 22, 0.95)',
+                    backdropFilter: 'blur(12px)',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: 10,
+                    zIndex: 10,
+                  }}
+                >
+                  {!isTightTop && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: '50%',
+                          backgroundColor: '#10B981',
+                          boxShadow: '0 0 8px #10B981',
+                        }}
+                      />
+                      <span
+                        style={{
+                          color: '#fff',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          letterSpacing: '0.01em',
+                        }}
+                      >
+                        {altOf(liveImage) || 'Live Demo'}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 10,
+                          color: 'rgba(255,255,255,0.7)',
+                          background: 'rgba(255,255,255,0.1)',
+                          padding: '2px 6px',
+                          borderRadius: 4,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                        }}
+                      >
+                        Live Web
+                      </span>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => openDemo(liveImage)}
+                      title="Buka di tab baru"
+                      aria-label="Buka demo di tab baru"
+                      style={{
+                        background: 'rgba(255,255,255,0.1)',
+                        border: '1px solid rgba(255,255,255,0.15)',
+                        color: '#fff',
+                        borderRadius: 6,
+                        padding: '4px 8px',
+                        fontSize: 11,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <span>Tab Baru</span>
+                      <ExternalLink size={12} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={closeLive}
+                      aria-label="Tutup demo live"
+                      title="Tutup (Esc)"
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 6,
+                        border: '1px solid rgba(255,255,255,0.18)',
+                        background: 'rgba(255,255,255,0.12)',
+                        color: '#fff',
+                        fontSize: 13,
+                        cursor: 'pointer',
+                        display: 'grid',
+                        placeItems: 'center',
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+
+                {/* Scaled Iframe Viewport (1440x900 standar desktop 16:10 utuh) */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    overflow: 'hidden',
+                    borderRadius: 14,
+                    background: '#000',
+                  }}
+                >
+                  <iframe
+                    src={previewUrlOf(liveImage)}
+                    title={`Demo live: ${altOf(liveImage) || 'template'}`}
+                    onLoad={() => setLiveReady(true)}
+                    style={{
+                      width: `${DESIGN_WIDTH}px`,
+                      height: `${DESIGN_HEIGHT}px`,
+                      transform: `scale(${scale})`,
+                      transformOrigin: 'top left',
+                      border: 0,
+                      display: 'block',
+                      background: '#fff',
+                      opacity: liveReady ? 1 : 0,
+                      transition: 'opacity 0.35s ease',
+                    }}
+                  />
+                </div>
+              </div>
+            </>
+          );
+        })()}
       </div>
       <nav aria-label="Pilih template" style={SR_ONLY}>
         {images.map((img, i) => (

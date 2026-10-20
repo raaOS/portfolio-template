@@ -136,7 +136,7 @@ export const TRANSITIONS = {
  * WAJIB sama dengan entri teratas CHANGELOG.md — dijaga test
  * `src/lib/constants.test.ts` supaya tidak pernah melenceng.
  */
-export const APP_VERSION = '1.3.48';
+export const APP_VERSION = '1.3.49';
 
 /**
  * Canonical site URL — used as fallback when NEXT_PUBLIC_SITE_URL is not set.
