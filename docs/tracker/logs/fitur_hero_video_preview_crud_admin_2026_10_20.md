@@ -1,5 +1,14 @@
 # #172 — Video Preview Hidup di Lembaran Hero + Panel Admin "Video Hero" (v1.3.49, 2026-10-20)
 
+**STATUS: ✅ Selesai & LIVE** (`/api/health` = **1.3.49**, Version ID `59c56de5-7483-44e8-9f61-32af503df059`, commit `41ec7eb`).
+
+**Bukti verifikasi produksi (2026-10-20 malam):**
+- Health 1.3.49; `/`, 3× `/preview/*`, `/landing/os-desktop.mp4` = **200**.
+- `GET /api/admin/hero-videos` anonim = **401** (owner-mode aktif → lolos guard lalu auth menolak = perilaku benar di site owner; di site klien = 404, diuji unit test).
+- DOM produksi (`makeitbetter.my.id`): 1 kanvas WebGL + 3 elemen `<video>` terpasang. `os-desktop.mp4` **readyState 4, muted/loop/playsInline, paused=false, currentTime maju 2,79 → 0,51 detik (1 putaran loop penuh 9 dtk terlewati)** = video benar-benar berjalan. Dua video lain `error code 4` (file memang sudah dihapus) → lapisan video disembunyikan otomatis → lembaran menampilkan gambar screenshot (tanpa kotak hitup/kosong).
+- Screenshot 2x (selisih 3 dtk): satu lembaran terbaca menampilkan **bingkai video** (desktop OS tanpa jendela — beda dari `os-desktop.webp` statis yang berjendela + sticky note) sementara bingkai sebelahnya = tangkapan layar statis persis file webp → lapisan video menempel benar di lembaran sambil drift.
+- Deploy sempat gagal 1x transitif (DNS `api.cloudflare.com` tidak terresolver) → retry sukses. Suite penuh sebelum commit: **139 file / 1.134 test PASS**; tsc 0; lint bersih; pre-commit lolos.
+
 ## Ringkasan Permintaan Owner
 
 Setelah v1.3.48 (koridor majalah → snap → demo live on-tap) live, owner ingin lembaran yang **bergerak** juga terlihat "hidup". Percobaan awal memakai script perekam otomatis (Playwright + ffmpeg-static): owner membatalkan — *"STOP, ribet pakai script, biar aku rekam manual aja, dan masukan ke halaman CRUD admin dashboard, tapi karena CRUD belum ada mungkin dibuatkan."* Keputusan: **owner rekam layar sendiri** (HP/laptop), AI buatkan **panel CRUD admin** untuk upload; kompresi & konversi format otomatis saat upload; fitur **owner-only** agar tidak kebawa deploy ke customer.
