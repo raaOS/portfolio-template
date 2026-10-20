@@ -15,6 +15,22 @@ async function loadZones(): Promise<AdminZone[]> {
   return mod.ADMIN_ZONES;
 }
 
+/**
+ * Semua app di registry wajib punya key PANEL_MAP (WindowContentRenderer),
+ * kalau tidak window-nya cuma menampilkan "Panel belum tersedia".
+ * Pengecualian: `ai` — fitur AI sengaja mati per keputusan owner v1.3.28.
+ */
+it('setiap app ADMIN_ZONES terdaftar di PANEL_MAP (guard "Panel belum tersedia")', async () => {
+  vi.stubEnv('NEXT_PUBLIC_OWNER_MODE', 'true');
+  const zones = await loadZones();
+  const { PANEL_MAP } = await import('./WindowContentRenderer');
+
+  const appIds = zones.flatMap((z) => z.apps.map((a) => a.id));
+  const missing = appIds.filter((id) => !(id in PANEL_MAP));
+
+  expect(missing).toEqual(['ai']);
+});
+
 function findApp(zones: AdminZone[], appId: string) {
   for (const zone of zones) {
     const app = zone.apps.find((a) => a.id === appId);

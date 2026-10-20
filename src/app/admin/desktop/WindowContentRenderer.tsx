@@ -120,7 +120,18 @@ const OrdersPanel = dynamic(() => import('./panels/OrdersPanel'), {
   loading: () => <AdminLoading size="page" />,
 });
 
-const PANEL_MAP: Record<string, React.ComponentType> = {
+const HeroVideosPanel = dynamic(() => import('./panels/HeroVideosPanel'), {
+  ssr: false,
+  loading: () => <AdminLoading size="page" />,
+});
+
+/**
+ * Map dari appId ke panel yang dirender di dalam window desktop admin.
+ * Di-export untuk guard test coverage (registry vs PANEL_MAP) — app yang
+ * terdaftar di ADMIN_ZONES tapi tiada di sini akan tampil "Panel belum
+ * tersedia" (kasus `harga` v1.3.29 & `heroVideos` v1.3.49).
+ */
+export const PANEL_MAP: Record<string, React.ComponentType> = {
   projects: ProjectsPanel,
   profile: ProfilePanel,
   experience: ExperiencePanel,
@@ -143,6 +154,7 @@ const PANEL_MAP: Record<string, React.ComponentType> = {
   backup: BackupPanel,
   harga: HargaPanel,
   orders: OrdersPanel,
+  heroVideos: HeroVideosPanel,
 };
 
 interface WindowContentRendererProps {

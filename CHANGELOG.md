@@ -3,6 +3,16 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.50] - 2026-10-20
+
+### 🐛 Fix: App "Video Hero" tidak bisa dibuka dari desktop admin (Panel belum tersedia)
+
+Ditemukan saat uji nyata oleh owner: klik **Video Hero** di zone Tampilan membuka window, tapi isinya hanya teks _"Panel 'heroVideos' belum tersedia"_. Akar masalah: app terdaftar di registry (`registry.ts`) dan `APP_ROUTE_MAP`, halaman `/admin/hero-videos` juga ada — tetapi key-nya **tidak didaftarkan ke `PANEL_MAP`** di `WindowContentRenderer.tsx`. Semua isi window admin diambil dari `PANEL_MAP` (halaman route tidak dirender `ClientAdminLayout`), jadi panelnya tidak pernah tampil. Bug kelas ini terulang untuk ketiga kalinya (`ai` v1.3.28, `harga` v1.3.29, kini `heroVideos`).
+
+- **Perbaikan:** dynamic import `HeroVideosPanel` + key `heroVideos` di `PANEL_MAP`.
+- **Guard anti-ulang:** `PANEL_MAP` kini di-export dan ditambah test coverage — semua app di `ADMIN_ZONES` wajib punya key `PANEL_MAP` (kecuali `ai` yang sengaja mati), jadi app baru yang terlewat langsung gagal test.
+- **Uji:** test registry 5 PASS; tsc 0; lint bersih.
+
 ## [1.3.49] - 2026-10-20
 
 ### ✨ Video Preview Hidup di Lembaran Hero + Panel Admin "Video Hero" (Owner Rekam & Upload Sendiri)
