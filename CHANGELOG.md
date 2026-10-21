@@ -3,6 +3,15 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.52] - 2026-10-21
+
+### 🐛 Fix: Mutasi admin berikutnya bisa gagal "Invalid or missing CSRF token" (polling auth merotasi token)
+
+Uji nyata upload Video Hero menemukan bahwa **setelah satu mutasi sukses, mutasi berikutnya bisa ditolak server** dengan pesan _"Invalid or missing CSRF token"_. Akar masalah lintas-fitur: `GET /api/auth/check-auth` (dipoll `useAdminAuth`) **membuat token CSRF baru setiap kali** dan menimpa cookie `csrf_token`, sedangkan sisi client meng-cache token lama (`client-csrf.ts`) dan tidak tahu cookie sudah berganti → header basi → server menolak. Ini bisa mempengaruhi **semua form admin** (simpan profil, upload, dsb.), bukan hanya Video Hero.
+
+- **Perbaikan:** `check-auth` kini **menggunakan ulang token dari cookie** yang sudah ada (hanya membuat baru bila belum ada) — pola yang sudah dipakai lama oleh `/api/admin/check-auth`. Token stabil selama sesi → cache client selalu cocok.
+- **Uji:** 1 test baru (cookie yang ada tidak di-rotate); suite auth 7 file / 35 test PASS; tsc 0; lint bersih.
+
 ## [1.3.51] - 2026-10-21
 
 ### 🐛 Fix: Upload Video Hero selalu gagal di langkah terakhir ("URL video harus http(s)")

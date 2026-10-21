@@ -43,4 +43,18 @@ describe('GET /api/auth/check-auth', () => {
     expect(data.user?.role).toBe('admin');
     expect(data.csrfToken.length).toBe(64);
   });
+
+  it('reuses existing csrf_token cookie instead of rotating (anti stale-cache)', async () => {
+    vi.mocked(getSiteUserSession).mockResolvedValue(null);
+
+    const existing = 'a'.repeat(64);
+    const req = new Request('http://localhost/api/auth/check-auth', {
+      headers: { cookie: `csrf_token=${existing}` },
+    });
+    const res = await GET(req);
+
+    const data = await res.json();
+    expect(data.csrfToken).toBe(existing);
+    expect(res.headers.get('set-cookie')).toContain(existing);
+  });
 });

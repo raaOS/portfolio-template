@@ -9,7 +9,14 @@ import { generateCSRFToken, CSRF_COOKIE_NAME } from '@/crud/shared/auth/csrf';
 
 export async function GET(request: Request) {
   const session = await getSiteUserSession(request);
-  const csrfToken = generateCSRFToken();
+  // Pakai ulang token dari cookie bila sudah ada — JANGAN rotate tiap
+  // polling. Cookie yang berganti membuat cache client (client-csrf.ts)
+  // mengirim header basi → mutasi admin berikutnya ditolak "Invalid or
+  // missing CSRF token" (ditemukan saat uji nyata upload Video Hero).
+  // Pola sama dengan /api/admin/check-auth.
+  const cookieHeader = request.headers.get('cookie') || '';
+  const existingToken = /(?:^|;\s*)csrf_token=([^;]+)/.exec(cookieHeader)?.[1];
+  const csrfToken = existingToken || generateCSRFToken();
 
   const response = NextResponse.json({
     authenticated: !!session,
