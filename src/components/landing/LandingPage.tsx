@@ -15,8 +15,9 @@ import './landing.css';
  * ✕/Esc menutup; v1.3.48 tanpa popup — lembarannya sendiri yang live).
  *
  * `heroVideos` (v1.3.49): peta { id template → URL video preview } dari D1
- * (panel admin "Video Hero", owner-only). Slot tanpa entry otomatis memakai
- * video default bawaan / gambar screenshot.
+ * (panel admin "Video Hero", owner-only). Slot tanpa entry = gambar
+ * screenshot statis (v1.3.53: video default bawaan tidak lagi ikut
+ * tampil — hanya rekaman upload yang beranimasi).
  */
 export default function LandingPage({
   heroVideos,

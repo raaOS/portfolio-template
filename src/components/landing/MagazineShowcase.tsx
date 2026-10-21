@@ -32,8 +32,9 @@
  *    gerak & lengkungan lembaran — kesan "hidup" saat koridor meluncur,
  *    tanpa iframe berat. Sumber video: `previewVideo` per slot dari D1
  *    (panel admin "Video Hero" — owner upload rekaman sendiri, route
- *    API owner-only), fallback video default bawaan `/landing/*.mp4`,
- *    lalu fallback gambar screenshot. Sembunyi otomatis saat lembaran
+ *    API owner-only) SAJA (v1.3.53: fallback video default bawaan
+ *    `/landing/*.mp4` dihapus atas permintaan owner — slot tanpa rekaman
+ *    = gambar screenshot statis). Sembunyi otomatis saat lembaran
  *    terangkat/live tayang, tab tersembunyi, atau video gagal dimuat
  *    (kembali ke gambar).
  *
@@ -92,8 +93,8 @@ export type MagazineImage = {
   previewUrl?: string;
   /**
    * URL video preview (v1.3.49) — dari panel admin "Video Hero" (D1).
-   * Kosong → fallback video default bawaan (`/landing/<screenshot>.mp4`),
-   * lalu gambar screenshot.
+   * Kosong → TIDAK ada video (gambar screenshot statis); video default
+   * bawaan tidak lagi ikut tampil (v1.3.53, permintaan owner).
    */
   previewVideo?: string;
 };
@@ -141,15 +142,12 @@ function previewUrlOf(image: MagazineImage): string {
   return image?.previewUrl ?? '';
 }
 
-/** Video preview rekaman demo (v1.3.49): URL dari panel admin "Video Hero"
-    (D1) menang; tanpa itu, diturunkan otomatis dari path screenshot
-    (os-desktop.webp → os-desktop.mp4 — video default bawaan). Hasil akhir
-    bisa '' (tanpa video) — lapisan video disembunyikan, lembaran tetap
-    menampilkan gambar screenshot seperti biasa. */
+/** Video preview rekaman demo (v1.3.49, dirapikan v1.3.53): HANYA URL dari
+    panel admin "Video Hero" (D1) yang diputar. Fallback video default
+    bawaan (/landing/*.mp4) DIHAPUS atas permintaan owner — slot tanpa
+    rekaman menampilkan gambar screenshot statis, tanpa animasi bawaan. */
 function previewVideoOf(image: MagazineImage): string {
-  if (image?.previewVideo) return image.previewVideo;
-  const src = srcOf(image);
-  return src.endsWith('.webp') ? src.replace(/\.webp$/, '.mp4') : '';
+  return image?.previewVideo ?? '';
 }
 
 /** Modulo gaya GLSL (hasil selalu non-negatif untuk y > 0). */

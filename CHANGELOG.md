@@ -3,6 +3,15 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.53] - 2026-10-21
+
+### 🎨 Perubahan: Video default bawaan tidak lagi tampil di hero halaman jualan
+
+Owner menemukan saat uji nyata: setelah meng-upload video hero, **video/gambar default bawaan masih ikut tampil** di lembaran lain (fallback otomatis `/landing/*.mp4`) sehingga terlihat seperti "dobel / tertimpa". Sesuai permintaan owner: **hanya rekaman hasil upload yang beranimasi** — slot tanpa rekaman kini menampilkan **gambar screenshot statis**, tanpa animasi video bawaan sama sekali.
+
+- **Perubahan:** fallback turunan `.webp → .mp4` pada `previewVideoOf` (MagazineShowcase) dihapus; sumber video hero = URL admin (D1) saja.
+- **Uji:** tsc 0; lint bersih; suite penuh PASS; verifikasi visual halaman jualan (upload → hanya video upload tampil; hapus → semua statis).
+
 ## [1.3.52] - 2026-10-21
 
 ### 🐛 Fix: Mutasi admin berikutnya bisa gagal "Invalid or missing CSRF token" (polling auth merotasi token)
