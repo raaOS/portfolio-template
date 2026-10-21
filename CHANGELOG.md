@@ -3,6 +3,18 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.61] - 2026-10-21
+
+### 🔧 Fix: Error 1102 "Worker exceeded resource limits" pada iframe demo live
+
+Laporan owner: saat membuka iframe demo live di halaman muka, **Spatial Gallery** dan **Infinite Canvas** memunculkan halaman Error 1102 (Ray `a4e0e2f0d882016b`), sementara macOS Desktop lancar. Error 1102 direproduksi di produksi (bukan tebakan): 16 request parallel ke `/preview/spatial-gallery` membalas **4 dari 32** dengan HTTP 503 `error code: 1102` (plus 1 respons HTML terpotong di tengah stream), `/preview/infinite-canvas` 2 dari 32, sedangkan 6/6 request **sequential selalu 200** — jadi pemicunya render SSR bersamaan, bukan beratnya template.
+
+**Akar masalah (terbukti dari `wrangler tail` produksi):** kuota baca KV harian Cloudflare habis — `Failed to get from cache / Error: KV get() limit exceeded for the day`. Karena baca cache gagal, **semua** route jatuh ke render penuh di Worker tiap request (`x-nextjs-cache: MISS` + TTFB 1,5–3,8 detik pada URL identik berulang), lalu beberapa render bersamaan menembus memori isolate 128 MB → 1102.
+
+- **Perbaikan:** `open-next.config.ts` kini membungkus KV incremental cache dengan `withRegionalCache` (Cache API per Data Center) + `bypassTagCacheOnCacheHit` + `shouldLazilyUpdateOnCacheHit: false`. KV hanya dibaca saat entry pertama per Data Center per URL (mode `long-lived`, TTL 300 detik); request berikutnya dilayani Cache API dengan **0 read KV dan 0 read tag cache** — kuota harian kembali jauh di bawah batas, TTFB kembali ke ±100 ms, dan render bersamaan (pemicu 1102) nyaris hilang.
+- **Konsekuensi yang disadari:** revalidasi on-demand bisa tertahan maksimum 300 detik (sama dengan `revalidate` halaman preview), sehingga batas staleness tetap terukur.
+- **Catatan:** penanganan ini murni di sisi cache. Opsi lanjutan bila kuota masih ketat di masa depan: naikkan plan Cloudflare, atau pindahkan store cache ke R2 (`NEXT_INC_CACHE_R2_BUCKET`).
+
 ## [1.3.56] - 2026-10-21
 
 ### 🐛 Fix: Gambar statis tengkorak hilang total (sliver pusat + fallback webp diperbarui)
