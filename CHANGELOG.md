@@ -3,6 +3,15 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.55] - 2026-10-21
+
+### 🐛 Fix: Cover statis ("tengkorak") masih tampil di lembaran berulang koridor
+
+Laporan owner via screenshot: rekaman upload (biru) tampil di sebagian lembaran, tetapi **beberapa lembaran lain tetap menampilkan gambar statis bawaan** — padahal rekaman sudah di-upload dan halaman sudah di-refresh berkali-kali. Akar masalah: koridor majalah berisi **20 lembaran yang mengulang 3 template** (template yang sama muncul ±7 kali), sedangkan lapisan video dibuat **tetap hanya 2** — sehingga hanya 2 lembaran terdekat yang kebagian video, sedangkan lembaran template yang sama di posisi lain tetap statis.
+
+- **Perbaikan:** jumlah lapisan video kini **dinamis = jumlah lembaran yang punya rekaman** di koridor. Setiap lembaran hasil upload rekaman selalu menampilkan videonya, di posisi gulir mana pun. Elemen video tetap satu per URL (biaya bandwidth & memori tidak bertambah, hanya draw call GPU tambahan yang ringan).
+- Slot tanpa rekaman tetap gambar screenshot statis (tanpa video bawaan, sesuai permintaan owner).
+
 ## [1.3.54] - 2026-10-21
 
 ### 🐛 Fix: Rekaman upload "tertutupi" gambar statis di beberapa posisi gulir

@@ -26,9 +26,9 @@
  *    kartu membuka demo di TAB BARU.
  * 5. Latar transparan — koridor mengambang di atas split off-white/biru.
  * 6. Nav keyboard sr-only (3 tombol) — aksesibilitas tanpa mouse.
- * 7. (v1.3.49) **Video preview di lembaran bergerak**: hingga
- *    VIDEO_LAYERS lembaran yang paling terbaca (kiri & kanan pusat)
- *    dilapisi video rekaman demo (muted, loop) yang mengikuti persis
+ * 7. (v1.3.49, dirapikan v1.3.55) **Video preview di lembaran bergerak**:
+ *    SEMUA lembaran yang punya rekaman (ber-ulang di koridor sekalipun)
+ *    dilapisi video (muted, loop) yang mengikuti persis
  *    gerak & lengkungan lembaran — kesan "hidup" saat koridor meluncur,
  *    tanpa iframe berat. Sumber video: `previewVideo` per slot dari D1
  *    (panel admin "Video Hero" — owner upload rekaman sendiri, route
@@ -80,7 +80,8 @@ const CORRIDOR_DIM = 0.22;
 const TAP_SLOP = 6;
 const TAP_MS = 600;
 const PICK_MAX = 1600;
-/** v1.3.49: maksimal lembaran paling terbaca yang dilapisi video preview. */
+/** Batas default pemilih slot `videoSlotIndices` (fungsional murni).
+    Koridor sendiri kini memakai jumlah lembaran ber-video dinamis (v1.3.55). */
 const VIDEO_LAYERS = 2;
 /** Lembaran di dekat pusat (sliver) dilewati — tidak terbaca, tak layak video. */
 const VIDEO_SKIP_CENTER = 0.35;
@@ -651,7 +652,7 @@ class MagazineScene {
   private settingsCache: ReturnType<typeof settingsFor> | null = null;
   private liveActive = false;
 
-  /** v1.3.49 — lapisan video preview (maks VIDEO_LAYERS lembaran terbaca). */
+  /** v1.3.49 — lapisan video preview (v1.3.55: satu per lembaran ber-video). */
   private videoMeshes: THREE.InstancedMesh[] = [];
   private videoAttrs: THREE.InstancedBufferAttribute[] = [];
   private videoEls: HTMLVideoElement[] = [];
@@ -887,8 +888,24 @@ class MagazineScene {
     }
     if (!this.videoEls.length) return;
 
+    // v1.3.55 — jumlah layer = jumlah lembaran BER-VIDEO di koridor (dinamis),
+    // bukan lagi kuota statis VIDEO_LAYERS. Koridor mengulang daftar gambar
+    // (pages=20 >> jumlah template): kuota lama hanya 2 layer → segelintir
+    // lembaran ber-video yang kebagian, lembaran ber-ulang lain tampil gambar
+    // statis (ditemukan owner via screenshot: cover "tengkorak" masih ada di
+    // lembaran berulang saat rekamannya sendiri sudah di-upload). Elemen
+    // <video> tetap per URL unik & VideoTexture dipakai bersama oleh semua
+    // layer → biaya nyaris nol (hanya draw call tambahan per lembaran aktif).
+    const vcount = Math.max(1, this.cfg.images.length);
+    const vpages = this.settings().pages;
+    let layers = 0;
+    for (let i = 0; i < vpages; i++) {
+      const url = previewVideoOf(this.cfg.images[i % vcount]);
+      if (url !== '' && !this.videoDead.has(url)) layers++;
+    }
+
     const shared = this.material.uniforms;
-    for (let layer = 0; layer < VIDEO_LAYERS; layer++) {
+    for (let layer = 0; layer < layers; layer++) {
       const geo = new THREE.BoxGeometry(
         1,
         1,
