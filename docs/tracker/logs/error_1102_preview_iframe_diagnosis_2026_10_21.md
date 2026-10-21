@@ -24,7 +24,7 @@ Tugas: menemukan akar masalahnya **dengan bukti**, lalu memperbaikinya.
 - [x] **`wrangler tail` produksi → penyebab sesungguhnya terbukti** (lihat §Akar Masalah).
 - [x] Ukur trafik nyata via GraphQL (26.074 request hari ini; 36.976 pada 19 Okt; 7.033 pada 20 Okt).
 - [x] Perbaiki `open-next.config.ts` dengan `withRegionalCache`.
-- [x] Tambah entri `CHANGELOG.md` `[1.3.60]`.
+- [x] Tambah entri `CHANGELOG.md` `[1.3.61]` (dipaksa naik dari 1.3.60 — lihat catatan tabrakan versi di bawah).
 
 ## 📊 Bukti Reproduksi (Hasil Uji Produksi)
 
@@ -133,8 +133,8 @@ maksimal 300 detik = sama dengan `revalidate` halaman preview, jadi staleness te
 
 - `open-next.config.ts` → tambah `withRegionalCache` + 4 opsi di atas (bagian komentar diperbarui).
 - `open-next.config.test.ts` → **baru**: guardrail yang mengunci lapisan RegionalCache + 4 opsi anti-1102.
-- `src/lib/constants.ts` → `APP_VERSION` `1.3.59` → `1.3.60` (wajib sama dengan entri teratas CHANGELOG).
-- `CHANGELOG.md` → entri baru `[1.3.60] - 2026-10-21` di baris paling atas.
+- `src/lib/constants.ts` → `APP_VERSION` `1.3.59` → `1.3.61` (wajib sama dengan entri teratas CHANGELOG).
+- `CHANGELOG.md` → entri baru `[1.3.61] - 2026-10-21` di baris paling atas.
 - `docs/tracker/logs/error_1102_preview_iframe_diagnosis_2026_10_21.md` (file ini) — dibuat baru.
 - `docs/tracker/INDEX_TRACKER.md` → entri 173.
 
@@ -153,26 +153,86 @@ Tidak ada file komponen, route, atau skema yang diubah.
 > belum punya `.env.local` sehingga prerender `/sitemap.xml` gagal (`Cloudflare D1 env is incomplete`).
 > Setelah `.env.local` disalin (gitignored, tidak ikut ke repo) build bersih.
 
+## ✅ Verifikasi Pasca-Deploy (2026-10-21 23:33 WIB)
+
+Deploy: `npm run deploy` dari main repo (fast-forward `main` = `e0f66e9`). Pre-deploy check
+lolos (0 blocker, 506 file), `cf:build` bersih, worker `portfolio-os-template` ter-upload —
+**Version ID `8cd4e4a3-f76a-4410-bba1-e6b089d67b89`**, binding `NEXT_INC_CACHE_KV` +
+`NEXT_TAG_CACHE_KV` tetap terpasang, aset statis 6 di-upload ulang (920 sudah ada).
+
+| Cek | Sebelum | Sesudah |
+|---|---|---|
+| `GET /api/health` | `1.3.59` | **`1.3.61`** ✅ |
+| Header `x-opennext-cache` di `/preview/spatial-gallery` | tidak pernah ada (selalu `x-nextjs-cache: MISS`) | **HIT pada 8/8 request** |
+| TTFB URL identik berulang | 1,5–3,8 s (selalu MISS) | **0,17–1,1 s**, stabil **±0,17 s** |
+| Ukuran HTML | 86.701 B | 86.659 B (konten identik) |
+| Event `wrangler tail` dengan **0 read KV** | 0 dari semua event | **6 dari 8 event** |
+| Read KV per event | 2+ read (selalu gagal) | hanya **2 dari 8 event** (sisa miss) |
+
+**Bukti `wrangler tail` — 8 request identik ke `/preview/spatial-gallery`:**
+
+```
+[ok] cpu=71ms  wall=1280ms   <- MISS regional: KV get gagal (kuota) -> SSR penuh
+[ok] cpu=13ms  wall=29ms     <- HIT regional: 0 read KV
+[ok] cpu=833ms wall=1986ms   <- MISS regional: KV get gagal (kuota) -> SSR penuh
+[ok] cpu=17ms  wall=30ms     <- HIT regional: 0 read KV
+[ok] cpu=7ms   wall=15ms     <- HIT regional: 0 read KV
+[ok] cpu=12ms  wall=23ms     <- HIT regional: 0 read KV
+[ok] cpu=36ms  wall=56ms     <- HIT regional: 0 read KV
+[ok] cpu=9ms   wall=20ms     <- HIT regional: 0 read KV
+```
+
+`Failed to get from regional: 0` — lapisan Cache API tidak pernah gagal. Dua sisa kegagalan KV
+adalah **miss regional**: kuota harian sudah terlanjur terbakar sebelum deploy dan hanya reset
+**00:00 UTC**. Setelah reset, miss akan membaca KV sukses lalu terisi ke Cache API, sehingga
+kuota harian jatuh jauh di bawah batas.
+
+**Sisa risiko (angka asli, jujur):** burst paksa-cold 16 paralel × 3 ronde dengan **query unik**
+— tiap URL = kunci cache berbeda → permanen MISS → SSR penuh. Ini **kasus terburuk buatan**,
+bukan trafik nyata (pengunjung membuka `/preview/<slug>` tanpa query):
+
+| Route | Gagal 1102 | Sebelum perbaikan |
+|---|---|---|
+| `/preview/spatial-gallery` | **0 / 48** ✅ | 4 / 32 |
+| `/preview/infinite-canvas` | 2 / 48 | 2 / 32 |
+| `/preview/os-desktop` | 4 / 48 | 1 / 32 |
+
+Sisa 1102 ini murni akibat **kuota KV hari ini sudah habis**, sehingga setiap miss masih jadi
+SSR penuh (16 render bersamaan → memori isolate 128 MB). Jalur nyata pengunjung sudah
+**HIT, 0 read KV, 15–56 ms** — jadi render bersamaan nyaris tidak pernah terjadi.
+
+**Tindak lanjut yang disarankan (belum dikerjakan):**
+
+1. **Verifikasi pemulihan kuota 2026-10-22 (setelah 00:00 UTC):** `npx wrangler tail` sambil
+   buka situs — `KV get() limit exceeded` harus benar-benar hilang, dan burst paksa-cold seharusnya
+   jauh lebih bersih karena miss kini bisa membaca KV.
+2. Kalau kuota masih sempit: pindahkan store cache ke **R2** (`NEXT_INC_CACHE_R2_BUCKET`),
+   atau naikkan plan Cloudflare (trafik 26k–37k request/hari juga sudah mendekati cap gratis
+   100.000 request/hari).
+3. Opsi terakhir: kurangi jumlah iframe `/preview/*` bersamaan di `MagazineShowcase.tsx`
+   (owner sudah memutuskan UX-nya, jadi jangan disentuh tanpa izin).
+
 ## 🐛 Bug & Perbaikan (Bug Tracker)
 
 - **Bug 1 (produksi):** `Error 1102` pada iframe `/preview/spatial-gallery` & `/preview/infinite-canvas`.
   - **Penyebab:** kuota baca KV harian habis → semua request render penuh → render bersamaan
     menembus memori isolate 128 MB.
   - **Perbaikan:** `open-next.config.ts` → `withRegionalCache` (Cache API di depan KV).
-    **Belum di-deploy.**
+    **Sudah di-deploy 2026-10-21 23:33 WIB**, versi `1.3.61`.
 - **Bug 2 (regresi, penguat Bug 1):** ISR KV tidak pernah HIT.
   - **Penyebab:** `KV get() limit exceeded for the day` — terbukti dari `wrangler tail`.
   - **Perbaikan:** sama dengan Bug 1.
 
 ## 📌 Catatan untuk AI Selanjutnya (Handoff Notes)
 
-- **BELUM DI-DEPLOY.** Perubahan hanya di working tree worktree ini (branch
-  `fix/preview-1102-concurrency`). Deploy = owner jalankan `npm run deploy` dari main repo,
-  atau merge branch ini dulu. **Jangan deploy tanpa izin owner.**
-- **Cara verifikasi setelah deploy:** `npx wrangler tail portfolio-os-template` sambil buka
-  halaman — pesan `KV get() limit exceeded for the day` harus **hilang**; lalu
-  `curl -sI https://makeitbetter.my.id/preview/spatial-gallery` harus memunculkan
-  `x-opennext-cache` / TTFB ±100 ms (bukan MISS + 1,5–3,8 s).
+- **SUDAH DI-DEPLOY** 2026-10-21 23:33 WIB sebagai **v1.3.61** (Version ID
+  `8cd4e4a3-f76a-4410-bba1-e6b089d67b89`) dari main repo setelah fast-forward `main` = `e0f66e9`,
+  supaya deploy berikutnya dari repo owner **tidak membalik** perbaikan ini. Angka verifikasi ada di
+  bagian **✅ Verifikasi Pasca-Deploy** di atas.
+- **Cara re-verifikasi (bisa dipakai ulang):** `npx wrangler tail portfolio-os-template` sambil
+  buka halaman — pesan `KV get() limit exceeded for the day` seharusnya **hilang setelah kuota
+  reset 00:00 UTC**; lalu `curl -sI https://makeitbetter.my.id/preview/spatial-gallery` harus
+  memunculkan `x-opennext-cache: HIT` / TTFB ±0,17 s (bukan MISS + 1,5–3,8 s).
 - **Cara reproduksi 1102:** `curl --parallel --parallel-max 16` ke
   `/preview/<slug>?p=<unik>` — hitung respons ber-`HTTP 503` berisi `error code: 1102`.
   Uji **satu per satu tidak pernah gagal**, jangan menyimpulkan "sudah normal" dari uji sekuensial.
@@ -182,5 +242,19 @@ Tidak ada file komponen, route, atau skema yang diubah.
   Windows `CreateDirectory ... Access is denied` (workerd) — pakai REST API, atau set `TEMP`/`TMP`.
 - Repo ini awalnya worktree `hidden-tiger` detached di `bac545d` (v1.3.41, 32 commit di belakang
   `main`); karena kode hero `MagazineShowcase.tsx` hanya ada di `main`, branch dibuat ulang dari
-  `main` (f46786d, v1.3.59) → **branch `fix/preview-1102-concurrency`**.
+  `main` → **branch `fix/preview-1102-concurrency`**, lalu **rebase ke `main` 1390ac2 (v1.3.60)**
+  sebelum digabung fast-forward.
+- ⚠️ **Tabrakan versi 2026-10-21:** saat sesi lain menambahkan `CHANGELOG [1.3.60]` (perapian
+  bilah demo live) **bersamaan** dengan perbaikan ini, kedua entry sama-sama berlabel `1.3.60`.
+  Rebase tidak memberi konflik (lokasi teks berbeda) sehingga **dua entry 1.3.60 menumpuk diam-diam**.
+  Disediakan: entry perbaikan ini dinaikkan jadi **`[1.3.61]`** + `APP_VERSION = '1.3.61'`.
+  Inilah sebabnya entry `[1.3.61]` sengaja diletakkan **paling atas** — test
+  `src/lib/constants.test.ts` mengambil `## [x]` **pertama** di file, jadi entry yang salah posisi
+  membuat test versi gagal (sempat terjadi di `main`: APP_VERSION 1.3.60 vs entri teratas 1.3.56).
+- ⚠️ **Bug hook pre-commit (belum diperbaiki, di luar scope):** `.husky/pre-commit` mengecek
+  keluaran `npx tsc --noEmit 2>&1 | head -20` lalu menguji `$?` — tetapi `$?` milik **`head`**,
+  bukan `tsc`. Akibatnya **error TypeScript tetap lolos** dengan pesan `✅ Pre-commit checks passed!`
+  (terbukti saat commit pertama: 2 error `TS18048` dari `open-next.config.test.ts` lolos hook).
+  Ralat: verifikasi tipe wajib dijalankan terpisah (`npx tsc --noEmit`), jangan percaya hook ini.
+  Pemilik: perbaikinya dengan memisah perintah dan menangkap kode keluaran `tsc` sendiri.
 - Perubahan logika lain (hero MagazineShowcase, route preview) **wajib izin owner dulu** (AGENTS.md).
