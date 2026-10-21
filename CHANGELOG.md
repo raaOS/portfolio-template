@@ -3,6 +3,15 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.54] - 2026-10-21
+
+### 🐛 Fix: Rekaman upload "tertutupi" gambar statis di beberapa posisi gulir
+
+Lanjutan uji nyata owner (setelah v1.3.53): rekaman upload hanya tampil sesekali — di posisi gulir tertentu, lembarannya menampilkan **gambar statis** seolah video tertutupi. Akar masalah: pemilihan lembaran ber-video hanya mengambil 2 lembaran dengan posisi Z terdekat **tanpa memprioritaskan lembaran yang punya rekaman** — bila lembaran ber-video kebetulan jatuh di urutan ke-3 atau sliver pusat, lapisan videonya hilang dan yang tampil gambar statisnya.
+
+- **Perbaikan:** semua lembaran terbaca kini menjadi kandidat, lalu **hanya lembaran yang punya rekaman upload** yang mengisi lapisan video (maksimal 2, tetap). Lembaran tanpa rekaman tidak lagi memakan jatah lapisan.
+- **Uji:** tsc 0; lint bersih; suite penuh PASS; verifikasi visual halaman jualan pada beberapa posisi gulir.
+
 ## [1.3.53] - 2026-10-21
 
 ### 🎨 Perubahan: Video default bawaan tidak lagi tampil di hero halaman jualan

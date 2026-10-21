@@ -938,7 +938,12 @@ class MagazineScene {
     if (!this.videoMeshes.length) return;
     const count = Math.max(1, this.cfg.images.length);
     // Lembaran terangkat / live tayang → seluruh lapisan video mundur.
-    const slots =
+    // v1.3.54 — semua lembaran terbaca jadi kandidat (terurut |z|), lalu
+    // HANYA yang punya rekaman (dan tidak gagal dimuat) yang mengisi layer.
+    // Sebelumnya 2 layer bisa terpakai lembaran tanpa rekaman → rekaman
+    // upload sempat "tertutupi" gambar statis saat lembaran ber-video
+    // kebetulan jatuh di urutan ke-3 / sliver pusat (ditemukan owner).
+    const cands =
       this.focus.index >= 0
         ? []
         : videoSlotIndices(
@@ -946,9 +951,15 @@ class MagazineScene {
             S.pages,
             S.pageSpacing,
             S.thickness,
-            this.videoMeshes.length,
+            S.pages,
             S.pageSpacing * VIDEO_SKIP_CENTER
           );
+    const slots = cands
+      .filter((slot) => {
+        const url = previewVideoOf(this.cfg.images[slot % count]);
+        return url !== '' && !this.videoDead.has(url);
+      })
+      .slice(0, this.videoMeshes.length);
     const wantPlaying = new Set<number>();
 
     for (let layer = 0; layer < this.videoMeshes.length; layer++) {
