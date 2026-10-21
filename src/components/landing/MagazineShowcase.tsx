@@ -83,8 +83,8 @@ const PICK_MAX = 1600;
 /** Batas default pemilih slot `videoSlotIndices` (fungsional murni).
     Koridor sendiri kini memakai jumlah lembaran ber-video dinamis (v1.3.55). */
 const VIDEO_LAYERS = 2;
-/** Lembaran di dekat pusat (sliver) dilewati — tidak terbaca, tak layak video. */
-const VIDEO_SKIP_CENTER = 0.35;
+/** Lembaran di dekat pusat (sliver) — v1.3.56: set ke 0 agar seluruh lembaran ber-video terlapisi penuh tanpa ada yang mati di tengah. */
+const VIDEO_SKIP_CENTER = 0;
 
 export type MagazineImage = {
   src: string;
@@ -1244,11 +1244,35 @@ class MagazineScene {
     }
   }
 
+  private tearDownVideos() {
+    for (const el of this.videoEls) {
+      el.pause();
+      el.removeAttribute('src');
+      el.load();
+      el.remove();
+    }
+    for (const t of this.videoTextures) t.dispose();
+    for (const m of this.videoMeshes) {
+      m.geometry.dispose();
+      (m.material as THREE.Material).dispose();
+      m.dispose();
+      this.scene.remove(m);
+    }
+    this.videoEls = [];
+    this.videoTextures = [];
+    this.videoUrls = [];
+    this.videoMeshes = [];
+    this.videoAttrs = [];
+    this.videoDead.clear();
+  }
+
   updateConfig(cfg: Config) {
     if (this.disposed) return;
     this.cfg = cfg;
     this.settingsCache = null;
     this.loadAtlas();
+    this.tearDownVideos();
+    this.setupVideos();
     this.applyConfig();
     this.writeCells();
   }
@@ -1354,19 +1378,7 @@ class MagazineScene {
     this.blank.dispose();
     this.atlas?.texture.dispose();
     this.mesh.dispose();
-    // v1.3.49 — bersihkan aset video preview.
-    for (const el of this.videoEls) {
-      el.pause();
-      el.removeAttribute('src');
-      el.load();
-      el.remove();
-    }
-    for (const t of this.videoTextures) t.dispose();
-    for (const m of this.videoMeshes) {
-      m.geometry.dispose();
-      (m.material as THREE.Material).dispose();
-      m.dispose();
-    }
+    this.tearDownVideos();
     this.renderer.dispose();
     const canvas = this.renderer.domElement;
     canvas.parentNode?.removeChild(canvas);
@@ -1451,7 +1463,7 @@ export default function MagazineShowcase({
   });
 
   const imageKey = images
-    .map((img) => `${srcOf(img)}@${offsetOf(img)}`)
+    .map((img) => `${srcOf(img)}@${offsetOf(img)}@${previewVideoOf(img)}`)
     .join('|');
 
   useEffect(() => {

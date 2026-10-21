@@ -80,12 +80,24 @@ export async function getHeroPreviewVideos(): Promise<Record<string, string>> {
       [SETTINGS_KEY]
     );
     if (rows.length > 0 && rows[0].value) {
-      const parsed = JSON.parse(rows[0].value) as { videos?: unknown };
+      const parsed = JSON.parse(rows[0].value) as {
+        videos?: unknown;
+        updatedAt?: unknown;
+      };
+      const versionTag =
+        typeof parsed.updatedAt === 'string' && parsed.updatedAt
+          ? encodeURIComponent(parsed.updatedAt)
+          : '';
       if (parsed && typeof parsed.videos === 'object' && parsed.videos) {
         const raw = parsed.videos as Record<string, unknown>;
         for (const slot of HERO_VIDEO_SLOTS) {
           const check = validateHeroVideoUrl(raw[slot]);
-          if (check.valid && check.value) value[slot] = check.value;
+          if (check.valid && check.value) {
+            const sep = check.value.includes('?') ? '&' : '?';
+            value[slot] = versionTag
+              ? `${check.value}${sep}v=${versionTag}`
+              : check.value;
+          }
         }
       }
     }
@@ -116,8 +128,11 @@ export async function updateHeroPreviewVideo(
 
   try {
     const current = await getHeroPreviewVideos();
-    const videos: Record<string, string> = { ...current };
-    if (check.value) videos[slug] = check.value;
+    const videos: Record<string, string> = {};
+    for (const [k, v] of Object.entries(current)) {
+      videos[k] = v.replace(/[?&]v=[^&]+/, '');
+    }
+    if (check.value) videos[slug] = check.value.replace(/[?&]v=[^&]+/, '');
     else delete videos[slug];
 
     const now = new Date().toISOString();

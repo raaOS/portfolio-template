@@ -3,6 +3,16 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.56] - 2026-10-21
+
+### 🐛 Fix: Gambar statis tengkorak hilang total (sliver pusat + fallback webp diperbarui)
+
+Laporan owner via screenshot: gambar statis bawaan ("tengkorak") **masih sempat terlihat ketika lembaran meluncur di tengah layar** (dilingkari merah). Akar masalah: aturan `VIDEO_SKIP_CENTER` (0.35) sengaja melepas lapisan video saat lembaran berada di sudut tepi/sliver tengah, sehingga menampakkan gambar latar dasar `os-desktop.webp` bawaan lama yang masih berupa gambar tengkorak.
+
+- **Perbaikan WebGL:** `VIDEO_SKIP_CENTER` dimatikan (set ke 0). Seluruh lembaran ber-video terlapisi video penuh tanpa pernah dilepas di posisi mana pun, termasuk saat di tengah layar.
+- **Pembersihan Aset Bawaan:** File gambar dasar `public/landing/os-desktop.webp` diganti dengan tangkapan layar bersih dari rekaman video asli owner (biru) — gambar tengkorak lama terhapus total dari seluruh website, sehingga saat loading awal maupun fallback statis, tampilan selalu serasi dengan video.
+- **Anti-Cache Video Hero:** URL video hero kini menyematkan versi `?v=<updatedAt>` dari database agar saat owner mengganti rekaman di masa mendatang, pengunjung langsung melihat video terbaru tanpa terhalang cache browser.
+
 ## [1.3.55] - 2026-10-21
 
 ### 🐛 Fix: Cover statis ("tengkorak") masih tampil di lembaran berulang koridor

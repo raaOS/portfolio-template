@@ -195,6 +195,44 @@ describe('updateHeroPreviewVideo', () => {
     expect(stored.videos).toEqual({ 'infinite-canvas': 'https://e.com/ic.mp4' });
   });
 
+  it('menyematkan ?v=updatedAt jika updatedAt ada di platform_settings', async () => {
+    queryMock.mockResolvedValueOnce([
+      {
+        value: JSON.stringify({
+          videos: { 'os-desktop': 'https://example.com/hero-os.mp4' },
+          updatedAt: '2026-10-21T08:00:00.000Z',
+        }),
+      },
+    ]);
+
+    await expect(getHeroPreviewVideos()).resolves.toEqual({
+      'os-desktop': 'https://example.com/hero-os.mp4?v=2026-10-21T08%3A00%3A00.000Z',
+    });
+  });
+
+  it('membersihkan parameter ?v= saat menyimpan slot', async () => {
+    queryMock.mockResolvedValueOnce([
+      {
+        value: JSON.stringify({
+          videos: { 'os-desktop': 'https://e.com/os.mp4' },
+          updatedAt: '2026-10-21T08:00:00.000Z',
+        }),
+      },
+    ]);
+    queryMock.mockResolvedValueOnce([]);
+
+    await updateHeroPreviewVideo(
+      'os-desktop',
+      'https://e.com/os.mp4?v=old-version'
+    );
+
+    const writeArgs = queryMock.mock.calls[1] as unknown as [string, unknown[]];
+    const stored = JSON.parse(String(writeArgs[1][1])) as {
+      videos: Record<string, string>;
+    };
+    expect(stored.videos['os-desktop']).toBe('https://e.com/os.mp4');
+  });
+
   it('mengembalikan error (tanpa melempar) saat D1 gagal menulis', async () => {
     queryMock.mockResolvedValueOnce([]);
     queryMock.mockRejectedValueOnce(new Error('d1 down'));
@@ -204,3 +242,4 @@ describe('updateHeroPreviewVideo', () => {
     expect(res.error).toBe('d1 down');
   });
 });
+
