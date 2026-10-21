@@ -28,6 +28,8 @@
 >
 > 9. **v1.3.58** — permintaan owner: hapus garis putih transparan (border) dari tombol **Tab Baru** dan tombol **✕** pada bilah kontrol demo live (`MagazineShowcase.tsx` ~baris 1744 & 1767): `border: '1px solid rgba(255,255,255,0.15/0.18)'` → `border: 'none'`. Perubahan murni visual, nol dampak logika.
 >
+> 10. **v1.3.59** — permintaan lanjutan owner: hapus latar abu-abu transparan (`background: 'rgba(255,255,255,0.1)'` tombol Tab Baru & `'rgba(255,255,255,0.12)'` tombol ✕) → `'transparent'`. Kedua tombol kini tanpa kotak maupun border. Verifikasi produksi: probe `getComputedStyle` background = `rgba(0, 0, 0, 0)` + screenshot bar live bersih (agent-browser).
+>
 >
 > **Hasil test nyata v1.3.55 (2026-10-21, browser produksi):** rekaman asli owner (upload PC 15:16 WIB) terverifikasi di D1 (`platform_settings.hero_preview_videos` = os-desktop → `hero-os-desktop.mp4`, updatedAt 08:16:48Z) dan di R2 (GET 200, **3.431.515 byte** — bukan lagi video test 248 KB; burst request sempat kena throttle 503 sesaat, bukan error produk). Homepage: 1 elemen video (`hero-os-desktop.mp4`, `playing=true`, readyState 4). **Screenshot bukti visual:** KEDUA lembaran OS Desktop yang terlihat di koridor tampil ber-video serentak (sebelumnya kuota 2 → lembaran ber-ulang statis "tengkorak"); posisi gulir dengan lembaran OS Desktop di sliver pusat menampilkan tepi lembaran (nyaris tak terlihat) — by-design tanpa video. Catatan: layar automation menampilkan sisa cache lokal video test lama (URL sama + header immutable) — konten R2 asli sudah rekaman owner (terverifikasi via fetch byte-size); browser owner sendiri sudah memuat rekaman segar (screenshot biru owner).
 >
