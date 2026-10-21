@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { validateAdminRequest } from '@/lib/auth';
 import { requireOwnerMode } from '@/lib/ownerMode';
 import {
+  getHeroPreviewPosters,
   getHeroPreviewVideos,
   updateHeroPreviewVideo,
 } from '@/lib/services/heroVideoService';
 
 /**
  * GET /api/admin/hero-videos
- * Membaca peta video hero per slot template (owner-mode only + admin).
+ * Membaca peta video + poster hero per slot template (owner-mode only + admin).
  *
  * Guard `requireOwnerMode` menahan route ini di deployment klien (404):
  * video hero adalah konten halaman jualan site owner, bukan konten klien
@@ -23,8 +24,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const videos = await getHeroPreviewVideos();
-    return NextResponse.json({ success: true, videos });
+    const [videos, posters] = await Promise.all([
+      getHeroPreviewVideos(),
+      getHeroPreviewPosters(),
+    ]);
+    return NextResponse.json({ success: true, videos, posters });
   } catch (error: unknown) {
     console.error('GET /api/admin/hero-videos error:', error);
     return NextResponse.json(
@@ -37,8 +41,10 @@ export async function GET(request: NextRequest) {
 /**
  * PUT /api/admin/hero-videos
  * Menyimpan/menghapus video satu slot (admin + CSRF).
- * Body: { slug: 'os-desktop' | ..., url: string } — `url` kosong = hapus
- * slot (hero kembali ke video default / gambar screenshot).
+ * Body: { slug: 'os-desktop' | ..., url: string, posterUrl?: string } —
+ * `url` kosong = hapus slot (hero kembali ke gambar screenshot statis);
+ * `posterUrl` (v1.3.57, auto-poster) opsional: undefined = pertahankan
+ * poster tersimpan, kosong = hapus, isi = ganti.
  */
 export async function PUT(request: NextRequest) {
   try {
@@ -58,7 +64,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const result = await updateHeroPreviewVideo(body.slug, body.url);
+    const result = await updateHeroPreviewVideo(body.slug, body.url, body.posterUrl);
     if (!result.success) {
       return NextResponse.json(
         { error: result.error || 'Gagal menyimpan video hero' },
@@ -66,8 +72,11 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const videos = await getHeroPreviewVideos();
-    return NextResponse.json({ success: true, videos });
+    const [videos, posters] = await Promise.all([
+      getHeroPreviewVideos(),
+      getHeroPreviewPosters(),
+    ]);
+    return NextResponse.json({ success: true, videos, posters });
   } catch (error: unknown) {
     console.error('PUT /api/admin/hero-videos error:', error);
     return NextResponse.json(

@@ -18,11 +18,20 @@ import './landing.css';
  * (panel admin "Video Hero", owner-only). Slot tanpa entry = gambar
  * screenshot statis (v1.3.53: video default bawaan tidak lagi ikut
  * tampil — hanya rekaman upload yang beranimasi).
+ *
+ * `heroPosters` (v1.3.57): peta { id template → URL foto poster otomatis }
+ * — 1 frame dari rekaman yang diupload (diekstrak browser saat upload).
+ * Poster menggantikan `src` (gambar STATIS lembaran) pada slot ber-video:
+ * selagi video buffer (koneksi lambat) / reduced-motion, pengunjung melihat
+ * frame videonya sendiri — bukan screenshot lama. `previewUrl` (tautan
+ * demo live) TIDAK disentuh.
  */
 export default function LandingPage({
   heroVideos,
+  heroPosters,
 }: {
   heroVideos?: Record<string, string>;
+  heroPosters?: Record<string, string>;
 }) {
   return (
     <main className={`wave-landing-viewport ${archivoBlack.variable}`}>
@@ -33,7 +42,9 @@ export default function LandingPage({
       <div className="mag-stage">
         <MagazineShowcase
           images={TEMPLATES_DATA.map((tpl) => ({
-            src: tpl.screenshot,
+            // v1.3.57 — auto-poster: foto frame rekaman menggantikan
+            // screenshot statis pada slot yang punya rekaman.
+            src: heroPosters?.[tpl.id] || tpl.screenshot,
             alt: tpl.name,
             previewUrl: tpl.previewUrl,
             previewVideo: heroVideos?.[tpl.id],

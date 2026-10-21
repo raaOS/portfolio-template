@@ -15,10 +15,12 @@ vi.mock('@/lib/auth', () => ({
 }));
 
 const getHeroPreviewVideos = vi.fn();
+const getHeroPreviewPosters = vi.fn();
 const updateHeroPreviewVideo = vi.fn();
 
 vi.mock('@/lib/services/heroVideoService', () => ({
   getHeroPreviewVideos: (...args: unknown[]) => getHeroPreviewVideos(...args),
+  getHeroPreviewPosters: (...args: unknown[]) => getHeroPreviewPosters(...args),
   updateHeroPreviewVideo: (...args: unknown[]) => updateHeroPreviewVideo(...args),
 }));
 
@@ -53,6 +55,9 @@ describe('GET /api/admin/hero-videos', () => {
     getHeroPreviewVideos.mockResolvedValue({
       'os-desktop': 'https://example.com/hero-os.mp4',
     });
+    getHeroPreviewPosters.mockResolvedValue({
+      'os-desktop': 'https://example.com/hero-os-poster.jpg',
+    });
   });
 
   afterEach(() => {
@@ -76,7 +81,7 @@ describe('GET /api/admin/hero-videos', () => {
     });
   });
 
-  it('returns the hero video map', async () => {
+  it('returns the hero video + poster map', async () => {
     const res = await GET(
       buildRequest('http://localhost/api/admin/hero-videos', 'GET')
     );
@@ -86,6 +91,9 @@ describe('GET /api/admin/hero-videos', () => {
     expect(body.success).toBe(true);
     expect(body.videos).toEqual({
       'os-desktop': 'https://example.com/hero-os.mp4',
+    });
+    expect(body.posters).toEqual({
+      'os-desktop': 'https://example.com/hero-os-poster.jpg',
     });
   });
 
@@ -107,6 +115,7 @@ describe('PUT /api/admin/hero-videos', () => {
     getHeroPreviewVideos.mockResolvedValue({
       'os-desktop': 'https://example.com/hero-os.mp4',
     });
+    getHeroPreviewPosters.mockResolvedValue({});
   });
 
   afterEach(() => {
@@ -138,9 +147,26 @@ describe('PUT /api/admin/hero-videos', () => {
     expect(body.success).toBe(true);
     expect(updateHeroPreviewVideo).toHaveBeenCalledWith(
       'os-desktop',
-      'https://example.com/new.mp4'
+      'https://example.com/new.mp4',
+      undefined
     );
     expect(body.videos['os-desktop']).toBe('https://example.com/hero-os.mp4');
+  });
+
+  it('forwards posterUrl (auto-poster v1.3.57) to the service', async () => {
+    const res = await PUT(
+      buildRequest('http://localhost/api/admin/hero-videos', 'PUT', {
+        slug: 'os-desktop',
+        url: 'https://example.com/new.mp4',
+        posterUrl: 'https://example.com/new-poster.jpg',
+      })
+    );
+    expect(res.status).toBe(200);
+    expect(updateHeroPreviewVideo).toHaveBeenCalledWith(
+      'os-desktop',
+      'https://example.com/new.mp4',
+      'https://example.com/new-poster.jpg'
+    );
   });
 
   it('deletes a slot when url is empty', async () => {
@@ -149,10 +175,11 @@ describe('PUT /api/admin/hero-videos', () => {
       buildRequest('http://localhost/api/admin/hero-videos', 'PUT', {
         slug: 'os-desktop',
         url: '',
+        posterUrl: '',
       })
     );
     expect(res.status).toBe(200);
-    expect(updateHeroPreviewVideo).toHaveBeenCalledWith('os-desktop', '');
+    expect(updateHeroPreviewVideo).toHaveBeenCalledWith('os-desktop', '', '');
   });
 
   it('returns 400 when slug is missing', async () => {

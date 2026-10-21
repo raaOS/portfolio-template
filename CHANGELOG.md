@@ -13,6 +13,18 @@ Laporan owner via screenshot: gambar statis bawaan ("tengkorak") **masih sempat 
 - **Pembersihan Aset Bawaan:** File gambar dasar `public/landing/os-desktop.webp` diganti dengan tangkapan layar bersih dari rekaman video asli owner (biru) — gambar tengkorak lama terhapus total dari seluruh website, sehingga saat loading awal maupun fallback statis, tampilan selalu serasi dengan video.
 - **Anti-Cache Video Hero:** URL video hero kini menyematkan versi `?v=<updatedAt>` dari database agar saat owner mengganti rekaman di masa mendatang, pengunjung langsung melihat video terbaru tanpa terhalang cache browser.
 
+## [1.3.57] - 2026-10-21
+
+### ✨ Fitur: Auto-Poster Otomatis untuk Video Hero
+
+Saat Anda upload rekaman di **Tampilan → Video Hero**, browser kini otomatis **mengekstrak satu foto frame terbaik (detik ke-1)** dari video dan mengunggahnya bersama sebagai **poster** — tanpa perlu membuat screenshot manual.
+
+- **Pengunjung koneksi lambat:** foto frame rekaman Anda tampil lebih dulu (diam sesaat), lalu mulus bergerak jadi video — tidak ada kedipan hitam atau gambar lain yang menyelingi.
+- **Pengunjung dengan animasi dimatikan (pengaturan hemat gerak):** yang tampil adalah foto asli dari rekaman Anda, bukan screenshot lama.
+- **Bebas repot:** kapan pun Anda ganti rekaman, posternya **ikut berganti otomatis** mengikuti video barunya.
+- Gagal ekstrak poster (kasus jarang) = rekaman tetap tersimpan normal tanpa poster.
+- Panel admin kini menampilkan pratinjau poster di tiap slot yang aktif.
+
 ## [1.3.55] - 2026-10-21
 
 ### 🐛 Fix: Cover statis ("tengkorak") masih tampil di lembaran berulang koridor

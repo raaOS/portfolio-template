@@ -18,6 +18,7 @@ vi.mock('@/lib/cloudflareD1', () => ({
 import { queryD1 } from '@/lib/cloudflareD1';
 import {
   clearHeroVideosCache,
+  getHeroPreviewPosters,
   getHeroPreviewVideos,
   HERO_VIDEO_SLOTS,
   isHeroVideoSlot,
@@ -240,6 +241,149 @@ describe('updateHeroPreviewVideo', () => {
     const res = await updateHeroPreviewVideo('os-desktop', 'https://e.com/a.mp4');
     expect(res.success).toBe(false);
     expect(res.error).toBe('d1 down');
+  });
+});
+
+describe('auto-poster (v1.3.57)', () => {
+  it('getHeroPreviewPosters mengembalikan peta poster (+ ?v= anti-cache)', async () => {
+    queryMock.mockResolvedValueOnce([
+      {
+        value: JSON.stringify({
+          videos: { 'os-desktop': 'https://e.com/os.mp4' },
+          posters: { 'os-desktop': 'https://e.com/os-poster.jpg' },
+          updatedAt: '2026-10-21T09:00:00.000Z',
+        }),
+      },
+    ]);
+
+    await expect(getHeroPreviewPosters()).resolves.toEqual({
+      'os-desktop':
+        'https://e.com/os-poster.jpg?v=2026-10-21T09%3A00%3A00.000Z',
+    });
+    // Video tetap terbaca normal lewat getter yang sama (satu query).
+    await expect(getHeroPreviewVideos()).resolves.toEqual({
+      'os-desktop': 'https://e.com/os.mp4?v=2026-10-21T09%3A00%3A00.000Z',
+    });
+    expect(queryMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('jatuh ke {} (tanpa melempar) saat JSON rusak / D1 mati', async () => {
+    queryMock.mockResolvedValueOnce([{ value: '{rusak' }]);
+    await expect(getHeroPreviewPosters()).resolves.toEqual({});
+
+    clearHeroVideosCache();
+    queryMock.mockRejectedValueOnce(new Error('d1 down'));
+    await expect(getHeroPreviewPosters()).resolves.toEqual({});
+  });
+
+  it('menyimpan posterUrl bersama video pada slot yang sama', async () => {
+    queryMock.mockResolvedValueOnce([
+      { value: JSON.stringify({ videos: {}, posters: {} }) },
+    ]);
+    queryMock.mockResolvedValueOnce([]);
+
+    const res = await updateHeroPreviewVideo(
+      'os-desktop',
+      'https://e.com/os.mp4',
+      'https://e.com/os-poster.jpg'
+    );
+    expect(res.success).toBe(true);
+
+    const writeArgs = queryMock.mock.calls[1] as unknown as [string, unknown[]];
+    const stored = JSON.parse(String(writeArgs[1][1])) as {
+      videos: Record<string, string>;
+      posters: Record<string, string>;
+    };
+    expect(stored.videos['os-desktop']).toBe('https://e.com/os.mp4');
+    expect(stored.posters['os-desktop']).toBe('https://e.com/os-poster.jpg');
+  });
+
+  it('tanpa posterUrl (undefined) mempertahankan poster tersimpan', async () => {
+    queryMock.mockResolvedValueOnce([
+      {
+        value: JSON.stringify({
+          videos: { 'os-desktop': 'https://e.com/os.mp4' },
+          posters: { 'os-desktop': 'https://e.com/old-poster.jpg' },
+        }),
+      },
+    ]);
+    queryMock.mockResolvedValueOnce([]);
+
+    const res = await updateHeroPreviewVideo(
+      'os-desktop',
+      'https://e.com/os-baru.mp4'
+    );
+    expect(res.success).toBe(true);
+
+    const writeArgs = queryMock.mock.calls[1] as unknown as [string, unknown[]];
+    const stored = JSON.parse(String(writeArgs[1][1])) as {
+      posters: Record<string, string>;
+    };
+    expect(stored.posters['os-desktop']).toBe('https://e.com/old-poster.jpg');
+  });
+
+  it('menghapus video slot ikut menghapus poster slot itu (slot lain utuh)', async () => {
+    queryMock.mockResolvedValueOnce([
+      {
+        value: JSON.stringify({
+          videos: {
+            'os-desktop': 'https://e.com/os.mp4',
+            'infinite-canvas': 'https://e.com/ic.mp4',
+          },
+          posters: {
+            'os-desktop': 'https://e.com/os-poster.jpg',
+            'infinite-canvas': 'https://e.com/ic-poster.jpg',
+          },
+        }),
+      },
+    ]);
+    queryMock.mockResolvedValueOnce([]);
+
+    const res = await updateHeroPreviewVideo('os-desktop', '');
+    expect(res.success).toBe(true);
+
+    const writeArgs = queryMock.mock.calls[1] as unknown as [string, unknown[]];
+    const stored = JSON.parse(String(writeArgs[1][1])) as {
+      videos: Record<string, string>;
+      posters: Record<string, string>;
+    };
+    expect(stored.videos).toEqual({ 'infinite-canvas': 'https://e.com/ic.mp4' });
+    expect(stored.posters).toEqual({
+      'infinite-canvas': 'https://e.com/ic-poster.jpg',
+    });
+  });
+
+  it('menolak posterUrl invalid tanpa menyentuh D1', async () => {
+    const res = await updateHeroPreviewVideo(
+      'os-desktop',
+      'https://e.com/os.mp4',
+      'javascript:alert(1)'
+    );
+    expect(res.success).toBe(false);
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  it('posterUrl kosong = hapus poster tanpa menghapus video', async () => {
+    queryMock.mockResolvedValueOnce([
+      {
+        value: JSON.stringify({
+          videos: { 'os-desktop': 'https://e.com/os.mp4' },
+          posters: { 'os-desktop': 'https://e.com/os-poster.jpg' },
+        }),
+      },
+    ]);
+    queryMock.mockResolvedValueOnce([]);
+
+    const res = await updateHeroPreviewVideo('os-desktop', 'https://e.com/os.mp4', '');
+    expect(res.success).toBe(true);
+
+    const writeArgs = queryMock.mock.calls[1] as unknown as [string, unknown[]];
+    const stored = JSON.parse(String(writeArgs[1][1])) as {
+      videos: Record<string, string>;
+      posters: Record<string, string>;
+    };
+    expect(stored.videos['os-desktop']).toBe('https://e.com/os.mp4');
+    expect(stored.posters).toEqual({});
   });
 });
 

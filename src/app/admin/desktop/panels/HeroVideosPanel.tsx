@@ -6,15 +6,19 @@ import { getWritableCsrfToken } from '@/lib/security/client-csrf';
 import { useFFmpeg } from '@/app/admin/components/file-upload/hooks/useFFmpeg';
 
 /**
- * Panel Video Hero (v1.3.49) — CRUD rekaman demo untuk lembaran koridor
- * hero halaman jualan storefront.
+ * Panel Video Hero (v1.3.49, auto-poster v1.3.57) — CRUD rekaman demo
+ * untuk lembaran koridor hero halaman jualan storefront.
  *
  * Alur upload per slot: rekaman mentah (HP/laptop, format apa pun) →
  * dikompres OTOMATIS di browser (WASM FFmpeg, profil `standard`:
- * MP4 H.264 720p, audio dibuang, faststart) → diunggah ke R2 lewat
- * `/api/admin/upload?folder=hero-videos` → URL disimpan di D1 lewat
- * `/api/admin/hero-videos`. Slot kosong = hero memakai video default /
- * gambar screenshot.
+ * MP4 H.264 720p, audio dibuang, faststart) → **auto-poster**: 1 frame
+ * (±detik ke-1) diekstrak dari video terkompres menjadi foto JPEG →
+ * keduanya diunggah ke R2 lewat `/api/admin/upload?folder=hero-videos` →
+ * URL video + poster disimpan di D1 lewat `/api/admin/hero-videos`.
+ * Poster = gambar dasar lembaran ber-video (selagi video buffer /
+ * reduced-motion pengunjung melihat frame videonya sendiri) dan IKUT
+ * BERGANTI otomatis tiap ganti rekaman. Gagal ekstrak poster = upload
+ * video tetap lanjut tanpa poster. Slot kosong = gambar screenshot statis.
  *
  * Owner-only: route API dibalas 404 di deployment klien (requireOwnerMode)
  * dan app ini tidak tampil di desktop admin klien (ownerOnly di registry).
@@ -40,8 +44,66 @@ type SlotState = {
 
 const IDLE_SLOT: SlotState = { busy: false, progress: 0, error: '' };
 
+/**
+ * Auto-poster (v1.3.57): ekstrak 1 frame (±detik ke-1) dari video hasil
+ * kompres → JPEG via canvas. Gagal/timeout (12 dtk) → `null` — upload
+ * video tetap lanjut tanpa poster.
+ */
+function extractPosterFrame(videoBlob: Blob): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    const objectUrl = URL.createObjectURL(videoBlob);
+    const el = document.createElement('video');
+    let settled = false;
+    const finish = (result: Blob | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      URL.revokeObjectURL(objectUrl);
+      el.removeAttribute('src');
+      resolve(result);
+    };
+    const timer = setTimeout(() => finish(null), 12000);
+    el.muted = true;
+    el.playsInline = true;
+    el.preload = 'auto';
+    el.addEventListener('error', () => finish(null));
+    el.addEventListener('loadeddata', () => {
+      const target =
+        Number.isFinite(el.duration) && el.duration > 0
+          ? Math.min(1, el.duration / 2)
+          : 0;
+      try {
+        el.currentTime = target;
+      } catch {
+        finish(null);
+      }
+    });
+    el.addEventListener('seeked', () => {
+      try {
+        const width = el.videoWidth || 1280;
+        const height = el.videoHeight || 720;
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return finish(null);
+        ctx.drawImage(el, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => finish(blob && blob.size > 0 ? blob : null),
+          'image/jpeg',
+          0.82
+        );
+      } catch {
+        finish(null);
+      }
+    });
+    el.src = objectUrl;
+  });
+}
+
 export default function HeroVideosPanel() {
   const [videos, setVideos] = useState<Record<string, string>>({});
+  const [posters, setPosters] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [notice, setNotice] = useState('');
@@ -76,6 +138,7 @@ export default function HeroVideosPanel() {
         throw new Error(data.error || `HTTP ${res.status}`);
       }
       setVideos(data.videos as Record<string, string>);
+      setPosters((data.posters as Record<string, string>) || {});
     } catch (err) {
       console.error('[HeroVideosPanel] Gagal memuat video hero:', err);
       setLoadError('Gagal memuat video hero. Coba segarkan halaman.');
@@ -91,18 +154,19 @@ export default function HeroVideosPanel() {
   }, [fetchVideos]);
 
   const saveUrl = useCallback(
-    async (slot: string, url: string) => {
+    async (slot: string, url: string, posterUrl: string) => {
       const res = await fetch('/api/admin/hero-videos', {
         method: 'PUT',
         headers: { 'x-csrf-token': getWritableCsrfToken(null) },
         credentials: 'include',
-        body: JSON.stringify({ slug: slot, url }),
+        body: JSON.stringify({ slug: slot, url, posterUrl }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) {
         throw new Error(data.error || `HTTP ${res.status}`);
       }
       setVideos(data.videos as Record<string, string>);
+      setPosters((data.posters as Record<string, string>) || {});
     },
     []
   );
@@ -133,9 +197,13 @@ export default function HeroVideosPanel() {
           type: 'video/mp4',
         });
 
-        // 2. Unggah ke R2 (folder hero-videos; route upload menghormati
-        //    folder yang diawali `assets/`).
+        // 2. Auto-poster (v1.3.57): ekstrak 1 frame dari video terkompres
+        //    → foto dasar lembaran ikut terunggah & berganti otomatis.
         setSlot(slot, { progress: 100 });
+        const posterBlob = await extractPosterFrame(named);
+
+        // 3. Unggah video ke R2 (folder hero-videos; route upload
+        //    menghormati folder yang diawali `assets/`).
         const formData = new FormData();
         formData.append('file', named);
         const res = await fetch(
@@ -152,13 +220,45 @@ export default function HeroVideosPanel() {
           throw new Error(data.error || `Upload gagal (HTTP ${res.status})`);
         }
 
-        // 3. Simpan URL ke D1 → hero ter-update dalam ±1 menit (ISR 60 dtk).
-        //    Route upload mengembalikan URL relatif (/r2/…) sedangkan
-        //    validasi service mewajibkan http(s) absolut → jadikan absolut.
+        // 4. Unggah poster (gagal = tanpa poster, bukan gagal total —
+        //    rekaman tetap tersimpan).
+        let posterUrl = '';
+        if (posterBlob) {
+          try {
+            const posterForm = new FormData();
+            posterForm.append(
+              'file',
+              new File([posterBlob], `hero-${slot}-poster.jpg`, {
+                type: 'image/jpeg',
+              })
+            );
+            const pres = await fetch(
+              `/api/admin/upload?folder=assets/hero-videos&filename=hero-${slot}-poster`,
+              {
+                method: 'POST',
+                headers: { 'x-csrf-token': getWritableCsrfToken(null) },
+                credentials: 'include',
+                body: posterForm,
+              }
+            );
+            const pdata = await pres.json().catch(() => ({}));
+            if (pres.ok && pdata.url) {
+              posterUrl = new URL(String(pdata.url), window.location.origin).toString();
+            }
+          } catch (posterErr) {
+            console.warn('[HeroVideosPanel] Poster gagal diunggah:', posterErr);
+          }
+        }
+
+        // 5. Simpan URL video + poster ke D1 → hero ter-update dalam ±1 menit
+        //    (ISR 60 dtk). Route upload mengembalikan URL relatif (/r2/…)
+        //    sedangkan validasi service mewajibkan http(s) absolut.
         const absoluteUrl = new URL(String(data.url), window.location.origin).toString();
-        await saveUrl(slot, absoluteUrl);
+        await saveUrl(slot, absoluteUrl, posterUrl);
         setNotice(
-          `Video ${SLOT_LABELS[slot]} tersimpan. Hero ter-update otomatis dalam ±1 menit.`
+          `Video ${SLOT_LABELS[slot]} tersimpan${
+            posterUrl ? ' + poster otomatis' : ''
+          }. Hero ter-update otomatis dalam ±1 menit.`
         );
       } catch (err) {
         console.error(`[HeroVideosPanel] Gagal upload ${slot}:`, err);
@@ -180,8 +280,8 @@ export default function HeroVideosPanel() {
       setSlot(slot, { busy: true, error: '' });
       setNotice('');
       try {
-        await saveUrl(slot, '');
-        setNotice(`Video ${SLOT_LABELS[slot]} dihapus — hero memakai video default / gambar.`);
+        await saveUrl(slot, '', '');
+        setNotice(`Video ${SLOT_LABELS[slot]} dihapus — hero kembali memakai gambar screenshot.`);
       } catch (err) {
         setSlot(slot, {
           error: err instanceof Error ? err.message : 'Gagal menghapus video.',
@@ -203,7 +303,9 @@ export default function HeroVideosPanel() {
           Rekam layar demo (durasi pendek ±15–30 detik, tanpa suara) lalu
           upload di slot template yang sesuai. Rekaman dikompres otomatis di
           browser (MP4, 720p, audio dibuang) sebelum disimpan — file mentah
-          besar pun aman. Slot kosong otomatis memakai video default / gambar
+          besar pun aman. Sekaligus, satu foto frame dari rekaman otomatis
+          dijadikan poster (gambar dasar lembaran selagi video dimuat, ikut
+          berganti tiap ganti rekaman). Slot kosong otomatis memakai gambar
           screenshot.
         </p>
       </div>
@@ -254,8 +356,22 @@ export default function HeroVideosPanel() {
                   />
                 ) : (
                   <p className="mb-2 text-xs text-neutral-500">
-                    Belum ada rekaman — hero memakai video default / gambar.
+                    Belum ada rekaman — hero memakai gambar screenshot.
                   </p>
+                )}
+
+                {posters[slot] && (
+                  <div className="mb-2 flex items-center gap-2">
+                    <img
+                      src={posters[slot]}
+                      alt={`Poster otomatis ${SLOT_LABELS[slot]}`}
+                      className="h-14 w-28 rounded border border-neutral-200 object-cover"
+                    />
+                    <p className="text-xs text-neutral-500">
+                      Poster otomatis — tampil selagi video dimuat, ikut
+                      berganti tiap ganti rekaman.
+                    </p>
+                  </div>
                 )}
 
                 <div className="flex flex-wrap items-center gap-2">
