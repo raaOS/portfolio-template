@@ -1741,7 +1741,7 @@ export default function MagazineShowcase({
                       aria-label="Buka demo di tab baru"
                       style={{
                         background: 'rgba(255,255,255,0.1)',
-                        border: '1px solid rgba(255,255,255,0.15)',
+                        border: 'none',
                         color: '#fff',
                         borderRadius: 6,
                         padding: '4px 8px',
@@ -1765,7 +1765,7 @@ export default function MagazineShowcase({
                         width: 28,
                         height: 28,
                         borderRadius: 6,
-                        border: '1px solid rgba(255,255,255,0.18)',
+                        border: 'none',
                         background: 'rgba(255,255,255,0.12)',
                         color: '#fff',
                         fontSize: 13,
