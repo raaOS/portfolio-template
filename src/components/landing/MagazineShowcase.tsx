@@ -1740,7 +1740,6 @@ export default function MagazineShowcase({
                       title="Buka di tab baru"
                       aria-label="Buka demo di tab baru"
                       style={{
-                        background: 'transparent',
                         border: 'none',
                         color: '#fff',
                         borderRadius: 6,
@@ -1766,7 +1765,6 @@ export default function MagazineShowcase({
                         height: 28,
                         borderRadius: 6,
                         border: 'none',
-                        background: 'transparent',
                         color: '#fff',
                         fontSize: 13,
                         cursor: 'pointer',

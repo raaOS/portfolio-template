@@ -13,6 +13,12 @@ Laporan owner via screenshot: gambar statis bawaan ("tengkorak") **masih sempat 
 - **Pembersihan Aset Bawaan:** File gambar dasar `public/landing/os-desktop.webp` diganti dengan tangkapan layar bersih dari rekaman video asli owner (biru) — gambar tengkorak lama terhapus total dari seluruh website, sehingga saat loading awal maupun fallback statis, tampilan selalu serasi dengan video.
 - **Anti-Cache Video Hero:** URL video hero kini menyematkan versi `?v=<updatedAt>` dari database agar saat owner mengganti rekaman di masa mendatang, pengunjung langsung melihat video terbaru tanpa terhalang cache browser.
 
+## [1.3.60] - 2026-10-21
+
+### 🧹 Perapian Kode: Bilah Demo Live
+
+Permintaan owner: baris `background` di kedua tombol bilah "Live Web" (Tab Baru & ✕) **dihapus total dari kode** (bukan lagi diset `transparent`). Hasil tampilan identik 100% dengan v1.3.59 — nilai awal CSS memang "tanpa latar", jadi kedua tombol tetap polos bersih tanpa kotak maupun garis.
+
 ## [1.3.59] - 2026-10-21
 
 ### 🎨 Perbaikan Tampilan Lanjutan: Bilah Demo Live
