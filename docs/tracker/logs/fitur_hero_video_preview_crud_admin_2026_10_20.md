@@ -2,6 +2,8 @@
 
 **STATUS: ✅ Selesai & LIVE** (`/api/health` = **1.3.49**, Version ID `59c56de5-7483-44e8-9f61-32af503df059`, commit `41ec7eb`).
 
+> **Update 2026-10-21 — fix v1.3.50 (test nyata owner):** klik **Video Hero** dari desktop ternyata membuka window berisi teks _"Panel 'heroVideos' belum tersedia"_. Akar masalah: app terdaftar di `registry.ts` + `APP_ROUTE_MAP`, halaman `/admin/hero-videos` ada, **tapi key `heroVideos` tidak pernah masuk `PANEL_MAP`** (`WindowContentRenderer.tsx`) — `ClientAdminLayout` tidak merender halaman route, semua isi window diambil dari `PANEL_MAP`. Bug kelas terulang ke-3 (`ai` v1.3.28, `harga` v1.3.29). Perbaikan: dynamic import `HeroVideosPanel` + key `heroVideos`; **guard test coverage** ditambahkan di `registry.test.ts` (semua app `ADMIN_ZONES` wajib ada di `PANEL_MAP`, kecuali `ai`) — `PANEL_MAP` kini di-export. Gate: **139 file / 1.135 test PASS**, tsc 0, lint bersih, CHANGELOG + `APP_VERSION` → **1.3.50**, commit `8a77db0`. Test nyata upload→verifikasi→hapus hero berlanjut setelah deploy.
+
 **Bukti verifikasi produksi (2026-10-20 malam):**
 - Health 1.3.49; `/`, 3× `/preview/*`, `/landing/os-desktop.mp4` = **200**.
 - `GET /api/admin/hero-videos` anonim = **401** (owner-mode aktif → lolos guard lalu auth menolak = perilaku benar di site owner; di site klien = 404, diuji unit test).

@@ -133,12 +133,13 @@ export default function HeroVideosPanel() {
           type: 'video/mp4',
         });
 
-        // 2. Unggah ke R2 (folder hero-videos, jalur upload admin yang ada).
+        // 2. Unggah ke R2 (folder hero-videos; route upload menghormati
+        //    folder yang diawali `assets/`).
         setSlot(slot, { progress: 100 });
         const formData = new FormData();
         formData.append('file', named);
         const res = await fetch(
-          `/api/admin/upload?folder=hero-videos&filename=hero-${slot}`,
+          `/api/admin/upload?folder=assets/hero-videos&filename=hero-${slot}`,
           {
             method: 'POST',
             headers: { 'x-csrf-token': getWritableCsrfToken(null) },
@@ -152,7 +153,10 @@ export default function HeroVideosPanel() {
         }
 
         // 3. Simpan URL ke D1 → hero ter-update dalam ±1 menit (ISR 60 dtk).
-        await saveUrl(slot, String(data.url));
+        //    Route upload mengembalikan URL relatif (/r2/…) sedangkan
+        //    validasi service mewajibkan http(s) absolut → jadikan absolut.
+        const absoluteUrl = new URL(String(data.url), window.location.origin).toString();
+        await saveUrl(slot, absoluteUrl);
         setNotice(
           `Video ${SLOT_LABELS[slot]} tersimpan. Hero ter-update otomatis dalam ±1 menit.`
         );

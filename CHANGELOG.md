@@ -3,6 +3,15 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.51] - 2026-10-21
+
+### 🐛 Fix: Upload Video Hero selalu gagal di langkah terakhir ("URL video harus http(s)")
+
+Uji nyata pertama oleh owner (v1.3.50) menemukan bahwa **alur upload selalu gagal setelah kompresi & unggah sukses**: route `/api/admin/upload` mengembalikan **URL relatif** (`/r2/assets/projects/…`) sedangkan validasi penyimpanan D1 dengan sengaja mewajibkan **http(s) absolut** (guard keamanan — tolak `javascript:` & protocol-relative). Selain itu parameter `folder=hero-videos` tidak dikenali route upload (hanya `sounds`/`wallpapers`/`models`/`assets/*`) sehingga video hero jatuh ke folder `assets/projects` yang tercampur file karya.
+
+- **Perbaikan (panel Video Hero):** URL hasil upload dijadikan absolut (`new URL(url, origin)`) sebelum disimpan, dan folder upload jadi `assets/hero-videos` (folder khusus, dihormati route upload). Validasi keamanan service tidak diubah — tetap ketat.
+- **Uji:** tsc 0; lint bersih; test terkait PASS (service + route tidak berubah).
+
 ## [1.3.50] - 2026-10-20
 
 ### 🐛 Fix: App "Video Hero" tidak bisa dibuka dari desktop admin (Panel belum tersedia)
