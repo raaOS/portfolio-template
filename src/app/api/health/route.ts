@@ -83,8 +83,14 @@ export async function GET(request: NextRequest) {
     if (isOwnerMode()) {
       try {
         const { getD1Value } = await import('@/lib/cloudflareD1');
-        const { WORKER_HEALTH_KEY } = await import('@/lib/workerHealthProbe');
-        checks.workerHealth = await getD1Value(WORKER_HEALTH_KEY);
+        const { WORKER_HEALTH_KEY, isWorkerHealthStale } = await import('@/lib/workerHealthProbe');
+        const stored = await getD1Value<Awaited<ReturnType<typeof import('@/lib/workerHealthProbe').probeWorkerHealth>>>(
+          WORKER_HEALTH_KEY
+        );
+        // Usia ikut dilaporkan. Bacaan yang tidak tersimpan akan tetap membawa
+        // angka lama, dan angka lama yang dipajang tanpa penanda justru
+        // menimbulkan lampu hijau palsu.
+        checks.workerHealth = stored ? { ...stored, stale: isWorkerHealthStale(stored) } : null;
       } catch (err) {
         console.error('Worker health read failed:', err instanceof Error ? err.message : err);
       }

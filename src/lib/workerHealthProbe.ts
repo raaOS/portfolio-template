@@ -69,6 +69,36 @@ export const WORKER_HEALTH_KEY = 'worker-health/latest';
 export const WORKER_HEALTH_HISTORY_KEY = 'worker-health/history';
 export const WORKER_HEALTH_HISTORY_LIMIT = 7;
 
+/**
+ * Batas usia bacaan probe sebelum dianggap **kunO**.
+ *
+ * Cron berjalan sehari sekali (01:00 WIB), jadi 25 jam memberi ruang satu run
+ * yang terlewat tanpa langsung berbunyi. Di luar batas ini portal menampilkan
+ * peringatan.
+ *
+ * Alasan batas ini ada: bacaan yang gagal disimpan membuat angka LAMA terpajang
+ * seolah angka segar — persis lampu hijau palsu. Angka yang usianya tidak
+ * disebut sama sekali tidak bisa dipercaya, jadi usianya wajib ikut dihitung.
+ */
+export const WORKER_HEALTH_STALE_AFTER_MS = 25 * 60 * 60 * 1000;
+
+/**
+ * Apakah bacaan ini masih layak dipajang sebagai kondisi terkini?
+ *
+ * Mengembalikan `true` kalau tidak ada stempel waktu sama sekali atau stempel
+ * waktunya tidak terbaca — dua-duanya berarti angka tersebut tidak bisa
+ * dipertanggungjawabkan, bukan berarti sehat.
+ */
+export function isWorkerHealthStale(
+  result: Pick<WorkerHealthResult, 'probedAt'> | null | undefined,
+  now: number = Date.now()
+): boolean {
+  if (!result?.probedAt) return true;
+  const at = Date.parse(result.probedAt);
+  if (!Number.isFinite(at)) return true;
+  return now - at > WORKER_HEALTH_STALE_AFTER_MS;
+}
+
 /** Halaman error Cloudflare memuat baris `error code: 1102`. */
 const ERROR_1102_PATTERN = /error\s+code:\s*1102/i;
 

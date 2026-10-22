@@ -60,26 +60,53 @@ export async function POST(request: NextRequest) {
     // Kegagalan probe TIDAK boleh menggagalkan run cron — pola yang sama dengan
     // backup di atas. Probe itu sendiri memang dirancang untuk melaporkan
     // kegagalan lewat hasilnya, bukan lewat exception.
+    //
+    // CATATAN v1.3.67 — kegagalan PENYIMPANAN tidak lagi ditelan diam-diam.
+    // Sebelumnya `workerHealth` di-assign sebelum `recordWorkerHealth()`, sehingga
+    // tulisan yang gagal tetap memperlihatkan angka segar di respons dan portal,
+    // sementara D1 tidak pernah menerimanya. Kegagalan semacam itu kini ikut
+    // dilaporkan lewat `workerHealthRecorded` / `workerHealthRecordError`, dan
+    // `/api/health` menandai bacaan yang usianya lewat batas sebagai `stale`.
     let workerHealth: Awaited<ReturnType<typeof probeWorkerHealth>> | null = null;
+    let workerHealthRecorded: boolean | null = null;
+    let workerHealthRecordError: string | null = null;
     if (isOwnerMode()) {
       try {
         workerHealth = await probeWorkerHealth();
-        await recordWorkerHealth(workerHealth);
-        console.log(
-          `[cron/daily] worker health: cache HIT ${workerHealth.cacheHit}/${workerHealth.concurrency} ` +
-            `(${Math.round(workerHealth.cacheHitRatio * 100)}%), ` +
-            `${workerHealth.ok}/${workerHealth.concurrency} sukses, ` +
-            `${workerHealth.failed1102}x 1102, ${workerHealth.timedOut} timeout, ` +
-            `p95 ${workerHealth.p95TtfbMs ?? '-'}ms, ` +
-            `${workerHealth.durationMs}ms (${workerHealth.transport}) ` +
-            `-> ${workerHealth.passed ? 'SEHAT' : 'TANDA MERAH'}`
-        );
       } catch (err) {
         console.error('[cron/daily] worker health probe failed:', err instanceof Error ? err.message : err);
       }
+
+      if (workerHealth) {
+        try {
+          await recordWorkerHealth(workerHealth);
+          workerHealthRecorded = true;
+          console.log(
+            `[cron/daily] worker health: cache HIT ${workerHealth.cacheHit}/${workerHealth.concurrency} ` +
+              `(${Math.round(workerHealth.cacheHitRatio * 100)}%), ` +
+              `${workerHealth.ok}/${workerHealth.concurrency} sukses, ` +
+              `${workerHealth.failed1102}x 1102, ${workerHealth.timedOut} timeout, ` +
+              `p95 ${workerHealth.p95TtfbMs ?? '-'}ms, ` +
+              `${workerHealth.durationMs}ms (${workerHealth.transport}) ` +
+              `-> ${workerHealth.passed ? 'SEHAT' : 'TANDA MERAH'}`
+          );
+        } catch (err) {
+          // Hasil probe SAH, tapi tidak tersimpan. Jangan disembunyikan: tanpa
+          // pesan ini portal akan memajang angka lama sebagai angka hari ini.
+          workerHealthRecorded = false;
+          workerHealthRecordError = err instanceof Error ? err.message : String(err);
+          console.error('[cron/daily] worker health record failed:', workerHealthRecordError);
+        }
+      }
     }
 
-    return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), workerHealth });
+    return NextResponse.json({
+      ok: true,
+      ranAt: new Date().toISOString(),
+      workerHealth,
+      workerHealthRecorded,
+      workerHealthRecordError,
+    });
   } catch (err) {
     console.error('[cron/daily] Failed:', err instanceof Error ? err.message : err);
     return NextResponse.json({ message: 'Cron run failed' }, { status: 500 });

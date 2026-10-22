@@ -196,4 +196,50 @@ describe('POST /api/cron/daily', () => {
     expect(recordWorkerHealthMock).not.toHaveBeenCalled();
     expect(body.workerHealth).toBeNull();
   });
+
+  // Regression test untuk temuan 2026-10-23: `recordWorkerHealth()` gagal
+  // menyimpan, tapi karena `workerHealth` sudah di-assign sebelumnya respons
+  // tetap memperlihatkan angka segar dan portal menampilkan angka lama sebagai
+  // angka hari ini. Kegagalan menyimpan kini wajib terlihat.
+  it('reports a failed write instead of pretending the run succeeded', async () => {
+    process.env.CRON_SECRET = 'test-secret';
+    isOwnerModeMock.mockReturnValue(true);
+    recordWorkerHealthMock.mockRejectedValueOnce(new Error('Too many subrequests'));
+
+    const response = await POST(buildRequest({ 'x-cron-secret': 'test-secret' }) as never);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.ok).toBe(true);
+    // Hasil probe SAH tetap dibalikkan — membuangnya akan menyembunyikan
+    // pengukurannya, padahal yang rusak adalah penyimpanannya.
+    expect(body.workerHealth).toEqual(HEALTH_RESULT);
+    expect(body.workerHealthRecorded).toBe(false);
+    expect(body.workerHealthRecordError).toContain('Too many subrequests');
+  });
+
+  it('reports a successful write when the probe result lands in D1', async () => {
+    process.env.CRON_SECRET = 'test-secret';
+    isOwnerModeMock.mockReturnValue(true);
+
+    const response = await POST(buildRequest({ 'x-cron-secret': 'test-secret' }) as never);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.workerHealthRecorded).toBe(true);
+    expect(body.workerHealthRecordError).toBeNull();
+  });
+
+  it('leaves the recording flags null on client deployments', async () => {
+    process.env.CRON_SECRET = 'test-secret';
+    isOwnerModeMock.mockReturnValue(false);
+
+    const response = await POST(buildRequest({ 'x-cron-secret': 'test-secret' }) as never);
+    const body = await response.json();
+
+    // Bukan "gagal" — memang tidak ada yang dicoba, karena site klien tidak
+    // boleh membebani Worker owner demi dashboard owner.
+    expect(body.workerHealthRecorded).toBeNull();
+    expect(body.workerHealthRecordError).toBeNull();
+  });
 });

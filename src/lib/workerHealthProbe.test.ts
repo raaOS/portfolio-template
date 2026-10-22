@@ -20,6 +20,8 @@ import {
   WORKER_HEALTH_HISTORY_KEY,
   WORKER_HEALTH_HISTORY_LIMIT,
   WORKER_HEALTH_KEY,
+  WORKER_HEALTH_STALE_AFTER_MS,
+  isWorkerHealthStale,
   probeWorkerHealth,
   recordWorkerHealth,
   type WorkerHealthResult,
@@ -265,5 +267,45 @@ describe('recordWorkerHealth', () => {
     await recordWorkerHealth(RESULT);
 
     expect(setD1ValueMock).toHaveBeenNthCalledWith(2, WORKER_HEALTH_HISTORY_KEY, [RESULT]);
+  });
+});
+
+/**
+ * Penanda usia bacaan. Latar belakangnya temuan 2026-10-23: tulisan probe gagal
+ * masuk D1 diam-diam, sehingga portal memajang angka lama sebagai angka hari ini.
+ * Tanpa penanda usia, angka lama tidak bisa dibedakan dari angka segar.
+ */
+describe('isWorkerHealthStale', () => {
+  const NOW = Date.parse('2026-10-23T12:00:00.000Z');
+
+  it('keeps a reading from the last cron cycle', () => {
+    const limaJamLalu = new Date(NOW - 5 * 60 * 60 * 1000).toISOString();
+
+    expect(isWorkerHealthStale({ probedAt: limaJamLalu } as WorkerHealthResult, NOW)).toBe(false);
+  });
+
+  it('accepts a reading just past the boundary', () => {
+    const tepat = new Date(NOW - WORKER_HEALTH_STALE_AFTER_MS).toISOString();
+
+    // Batasnya sendiri belum dianggap kuno — hanya yang melewatinya.
+    expect(isWorkerHealthStale({ probedAt: tepat } as WorkerHealthResult, NOW)).toBe(false);
+  });
+
+  it('flags a reading older than one cron cycle', () => {
+    const satuHariSetengah = new Date(NOW - 30 * 60 * 60 * 1000).toISOString();
+
+    expect(isWorkerHealthStale({ probedAt: satuHariSetengah } as WorkerHealthResult, NOW)).toBe(true);
+  });
+
+  it('flags a missing timestamp instead of assuming health', () => {
+    // Bacaan tanpa stempel waktu tidak bisa dipertanggungjawabkan — memakainya
+    // sebagai "sehat" justru mengulangi kesalahan lampu hijau palsu.
+    expect(isWorkerHealthStale({} as WorkerHealthResult, NOW)).toBe(true);
+    expect(isWorkerHealthStale(null, NOW)).toBe(true);
+    expect(isWorkerHealthStale(undefined, NOW)).toBe(true);
+  });
+
+  it('flags an unparseable timestamp instead of throwing', () => {
+    expect(isWorkerHealthStale({ probedAt: 'bukan-tanggal' } as WorkerHealthResult, NOW)).toBe(true);
   });
 });

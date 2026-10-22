@@ -1982,6 +1982,22 @@ Website bisa dibuka di https://${data.domain} (aktif dalam 5-15 menit). 🚀`;
    * Entri lama (sebelum v1.3.65) tidak punya `cacheHit`; kalau begitu jatuh ke
    * tampilan lama `${ok}/${concurrency}` supaya tidak pernah melempar.
    */
+  /**
+   * Usia bacaan dalam bahasa manusia — dipakai untuk menandai data kunO.
+   * Mengembalikan string kosong kalau stempel waktunya tidak terbaca, supaya
+   * pemanggil bisa memperlakukannya sebagai "usia tidak diketahui".
+   */
+  function formatProbeAge(probedAt) {
+    const at = Date.parse(probedAt || '');
+    if (!Number.isFinite(at)) return '';
+    const menit = Math.floor((Date.now() - at) / 60000);
+    if (menit < 1) return 'baru saja';
+    if (menit < 60) return menit + ' menit lalu';
+    const jam = Math.floor(menit / 60);
+    if (jam < 48) return jam + ' jam lalu';
+    return Math.floor(jam / 24) + ' hari lalu';
+  }
+
   function renderProbeBadge(wh) {
     if (!wh || typeof wh !== 'object' || !wh.concurrency) {
       return '<span style="color: var(--text-muted);">-</span>';
@@ -2005,6 +2021,20 @@ Website bisa dibuka di https://${data.domain} (aktif dalam 5-15 menit). 🚀`;
         })
       : '';
     const timing = typeof wh.p95TtfbMs === 'number' ? ` · p95 ${wh.p95TtfbMs}ms` : '';
+
+    // Data KUNO: bacaan ini lebih tua dari satu siklus cron, sehingga tidak lagi
+    // mewakili kondisi hari ini. Angkanya tetap ditampilkan apa adanya —
+    // menyembunyikannya justru menghapus satu-satunya petunjuk bahwa probe sudah
+    // lama tidak berhasil menyimpan apa pun — tapi diberi penanda kuning supaya
+    // tidak pernah dibaca sebagai angka segar.
+    if (wh.stale) {
+      const usia = formatProbeAge(wh.probedAt);
+      const judul = 'Bacaan probe tidak diperbarui' + (usia ? ' sejak ' + usia : '') +
+        '. Angka yang tersimpan adalah hasil run terakhir yang berhasil disimpan, bukan kondisi hari ini.';
+      return '<span title="' + judul + '" style="font-size: 0.6875rem; font-weight: 600; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; border-radius: 9999px; padding: 0.05rem 0.4rem; white-space: nowrap;">' +
+        (usia ? 'KUNO ' + usia : 'KUNO') + '</span>';
+    }
+
     const title = `Rasio cache harian (probe 32 request serentak)${timing}${when ? ' · terakhir ' + when : ''}`;
 
     return `<span title="${title}" style="font-size: 0.6875rem; font-weight: 600; color: ${color}; background: ${bg}; border: 1px solid ${border}; border-radius: 9999px; padding: 0.05rem 0.4rem; white-space: nowrap;">${counts}${detail}</span>`;

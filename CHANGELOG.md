@@ -3,6 +3,28 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.67] - 2026-10-23
+
+###🩺 Probe Harian Berhenti Memberi Lampu Hijau Palsu
+
+Temuan pasca-deploy v1.3.65: **hasil probe harian tidak pernah tersimpan**, tapi portal tetap menampilkan angka segar. Penyelidikan dengan angka nyata:
+
+| Fakta | Bukti |
+|---|---|
+| Cron melapor sukses setiap kali | Respons `probedAt 19:28:56`, semua field ada, `passed true` |
+| D1 tidak pernah menerimanya | `worker-health/latest` masih `updated_at 19:18:58` — 19 menit kemudian |
+| Riwayat cuma berisi 1 entri | `worker-health/history` = 1 entri, padahal cron dipanggil 5 kali |
+
+**Akar masalah yang terlihat dari kode:** `workerHealth` di-assign *sebelum* `recordWorkerHealth()`. Ketika tulisan itu melempar, `catch` menelannya dan respons tetap memamerkan angka — sehingga portal memajang bacaan lama sebagai bacaan hari ini.
+
+**Yang diperbaiki:**
+
+- Kegagalan **menyimpan** kini ikut dilaporkan di respons cron (`workerHealthRecorded` + `workerHealthRecordError`) — tidak lagi ditelan diam-diam. Hasil probe yang sah tetap dibalikkan, karena membuangnya justru menyembunyikan pengukurannya.
+- `/api/health` kini menyertakan penanda **`stale`**: bacaan lebih tua dari **25 jam** (satu siklus cron) ditandai.
+- Portal menampilkan badge **kuning `KUNO …`** untuk bacaan usang, lengkap dengan usianya — bukan lagi badge hijau `HIT 100%` yang bisa disalahartikan sebagai kondisi hari ini. Angka lama tetap disimpan apa adanya, karena menyembunyikannya justru menghapus satu-satunya petunjuk bahwa probe sudah lama berhenti menyimpan.
+
+> ⚠️ **Belum beres — penyebab akhir belum terbukti.** Yang sudah dikesampingkan lewat pengujian, bukan ditebak: skema `app_kv` benar (`key TEXT PRIMARY KEY`), REST API sehat dari luar (jalur kode aslinya sukses: bootstrap 6098 ms, tulis 192 ms, baca 146 ms; 30 query beruntun 0 gagal), dan bootstrap 24 statement tidak pernah gagal. Kandidat tersisa: **batas 50 subrequest eksternal per invokasi di paket Free** — Worker ini **tidak punya binding D1**, jadi setiap operasi D1 ditempuh keluar lewat `fetch()` ke `api.cloudflare.com`, sementara `bootstrapD1Schema()` sendiri butuh 24 panggilan tiap isolate dingin. Penanda `stale` dipasang lebih dulu supaya selama penyelidikan berlangsung tidak ada angka palsu yang dipajang.
+
 ## [1.3.66] - 2026-10-23
 
 ###🗂️ Redesain Desktop Admin: 4 Zone Langsung Terbuka 2×2, Kartu Folder Dihapus
