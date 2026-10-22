@@ -201,8 +201,14 @@ export default function HargaPanel() {
             htmlFor="owner-whatsapp"
             className="mb-1 block text-sm font-semibold text-gray-800"
           >
-            Nomor WhatsApp owner (tombol &quot;Pesan&quot;)
+            WhatsApp Transaksi — buyer chat setelah membeli
           </label>
+          <p className="mb-2 text-xs text-gray-500">
+            Khusus urusan transaksi: tombol WA di halaman status pesanan (konfirmasi bayar
+            &amp; serah-terima akses) dan tombol &quot;Pesan&quot; di halaman jualan.
+            Kontak publik yang tampil ke pengunjung diatur terpisah di
+            <strong> Komunikasi → Contacts</strong>.
+          </p>
           <input
             id="owner-whatsapp"
             type="text"

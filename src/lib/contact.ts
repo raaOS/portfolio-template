@@ -90,6 +90,12 @@ export async function updateContactData(
           },
         }
       : data.formSettings,
+    // Label tab Settings (chatButtonText) — sebelumnya tak pernah tersimpan
+    // (schema lama menolak key `labels` → 400). Merge dangkal cukup karena
+    // hanya ada satu field (chatButtonText).
+    labels: updates.labels
+      ? { ...data.labels, ...updates.labels }
+      : data.labels,
     lastUpdated: new Date().toISOString(),
   };
 

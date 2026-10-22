@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ContactData, UpdateContactData } from '@/types/contact';
+import { ContactData, ContactInfo, UpdateContactData } from '@/types/contact';
 import { AdminHeader } from '../../components/components/AdminHeader';
 import { useToast } from '@/contexts/ToastContext';
-import { PhoneCall, Type, Share2, Info } from 'lucide-react';
+import { PhoneCall, Type, Share2, Info, Mail } from 'lucide-react';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import {
   ADMIN_DATA_GC_TIME,
@@ -18,7 +18,9 @@ import {
 export default function AdminContactClient() {
   const queryClient = useQueryClient();
   const [, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'content' | 'socials' | 'labels'>('content');
+  const [activeTab, setActiveTab] = useState<'content' | 'info' | 'socials' | 'labels'>(
+    'content'
+  );
   const { showSuccess, showError } = useToast();
   const { csrfToken } = useAdminAuth();
 
@@ -102,6 +104,7 @@ export default function AdminContactClient() {
             <nav className="flex space-x-1 px-4 py-2">
               {[
                 { id: 'content', name: 'Page Content', icon: Type },
+                { id: 'info', name: 'Contact Info', icon: Mail },
                 { id: 'socials', name: 'Social Media', icon: Share2 },
                 { id: 'labels', name: 'Settings', icon: Info },
               ].map((tab) => {
@@ -109,7 +112,9 @@ export default function AdminContactClient() {
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id as 'content' | 'socials' | 'labels')}
+                    onClick={() =>
+                      setActiveTab(tab.id as 'content' | 'info' | 'socials' | 'labels')
+                    }
                     className={`flex items-center rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
                       activeTab === tab.id
                         ? 'bg-amber-100 text-amber-800 shadow-sm'
@@ -133,6 +138,20 @@ export default function AdminContactClient() {
                 <ContactContentForm
                   data={contactData.content || { headline: '', subtext: '' }}
                   onUpdate={(data) => handleUpdateContact({ content: data })}
+                />
+              </div>
+            )}
+
+            {activeTab === 'info' && contactData && (
+              <div className="max-w-2xl">
+                <h3 className="mb-2 text-lg font-medium text-gray-900">Kontak Publik</h3>
+                <p className="mb-6 text-sm text-gray-500">
+                  Kontak yang tampil ke pengunjung (window Contact, tombol chat WhatsApp,
+                  link email). Di situs klien, isinya kontak milik klien tersebut.
+                </p>
+                <ContactInfoForm
+                  info={contactData.info}
+                  onUpdate={(info) => handleUpdateContact({ info })}
                 />
               </div>
             )}
@@ -258,6 +277,95 @@ function ContactContentForm({ data, onUpdate }: ContactContentFormProps) {
           className="rounded-lg bg-gray-900 px-6 py-2.5 font-medium text-white shadow-sm transition-colors hover:bg-black"
         >
           Save Content
+        </button>
+      </div>
+    </form>
+  );
+}
+
+interface ContactInfoFormProps {
+  info: ContactInfo;
+  onUpdate: (info: ContactInfo) => void;
+}
+
+function ContactInfoForm({ info, onUpdate }: ContactInfoFormProps) {
+  const [email, setEmail] = useState(info.email || '');
+  const [phone, setPhone] = useState(info.phone || '');
+  const [whatsapp, setWhatsapp] = useState(info.socialMedia?.whatsapp || '');
+  const [address, setAddress] = useState(info.address || '');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onUpdate({
+      ...info,
+      email,
+      phone,
+      address,
+      socialMedia: { ...info.socialMedia, whatsapp },
+    });
+  };
+
+  const fields = [
+    {
+      key: 'email',
+      label: 'Email',
+      type: 'email',
+      placeholder: 'nama@email.com',
+      value: email,
+      onChange: setEmail,
+    },
+    {
+      key: 'phone',
+      label: 'Telepon',
+      type: 'tel',
+      placeholder: '+62 812-3456-7890',
+      value: phone,
+      onChange: setPhone,
+    },
+    {
+      key: 'whatsapp',
+      label: 'WhatsApp',
+      type: 'tel',
+      placeholder: '6281234567890',
+      value: whatsapp,
+      onChange: setWhatsapp,
+      hint: 'Format internasional tanpa + (contoh: 6281234567890) — dipakai tombol "Mulai Obrolan WhatsApp".',
+    },
+    {
+      key: 'address',
+      label: 'Alamat',
+      type: 'text',
+      placeholder: 'Jakarta, Indonesia',
+      value: address,
+      onChange: setAddress,
+    },
+  ];
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5">
+      {fields.map((f) => (
+        <div key={f.key}>
+          <label className="mb-1 block text-sm font-medium text-gray-700">{f.label}</label>
+          <input
+            type={f.type}
+            autoComplete="off"
+            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 transition-all focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
+            placeholder={f.placeholder}
+            value={f.value}
+            onChange={(e) => f.onChange(e.target.value)}
+          />
+          {'hint' in f && f.hint && (
+            <p className="mt-1 text-xs text-gray-500">{f.hint}</p>
+          )}
+        </div>
+      ))}
+
+      <div className="pt-4">
+        <button
+          type="submit"
+          className="rounded-lg bg-gray-900 px-6 py-2.5 font-medium text-white shadow-sm transition-colors hover:bg-black"
+        >
+          Save Contact Info
         </button>
       </div>
     </form>

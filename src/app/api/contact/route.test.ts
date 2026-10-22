@@ -150,6 +150,29 @@ describe('PUT /api/contact', () => {
     expect(revalidatePathMock).toHaveBeenCalled();
   });
 
+  it('accepts public contact info fields (email, phone, address, whatsapp)', async () => {
+    const payload = {
+      info: {
+        email: 'halo@studio.id',
+        phone: '+62 811-0000-1111',
+        address: 'Bandung, Indonesia',
+        socialMedia: { whatsapp: '6281100001111' },
+      },
+    };
+    const response = await PUT(buildPut(payload) as never);
+
+    expect(response.status).toBe(200);
+    expect(updateContactDataMock).toHaveBeenCalledWith(payload, 'default-site');
+  });
+
+  it('accepts labels payload (Settings tab chat button)', async () => {
+    const payload = { labels: { chatButtonText: 'Mulai Ngobrol' } };
+    const response = await PUT(buildPut(payload) as never);
+
+    expect(response.status).toBe(200);
+    expect(updateContactDataMock).toHaveBeenCalledWith(payload, 'default-site');
+  });
+
   it('deep merges with existing D1 data', async () => {
     updateContactDataMock.mockResolvedValue({
       content: { title: 'Old Title' },

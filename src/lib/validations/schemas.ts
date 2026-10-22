@@ -105,6 +105,7 @@ export const updateContactSchema = z
     content: z.record(z.string(), z.unknown()).optional(),
     info: z.record(z.string(), z.unknown()).optional(),
     formSettings: z.record(z.string(), z.unknown()).optional(),
+    labels: z.record(z.string(), z.unknown()).optional(),
   })
   .strict();
 

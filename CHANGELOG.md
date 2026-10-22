@@ -3,6 +3,18 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.62] - 2026-10-23
+
+### ✨ Fitur: CRUD Kontak Publik terpisah + label WhatsApp Transaksi (2 CRUD, 2 tujuan)
+
+Permintaan owner: sistem CRUD WA & email selama ini membingungkan karena ada dua tujuan berbeda — akhirnya diputuskan **dua CRUD terpisah di dua letak berbeda**:
+
+1. **Komunikasi → Contacts — tab baru "Contact Info"**: form **Email, Telepon, WhatsApp, Alamat**. Sebelumnya field ini (`info.email`/`phone`/`address`/`socialMedia.whatsapp`) sudah didukung tipe & API-nya tapi **tidak punya form admin sama sekali** — jadi tidak bisa diisi dari panel. Isinya kontak publik yang tampil ke pengunjung (window Contact, tombol "Mulai Obrolan WhatsApp", link email); di situs klien otomatis = kontak milik klien.
+2. **Sistem → Harga Jual — label diperjelas**: field WA kini berjudul **"WhatsApp Transaksi — buyer chat setelah membeli"** + keterangan bahwa kontak publik diatur terpisah di Komunikasi → Contacts. Nomor ini hanya untuk alur pesanan (konfirmasi bayar & serah-terima akses), bukan kontak tampilan.
+3. **🐛 Fix: tab Settings di panel Contact Page tidak bisa menyimpan** — "Chat Button Text" selalu gagal 400 `Invalid contact payload` (schema `updateContactSchema` `.strict()` tidak memuat key `labels`, dan `updateContactData` tidak pernah menyimpannya). Diperbaiki di kedua lapis + 2 test baru.
+
+Gate: **tsc 0 + lint 0 + suite 140 file / 1.150 test PASS**.
+
 ## [1.3.61] - 2026-10-21
 
 ### 🔧 Fix: Error 1102 "Worker exceeded resource limits" pada iframe demo live
