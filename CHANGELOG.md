@@ -3,6 +3,32 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.65] - 2026-10-23
+
+### 🩺 Koreksi: probe harian kini mengukur kesehatan cache (perbaikan atas 1.3.64)
+
+**Versi 1.3.64 ternyata tidak mengukur apa pun, dan ini harus dikoreksi terbuka.** Verifikasi pasca-deploy membuktikan probe-nya selalu melapor `32/32 lulus` — sebuah **lampu hijau palsu**. Empat fakta terukur langsung di produksi:
+
+1. **Query unik tidak mem-bust cache.** Halaman demo adalah ISR statis (`revalidate = 300`), sehingga cache key-nya pathname saja. Tiga URL `?probe=` berbeda berturut-turut semuanya menjawab `x-opennext-cache: HIT`. Artinya 32 request probe membaca **entri cache yang sama** dan selesai hanya ±34 ms.
+2. **`/api/revalidate` tidak menembus.** Endpoint melapor `{"revalidated":true}` tapi cache tetap `HIT` — karena `shouldLazilyUpdateOnCacheHit: false` membuat regional cache otoritatif sampai `max-age` 300 detiknya habis sendiri.
+3. **Setelah TTL habis pun bukan MISS.** Uji tunggu 315 detik: responsnya `STALE` (baca KV, sajikan basi, revalidasi **sekali** di latar), lalu `HIT`. Tidak pernah terjadi 32 render serentak.
+4. **Burst 32 serentak tepat setelah purge:** `{"HIT":32}` — nol miss.
+
+Jadi memaksa render dingin **tidak mungkin dilakukan dari dalam aplikasi** tanpa mengubah konfigurasi cache — yang tidak kita inginkan. Ditambah, 32 jauh di bawah ambang patah terukur (48 bersih, 64 → 1102), jadi bahkan dalam skenario rusak pun versi lama tetap hijau.
+
+**Perbaikannya:** berhenti berpura-pura memaksa render, dan mengukur hal yang justru menjadi **akar masalah** — apakah cache masih melindungi.
+
+- Probe kini membaca header `x-opennext-cache` dari **setiap** respons dan menghitung **rasio cache**: `HIT` dan `STALE` dihitung dilindungi (keduanya menyaji dari cache tanpa render), `MISS`/tanpa header dihitung berrender.
+- `passed` kini **dua syarat**: tidak ada request gagal **dan** rasio cache ≥ 90%. Rasio runtuh di bawah ambang tetap ditandai merah **walau nol request error** — dan itu persis kondisi saat kuota KV habis pada 2026-10-21 yang berujung Error 1102.
+- Menyimpan p95 TTFB sebagai indikator kuantitatif tambahan: selama cache sehat 32 request serentak selesai ±34 ms; kalau mulai render, angkanya melonjak ke ratusan milidetik.
+- Portal: kolom diganti jadi **"Kesehatan Cache Worker"** dengan badge `HIT 100%` (hijau) atau `HIT 87% · 2× 1102` (merah), plus p95 di tooltip. Entri lama tanpa field baru tetap tampil dengan format lawas tanpa error.
+
+**Yang tidak berubah:** tetap cron 01:00 WIB, tetap 32 request serentak lewat service binding, tetap khusus site owner (`OWNER_MODE`), tetap tampil di `/api/health` **dan** portal.
+
+**Batasan yang tetap jujur:** sifatnya masih **prediktif, bukan retroaktif** — menjawab "perlindungan cache masih utuh hari ini?", bukan "1102 terjadi kapan". Probe tidak mendeteksi 1102 lewat jumlah kegagalan; sinyalnya ada pada rasio cache dan latensi.
+
+Gate: **141 file / 1.167 test PASS** (3 test baru mengunci perilaku inti: rasio runtuh walau nol error → gagal; `STALE` tetap dihitung terlindungi; ambang 0,90 diuji dua sisi), tsc 0, lint 0.
+
 ## [1.3.64] - 2026-10-23
 
 ### 🩺 Fitur: Pemeriksaan Kesehatan Worker Harian (peringatan dini Error 1102)
@@ -21,6 +47,8 @@ Mengatasi masalah Error 1102 yang sempat membuat halaman demo iframe mati. Error
 **Yang perlu diketahui (jujur):** sifatnya **prediktif, bukan retroaktif** — ia menjawab "kepala ruang berapa hari ini", bukan "Error 1102 terjadi kemarin jam berapa". Probe juga membebani Worker 32 render serentak sekali sehari, dan menyisakan entri cache yang kedaluwarsa sendiri dalam 300 detik.
 
 Gate: **21 test PASS** (10 modul probe + 11 route cron, termasuk kasus 1102 vs 503 biasa vs timeout, owner-only, dan "probe gagal tidak menggagalkan cron").
+
+> ⚠️ **DIKOREKSI di [1.3.65].** Ternyata probe pada versi ini **tidak mengukur apa pun**: query unik tidak mem-bust cache sehingga semua request membaca entri cache yang sama, dan jumlah kegagalan takkan pernah naik karena 32 berada jauh di bawah ambang patah. Rincian keempat bukti produksi dan perbaikannya ada di entri 1.3.65.
 
 ## [1.3.63] - 2026-10-23
 

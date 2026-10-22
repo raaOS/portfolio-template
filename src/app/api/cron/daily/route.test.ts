@@ -31,7 +31,7 @@ import { POST } from './route';
 
 /** Hasil probe sukses — dipakai ulang tiap kasus supaya bentuknya stabil. */
 const HEALTH_RESULT = {
-  probedAt: '2026-10-23T00:00:00.000Z',
+  probedAt: '2026-10-23T18:00:00.000Z',
   slug: 'spatial-gallery',
   target: 'https://makeitbetter.my.id/preview/spatial-gallery',
   transport: 'service-binding',
@@ -40,8 +40,12 @@ const HEALTH_RESULT = {
   failed: 0,
   failed1102: 0,
   timedOut: 0,
-  avgTtfbMs: 180,
-  durationMs: 900,
+  cacheHit: 32,
+  cacheRendered: 0,
+  cacheHitRatio: 1,
+  avgTtfbMs: 34,
+  p95TtfbMs: 48,
+  durationMs: 60,
   passed: true,
 };
 

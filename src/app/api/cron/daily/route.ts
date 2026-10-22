@@ -66,9 +66,13 @@ export async function POST(request: NextRequest) {
         workerHealth = await probeWorkerHealth();
         await recordWorkerHealth(workerHealth);
         console.log(
-          `[cron/daily] worker health: ${workerHealth.ok}/${workerHealth.concurrency} ok, ` +
+          `[cron/daily] worker health: cache HIT ${workerHealth.cacheHit}/${workerHealth.concurrency} ` +
+            `(${Math.round(workerHealth.cacheHitRatio * 100)}%), ` +
+            `${workerHealth.ok}/${workerHealth.concurrency} sukses, ` +
             `${workerHealth.failed1102}x 1102, ${workerHealth.timedOut} timeout, ` +
-            `${workerHealth.durationMs}ms (${workerHealth.transport})`
+            `p95 ${workerHealth.p95TtfbMs ?? '-'}ms, ` +
+            `${workerHealth.durationMs}ms (${workerHealth.transport}) ` +
+            `-> ${workerHealth.passed ? 'SEHAT' : 'TANDA MERAH'}`
         );
       } catch (err) {
         console.error('[cron/daily] worker health probe failed:', err instanceof Error ? err.message : err);

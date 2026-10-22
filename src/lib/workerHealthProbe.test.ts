@@ -28,8 +28,12 @@ import {
 /** Body persis seperti yang dikirim Cloudflare untuk Error 1102. */
 const ERROR_1102_BODY = 'error code: 1102';
 
-function fakeResponse(status: number, body = ''): Response {
-  return new Response(body, { status });
+/**
+ * Respons tiruan. Default `HIT` supaya kasus umum mewakili kondisi cache sehat;
+ * kirim `'MISS'` untuk meniru request yang berakhir render.
+ */
+function fakeResponse(status: number, body = '', cache: string = 'HIT'): Response {
+  return new Response(body, { status, headers: { 'x-opennext-cache': cache } });
 }
 
 function fetchMock(): ReturnType<typeof vi.fn> {
@@ -48,7 +52,7 @@ describe('probeWorkerHealth', () => {
     vi.resetAllMocks();
   });
 
-  it('reports passed when every request returns 200', async () => {
+  it('reports passed when every request returns 200 from cache', async () => {
     fetchMock().mockResolvedValue(fakeResponse(200, '<html>ok</html>'));
 
     const result = await probeWorkerHealth({ concurrency: 4 });
@@ -61,6 +65,11 @@ describe('probeWorkerHealth', () => {
     expect(result.passed).toBe(true);
     expect(result.transport).toBe('public-url');
     expect(fetchMock()).toHaveBeenCalledTimes(4);
+    // Kondisi sehat: semuanya disaji dari cache, nol yang ikut render.
+    expect(result.cacheHit).toBe(4);
+    expect(result.cacheRendered).toBe(0);
+    expect(result.cacheHitRatio).toBe(1);
+    expect(typeof result.p95TtfbMs).toBe('number');
   });
 
   it('gives every request a unique query so each one is a genuine cold render', async () => {
@@ -124,6 +133,59 @@ describe('probeWorkerHealth', () => {
     expect(result.passed).toBe(false);
   }, 10_000);
 
+  it('fails when the cache stops protecting, even with no request errors', async () => {
+    // INI INTI FITURNYA. Semua request 200 dan tidak ada yang gagal, tapi semuanya
+    // berakhir render — kondisi persis saat kuota KV habis pada 2026-10-21 sebelum
+    // Error 1102 muncul. Versi probe lama akan melapor lulus pada kasus ini.
+    fetchMock().mockResolvedValue(fakeResponse(200, '<html>ok</html>', 'MISS'));
+
+    const result = await probeWorkerHealth({ concurrency: 4 });
+
+    expect(result.ok).toBe(4);
+    expect(result.failed).toBe(0);
+    expect(result.cacheHit).toBe(0);
+    expect(result.cacheRendered).toBe(4);
+    expect(result.cacheHitRatio).toBe(0);
+    expect(result.passed).toBe(false);
+  });
+
+  it('counts STALE as protected because it is served without rendering', async () => {
+    fetchMock().mockResolvedValue(fakeResponse(200, 'ok', 'STALE'));
+
+    const result = await probeWorkerHealth({ concurrency: 4 });
+
+    expect(result.cacheHit).toBe(4);
+    expect(result.cacheRendered).toBe(0);
+    expect(result.cacheHitRatio).toBe(1);
+    expect(result.passed).toBe(true);
+  });
+
+  it('tolerates a few misses but fails once the ratio drops below the threshold', async () => {
+    // 30/32 = 0,9375 -> masih di atas ambang 0,90.
+    let responses = [
+      ...Array.from({ length: 30 }, () => fakeResponse(200, 'ok', 'HIT')),
+      ...Array.from({ length: 2 }, () => fakeResponse(200, 'ok', 'MISS')),
+    ];
+    fetchMock().mockImplementation(() => Promise.resolve(responses.shift() ?? fakeResponse(200)));
+
+    const healthy = await probeWorkerHealth({ concurrency: 32 });
+    expect(healthy.cacheHitRatio).toBeCloseTo(0.9375, 4);
+    expect(healthy.failed).toBe(0);
+    expect(healthy.passed).toBe(true);
+
+    // 28/32 = 0,875 -> di bawah ambang, harus gagal walau nol request error.
+    responses = [
+      ...Array.from({ length: 28 }, () => fakeResponse(200, 'ok', 'HIT')),
+      ...Array.from({ length: 4 }, () => fakeResponse(200, 'ok', 'MISS')),
+    ];
+    fetchMock().mockImplementation(() => Promise.resolve(responses.shift() ?? fakeResponse(200)));
+
+    const sick = await probeWorkerHealth({ concurrency: 32 });
+    expect(sick.cacheHitRatio).toBeCloseTo(0.875, 4);
+    expect(sick.failed).toBe(0);
+    expect(sick.passed).toBe(false);
+  });
+
   it('prefers the WORKER_SELF_REFERENCE service binding when it is available', async () => {
     const bindingFetch = vi.fn().mockResolvedValue(fakeResponse(200, 'ok'));
     getCloudflareContextMock.mockResolvedValue({
@@ -160,8 +222,12 @@ describe('recordWorkerHealth', () => {
     failed: 0,
     failed1102: 0,
     timedOut: 0,
-    avgTtfbMs: 180,
-    durationMs: 900,
+    cacheHit: 32,
+    cacheRendered: 0,
+    cacheHitRatio: 1,
+    avgTtfbMs: 34,
+    p95TtfbMs: 48,
+    durationMs: 60,
     passed: true,
   };
 

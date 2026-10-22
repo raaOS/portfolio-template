@@ -3,30 +3,66 @@ import { getPublicBaseUrl } from '@/lib/constants';
 import { getD1Value, setD1Value } from '@/lib/cloudflareD1';
 
 /**
- * Probe kesehatan Worker harian — deteksi dini Error 1102 (Cloudflare:
+ * Probe kesehatan Worker harian — peringatan dini Error 1102 (Cloudflare:
  * "Worker exceeded CPU time limit").
  *
  * Latar belakang (lihat `docs/tracker/logs/error_1102_preview_iframe_diagnosis_2026_10_21.md`):
  * Error 1102 membunuh isolate, jadi TIDAK bisa ditangkap `try/catch` di dalam
  * aplikasi maupun oleh error tracker. Satu-satunya cara mengetahuinya dari dalam
- * tanpa memantau `wrangler tail` adalah mengukur **kepala ruang** — menembakkan
- * render dingin serentak dan menghitung berapa yang tumbang.
+ * tanpa memantau `wrangler tail` adalah memantau kondisi yang MELEMPARKAN-nya.
  *
- * Kepala ruang terukur pada 2026-10-22: 48 paralel bersih, 64 mulai ada 1102,
- * 96 tetap ada. Karena itu default 32 berada jauh di bawah ambang: probe normalnya
- * lulus, dan baru berubah merah kalau kepala ruang benar-benar menyusut.
+ * YANG DIUKUR: **kesehatan cache**, bukan paksaan render. Keputusan ini lahir dari
+ * percobaan di produksi 2026-10-23 yang membuktikan paksaan render TIDAK mungkin
+ * dilakukan dari dalam aplikasi:
  *
- * Sifatnya **prediktif, bukan retroaktif** — ia menjawab "kepala ruang berapa
- * hari ini", bukan "1102 terjadi kapan pada pengunjung nyata".
+ *   1. Query unik `?probe=` TIDAK mem-bust cache — halaman preview adalah ISR
+ *      statis (`revalidate = 300`) sehingga cache key-nya pathname saja. Tiga URL
+ *      unik terbukti semuanya `x-opennext-cache: HIT`.
+ *   2. `/api/revalidate` (HMAC) melapor `{"revalidated":true}` tapi tetap `HIT` —
+ *      `shouldLazilyUpdateOnCacheHit: false` membuat regional cache otoritatif
+ *      sampai `max-age` 300 detiknya habis sendiri.
+ *   3. Setelah TTL habis pun responsnya `STALE` (baca KV, sajikan basi, revalidasi
+ *      SEKALI di latar), lalu `HIT` — tidak pernah ada render serentak.
+ *   4. Burst 32 serentak tepat setelah purge: `{"HIT":32}` — nol miss.
+ *
+ * Jadi probe berhenti berpura-pura memaksa render dingin, dan mengukur hal yang
+ * justru menjadi AKAR MASALAH: apakah cache masih melindungi.
+ *
+ * Logikanya: selama cache sehat, 32 request serentak lewat service binding selesai
+ * ±34 ms dan semuanya tersaji dari cache tanpa render. Begitu cache berhenti
+ * melindungi (kuota KV habis — pemicu persis Error 1102 pada 2026-10-21), request
+ * yang sama ikut render semua: rasio cache runtuh di bawah ambang, latensi melonjak
+ * ke ratusan milidetik, dan risiko 1102 ikut naik. Ketiganya terekam dalam satu run.
+ *
+ * Batas yang disadari: 32 jauh di bawah ambang patah terukur (48 bersih, 64 → 1102),
+ * sehingga probe ini TIDAK akan mendeteksi 1102 lewat jumlah kegagalan semata.
+ * Itulah sebabnya `passed` ditentukan oleh rasio cache, bukan oleh `failed`.
+ *
+ * Sifatnya tetap **prediktif, bukan retroaktif** — ia menjawab "perlindungan cache
+ * masih utuh hari ini?", bukan "1102 terjadi kapan pada pengunjung nyata".
  */
 
 /** Jumlah request serentak. Sengaja di bawah ambang patah (±50). */
 export const PROBE_DEFAULT_CONCURRENCY = 32;
 
+/**
+ * Ambang rasio cache untuk dianggap sehat. Rasio = respons yang disaji dari cache
+ * (HIT/STALE, tanpa render) dibagi total respons.
+ *
+ * 0.90 memberi ruang untuk beberapa miss yang wajar (mis. entri baru pertama kali
+ * sehari). Di bawah ini berarti request ikut render — persis kondisi yang pada
+ * 2026-10-21 menimbulkan Error 1102.
+ */
+export const PROBE_MIN_CACHE_HIT_RATIO = 0.9;
+
 /** Batas tunggu per request; lewat ini dihitung gagal. */
 export const PROBE_DEFAULT_TIMEOUT_MS = 20_000;
 
-/** Halaman demo dipakai sebagai sasaran — satu-satunya route ISR berat di site. */
+/**
+ * Halaman demo dipakai sebagai sasaran. Sengaja tidak diganti-ganti: sejak ditemukan
+ * bahwa query tidak mem-bust cache, URL-nya memang selalu sama — nilainya ada pada
+ * pengukuran rasio cache dan latensi, bukan pada variasi URL.
+ */
 export const PROBE_DEFAULT_SLUG = 'spatial-gallery';
 
 export const WORKER_HEALTH_KEY = 'worker-health/latest';
@@ -46,12 +82,27 @@ export interface WorkerHealthResult {
   concurrency: number;
   ok: number;
   failed: number;
-  /** Gagal karena Error 1102 — ini yang dicari pemilik site. */
+  /** Gagal karena Error 1102 — tetap dicatat walau bukan penentu `passed`. */
   failed1102: number;
   timedOut: number;
+  /**
+   * Respons yang disaji dari cache TANPA memicu render (`HIT` atau `STALE`).
+   * Inilah angka penentu: turun = pengunjung ikut render = risiko 1102 naik.
+   */
+  cacheHit: number;
+  /** Respons yang berakhir render (MISS / tanpa header cache). */
+  cacheRendered: number;
+  /** `cacheHit / concurrency`, dibulatkan 4 desimal. */
+  cacheHitRatio: number;
   /** Rata-rata TTFB request yang berhasil, dalam ms. */
   avgTtfbMs: number | null;
+  /** TTFB persentil 95 dalam ms — lonjakannya menandai render yang tertahan. */
+  p95TtfbMs: number | null;
   durationMs: number;
+  /**
+   * Lulus hanya kalau tidak ada kegagalan DAN cache masih melindungi
+   * (`cacheHitRatio >= PROBE_MIN_CACHE_HIT_RATIO`).
+   */
   passed: boolean;
 }
 
@@ -67,6 +118,8 @@ interface AttemptOutcome {
   status: number | null;
   is1102: boolean;
   timedOut: boolean;
+  /** Nilai header `x-opennext-cache` (`HIT`/`STALE`/`MISS`), atau null bila tidak ada. */
+  cacheStatus: string | null;
 }
 
 interface SelfFetcher {
@@ -110,14 +163,17 @@ async function resolveSelfFetcher(): Promise<SelfFetcher> {
 }
 
 /**
- * Tembakkan `concurrency` request render-dingin serentak ke `/preview/<slug>`.
+ * Tembakkan `concurrency` request serentak ke `/preview/<slug>` dan ukur dua hal:
+ * apakah ada yang gagal, dan apakah cache masih menanganinya tanpa render.
  *
- * Tiap request memakai query unik (`?probe=<stamp>-<i>`) supaya benar-benar
- * memaksa render ulang, bukan tersaji dari regional cache — tanpa itu probe hanya
- * mengukur cache dan tidak pernah mendekati batas CPU.
+ * Catatan: request sengaja memakai query unik (`?probe=<stamp>-<i>`) **bukan** untuk
+ * mem-bust cache — ternyata tidak bisa (lihat catatan di atas modul). Query itu
+ * dipertahankan hanya agar tiap run tidak berbagi entri dengan run sebelumnya;
+ * tetap tidak berbahaya karena seluruhnya kedaluwarsa dalam `revalidate` (300 detik).
  *
- * Query unik menyisakan entri cache di Cache API; semua kedaluwarsa sendiri
- * dalam `revalidate` halaman preview (300 detik), jadi tidak menetap.
+ * Header `x-opennext-cache` dibaca dari setiap respons. Membaca header gratis —
+ * tidak perlu membuka body. Hanya respons non-200 yang body-nya dibuka, untuk
+ * membedakan `error code: 1102` dari kegagalan lain.
  */
 export async function probeWorkerHealth(
   options: Partial<ProbeOptions> = {}
@@ -143,9 +199,17 @@ export async function probeWorkerHealth(
           headers: { accept: 'text/html' },
         });
         const ttfbMs = performance.now() - attemptStart;
+        const cacheStatus = response.headers.get('x-opennext-cache');
 
         if (response.ok) {
-          return { ok: true, ttfbMs, status: response.status, is1102: false, timedOut: false };
+          return {
+            ok: true,
+            ttfbMs,
+            status: response.status,
+            is1102: false,
+            timedOut: false,
+            cacheStatus,
+          };
         }
 
         // Hanya respons non-200 yang dibaca isinya: halaman sukses 86 KB tidak
@@ -163,6 +227,7 @@ export async function probeWorkerHealth(
           status: response.status,
           is1102: ERROR_1102_PATTERN.test(body),
           timedOut: false,
+          cacheStatus,
         };
       } catch (error) {
         return {
@@ -171,6 +236,7 @@ export async function probeWorkerHealth(
           status: null,
           is1102: false,
           timedOut: error instanceof Error && error.name === 'AbortError',
+          cacheStatus: null,
         };
       } finally {
         clearTimeout(timer);
@@ -180,6 +246,18 @@ export async function probeWorkerHealth(
 
   const okCount = outcomes.filter((outcome) => outcome.ok).length;
   const ttfbs = outcomes.filter((outcome) => outcome.ok).map((outcome) => outcome.ttfbMs);
+
+  // `HIT` dan `STALE` sama-sama dilindungi: keduanya menyaji dari cache TANPA
+  // memicu render (STALE berarti menyajikan yang basi sambil revalidate di latar).
+  // `MISS` atau header yang tidak ada = request benar-benar render — itulah yang
+  // berjumlah banyak ketika kuota KV habis, dan itulah yang menimbulkan Error 1102.
+  const cacheHit = outcomes.filter(
+    (outcome) => outcome.cacheStatus === 'HIT' || outcome.cacheStatus === 'STALE'
+  ).length;
+  const cacheRendered = outcomes.length - cacheHit;
+  const cacheHitRatio = outcomes.length
+    ? Number((cacheHit / outcomes.length).toFixed(4))
+    : 0;
 
   return {
     probedAt: new Date().toISOString(),
@@ -191,12 +269,26 @@ export async function probeWorkerHealth(
     failed: outcomes.length - okCount,
     failed1102: outcomes.filter((outcome) => !outcome.ok && outcome.is1102).length,
     timedOut: outcomes.filter((outcome) => outcome.timedOut).length,
+    cacheHit,
+    cacheRendered,
+    cacheHitRatio,
     avgTtfbMs: ttfbs.length
       ? Math.round(ttfbs.reduce((sum, value) => sum + value, 0) / ttfbs.length)
       : null,
+    p95TtfbMs: percentile(ttfbs, 95),
     durationMs: Math.round(performance.now() - startedAt),
-    passed: okCount === outcomes.length,
+    // Dua syarat: tidak ada yang jatuh, dan cache masih menahan beban. Gagal di
+    // salah satu saja sudah cukup untuk ditandai merah.
+    passed: okCount === outcomes.length && cacheHitRatio >= PROBE_MIN_CACHE_HIT_RATIO,
   };
+}
+
+/** Persentil sederhana (metode terdekat) dari daftar yang sudah tidak terurut. */
+function percentile(values: number[], p: number): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = Math.min(sorted.length - 1, Math.ceil((p / 100) * sorted.length) - 1);
+  return Math.round(sorted[Math.max(0, index)]);
 }
 
 /**

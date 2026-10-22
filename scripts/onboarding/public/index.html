@@ -937,7 +937,7 @@
               <th style="padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border);">Status</th>
               <th style="padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border);">Respons</th>
               <th style="padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border);">Versi Terpasang</th>
-              <th style="padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border);">Kepala Ruang Worker</th>
+              <th style="padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border);">Kesehatan Cache Worker</th>
               <th style="padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border);">Domain Aktif</th>
               <th style="padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border);">Aksi</th>
             </tr>
@@ -1969,13 +1969,18 @@ Website bisa dibuka di https://${data.domain} (aktif dalam 5-15 menit). 🚀`;
   }
 
   /**
-   * Badge hasil probe kesehatan Worker harian (Error 1102 / CPU limit).
+   * Badge kesehatan cache Worker harian (peringatan dini Error 1102).
    *
    * Data berasal dari cron `/api/cron/daily` di site owner dan hanya diisi di
    * site owner (OWNER_MODE) — site klien mengirim null dan kolomnya tampil "-".
    *
-   * Angka 32/32 berarti 32 render-dingin serentak semuanya lolos. Kalau ada yang
-   * tumbang, badge berubah merah dan menyebut berapa kali tersangkut 1102.
+   * Angka utamanya RASIO CACHE, bukan jumlah kegagalan: `HIT 100%` berarti 32
+   * request serentak semuanya disaji dari cache tanpa render. Kalau rasio ini
+   * runtuh, pengunjung ikut render — persis kondisi yang menimbulkan Error 1102
+   * saat kuota KV habis. Jumlah kegagalan tetap ditampilkan sebagai detail.
+   *
+   * Entri lama (sebelum v1.3.65) tidak punya `cacheHit`; kalau begitu jatuh ke
+   * tampilan lama `${ok}/${concurrency}` supaya tidak pernah melempar.
    */
   function renderProbeBadge(wh) {
     if (!wh || typeof wh !== 'object' || !wh.concurrency) {
@@ -1985,14 +1990,23 @@ Website bisa dibuka di https://${data.domain} (aktif dalam 5-15 menit). 🚀`;
     const color = passed ? '#047857' : '#b91c1c';
     const bg = passed ? '#d1fae5' : '#fee2e2';
     const border = passed ? '#a7f3d0' : '#fecaca';
-    const counts = `${wh.ok}/${wh.concurrency}`;
-    const detail = wh.failed1102 ? ` · ${wh.failed1102}× 1102` : '';
+
+    const pct = typeof wh.cacheHitRatio === 'number' ? Math.round(wh.cacheHitRatio * 100) : null;
+    const counts = pct !== null
+      ? `HIT ${pct}%`
+      : `${wh.ok}/${wh.concurrency}`;
+    const detail = wh.failed1102
+      ? ` · ${wh.failed1102}× 1102`
+      : (wh.failed ? ` · ${wh.failed} gagal` : '');
+
     const when = wh.probedAt
       ? new Date(wh.probedAt).toLocaleString('id-ID', {
           day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
         })
       : '';
-    const title = `Probe render-dingin harian${when ? ' · terakhir ' + when : ''}`;
+    const timing = typeof wh.p95TtfbMs === 'number' ? ` · p95 ${wh.p95TtfbMs}ms` : '';
+    const title = `Rasio cache harian (probe 32 request serentak)${timing}${when ? ' · terakhir ' + when : ''}`;
+
     return `<span title="${title}" style="font-size: 0.6875rem; font-weight: 600; color: ${color}; background: ${bg}; border: 1px solid ${border}; border-radius: 9999px; padding: 0.05rem 0.4rem; white-space: nowrap;">${counts}${detail}</span>`;
   }
 
