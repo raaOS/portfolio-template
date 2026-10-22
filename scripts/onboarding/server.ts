@@ -1254,14 +1254,19 @@ const server = http.createServer(async (req, res) => {
             const latencyMs = Date.now() - start;
             let version: string | null = null;
             let dbStatus: string | null = null;
+            let workerHealth: Record<string, unknown> | null = null;
             try {
               const body = (await healthRes.json()) as {
                 version?: string;
                 database?: string;
                 status?: string;
+                workerHealth?: Record<string, unknown> | null;
               };
               version = body.version || null;
               dbStatus = body.database || null;
+              // Hanya site owner yang mengisinya (lihat OWNER_MODE di route health);
+              // site klien selalu null sehingga kolomnya tampil kosong.
+              workerHealth = body.workerHealth || null;
             } catch {
               // health endpoint merespon non-JSON — anggap hidup tanpa detail.
             }
@@ -1272,6 +1277,7 @@ const server = http.createServer(async (req, res) => {
               latencyMs,
               deployedVersion: version,
               database: dbStatus,
+              workerHealth,
             };
           } catch {
             return {
@@ -1281,6 +1287,7 @@ const server = http.createServer(async (req, res) => {
               latencyMs: null,
               deployedVersion: null,
               database: null,
+              workerHealth: null,
             };
           }
         })

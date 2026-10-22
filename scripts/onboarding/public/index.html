@@ -937,6 +937,7 @@
               <th style="padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border);">Status</th>
               <th style="padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border);">Respons</th>
               <th style="padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border);">Versi Terpasang</th>
+              <th style="padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border);">Kepala Ruang Worker</th>
               <th style="padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border);">Domain Aktif</th>
               <th style="padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border);">Aksi</th>
             </tr>
@@ -1967,6 +1968,34 @@ Website bisa dibuka di https://${data.domain} (aktif dalam 5-15 menit). 🚀`;
     return 0;
   }
 
+  /**
+   * Badge hasil probe kesehatan Worker harian (Error 1102 / CPU limit).
+   *
+   * Data berasal dari cron `/api/cron/daily` di site owner dan hanya diisi di
+   * site owner (OWNER_MODE) — site klien mengirim null dan kolomnya tampil "-".
+   *
+   * Angka 32/32 berarti 32 render-dingin serentak semuanya lolos. Kalau ada yang
+   * tumbang, badge berubah merah dan menyebut berapa kali tersangkut 1102.
+   */
+  function renderProbeBadge(wh) {
+    if (!wh || typeof wh !== 'object' || !wh.concurrency) {
+      return '<span style="color: var(--text-muted);">-</span>';
+    }
+    const passed = wh.passed !== false;
+    const color = passed ? '#047857' : '#b91c1c';
+    const bg = passed ? '#d1fae5' : '#fee2e2';
+    const border = passed ? '#a7f3d0' : '#fecaca';
+    const counts = `${wh.ok}/${wh.concurrency}`;
+    const detail = wh.failed1102 ? ` · ${wh.failed1102}× 1102` : '';
+    const when = wh.probedAt
+      ? new Date(wh.probedAt).toLocaleString('id-ID', {
+          day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+        })
+      : '';
+    const title = `Probe render-dingin harian${when ? ' · terakhir ' + when : ''}`;
+    return `<span title="${title}" style="font-size: 0.6875rem; font-weight: 600; color: ${color}; background: ${bg}; border: 1px solid ${border}; border-radius: 9999px; padding: 0.05rem 0.4rem; white-space: nowrap;">${counts}${detail}</span>`;
+  }
+
   function renderStatusRow(c, latestVersion) {
     const isOnline = c.online;
     const isCurrent = latestVersion && c.deployedVersion && compareVersions(c.deployedVersion, latestVersion) >= 0;
@@ -2000,6 +2029,7 @@ Website bisa dibuka di https://${data.domain} (aktif dalam 5-15 menit). 🚀`;
         <td style="padding: 0.75rem; vertical-align: top;">${statusBadge}${dbBadge}</td>
         <td style="padding: 0.75rem; vertical-align: top; color: var(--text-muted);">${latency}</td>
         <td style="padding: 0.75rem; vertical-align: top;">${versionBadge}</td>
+        <td style="padding: 0.75rem; vertical-align: top;">${renderProbeBadge(c.workerHealth)}</td>
         <td style="padding: 0.75rem; vertical-align: top; font-size: 0.75rem;">${domainText}</td>
         <td style="padding: 0.75rem; vertical-align: top;">
           <a href="${c.websiteUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--primary, #4f46e5); font-size: 0.75rem; font-weight: 500; text-decoration: none; border-bottom: 1px dotted currentColor; margin-right: 0.75rem;">Kunjungi</a>

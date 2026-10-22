@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { enforceRequestRateLimit } from '@/lib/security/request';
 import { APP_VERSION } from '@/lib/constants';
+import { isOwnerMode } from '@/lib/ownerMode';
 
 function isCloudflareRuntime(request: NextRequest): boolean {
   return Boolean(
@@ -70,6 +71,23 @@ export async function GET(request: NextRequest) {
       console.error('Database health check failed:', error);
       checks.database = 'disconnected';
       checks.status = 'degraded';
+    }
+
+    // Hasil probe kesehatan Worker harian (Error 1102 / CPU limit) — hanya site
+    // owner. Ditulis oleh cron `/api/cron/daily` dan dibaca dari `app_kv`.
+    //
+    // Sengaja TIDAK mengubah `checks.status`: probe gagal berarti "kepala ruang
+    // menyusut", bukan "site ini sakit" — situsnya sendiri masih melayani request
+    // dengan normal. Kegagalan membaca D1 juga ditelan di sini agar halaman
+    // kesehatan tetap menjawab 200 saat storage sedang bermasalah.
+    if (isOwnerMode()) {
+      try {
+        const { getD1Value } = await import('@/lib/cloudflareD1');
+        const { WORKER_HEALTH_KEY } = await import('@/lib/workerHealthProbe');
+        checks.workerHealth = await getD1Value(WORKER_HEALTH_KEY);
+      } catch (err) {
+        console.error('Worker health read failed:', err instanceof Error ? err.message : err);
+      }
     }
 
     // Memory usage

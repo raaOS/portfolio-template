@@ -3,6 +3,25 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.64] - 2026-10-23
+
+### 🩺 Fitur: Pemeriksaan Kesehatan Worker Harian (peringatan dini Error 1102)
+
+Mengatasi masalah Error 1102 yang sempat membuat halaman demo iframe mati. Error 1102 mematikan isolate Worker, sehingga **tidak bisa ditangkap** `try/catch` maupun error tracker mana pun — satu-satunya cara mengetahuinya selama ini adalah memantau `wrangler tail` secara manual. Kini situs mengukur sendiri **kepala ruang**-nya setiap hari.
+
+**Cara kerjanya:** cron harian (01:00 WIB) menembakkan **32 request render-dingin serentak** ke halaman demo `/preview/spatial-gallery`, menghitung berapa yang tumbang, lalu menyimpan hasilnya di database.
+
+- **Mengapa 32:** ambang patah sudah terukur — 48 paralel masih bersih, 64 mulai menimbulkan Error 1102. Jadi 32 duduk jauh di bawah ambang: probe normalnya lulus, dan baru berubah merah kalau kepala ruang benar-benar menyusut.
+- **Khusus situs owner** (`OWNER_MODE`): situs klien **tidak dijalankan** probe ini dan tidak menulis apa pun ke database mereka — beban harian klien tidak bertambah.
+- **Tampil di dua tempat:** kolom baru **"Kepala Ruang Worker"** di menu Status Klien portal (`PENGELOLA_KLIEN.bat`) — hijau `32/32` berarti sehat, merah `29/32 · 2× 1102` berarti kepala ruang sudah menyempit — dan field `workerHealth` di `/api/health`.
+- **Riwayat 7 hari** disimpan agar trennya bisa dilihat, bukan hanya angka hari ini.
+
+**Perbaikan portal:** site Anda sendiri sebelumnya **tidak muncul** di menu Status Klien. Daftar itu dibangun dari `arsip-klien/*/config.env`, dan satu-satunya folder (`uji-domain`) tidak punya `config.env` — portal memakai fallback `uji-domain.workers.dev` yang mati (HTTP 000). Kini dibuat entry `arsip-klien/00_site-owner/config.env` yang menunjuk ke `https://makeitbetter.my.id` (HTTP 200), jadi site produksi ikut terpantau bersama klien lain.
+
+**Yang perlu diketahui (jujur):** sifatnya **prediktif, bukan retroaktif** — ia menjawab "kepala ruang berapa hari ini", bukan "Error 1102 terjadi kemarin jam berapa". Probe juga membebani Worker 32 render serentak sekali sehari, dan menyisakan entri cache yang kedaluwarsa sendiri dalam 300 detik.
+
+Gate: **21 test PASS** (10 modul probe + 11 route cron, termasuk kasus 1102 vs 503 biasa vs timeout, owner-only, dan "probe gagal tidak menggagalkan cron").
+
 ## [1.3.63] - 2026-10-23
 
 ### 🗂️ Perapian Desktop Admin: Video Hero pindah ke "Sistem Owner"

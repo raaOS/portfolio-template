@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { sweepExpiredOrders } from '@/lib/services/orderService';
 import { runDailyBackup } from '@/lib/services/d1BackupService';
+import { isOwnerMode } from '@/lib/ownerMode';
+import { probeWorkerHealth, recordWorkerHealth } from '@/lib/workerHealthProbe';
 
 /**
  * POST /api/cron/daily — pekerjaan harian yang dijalankan Cloudflare cron trigger
@@ -49,7 +51,31 @@ export async function POST(request: NextRequest) {
       console.error('[cron/daily] backup failed:', err instanceof Error ? err.message : err);
     }
 
-    return NextResponse.json({ ok: true, ranAt: new Date().toISOString() });
+    // Probe kesehatan Worker harian — deteksi dini Error 1102 / CPU limit.
+    //
+    // Khusus site OWNER (`isOwnerMode()` fail-closed): site klien dilewati
+    // sepenuhnya tanpa menulis apa pun ke D1 mereka, supaya deployment klien
+    // tidak membebani Worker-nya sendiri tiap hari demi dashboard milik owner.
+    //
+    // Kegagalan probe TIDAK boleh menggagalkan run cron — pola yang sama dengan
+    // backup di atas. Probe itu sendiri memang dirancang untuk melaporkan
+    // kegagalan lewat hasilnya, bukan lewat exception.
+    let workerHealth: Awaited<ReturnType<typeof probeWorkerHealth>> | null = null;
+    if (isOwnerMode()) {
+      try {
+        workerHealth = await probeWorkerHealth();
+        await recordWorkerHealth(workerHealth);
+        console.log(
+          `[cron/daily] worker health: ${workerHealth.ok}/${workerHealth.concurrency} ok, ` +
+            `${workerHealth.failed1102}x 1102, ${workerHealth.timedOut} timeout, ` +
+            `${workerHealth.durationMs}ms (${workerHealth.transport})`
+        );
+      } catch (err) {
+        console.error('[cron/daily] worker health probe failed:', err instanceof Error ? err.message : err);
+      }
+    }
+
+    return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), workerHealth });
   } catch (err) {
     console.error('[cron/daily] Failed:', err instanceof Error ? err.message : err);
     return NextResponse.json({ message: 'Cron run failed' }, { status: 500 });
