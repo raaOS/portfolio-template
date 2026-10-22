@@ -3,6 +3,17 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.63] - 2026-10-23
+
+### 🗂️ Perapian Desktop Admin: Video Hero pindah ke "Sistem Owner"
+
+Permintaan owner: (1) app **Video Hero** dipindahkan dari zone **Tampilan** ke zone **Sistem**, dan (2) zone **Sistem** diganti namanya jadi **"Sistem Owner"** — sehingga seluruh tiga app khusus owner (**Harga Jual, Order & Pembayaran, Video Hero**) kini berkumpul dalam satu zone yang jelas identitasnya.
+
+- Perubahan murni tata letak desktop admin (registry `ADMIN_ZONES`); route, panel, API, dan proteksi `ownerOnly` (sembunyi di situs klien + API balas 404) **tidak berubah sama sekali**.
+- Guard test registry diperkuat: `heroVideos` kini ikut dipastikan `ownerOnly` (tampil di owner, hilang di klien) + test baru mengunci letak zone & label "Sistem Owner".
+
+Gate: **tsc 0 + lint 0 + registry test 6/6 PASS**.
+
 ## [1.3.62] - 2026-10-23
 
 ### ✨ Fitur: CRUD Kontak Publik terpisah + label WhatsApp Transaksi (2 CRUD, 2 tujuan)

@@ -120,8 +120,8 @@ const ALL_ADMIN_ZONES: AdminZone[] = [
   },
   {
     id: 'system',
-    label: 'Sistem',
-    description: 'Statistik pengunjung, log aktivitas, backup, harga jual, dan pesanan',
+    label: 'Sistem Owner',
+    description: 'Statistik pengunjung, log aktivitas, backup, harga jual, pesanan, dan video hero',
     icon: Monitor,
     iconColor: 'text-cyan-600',
     iconBg: 'bg-cyan-500',
@@ -183,6 +183,21 @@ const ALL_ADMIN_ZONES: AdminZone[] = [
         defaultHeight: 720,
         ownerOnly: true,
       },
+      {
+        // Video preview lembaran hero halaman jualan (storefront milik
+        // owner) — rekaman demo yang di-upload owner. Konten bisnis owner,
+        // jadi ownerOnly: app tidak tampil di desktop admin klien (saringan
+        // getAdminZones membuang app ownerOnly), dan API-nya dibalas 404 di
+        // deployment klien (requireOwnerMode).
+        id: 'heroVideos',
+        label: 'Video Hero',
+        icon: Clapperboard,
+        iconColor: 'text-rose-600',
+        iconBg: 'bg-rose-100',
+        defaultWidth: 860,
+        defaultHeight: 620,
+        ownerOnly: true,
+      },
     ],
   },
   {
@@ -238,21 +253,6 @@ const ALL_ADMIN_ZONES: AdminZone[] = [
         iconBg: 'bg-violet-100',
         defaultWidth: 950,
         defaultHeight: 700,
-      },
-      {
-        // Video preview lembaran hero halaman jualan (storefront milik
-        // owner) — rekaman demo yang di-upload owner. Konten bisnis owner,
-        // jadi ownerOnly: app & zone-nya tidak tampil di desktop admin klien
-        // (saringan getAdminZones membuang app ownerOnly), dan API-nya
-        // dibalas 404 di deployment klien (requireOwnerMode).
-        id: 'heroVideos',
-        label: 'Video Hero',
-        icon: Clapperboard,
-        iconColor: 'text-rose-600',
-        iconBg: 'bg-rose-100',
-        defaultWidth: 860,
-        defaultHeight: 620,
-        ownerOnly: true,
       },
     ],
   },
