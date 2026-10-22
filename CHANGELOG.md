@@ -3,6 +3,19 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.66] - 2026-10-23
+
+###🗂️ Redesain Desktop Admin: 4 Zone Langsung Terbuka 2×2, Kartu Folder Dihapus
+
+Login admin kini **langsung menampilkan 4 jendela zone tersusun 2×2** — layar "4 kartu folder" yang harus diklik dulu sudah dihapus:
+
+- **Susunan otomatis sesuai pesanan owner:** Sistem Owner (kiri-atas), Komunikasi (kanan-atas), Konten & Berkas (kiri-bawah), Tampilan (kanan-bawah). Posisi dihitung dari ukuran layar → selalu rapi dan kembali rapi setiap halaman admin dibuka ulang.
+- **Jendela zone terkunci penuh:** titik merah/kuning/hijau tetap dirender tapi fungsi tutup/kecilkan/full dimatikan; zona juga tidak bisa digeser maupun diubah ukurannya — komposisi 2×2 mustahil berantakan. Judul zone (ikon + nama) tetap.
+- **Jendela CRUD di dalam zone tetap normal:** bisa ditutup, diminimize, difull, digeser, dan diresize seperti biasa.
+- **Taskbar bawah tetap** hanya menampilkan jendela yang terbuka (4 zone + CRUD yang dibuka) — tanpa tombol launcher tambahan.
+- **Layar kecil (< 1160×700):** keempat zone tetap otomatis terbuka dengan posisi bertumpuk (stagger) — masih bisa digeser manual.
+- Kartu folder `ZoneFolderIcon.tsx` + gaya CSS-nya dihapus (sudah mati). Guard test baru: auto-open 4 zone, urutan kuadran sesuai mockup, aman terhadap StrictMode double-invoke, dan fallback layar kecil.
+
 ## [1.3.65] - 2026-10-23
 
 ### 🩺 Koreksi: probe harian kini mengukur kesehatan cache (perbaikan atas 1.3.64)

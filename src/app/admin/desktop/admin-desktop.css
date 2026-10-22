@@ -145,74 +145,6 @@
   color: #ef4444;
 }
 
-/* ─── Zone Folder Icons ─── */
-.admin-desktop-zones {
-  position: absolute;
-  top: 56px;
-  left: 0;
-  right: 0;
-  bottom: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 64px;
-  z-index: 1;
-  padding: 40px;
-}
-
-.admin-zone-folder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  padding: 32px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.4);
-  border: 1px solid #e4e4e7;
-  backdrop-filter: blur(12px);
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  max-width: 220px;
-  text-align: center;
-}
-
-.admin-zone-folder:hover {
-  background: rgba(255, 255, 255, 0.75);
-  border-color: #d4d4d8;
-  transform: translateY(-4px) scale(1.02);
-}
-
-.admin-zone-folder:active {
-  transform: translateY(-2px) scale(1.01);
-}
-
-.admin-zone-folder-icon {
-  width: 88px;
-  height: 88px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.3s ease;
-}
-
-.admin-zone-folder:hover .admin-zone-folder-icon {
-  transform: scale(1.08);
-}
-
-.admin-zone-folder-label {
-  font-size: 15px;
-  font-weight: 600;
-  color: #3f3f46;
-  letter-spacing: -0.01em;
-}
-
-.admin-zone-folder-desc {
-  font-size: 12px;
-  color: #71717a;
-  line-height: 1.4;
-}
-
 /* ─── Folder Overlay Window ─── */
 .admin-folder-overlay {
   position: fixed;
@@ -394,6 +326,18 @@
   filter: brightness(0.9);
 }
 
+/* Jendela zone terkunci (v1.3.65): titik warna hanya visual —
+   tanpa kursor tangan, tanpa hover/efek tekan. */
+.admin-window-btn:disabled {
+  cursor: default !important;
+}
+
+.admin-window-btn:disabled:hover,
+.admin-window-btn:disabled:active {
+  color: transparent;
+  filter: none;
+}
+
 .admin-window-btn-close {
   background: #ff5f57;
   border: 1px solid #e0443e;
@@ -570,32 +514,6 @@
 
 /* ─── Responsive Adjustments ─── */
 @media (max-width: 768px) {
-  .admin-desktop-zones {
-    flex-direction: column;
-    gap: 24px;
-    padding: 20px;
-  }
-
-  .admin-zone-folder {
-    padding: 20px;
-    max-width: 100%;
-    flex-direction: row;
-    gap: 16px;
-    text-align: left;
-  }
-
-  .admin-zone-folder-icon {
-    width: 60px;
-    height: 60px;
-    border-radius: 10px;
-    flex-shrink: 0;
-  }
-
-  .admin-zone-folder-icon svg {
-    width: 28px;
-    height: 28px;
-  }
-
   .admin-window {
     left: 0 !important;
     top: 36px !important;

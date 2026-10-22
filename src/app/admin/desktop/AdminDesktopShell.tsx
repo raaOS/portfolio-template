@@ -1,10 +1,8 @@
 'use client';
 
 import React from 'react';
-import { ADMIN_ZONES } from './registry';
 import type { AdminDesktopActions, AdminWindowState } from './types';
 import AdminMenuBar from './AdminMenuBar';
-import ZoneFolderIcon from './ZoneFolderIcon';
 import AdminWindowFrame from './AdminWindowFrame';
 import WindowContentRenderer from './WindowContentRenderer';
 import AdminTaskbar from './AdminTaskbar';
@@ -27,22 +25,6 @@ export default function AdminDesktopShell({
 
       {/* Top Menu Bar */}
       <AdminMenuBar onLogout={onLogout} />
-
-      {/* Desktop Zone Folder Icons */}
-      <div className="admin-desktop-zones">
-        {ADMIN_ZONES.map((zone) => (
-          <ZoneFolderIcon
-            key={zone.id}
-            id={zone.id}
-            label={zone.label}
-            description={zone.description}
-            icon={zone.icon}
-            iconBg={zone.iconBg}
-            gradient={zone.gradient}
-            onOpen={actions.openFolder}
-          />
-        ))}
-      </div>
 
       {/* Active CRUD Windows */}
       {windows.map((win) => (

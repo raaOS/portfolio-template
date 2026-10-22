@@ -297,6 +297,10 @@ export default function AdminWindowFrame({ state, actions, children }: AdminWind
 
   const Icon = state.icon;
   const isMax = state.isMaximized;
+  // Jendela zone (container `folder-<zone>`, v1.3.65): titik warna tetap
+  // dirender tapi fungsinya dimatikan, drag & resize ikut mati — posisi 2×2
+  // terkunci. Jendela CRUD app di dalamnya berperilaku normal.
+  const isZone = state.appId.startsWith('folder-');
 
   const style: React.CSSProperties = isMax
     ? { inset: 0, width: '100%', height: '100%', zIndex: state.zIndex }
@@ -316,7 +320,7 @@ export default function AdminWindowFrame({ state, actions, children }: AdminWind
       onMouseDown={() => actions.bringToFront(state.id)}
     >
       {/* Title bar */}
-      <div className="admin-window-titlebar" onMouseDown={handleDragStart}>
+      <div className="admin-window-titlebar" onMouseDown={isZone ? undefined : handleDragStart}>
         {/* macOS traffic light buttons */}
         <div className="admin-window-buttons group">
           <button
@@ -341,13 +345,14 @@ export default function AdminWindowFrame({ state, actions, children }: AdminWind
               e.stopPropagation();
               actions.closeWindow(state.id);
             }}
-            title="Tutup"
+            title={isZone ? undefined : 'Tutup'}
+            disabled={isZone}
           >
             <svg
               viewBox="0 0 12 12"
               width={8}
               height={8}
-              className="opacity-0 transition-opacity group-hover:opacity-100"
+              className={isZone ? 'opacity-0' : 'opacity-0 transition-opacity group-hover:opacity-100'}
               style={{ color: 'rgba(0,0,0,0.6)' }}
             >
               <path
@@ -380,13 +385,14 @@ export default function AdminWindowFrame({ state, actions, children }: AdminWind
               e.stopPropagation();
               actions.minimizeWindow(state.id);
             }}
-            title="Minimize"
+            title={isZone ? undefined : 'Minimize'}
+            disabled={isZone}
           >
             <svg
               viewBox="0 0 12 12"
               width={8}
               height={8}
-              className="opacity-0 transition-opacity group-hover:opacity-100"
+              className={isZone ? 'opacity-0' : 'opacity-0 transition-opacity group-hover:opacity-100'}
               style={{ color: 'rgba(0,0,0,0.6)' }}
             >
               <path d="M2 6h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -414,13 +420,14 @@ export default function AdminWindowFrame({ state, actions, children }: AdminWind
               e.stopPropagation();
               actions.toggleMaximize(state.id);
             }}
-            title={isMax ? 'Restore' : 'Maximize'}
+            title={isZone ? undefined : isMax ? 'Restore' : 'Maximize'}
+            disabled={isZone}
           >
             <svg
               viewBox="0 0 12 12"
               width={8}
               height={8}
-              className="opacity-0 transition-opacity group-hover:opacity-100"
+              className={isZone ? 'opacity-0' : 'opacity-0 transition-opacity group-hover:opacity-100'}
               style={{ color: 'rgba(0,0,0,0.6)' }}
             >
               {isMax ? (
@@ -468,7 +475,9 @@ export default function AdminWindowFrame({ state, actions, children }: AdminWind
       <div className="admin-window-content">{children}</div>
 
       {/* Resize handle */}
-      {!isMax && <div className="admin-window-resize-handle" onMouseDown={handleResizeStart} />}
+      {!isMax && !isZone && (
+        <div className="admin-window-resize-handle" onMouseDown={handleResizeStart} />
+      )}
     </div>
   );
 }

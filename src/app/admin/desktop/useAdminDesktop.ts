@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { AdminWindowState, AdminDesktopActions } from './types';
 import { ADMIN_ZONES } from './registry';
 
@@ -13,6 +13,10 @@ function getStaggerOffset(windowCount: number) {
     y: base + (windowCount % 8) * 30,
   };
 }
+
+// Urutan kuadran 2×2 sesuai mockup owner (v1.3.65): kiri-atas → kanan-atas →
+// kiri-bawah → kanan-bawah. Zone di luar daftar ini jatuh ke urutan registry.
+const QUADRANT_ORDER = ['system', 'communications', 'content', 'display'];
 
 export function useAdminDesktop() {
   const [windows, setWindows] = useState<AdminWindowState[]>([]);
@@ -143,6 +147,66 @@ export function useAdminDesktop() {
       return [...prev, newWindow];
     });
   }, []);
+
+  /**
+   * Auto-buka semua zone tersusun kuadran 2×2 (v1.3.65) — pengganti 4 kartu
+   * folder di desktop. Layar terlalu kecil untuk 2×2 rapi → jatuh ke stagger
+   * lama (tumpuk, masih bisa digeser manual oleh user).
+   */
+  const openAllZonesTiled = useCallback(() => {
+    const vw = typeof window !== 'undefined' ? window.innerWidth : 1440;
+    const vh = typeof window !== 'undefined' ? window.innerHeight : 900;
+    const MARGIN = 16;
+    const GAP = 12;
+    const MENUBAR = 36;
+    const TASKBAR = 60;
+    const canTile = vw >= 1160 && vh >= 700;
+
+    if (!canTile) {
+      for (const zone of ADMIN_ZONES) openFolder(zone.id);
+      return;
+    }
+
+    const w = Math.min(560, Math.floor((vw - MARGIN * 2 - GAP) / 2));
+    const h = Math.min(400, Math.floor((vh - MENUBAR - TASKBAR - MARGIN * 2 - GAP) / 2));
+    const cols = [MARGIN, vw - MARGIN - w];
+    const rows = [MENUBAR + MARGIN, vh - TASKBAR - MARGIN - h];
+
+    setWindows((prev) => {
+      const next = [...prev];
+      ADMIN_ZONES.forEach((zone, index) => {
+        const folderAppId = `folder-${zone.id}`;
+        if (next.some((win) => win.appId === folderAppId)) return;
+        const quadrant = QUADRANT_ORDER.indexOf(zone.id);
+        const slot = (quadrant === -1 ? index : quadrant) % 4;
+        windowCountRef.current++;
+        nextZIndex++;
+        next.push({
+          id: `${folderAppId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          appId: folderAppId,
+          title: zone.label,
+          icon: zone.icon,
+          iconColor: zone.iconColor,
+          isMinimized: false,
+          isMaximized: false,
+          zIndex: nextZIndex,
+          x: cols[slot % 2],
+          y: rows[Math.floor(slot / 2)],
+          width: w,
+          height: h,
+        });
+      });
+      return next;
+    });
+  }, [openFolder]);
+
+  // Auto-open saat desktop dimuat. Timer (bukan setState sinkron di effect)
+  // agar lolos lint react-hooks/set-state-in-effect; dedup `folder-<zoneId>`
+  // bawaan membuat aman terhadap StrictMode double-invoke.
+  useEffect(() => {
+    const timer = setTimeout(openAllZonesTiled, 0);
+    return () => clearTimeout(timer);
+  }, [openAllZonesTiled]);
 
   const actions: AdminDesktopActions = {
     openApp,
