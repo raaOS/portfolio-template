@@ -329,7 +329,7 @@ function ContactInfoForm({ info, onUpdate }: ContactInfoFormProps) {
       placeholder: '6281234567890',
       value: whatsapp,
       onChange: setWhatsapp,
-      hint: 'Format internasional tanpa + (contoh: 6281234567890) — dipakai tombol "Mulai Obrolan WhatsApp".',
+      hint: 'Dipakai fitur chat — pesan pengunjung diteruskan ke WhatsApp-mu. Format: 6281234567890 (tanpa +).',
     },
     {
       key: 'address',

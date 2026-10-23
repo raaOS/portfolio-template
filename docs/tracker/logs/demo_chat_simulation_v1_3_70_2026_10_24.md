@@ -39,3 +39,10 @@ kembali jalur legacy "pesan disimpan D1 tak dibaca siapa pun" (buruk untuk demo 
   (screenshot `AppData\Local\Temp\opencode\demo_e2e_after.png`); `agent-browser tab list` hanya 1 tab —
   **nol popup wa.me** ✓; D1 setelah test: app_kv kunci chat/visitor = 0, `submissions` = 0,
   `audit_logs` 2 jam terakhir = 0 → **demo benar-benar tidak menulis apa pun** ✓
+
+## Tweak pasca-rilis (2026-10-24, ijin owner)
+
+Hint kolom WhatsApp di `/admin/communications/contacts` diperbarui: sebelumnya hanya menyebut
+"tombol Mulai Obrolan WhatsApp", kini menjelaskan fungsinya dengan benar — nomor itu dipakai
+fitur chat (pesan pengunjung diteruskan ke WA admin), format 6281234567890. Satu baris teks,
+logika tak tersentuh (tsc 0, lint 0, 144 file/1197 test PASS).
