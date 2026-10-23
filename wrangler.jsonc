@@ -44,6 +44,21 @@
     // `docs/tracker/logs/cron_worker_secrets_2026_10_03.md` bagian uji fire.
     "crons": ["0 18 * * *"]
   },
+  // Batas subrequest per invokasi.
+  //
+  // Diperlukan oleh cron harian: Worker ini TIDAK punya binding D1, sehingga
+  // setiap operasi D1 ditempuh keluar lewat fetch() ke api.cloudflare.com, yang
+  // terhitung subrequest eksternal. `bootstrapD1Schema()` saja memakai 24
+  // panggilan per isolate dingin, ditambah backup harian dan 2 tulisan hasil
+  // probe — melewati batas 50 bawaan dan membuat tulisan gagal dengan pesan
+  // "Too many subrequests by single Worker invocation" (terbukti 2026-10-23).
+  //
+  // Nilai 500 memberi ruang besar untuk cron sekaligus tetap membatasi runaway.
+  // Kalau paket akun ternyata gratis (dibatasi 50), nilai ini akan di-clamp dan
+  // kegagalannya terlihat lagi lewat `workerHealthRecordError` di respons cron.
+  "limits": {
+    "subrequests": 500
+  },
   "observability": {
     "enabled": true
   }
