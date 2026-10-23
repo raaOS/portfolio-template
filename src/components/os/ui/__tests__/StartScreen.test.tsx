@@ -118,4 +118,38 @@ describe('StartScreen — HELLO hitam diputar sampai selesai (v1.3.37)', () => {
     expect(onStart).toHaveBeenCalledTimes(1);
     unmount();
   });
+
+  // ─── CRUD Intro Animasi (v1.3.42): prop style ────────────────────────────
+  it('style default hello-black: latar putih (perilaku lama tidak berubah)', () => {
+    vi.useFakeTimers();
+    render(<StartScreen onStart={vi.fn()} isActive />);
+
+    const el = screen.getByTestId('os-start-screen');
+    expect(el).toHaveAttribute('data-intro-style', 'hello-black');
+    expect(el.className).toContain('bg-white');
+    expect(el.className).not.toContain('bg-black');
+  });
+
+  it('style hello-orange: latar hitam', () => {
+    vi.useFakeTimers();
+    render(<StartScreen onStart={vi.fn()} isActive style="hello-orange" />);
+
+    const el = screen.getByTestId('os-start-screen');
+    expect(el).toHaveAttribute('data-intro-style', 'hello-orange');
+    expect(el.className).toContain('bg-black');
+    expect(el.className).not.toContain('bg-white');
+  });
+
+  it('style hello-orange tetap menjalankan boot normal saat onComplete', () => {
+    vi.useFakeTimers();
+    const onStart = vi.fn();
+    render(<StartScreen onStart={onStart} isActive style="hello-orange" />);
+
+    act(() => {
+      onComplete();
+      vi.advanceTimersByTime(650);
+    });
+
+    expect(onStart).toHaveBeenCalledTimes(1);
+  });
 });

@@ -72,6 +72,10 @@ export default function InfiniteCanvasRenderer({ data }: TemplateRendererProps) 
   // Batasi tepat 10 aset proyek dari 21 proyek yang tersedia
   const displayProjects = projects ? projects.slice(0, 10) : [];
 
+  // CRUD "Intro Animasi" (v1.3.42): gaya intro dari aboutData.introConfig,
+  // default 'hello-orange' (perilaku v1.3.36). 'none' = tanpa intro.
+  const introStyle = about?.introConfig?.['infinite-canvas'] ?? 'hello-orange';
+
   // Deteksi sesi admin dan CSRF token
   const { isAdmin, csrfToken } = useAdminAuth();
 
@@ -315,8 +319,10 @@ export default function InfiniteCanvasRenderer({ data }: TemplateRendererProps) 
       onPointerLeave={handlePointerUp}
     >
       {/* Intro HELLO (v1.3.36): animasi diputar sampai selesai satu putaran
-          penuh, baru fade-out menampilkan kanvas. */}
-      <HelloIntro />
+          penuh, baru fade-out menampilkan kanvas. Gaya ('hello-orange' /
+          'hello-black') & penyematan ('none' = tanpa intro) diatur lewat CRUD
+          Intro Animasi (v1.3.42). */}
+      {introStyle !== 'none' && <HelloIntro style={introStyle} />}
 
       {/* Corner decorative brackets */}
       <CornerBrackets />

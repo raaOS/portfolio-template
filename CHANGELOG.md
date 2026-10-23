@@ -3,6 +3,21 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.42] - 2026-10-14
+
+### 🎬 CRUD "Intro Animasi": Pilih Loader Pembuka per Template + Perbaikan Cacat Logika Intro
+
+Sebelumnya animasi intro/loader pembuka di-hardcode per template (os-desktop = HELLO hitam; infinite-canvas & spatial-gallery = HELLO oranye) dan **tidak bisa diatur dari CRUD mana pun**. Kini klien bisa memilih gaya intro langsung dari panel admin, sekaligus dua cacat logika pada intro ditutup.
+
+- **Fitur baru: sub-tab "Intro Animasi"** di panel **Tampilan & Desktop** (`/admin/system/appearance`). Tiga kartu template (macOS Desktop, Infinite Canvas, Spatial Gallery), masing-masing dengan pilihan: **HELLO Hitam** (latar putih), **HELLO Oranye** (latar hitam), atau **Tanpa Intro**. Map lengkap 3 template selalu dikirim saat simpan.
+- **Penyimpanan di blob `about`** (key `introConfig`) lewat `PUT /api/about` — tanpa tabel baru, tanpa migrasi database. Kontrak zod `.strict()`: nilai/template di luar allowlist langsung ditolak 400 (typo tidak tersimpan diam-diam). Default aman saat config kosong = **perilaku persis versi sebelumnya** (os-desktop hitam, dua lainnya oranye) — klien lama tidak terpengaruh.
+- **Perbaikan cacat logika C1 — `HelloIntro` loop selamanya / layar hitam permanen:** overlay kini punya **jaring pengaman absolut 30 detik** yang memaksa fade-out meski (a) sinyal selesai lottie tak pernah fire (chunk `lottie-react` gagal dimuat) maupun (b) `ready` tak pernah `true` (WebGL gagal / scene 3D terlambat siap — sebelumnya HELLO mengulang tanpa henti karena `ready` menunggu `onReady` scene yang tidak pernah datang).
+- **Perbaikan cacat logika C2 — perubahan config tidak tampil di halaman preview:** `PUT /api/about` kini ikut me-revalidate `/preview/os-desktop`, `/preview/infinite-canvas`, dan `/preview/spatial-gallery` (sebelumnya hanya `/` + `/about` → demo preview basi sampai ISR 60 detik kebakar sendiri).
+- **os-desktop "Tanpa Intro":** boot screen dilewati lewat jalur `skipBoot()` yang sudah ada (mesin reveal skipped-boot teruji) — tanpa membongkar state machine boot; pengunjung langsung melihat desktop dengan transisi fade khas skipped-boot.
+- **`StartScreen` & `HelloIntro` keduanya menerima prop `style`** (`hello-black` | `hello-orange`) yang menukar JSON lottie + warna latar; seluruh perilaku boot lama (skip klik/keyboard, jaring pengaman 15 detik, penanda sessionStorage) tidak berubah.
+- **Test baru 12 kasus:** HelloIntro (5: fade normal, varian hitam, ready=false→safety, tanpa sinyal→safety, tanpa dobel fade), StartScreen (3: default latar putih, hello-orange latar hitam, boot tetap jalan), skema zod introConfig (4: map lengkap, map parsial, nilai asing ditolak, key asing ditolak).
+- **Dicatat, tidak diubah:** suara `startup` os-desktop hanya berbunyi saat skip manual (klik/keyboard), bukan saat boot selesai — diduga disengaja sejak v1.3.37, di luar scope sprint ini.
+
 ## [1.3.41] - 2026-10-13
 
 ### 🎭 Redesain Total Storefront: Panggung Demo Live (LiveStage) + Modal Konversi

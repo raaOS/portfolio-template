@@ -19,6 +19,10 @@ export default function SpatialGalleryRenderer({ data }: { data?: { projects?: P
   const projects = useMemo(() => projectsRaw ?? [], [projectsRaw])
   const spatialGalleryConfig = data?.about?.spatialGalleryConfig
 
+  // CRUD "Intro Animasi" (v1.3.42): gaya intro dari aboutData.introConfig,
+  // default 'hello-orange' (perilaku v1.3.36). 'none' = tanpa intro.
+  const introStyle = data?.about?.introConfig?.['spatial-gallery'] ?? 'hello-orange'
+
   const tubeScrollTarget = useRef(0)
   const tubeSpinVelocity = useRef(0)
   const tubeNaturalDir = useRef(1)
@@ -217,8 +221,11 @@ export default function SpatialGalleryRenderer({ data }: { data?: { projects?: P
 
         {/* Intro HELLO (v1.3.36): animasi diputar sampai selesai satu putaran
             penuh — baru fade-out menampilkan galeri. Disembunyikan lebih awal
-            kalau scene 3D sudah siap sebelum animasi selesai (ready). */}
-        <HelloIntro ready={sceneReady} />
+            kalau scene 3D sudah siap sebelum animasi selesai (ready).
+            Gaya & penyematan ('none' = tanpa intro) diatur lewat CRUD Intro
+            Animasi (v1.3.42); HelloIntro punya jaring pengaman absolut 30 dtk
+            sehingga kegagalan WebGL tak membuat loop selamanya. */}
+        {introStyle !== 'none' && <HelloIntro ready={sceneReady} style={introStyle} />}
 
         {/* Brand overlay */}
         <div className="absolute bottom-6 left-6 z-10 text-white/80 text-sm font-semibold tracking-wide select-none pointer-events-none">

@@ -3,16 +3,21 @@
 import dynamic from 'next/dynamic';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { m } from 'motion/react';
-import helloAnimationData from '../../../../public/lottie/hello hitam.json';
+import helloHitamAnimationData from '../../../../public/lottie/hello hitam.json';
+import helloOrangeAnimationData from '../../../../public/lottie/hello orange.json';
 import { soundManager } from '../utils/SoundManager';
 
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
+
+/** Gaya intro os-desktop (CRUD "Intro Animasi" v1.3.42). Default 'hello-black'. */
+export type StartScreenStyle = 'hello-black' | 'hello-orange';
 
 interface StartScreenProps {
   onStart: () => void;
   isActive: boolean;
   onReady?: () => void;
   onReveal?: () => void;
+  style?: StartScreenStyle;
 }
 
 type ScreenState = 'idle' | 'booting' | 'done';
@@ -29,7 +34,13 @@ const BOOT_CONFIG = {
   completeDelay: 650,
 };
 
-const StartScreen = ({ onStart, isActive, onReady, onReveal }: StartScreenProps) => {
+const StartScreen = ({
+  onStart,
+  isActive,
+  onReady,
+  onReveal,
+  style = 'hello-black',
+}: StartScreenProps) => {
   const [screenState, setScreenState] = useState<ScreenState>('idle');
   const timersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const revealRafRef = useRef<number | null>(null);
@@ -120,14 +131,21 @@ const StartScreen = ({ onStart, isActive, onReady, onReveal }: StartScreenProps)
     return null;
   }
 
+  // Varian HELLO mengikuti CRUD "Intro Animasi" (v1.3.42): hitam = latar
+  // putih (default), oranye = latar hitam. Perilaku boot tidak berubah.
+  const isOrangeVariant = style === 'hello-orange';
+
   return (
     <m.button
       id="start-screen"
       type="button"
       data-testid="os-start-screen"
       data-boot-state={screenState}
+      data-intro-style={style}
       aria-label="Mulai Portfolio OS"
-      className="fixed inset-0 z-[999999] flex h-full w-full cursor-pointer select-none items-center justify-center overflow-hidden bg-white p-6 text-black outline-none print:hidden"
+      className={`fixed inset-0 z-[999999] flex h-full w-full cursor-pointer select-none items-center justify-center overflow-hidden p-6 outline-none print:hidden ${
+        isOrangeVariant ? 'bg-black text-white' : 'bg-white text-black'
+      }`}
       initial={{ y: '0%' }}
       animate={{ y: screenState === 'booting' ? '-100%' : '0%' }}
       transition={{
@@ -151,7 +169,7 @@ const StartScreen = ({ onStart, isActive, onReady, onReveal }: StartScreenProps)
             auto-start 1,2 detik memotong animasi sehingga tulisan HELLO sering
             tak sempat tampil (laporan owner v1.3.37). */}
         <Lottie
-          animationData={helloAnimationData}
+          animationData={isOrangeVariant ? helloOrangeAnimationData : helloHitamAnimationData}
           loop={false}
           autoplay
           onComplete={() => handleStart({ playSound: false })}

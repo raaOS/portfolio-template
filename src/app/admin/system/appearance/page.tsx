@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, lazy, Suspense } from 'react';
-import { Monitor, Image as ImageIcon, Box } from 'lucide-react';
+import { Monitor, Image as ImageIcon, Box, PlayCircle } from 'lucide-react';
 import { AdminAuthGuard } from '../../components/AdminAuthGuard';
 import { AdminHeader } from '../../components/components/AdminHeader';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
@@ -9,6 +9,7 @@ import { useAdminSystem } from '../../hooks/useAdminSystem';
 import { useAdminContent } from '../../hooks/useAdminContent';
 import WallpaperManager from '../components/WallpaperManager';
 import DesktopProjectsForm from '../components/DesktopProjectsForm';
+import IntroConfigManager from '../components/IntroConfigManager';
 import AdminLoading from '@/components/admin/AdminLoading';
 
 const SpatialModelManager = lazy(() => import('../components/SpatialModelManager'));
@@ -25,7 +26,9 @@ function AppearanceClientContent() {
 
   const { projects } = useAdminContent(csrfToken);
 
-  const [activeSubTab, setActiveSubTab] = useState<'wallpaper' | 'desktop' | 'spatial'>('wallpaper');
+  const [activeSubTab, setActiveSubTab] = useState<'wallpaper' | 'desktop' | 'spatial' | 'intro'>(
+    'wallpaper'
+  );
 
   if (loading && !systemData) {
     return (
@@ -95,6 +98,17 @@ function AppearanceClientContent() {
             <Box className="h-4 w-4" />
             Objek 3D Spatial
           </button>
+          <button
+            onClick={() => setActiveSubTab('intro')}
+            className={`flex items-center gap-2 border-b-2 px-6 py-3 text-sm font-semibold transition-all ${
+              activeSubTab === 'intro'
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+            }`}
+          >
+            <PlayCircle className="h-4 w-4" />
+            Intro Animasi
+          </button>
         </div>
 
         {/* Tab Content */}
@@ -131,7 +145,7 @@ function AppearanceClientContent() {
                 onUpdate={(data) => handleUpdateSystem({ desktopPreferences: data })}
               />
             </div>
-          ) : (
+          ) : activeSubTab === 'spatial' ? (
             <div className="space-y-8">
               <div className="mb-6 rounded-lg border border-purple-200 bg-purple-50 p-4">
                 <h3 className="flex items-center gap-2 font-bold text-purple-800">
@@ -150,6 +164,12 @@ function AppearanceClientContent() {
                 />
               </Suspense>
             </div>
+          ) : (
+            <IntroConfigManager
+              data={systemData.introConfig}
+              onUpdate={(cfg) => handleUpdateSystem({ introConfig: cfg })}
+              isLoading={systemIsPlaceholder}
+            />
           )}
         </div>
       </div>

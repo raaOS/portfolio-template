@@ -198,6 +198,7 @@ export interface AboutData {
   islandNotifications?: AboutIslandNotification[];
   soundConfig?: SoundConfig;
   spatialGalleryConfig?: SpatialGalleryConfig;
+  introConfig?: IntroConfig;
 
   labels?: {
     experienceTitle?: string;
@@ -216,6 +217,19 @@ export interface SpatialGalleryConfig {
   modelScale?: number; // scale multiplier: 0.5 to 2.0 (default: 1.0)
 }
 
+/**
+ * Gaya animasi intro/loader pembuka (CRUD "Intro Animasi" — v1.3.42).
+ * - `hello-black`  = lottie HELLO varian hitam di latar putih (gaya os-desktop).
+ * - `hello-orange` = lottie HELLO varian oranye di latar hitam (gaya HelloIntro).
+ * - `none`         = tanpa intro, halaman langsung tampil.
+ */
+export type IntroStyle = 'hello-black' | 'hello-orange' | 'none';
+
+export type IntroTemplateKey = 'os-desktop' | 'infinite-canvas' | 'spatial-gallery';
+
+/** Pilihan gaya intro per template. Key yang tidak diisi memakai default template. */
+export type IntroConfig = Partial<Record<IntroTemplateKey, IntroStyle>>;
+
 export interface UpdateAboutData {
   hero?: Partial<AboutHero>;
   professional?: Partial<AboutProfessional>;
@@ -230,6 +244,7 @@ export interface UpdateAboutData {
   islandNotifications?: AboutIslandNotification[];
   soundConfig?: SoundConfig;
   spatialGalleryConfig?: SpatialGalleryConfig;
+  introConfig?: IntroConfig;
 
   labels?: Partial<AboutData['labels']>;
 }

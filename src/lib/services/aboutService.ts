@@ -159,6 +159,9 @@ export const aboutService = {
           updates.spatialGalleryConfig !== undefined
             ? updates.spatialGalleryConfig
             : current.spatialGalleryConfig,
+        // Intro loader per template (v1.3.42) — pola replace-per-map sama
+        // seperti spatialGalleryConfig; UI selalu mengirim map lengkap.
+        introConfig: updates.introConfig !== undefined ? updates.introConfig : current.introConfig,
 
         lastUpdated: new Date().toISOString(),
       };

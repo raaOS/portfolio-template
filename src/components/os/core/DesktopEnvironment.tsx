@@ -25,7 +25,7 @@ import { useDesktopLayout } from '../hooks/useDesktopLayout';
 import { useDesktopIcons } from '../hooks/useDesktopIcons';
 import { useDesktopNavigation } from '../hooks/useDesktopNavigation';
 import { useOSOverlays, useOSBoot } from '../context/OSSystemContext';
-import type { AboutData } from '@/types/about';
+import type { AboutData, IntroStyle } from '@/types/about';
 import type { ExperienceData } from '@/types/experience';
 import type { HardSkillsData } from '@/types/hardSkill';
 import type { Project } from '@/types/projects';
@@ -237,7 +237,7 @@ function DesktopMain({
   isWhatsAppEnabled,
   bootSequence,
 }: DesktopMainProps) {
-  const { needsPowerOn, isBooting, finishBooting } = bootSequence;
+  const { needsPowerOn, isBooting, finishBooting, skipBoot } = bootSequence;
   const { startScreenReady, setStartScreenReady, isRevealed, setIsRevealed } = useOSBoot();
   const {
     notesVisible,
@@ -248,6 +248,19 @@ function DesktopMain({
     setShowMissionControl,
   } = useOSOverlays();
   const wasBootSkipped = !needsPowerOn && !isBooting;
+
+  // CRUD "Intro Animasi" (v1.3.42): gaya intro os-desktop dibaca dari
+  // aboutData.introConfig (default 'hello-black'). Pilihan 'none' melewati
+  // StartScreen sepenuhnya — boot di-skip lewat jalur skipBoot yang sudah ada
+  // (effek sinkronisasi skipped-boot di bawah akan me-reveal desktop +
+  // memasang penanda sessionStorage, sama seperti navigasi internal).
+  const osIntroStyle: IntroStyle = aboutData?.introConfig?.['os-desktop'] ?? 'hello-black';
+
+  useEffect(() => {
+    if (osIntroStyle === 'none' && (needsPowerOn || isBooting)) {
+      skipBoot();
+    }
+  }, [osIntroStyle, needsPowerOn, isBooting, skipBoot]);
   const [desktopEntranceReady, setDesktopEntranceReady] = React.useState(false);
   const [windowsEntranceReady, setWindowsEntranceReady] = React.useState(false);
   const [notesEntranceReady, setNotesEntranceReady] = React.useState(false);
@@ -683,6 +696,7 @@ function DesktopMain({
               key="start-screen"
               onStart={handleBootComplete}
               isActive={needsPowerOn || isBooting}
+              style={osIntroStyle === 'hello-orange' ? 'hello-orange' : 'hello-black'}
               onReady={() => {
                 // `body::before` only protects the SSR gap before
                 // StartScreen mounts. Keeping it during the Lottie boot

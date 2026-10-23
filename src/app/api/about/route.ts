@@ -53,8 +53,16 @@ export async function PUT(request: NextRequest) {
     // Invalidate cache agar visitor langsung lihat perubahan
     invalidateAboutCache();
 
-    // Revalidate ISR pages
-    await revalidateSiteContentPaths(siteId, ['/', '/about']);
+    // Revalidate ISR pages — sertakan /preview/* (v1.3.42): halaman demo
+    // preview memakai renderer & intro yang sama, tanpa ini perubahan intro
+    // config hanya tampil di `/` sedangkan preview basi sampai ISR 60 dtk.
+    await revalidateSiteContentPaths(siteId, [
+      '/',
+      '/about',
+      '/preview/os-desktop',
+      '/preview/infinite-canvas',
+      '/preview/spatial-gallery',
+    ]);
 
     return NextResponse.json({
       success: true,

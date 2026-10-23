@@ -317,6 +317,18 @@ const spatialGalleryConfigSchema = z
   })
   .strict();
 
+// CRUD "Intro Animasi" (v1.3.42): pilihan gaya loader/intro pembuka per
+// template. Key literal per template + .strict() agar ketik salah ketik
+// (typo) langsung 400, bukan tersimpan diam-diam.
+const introStyleSchema = z.enum(['hello-black', 'hello-orange', 'none']);
+const introConfigSchema = z
+  .object({
+    'os-desktop': introStyleSchema.optional(),
+    'infinite-canvas': introStyleSchema.optional(),
+    'spatial-gallery': introStyleSchema.optional(),
+  })
+  .strict();
+
 export const updateAboutSchema = z
   .object({
     hero: aboutHeroSchema.partial().optional(),
@@ -331,6 +343,7 @@ export const updateAboutSchema = z
     soundConfig: z.record(z.string(), soundSettingSchema).optional(),
     labels: aboutLabelsSchema.optional(),
     spatialGalleryConfig: spatialGalleryConfigSchema.optional(),
+    introConfig: introConfigSchema.optional(),
   })
   .strict()
   .refine(

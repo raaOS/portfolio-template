@@ -278,6 +278,38 @@ describe('updateAboutSchema layout preferences', () => {
   });
 });
 
+describe('updateAboutSchema introConfig (CRUD Intro Animasi v1.3.42)', () => {
+  it('accepts a full per-template map', () => {
+    const result = updateAboutSchema.safeParse({
+      introConfig: {
+        'os-desktop': 'hello-orange',
+        'infinite-canvas': 'none',
+        'spatial-gallery': 'hello-black',
+      },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts a partial map (key tidak diisi memakai default template)', () => {
+    const result = updateAboutSchema.safeParse({ introConfig: { 'os-desktop': 'none' } });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects unknown style values', () => {
+    const result = updateAboutSchema.safeParse({
+      introConfig: { 'os-desktop': 'rainbow' },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects unknown template keys (.strict — typo tidak boleh tersimpan diam-diam)', () => {
+    const result = updateAboutSchema.safeParse({
+      introConfig: { 'osdesktop': 'hello-black' },
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
 describe('wallpaperSchema', () => {
   it('accepts valid wallpaper with all fields', () => {
     const result = wallpaperSchema.safeParse({
