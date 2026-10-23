@@ -32,4 +32,10 @@ kembali jalur legacy "pesan disimpan D1 tak dibaca siapa pun" (buruk untuk demo 
 ## Gerbang
 
 - typegen → tsc: 0 · lint: 0 · vitest: **144 file / 1197 test PASS** (+1 test demo)
-- Deploy: (diisi setelah jalan) — verifikasi `/api/health` version 1.3.70
+- Deploy: Version `99c911bf-f771-431c-8b03-c5891996fd6e`; `/api/health` prod = `version: 1.3.70,
+  db connected, stale false, p95 156 ms`
+- E2E nyata di prod (`/preview/os-desktop?app=contact`, 2026-10-24): kirim "Tes mode demo dari agent"
+  → balon pengunjung ✓ → 2 balon admin (notice + reply) muncul ±2 detik ✓
+  (screenshot `AppData\Local\Temp\opencode\demo_e2e_after.png`); `agent-browser tab list` hanya 1 tab —
+  **nol popup wa.me** ✓; D1 setelah test: app_kv kunci chat/visitor = 0, `submissions` = 0,
+  `audit_logs` 2 jam terakhir = 0 → **demo benar-benar tidak menulis apa pun** ✓
