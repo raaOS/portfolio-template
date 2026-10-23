@@ -3,6 +3,19 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.40] - 2026-10-13
+
+### 🚀 Landing Storefront: Wave Reel 1 Section — 3 Demo Live & Tombol Pesan WhatsApp
+
+- **Homepage deployment storefront diganti total (hanya bila `STOREFRONT=true`):** satu section "wave reel" terinspirasi saurow-reel — nav (logo + **harga** + tombol **Pesan** yang selalu terlihat) → runway sticky ±380vh (desktop) / 300vh (mobile) berisi **3 kartu demo template berisi iframe live** yang bergeser horizontal mengikuti scroll vertikal → mini footer (harga, Pesan, Syarat & Ketentuan, Kebijakan Privasi, © tahun). Section "Fitur Utama" + grid statis lama dihapus. **Situs klien non-storefront tidak terpengaruh.**
+- **Gelombang (wave) 60 fps tanpa library baru:** kecepatan scroll diubah jadi amplitudo gelombang CSS 3D (angkat + kedalaman + tilt) yang luruh kembali rata saat scroll berhenti; pita "tak terbatas" hanya dengan 3 kartu (double-modulo) sehingga tidak ada iframe duplikat; transform ditulis langsung ke `style` di rAF (tanpa setState per frame) dan loop berhenti saat idle/tab tersembunyi. Verifikasi browser: **194 frame / 1,6 dtk ≈ 60 fps, frame terlama 16,2 ms, 0 long frame**.
+- **Beban awal dijaga:** 3 iframe live baru di-mount setelah section terlihat (IntersectionObserver), `loading="lazy"`, `pointer-events:none`, route `/preview/<slug>` memakai ISR 60 dtk.
+- **Klik kartu → popup:** **Live Preview** membuka `/preview/<slug>` di tab baru (`rel=noopener`), **Pesan** membuka WhatsApp `https://wa.me/<nomor>` dengan pesan siap kirim (nama template + harga + link `/checkout` absolut) — **nomor kosong → otomatis diarahkan ke `/checkout`**. Popup punya focus trap, tutup dengan Esc/backdrop, dan kunci scroll tanpa lompat layout.
+- **Nomor WhatsApp kini bisa diubah tanpa deploy:** disimpan di D1 `platform_settings` key `owner_whatsapp` (8–15 digit), diedit lewat panel **Harga Jual** (owner-only), dibaca publik lewat rantai fallback `owner_whatsapp` → `NEXT_PUBLIC_ADMIN_WA` → `payment_config` lama. Endpoint `payment-config` yang lama tetap tidak dihidupkan lagi.
+- **Penempatan harga gampang diatur:** satu konstanta `PRICE_PLACEMENT = { nav, footer, modal }` di puncak `src/components/landing/LandingPage.tsx`. Harga ikut mengecil (bukan hilang) di layar <560px.
+- **Aksesibilitas & kualitas:** satu `h1`, kartu bisa dijangkau keyboard, `prefers-reduced-motion` → baris kartu statis tanpa gelombang (terverifikasi unit test + CSS), first-paint tanpa kartu menumpuk (fallback transform CSS), halaman legal (`/syarat-ketentuan`, `/kebijakan-privasi`) tetap memakai CSS `.landing-doc` yang sama.
+- **Verifikasi:** `tsc --noEmit` 0 error · `npm run lint` bersih · **131 file / 1044 test lulus** (9 test baru: `reelData.test.ts` + `useReelMotion.test.tsx`) · QA browser desktop 800px + 1280px + mobile 390px. Log detail: `docs/tracker/logs/landing_wave_reel_2026_10_12.md`.
+
 ## [1.3.39] - 2026-10-12
 
 ### 🛠️ Portal Onboarding: Tab "Peta Bisnis" Kembali Menampilkan Kedua Diagram

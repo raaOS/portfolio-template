@@ -68,6 +68,107 @@ export function clearBasePriceCache(): void {
   priceCache = null;
 }
 
+// ── Nomor WhatsApp owner (kontak "Pesan") ──────────────────────────────────
+//
+// Disimpan terpisah dari harga (key `owner_whatsapp`) supaya owner bisa
+// ganti-ganti nomor WA tanpa deploy: diedit dari panel admin "Harga Jual",
+// dibaca halaman jualan `/` (ISR 60 dtk) dan `getPublicPaymentInfo()`
+// (dipakai halaman order). Fallback terakhir = env `NEXT_PUBLIC_ADMIN_WA`.
+const WA_SETTINGS_KEY = 'owner_whatsapp';
+const WA_CACHE_TTL_MS = 60_000;
+let waCache: { value: string; loadedAt: number } | null = null;
+
+/**
+ * Menormalkan input nomor WA menjadi murni digit (wa.me hanya menerima
+ * digit). String kosong SAH = owner ingin mengosongkan nomor (tombol "Pesan"
+ * lalu jatuh ke `/checkout`). Guardrail 8–15 digit sesuai panjang nomor
+ * internasional.
+ */
+export function normalizeWhatsappNumber(value: unknown): {
+  valid: boolean;
+  error?: string;
+  value: string;
+} {
+  if (value === null || value === undefined) return { valid: true, value: '' };
+  const digits = String(value).replace(/\D/g, '');
+  if (digits.length === 0) return { valid: true, value: '' };
+  if (digits.length < 8 || digits.length > 15) {
+    return {
+      valid: false,
+      error: 'Nomor WhatsApp harus 8–15 digit (contoh: 6281234567890).',
+      value: '',
+    };
+  }
+  return { valid: true, value: digits };
+}
+
+/** Bersihkan cache nomor WA (dipakai unit test; `updateOwnerWhatsapp` memanggil ini otomatis). */
+export function clearOwnerWhatsappCache(): void {
+  waCache = null;
+}
+
+/**
+ * Membaca nomor WhatsApp owner dari D1 (cache 60 detik). TIDAK PERNAH
+ * melempar: kegagalan apa pun jatuh ke env `NEXT_PUBLIC_ADMIN_WA`, lalu `''`.
+ * Hasil `''` berarti tombol "Pesan" akan diarahkan ke `/checkout`.
+ */
+export async function getOwnerWhatsapp(): Promise<string> {
+  if (waCache && Date.now() - waCache.loadedAt < WA_CACHE_TTL_MS) return waCache.value;
+
+  let value = '';
+  try {
+    const rows = await queryD1<{ value: string }>(
+      'SELECT value FROM platform_settings WHERE key = ? LIMIT 1',
+      [WA_SETTINGS_KEY]
+    );
+    if (rows.length > 0 && rows[0].value) {
+      const parsed = JSON.parse(rows[0].value) as { number?: unknown };
+      const check = normalizeWhatsappNumber(parsed.number);
+      if (check.valid) value = check.value;
+    }
+  } catch (err) {
+    console.warn('[pricingConfigService] Gagal baca nomor WA owner:', err);
+  }
+
+  if (!value) {
+    const fromEnv = normalizeWhatsappNumber(process.env.NEXT_PUBLIC_ADMIN_WA);
+    if (fromEnv.valid) value = fromEnv.value;
+  }
+
+  waCache = { value, loadedAt: Date.now() };
+  return value;
+}
+
+/**
+ * Menyimpan nomor WhatsApp owner (upsert ke key `owner_whatsapp`).
+ * Mengembalikan `{ success, error? }` — tidak pernah melempar.
+ */
+export async function updateOwnerWhatsapp(
+  value: unknown
+): Promise<{ success: boolean; error?: string; adminWhatsapp?: string }> {
+  const check = normalizeWhatsappNumber(value);
+  if (!check.valid) return { success: false, error: check.error || 'Nomor tidak valid.' };
+
+  try {
+    const now = new Date().toISOString();
+    await queryD1(
+      `INSERT INTO platform_settings (key, value, updated_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(key)
+       DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+      [WA_SETTINGS_KEY, JSON.stringify({ number: check.value, updatedAt: now }), now]
+    );
+    waCache = null;
+    return { success: true, adminWhatsapp: check.value };
+  } catch (err) {
+    console.error('[pricingConfigService] Gagal simpan nomor WA owner:', err);
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Gagal menyimpan nomor',
+    };
+  }
+}
+
 /**
  * Membaca harga dasar dari D1 (cache 60 detik). Tidak pernah melempar —
  * kegagalan apa pun (tabel kosong, JSON rusak, nilai di luar batas, D1 mati)

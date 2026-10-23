@@ -1,139 +1,90 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { formatIdr, BASE_PRICE } from '@/constants/pricing';
+import ReelSection from './reel/ReelSection';
+import TemplateModal from './reel/TemplateModal';
+import { buildOrderHref, type ReelTemplate } from './reel/reelData';
 import './landing.css';
 
-const TEMPLATES = [
-  {
-    id: 'os-desktop',
-    name: 'OS Desktop',
-    description:
-      'Desktop simulator bergaya macOS — window system, dock, menu bar, dan efek visual interaktif.',
-    previewUrl: '/preview/os-desktop',
-    href: '/preview/os-desktop',
-  },
-  {
-    id: 'infinite-canvas',
-    name: 'Infinite Canvas',
-    description:
-      'Kanvas tak terbatas — drag, zoom, dan jelajahi project dalam tampilan scattered cards.',
-    previewUrl: '/preview/infinite-canvas',
-    href: '/preview/infinite-canvas',
-  },
-  {
-    id: 'spatial-gallery',
-    name: 'Spatial Gallery',
-    description:
-      'Galeri 3D dengan curved grid dan orbital artwork — jelajahi project dalam scene spatial.',
-    previewUrl: '/preview/spatial-gallery',
-    href: '/preview/spatial-gallery',
-  },
-];
-
-const FEATURES = [
-  {
-    title: 'Admin Panel',
-    description:
-      'Dashboard lengkap untuk kelola project, profil, pengalaman, skill, dan testimoni.',
-  },
-  {
-    title: 'AI Assistant',
-    description:
-      'Chatbot terintegrasi yang mendukung Gemini, OpenAI, OpenRouter, Groq, dan provider custom.',
-  },
-  {
-    title: 'Media Pipeline',
-    description:
-      'Upload langsung ke Cloudflare R2 dengan kompresi video WASM dan optimasi gambar otomatis.',
-  },
-];
+/**
+ * Penempatan tampilan harga di halaman jualan — ubah nilai di sini saja.
+ * Nilai harga itself datang dari panel admin "Harga Jual" (D1), di-inject
+ * server lewat props `basePrice`, jadi tidak perlu menyentuh kode sama sekali
+ * untuk mengganti nominal.
+ *
+ * Catatan: footer sengaja TIDAK lagi memuat blok harga/CTA (permintaan owner
+ * 2026-10-13) — footer hanya baris © tahun + link legal.
+ */
+const PRICE_PLACEMENT = {
+  nav: true,
+  modal: true,
+} as const;
 
 /**
- * Halaman jualan storefront. `basePrice` di-inject server dari D1 (panel
- * admin "Harga Jual") pada render `/` mode storefront — tanpa fetch tambahan
- * di sisi klien. Fallback: `BASE_PRICE`.
+ * Halaman jualan storefront. Harga (`basePrice`) dan nomor WhatsApp owner
+ * (`adminWhatsapp`) di-inject server dari D1 (panel "Harga Jual") pada render
+ * `/` mode storefront — tanpa fetch tambahan di sisi klien.
+ *
+ * Struktur: nav lengket → SATU section reel (3 demo live dalam iframe yang
+ * bergerak & berombak saat scroll) → footer mini (© tahun + link legal).
  */
-export default function LandingPage({ basePrice = BASE_PRICE }: { basePrice?: number }) {
+export default function LandingPage({
+  basePrice = BASE_PRICE,
+  adminWhatsapp = '',
+}: {
+  basePrice?: number;
+  adminWhatsapp?: string;
+}) {
+  const [activeTemplate, setActiveTemplate] = useState<ReelTemplate | null>(null);
+  const closeModal = useCallback(() => setActiveTemplate(null), []);
+
   const year = new Date().getFullYear();
+  const orderHref = buildOrderHref(adminWhatsapp, undefined, basePrice);
+  const opensInNewTab = orderHref.startsWith('https://');
+
+  const orderLinkProps = opensInNewTab
+    ? ({ target: '_blank', rel: 'noopener noreferrer' } as const)
+    : {};
 
   return (
     <div className="landing">
-      {/* Nav */}
-      <nav className="landing-nav">
+      <nav className="landing-nav" aria-label="Navigasi utama">
         <Link href="/" className="landing-logo">
           Make it Better Studio
         </Link>
+        <div className="landing-nav-actions">
+          {PRICE_PLACEMENT.nav && (
+            <span className="landing-nav-price">{formatIdr(basePrice)}</span>
+          )}
+          <a className="landing-btn landing-btn-sm" href={orderHref} {...orderLinkProps}>
+            Pesan
+          </a>
+        </div>
       </nav>
 
-      {/* Hero */}
-      <section className="landing-hero" id="main-content">
-        <h1>Template portfolio interaktif yang siap pakai</h1>
-        <p>
-          Tiga pilihan template — deploy ke Cloudflare, kelola lewat admin panel,
-          sesuaikan sesuka hati.
-        </p>
-      </section>
+      <main id="main-content">
+        <ReelSection onSelect={setActiveTemplate} />
 
-      {/* Template Showcase */}
-      <section className="landing-templates">
-        {TEMPLATES.map((tpl) => (
-          <article key={tpl.id} className="landing-card">
-            <div className="landing-card-preview">
-              <iframe
-                src={tpl.previewUrl}
-                title={`Preview ${tpl.name}`}
-                className="landing-card-iframe"
-                loading="lazy"
-              />
-            </div>
-            <div className="landing-card-body">
-              <h2>{tpl.name}</h2>
-              <p>{tpl.description}</p>
-              <Link
-                href={tpl.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="landing-card-link"
-              >
-                Live Preview
-              </Link>
-            </div>
-          </article>
-        ))}
-      </section>
+        <footer className="landing-footer">
+          <div className="landing-footer-meta">
+            <p>© {year} Make it Better Studio</p>
+            <p className="landing-footer-links">
+              <Link href="/syarat-ketentuan">Syarat &amp; Ketentuan</Link>
+              <Link href="/kebijakan-privasi">Kebijakan Privasi</Link>
+            </p>
+          </div>
+        </footer>
+      </main>
 
-      {/* Features */}
-      <section className="landing-features">
-        <h2 className="landing-features-heading">Fitur Utama</h2>
-        <div className="landing-features-grid">
-          {FEATURES.map((f) => (
-            <div key={f.title} className="landing-feature">
-              <h3>{f.title}</h3>
-              <p>{f.description}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Pricing CTA */}
-      <section className="landing-cta">
-        <hr className="landing-cta-divider" />
-        <p className="landing-price-label">Harga template</p>
-        <p className="landing-price">{formatIdr(basePrice)}</p>
-        <p className="landing-price-note">
-          Sekali bayar — termasuk source code, admin panel, dan setup Cloudflare.
-        </p>
-        <Link href="/checkout" className="landing-btn">
-          Pesan Sekarang
-        </Link>
-      </section>
-
-      {/* Footer */}
-      <footer className="landing-footer">
-        <p>&copy; {year} Make it Better Studio</p>
-      </footer>
+      <TemplateModal
+        template={activeTemplate}
+        basePrice={basePrice}
+        adminWhatsapp={adminWhatsapp}
+        showPrice={PRICE_PLACEMENT.modal}
+        onClose={closeModal}
+      />
     </div>
   );
 }
