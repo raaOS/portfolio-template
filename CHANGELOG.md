@@ -3,6 +3,19 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.69] - 2026-10-23
+
+### 🧹 Bersih-bersih Chat: Rute Mikrofon Diratakan, Versi Health Dibump
+
+Lanjutan jembatan WhatsApp (v1.3.68) — keputusan owner semuanya dua-duanya: **"BERSIHKAN"**.
+
+- **`/api/chat/voice` dihapus total** (route + 8 test): rute transkripsi suara Groq yang hanya jalan bila `FEATURE_AI=true` + provider groq — di demo (dan klien tanpa AI) selalu **403**. Satu-satunya pemanggil adalah tombol mikrofon footer, yang di mode WA sudah disembunyikan v1.3.68.
+- **Footer chat dirapikan**: MediaRecorder, timer, transkripsi, dan ikon mic/square/loader buang — chat kini teks + emoji, tombol kirim **selalu tampil** di kedua mode (disabled saat kosong) — tidak ada lagi tombol yang menekan 404/403. ~90 baris kode mati hilang.
+- Kata kamus yatim `chat.recording`/`chat.transcribing` (id+en) ikut dibuang; daftar CSRF tidak lagi mendaftar `/api/chat/voice`.
+- **`APP_VERSION` dibump `1.3.67` → `1.3.69`** — pertanyaan owner *"aku gak paham bump apa?"*: itu cukup ganti angka versi di konstanta (`src/lib/constants.ts`) supaya `/api/health` memajang versi rilis yang benar-benar berjalan, bukan yang bengkalai.
+- **Jalur yang TETAP hidup dan dipertahankan:** `/api/chat/send` + `/api/chat/sync` (pemicu cadangan saat nomor WA klien kosong) + fungsi orphan `addAdminReply`/`setAiMode` (fondasi jawaban admin someday).
+- Data chat produksi (`"daad"`, pengunjung asli 21:37 WIB) **dipura dari D1** setelah barisnya diback-up (`chat_rows_backup.json`): app_kv kembali **0 baris chat** — persis baseline audit v1.3.68.
+
 ## [1.3.68] - 2026-10-23
 
 ### 💬 Jendela Contact Kini Jadi Jembatan WhatsApp — Chat yang Benar-Benar Dijawab

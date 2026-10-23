@@ -76,7 +76,6 @@ export function checkCSRF(request: NextRequest) {
       '/api/auth/reset-password',
       '/api/setup',
       '/api/chat/send',
-      '/api/chat/voice',
       '/api/translate',
       '/api/admin/pin/verify',
       // Visitor-reachable mutation endpoints yang tidak memerlukan sesi admin.

@@ -115,8 +115,6 @@ export const en: Dictionary = {
     verifiedTestimonials: 'Verified Testimonials',
     noMessages: 'No messages',
     encrypted: 'End-to-End Encrypted',
-    recording: 'Recording',
-    transcribing: 'Transcribing voice...',
     inputPlaceholder: 'Type a message...',
     connectionInterrupted: 'Connection interrupted. Trying to reconnect...',
     defaultPrompt:

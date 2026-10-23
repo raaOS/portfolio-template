@@ -113,8 +113,6 @@ export const id = {
     verifiedTestimonials: 'Testimoni Terverifikasi',
     noMessages: 'Tidak ada pesan',
     encrypted: 'End-to-End Encrypted',
-    recording: 'Merekam',
-    transcribing: 'Menerjemahkan suara...',
     inputPlaceholder: 'Ketik pesan...',
     connectionInterrupted: 'Koneksi terganggu. Mencoba menghubungkan kembali...',
     defaultPrompt:
