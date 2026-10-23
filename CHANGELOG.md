@@ -3,6 +3,36 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.68] - 2026-10-23
+
+### 💬 Jendela Contact Kini Jadi Jembatan WhatsApp — Chat yang Benar-Benar Dijawab
+
+Status fitur chat template sudah diperiksa sampai ke database (Oct 2026):
+
+| Fakta | Bukti |
+|---|---|
+| Kotak chat lama berjanji "nanti aku segera balas" | `src/data/contact.json` subtext |
+| **Tidak pernah ada yang menjawab** | `FEATURE_AI=false` + key AI kosong; fungsi balasan admin (`chatStore.addAdminReply`) ada di kode tapi **tidak dipanggil oleh route/API/UI mana pun** |
+| Belum pernah dipakai pengunjung | app_kv D1 demo: **0 baris** `sessions`/`messages`/`typing` (semua bentuk key dicek) |
+| App admin "Messages" bukan chat | Ia membaca `/api/leads` (form kontak), bukan pesan chat |
+
+**Keputusan owner: chat = jembatan WhatsApp.** Jendela chat tetap ada sebagai tampilan ikonik; tombol kirim kini meneruskan pesan ke **nomor WhatsApp klien** (`wa.me`) dengan isi pesan yang diketik terbawa. Percakapan nyata terjadi di aplikasi WhatsApp klien — **di luar template** — dan dijawab langsung oleh orangnya, bukan bot. Setup klien: isi satu kolom — app admin "Contacts" → Nomor WhatsApp (kolom sudah ada sejak lama).
+
+**Yang berubah:**
+
+- `useChatSync(greeting, whatsappNumber)` — mode baru: polling 8 dtk/60 dtk **dimatikan sama sekali**, tombol kirim membuka `wa.me/<nomor>?text=<pesan>`, balon pesan tetap tampil dengan centang biru. **Nol request, nol tulis D1** — pemborong request terbesar demo hilang; anggaran harian Workers Free lega.
+- **Nomor tidak ada/tidak valid → perilaku lama dipakai** (pesan tersimpan D1, polling jalan) — situs klien yang belum mengisi nomor tidak kehilangan fitur, dan bot/`FEATURE_AI` tidak disentuh (tetap tidur, bisa dinyalakan klien dengan key miliknya).
+- Footer mode WA: tombol mikrofon (transkripsi) & `+` disembunyikan; pengirim emoji tetap bisa.
+- Helper bersama baru `src/utils/whatsappLink.ts` (`normalizeWhatsAppNumber` + `buildWhatsAppLink`): menerima `0812…` (auto → `62…`), `+62…`, `62…`, bahkan URL wa.me yang di-paste; digit 8–15.
+- Builder WA di template infinite-canvas (`CanvasLeftDrawer`) kini memakai helper yang sama — nomor ber-prefix `0` sebelumnya menghasilkan link `wa.me/0812…` yang **rusak**; sekarang benar.
+
+**Verifikasi (nomor dummy `081234567890`, bukan nomor asli siapa pun):**
+
+- Unit: 12 test baru — normalisasi semua bentuk nomor + hook `useChatSync` (mode WA: `window.open(wa.me…)` tanpa **satu pun** `fetch`; mode lama: tetap `POST /api/chat/send`). Suite penuh **145 file / 1204 test PASS**, tsc 0, lint 0.
+- Live (dev + browser automation): desktop `/preview/os-desktop?app=contact` → ketik pesan → kirim → browser membuka **WhatsApp asli**: *"Chat on WhatsApp with +62 812-3456-7890"* + pesan full *"Tes dari agent - nomor dummy 6281234567890"*. Balon muncul centang biru. Log dev **nol** request chat. Nomor dummy lalu **ditarik dari D1** (baris `content_default-site` dipulihkan **identik byte-per-byte** dengan back-up — dibandingkan hash).
+
+Catatan operasional: satu pesan pengunjung asli (`"daad"`, 21:37 WIB) masuk jalur lama saat halaman produksi belum punya jembatan — tinggal di D1 versi lama; setelah deploy ini, chat baru sepanjang nomor WA terisi tidak akan menyimpan apa pun lagi.
+
 ## [1.3.67] - 2026-10-23
 
 ###🩺 Probe Harian Berhenti Memberi Lampu Hijau Palsu

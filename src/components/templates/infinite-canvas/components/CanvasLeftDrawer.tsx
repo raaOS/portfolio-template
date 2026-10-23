@@ -27,6 +27,7 @@ import type { WorkExperience } from '@/types/experience';
 import type { ContactData } from '@/types/contact';
 import type { Testimonial } from '@/types/testimonial';
 import type { SiteProfileHeader } from '@/types/template';
+import { buildWhatsAppLink } from '@/utils/whatsappLink';
 
 export type CanvasLeftPanelType = 'about' | 'wa' | 'contact' | 'notes';
 
@@ -159,13 +160,10 @@ export function CanvasLeftDrawer({
   const email = contact?.info?.email || 'contact@example.com';
   const phone = contact?.info?.phone || '';
   const address = contact?.info?.address || '';
-  const rawWa = contact?.info?.socialMedia?.whatsapp || phone;
-  const cleanWa = rawWa ? rawWa.replace(/\D/g, '') : '';
-  const waUrl = cleanWa
-    ? `https://wa.me/${cleanWa}?text=${encodeURIComponent(
-        'Halo! Saya tertarik dengan karya di portofolio Anda dan ingin berdiskusi lebih lanjut.'
-      )}`
-    : '#';
+  const waUrl = buildWhatsAppLink(
+    contact?.info?.socialMedia?.whatsapp || phone,
+    'Halo! Saya tertarik dengan karya di portofolio Anda dan ingin berdiskusi lebih lanjut.'
+  ) || '#';
 
   const copyEmail = () => {
     if (navigator.clipboard) {

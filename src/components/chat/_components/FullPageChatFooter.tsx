@@ -8,9 +8,15 @@ import { useDictionary } from '@/contexts/LanguageContext';
 interface FullPageChatFooterProps {
   onSend: (text: string) => void;
   isSending: boolean;
+  /** Mode jembatan WhatsApp: tombol mikrofon & attachment disembunyikan (tidak berfungsi). */
+  whatsappMode?: boolean;
 }
 
-export default function FullPageChatFooter({ onSend, isSending }: FullPageChatFooterProps) {
+export default function FullPageChatFooter({
+  onSend,
+  isSending,
+  whatsappMode = false,
+}: FullPageChatFooterProps) {
   const t = useDictionary();
   const [inputValue, setInputValue] = useState('');
   const [isRecording, setIsRecording] = useState(false);
@@ -131,7 +137,9 @@ export default function FullPageChatFooter({ onSend, isSending }: FullPageChatFo
       {!isRecording && (
         <div className="flex items-center gap-3 text-[#54656f] dark:text-[#8696a0]">
           <EmojiPicker onEmojiSelect={handleEmojiSelect} />
-          <Plus className="h-6 w-6 cursor-pointer transition-colors hover:text-[#111b21] dark:hover:text-white" />
+          {!whatsappMode && (
+            <Plus className="h-6 w-6 cursor-pointer transition-colors hover:text-[#111b21] dark:hover:text-white" />
+          )}
         </div>
       )}
 
@@ -165,6 +173,16 @@ export default function FullPageChatFooter({ onSend, isSending }: FullPageChatFo
           onClick={handleSend}
           disabled={isSending || isTranscribing}
           className="rounded-full p-2 text-[#00a884] transition-all"
+        >
+          <Send className="h-6 w-6" />
+        </button>
+      ) : whatsappMode ? (
+        // Mode WhatsApp: tanpa isi pesan → tombol kirim tetap tampil
+        // (disabled sampai ada isi) menggantikan tombol mikrofon.
+        <button
+          disabled
+          aria-label="Ketik pesan terlebih dahulu"
+          className="rounded-full p-2 text-[#54656f] opacity-50 dark:text-[#8696a0]"
         >
           <Send className="h-6 w-6" />
         </button>

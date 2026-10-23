@@ -30,9 +30,11 @@ interface FullPageChatProps {
 export default function FullPageChat({ contactInfo, embedded = false }: FullPageChatProps) {
   const t = useDictionary();
   const bottomRef = useRef<HTMLDivElement>(null);
-  const { messages, sendMessage, isSending, isAdminTyping, syncError } = useChatSync(
-    contactInfo?.subtext || t.chat.defaultPrompt
-  );
+  // Jembatan WhatsApp (v1.3.68): nomor WA admin dari data contact — dibaca oleh
+  // useChatSync untuk mematikan polling & meneruskan pesan ke wa.me.
+  const whatsappNumber = contactInfo?.socialMedia?.whatsapp || null;
+  const { messages, sendMessage, isSending, isAdminTyping, isWhatsAppBridge, syncError } =
+    useChatSync(contactInfo?.subtext || t.chat.defaultPrompt, whatsappNumber);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -57,13 +59,17 @@ export default function FullPageChat({ contactInfo, embedded = false }: FullPage
         style={embedded ? undefined : { maxWidth: '480px' }}
       >
         <FullPageChatHeader />
-        {syncError && (
+        {syncError && !isWhatsAppBridge && (
           <div className="animate-pulse border-b border-red-500/20 bg-red-500/10 px-4 py-1 text-center text-[10px] text-red-500">
             {t.chat.connectionInterrupted}
           </div>
         )}
         <FullPageChatMessages messages={messages} isTyping={isAdminTyping} bottomRef={bottomRef} />
-        <FullPageChatFooter onSend={sendMessage} isSending={isSending} />
+        <FullPageChatFooter
+          onSend={sendMessage}
+          isSending={isSending}
+          whatsappMode={isWhatsAppBridge}
+        />
       </m.div>
 
       {!embedded && (
