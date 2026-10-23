@@ -19,6 +19,7 @@ const sweepExpiredOrders = vi.fn();
 const activateOrder = vi.fn();
 const cancelOrder = vi.fn();
 const reopenOrder = vi.fn();
+const createOrder = vi.fn();
 
 vi.mock('@/lib/services/orderService', () => ({
   getAdminOrders: (...args: unknown[]) => getAdminOrders(...args),
@@ -26,6 +27,7 @@ vi.mock('@/lib/services/orderService', () => ({
   activateOrder: (...args: unknown[]) => activateOrder(...args),
   cancelOrder: (...args: unknown[]) => cancelOrder(...args),
   reopenOrder: (...args: unknown[]) => reopenOrder(...args),
+  createOrder: (...args: unknown[]) => createOrder(...args),
 }));
 
 import { GET, POST } from './route';
@@ -99,6 +101,74 @@ describe('POST /api/admin/orders', () => {
   it('requires orderId dan action', async () => {
     const res = await POST(buildRequest('http://localhost/api/admin/orders', 'POST', {}));
     expect(res.status).toBe(400);
+  });
+
+  // Alur B (chat-first): owner membuat order dari panel lalu menyalin link
+  // checkout. Aksi ini tidak butuh orderId (belum ada order saat dipanggil).
+  describe('action create (Alur B)', () => {
+    const createBody = {
+      action: 'create',
+      buyerName: 'Budi Santoso',
+      buyerEmail: 'budi@mail.com',
+      buyerWhatsapp: '081234567890',
+    };
+
+    beforeEach(() => {
+      createOrder.mockReset();
+    });
+
+    it('membuat order dan mengembalikan checkoutUrl berisi token', async () => {
+      createOrder.mockResolvedValue({
+        success: true,
+        order: { id: 'ORD-1', desired_slug: 'budi-santoso', status: 'pending_payment' },
+        accessToken: 'token-mentah-abc',
+      });
+
+      const res = await POST(buildRequest('http://localhost/api/admin/orders', 'POST', createBody));
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.success).toBe(true);
+      expect(body.order.id).toBe('ORD-1');
+      // Token checkout hanya tersedia di momen pembuatan (hash disimpan di D1).
+      expect(body.checkoutUrl).toContain('/orders/ORD-1?token=token-mentah-abc');
+
+      // Slug auto-generate dari nama bila tidak diisi (sama dengan checkout publik).
+      expect(createOrder).toHaveBeenCalledWith(
+        expect.objectContaining({ desiredSlug: 'budi-santoso' }),
+        expect.objectContaining({ APP_BASE_URL: expect.any(String) })
+      );
+    });
+
+    it('menolak data pembeli yang tidak lengkap tanpa memanggil createOrder', async () => {
+      const res = await POST(
+        buildRequest('http://localhost/api/admin/orders', 'POST', {
+          ...createBody,
+          buyerEmail: '',
+        })
+      );
+      expect(res.status).toBe(400);
+      expect(createOrder).not.toHaveBeenCalled();
+    });
+
+    it('meneruskan error createOrder (mis. slug duplikat) dengan 400', async () => {
+      createOrder.mockResolvedValue({
+        success: false,
+        error: 'Slug tidak tersedia atau sudah digunakan. Silakan pilih slug lain.',
+      });
+
+      const res = await POST(
+        buildRequest('http://localhost/api/admin/orders', 'POST', {
+          ...createBody,
+          desiredSlug: 'slug-terpakai',
+        })
+      );
+      expect(res.status).toBe(400);
+
+      const body = await res.json();
+      expect(body.success).toBe(false);
+      expect(body.error).toContain('Slug tidak tersedia');
+    });
   });
 });
 

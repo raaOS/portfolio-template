@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateAdminRequest } from '@/lib/auth';
 import { requireOwnerMode } from '@/lib/ownerMode';
-import { activateOrder, cancelOrder, getAdminOrders, reopenOrder, sweepExpiredOrders } from '@/lib/services/orderService';
+import { getPublicBaseUrl } from '@/lib/constants';
+import {
+  activateOrder,
+  cancelOrder,
+  createOrder,
+  getAdminOrders,
+  reopenOrder,
+  sweepExpiredOrders,
+} from '@/lib/services/orderService';
 
 export async function GET(request: NextRequest) {
   try {
@@ -54,6 +62,64 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { orderId, action, cancelReason, allowExpired, proofUrl } = body;
+
+    // Alur B (chat-first): seller membuat order dari panel setelah deal di
+    // WhatsApp, lalu menyalin link checkout ke pembeli. Jalur admin ini sengaja
+    // TIDAK lewat rate-limit publik `billing_checkout` (5/menit per IP) karena
+    // pemanggilnya owner sendiri — anti-spam publik tidak relevan di sini.
+    if (action === 'create') {
+      const { buyerName, buyerEmail, buyerWhatsapp, desiredSlug, templateId } = body;
+
+      if (!buyerName || !buyerEmail || !buyerWhatsapp) {
+        return NextResponse.json(
+          { success: false, error: 'Nama, email, dan WhatsApp pembeli wajib diisi' },
+          { status: 400 }
+        );
+      }
+
+      // Slug opsional — auto-generate dari nama pembeli (sama dengan checkout publik).
+      const slug = desiredSlug
+        ? String(desiredSlug).trim().toLowerCase()
+        : String(buyerName)
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-|-$/g, '')
+            .slice(0, 30) || 'portfolio';
+
+      const result = await createOrder(
+        {
+          buyerName,
+          buyerEmail,
+          buyerWhatsapp,
+          desiredSlug: slug,
+          templateId: typeof templateId === 'string' && templateId.trim() ? templateId.trim() : undefined,
+        },
+        {
+          TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
+          TELEGRAM_ADMIN_CHAT_ID: process.env.TELEGRAM_ADMIN_CHAT_ID,
+          APP_BASE_URL: getPublicBaseUrl(),
+        }
+      );
+
+      if (!result.success || !result.order) {
+        return NextResponse.json({ success: false, error: result.error || 'Gagal membuat order' }, { status: 400 });
+      }
+
+      // Link checkout hanya bisa ditampilkan SEKARANG: `access_token_hash`
+      // disimpan di D1, token mentahnya tidak pernah bisa dibaca lagi. Panel
+      // wajib menyalin/mengirimkannya ke pembeli sebelum dialog ditutup.
+      const checkoutUrl = result.accessToken
+        ? `${getPublicBaseUrl()}/orders/${result.order.id}?token=${result.accessToken}`
+        : '';
+
+      return NextResponse.json({
+        success: true,
+        message: `Order ${result.order.id} dibuat. Salin link checkout ke pembeli.`,
+        order: result.order,
+        checkoutUrl,
+      });
+    }
 
     if (!orderId || !action) {
       return NextResponse.json(

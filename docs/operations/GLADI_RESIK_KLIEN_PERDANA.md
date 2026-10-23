@@ -33,18 +33,39 @@
 
 ## 2. Tahap A — Uji alur jualan di storefront
 
+Uji **kedua jalur** order — keduanya memakai mesin order yang sama, tapi titik masuknya
+berbeda (sejak v1.3.40 alur utama = chat-first):
+
+### A1. Jalur chat-first (alur utama — wajib diuji)
+
+1. Login owner → `/admin/system/orders` (aplikasi **Pesanan**, zona Sistem) → klik **Buat Pesanan**.
+2. Isi nama test, **email Anda sendiri**, WA test, slug test → **Buat & Dapatkan Link**.
+3. Centang:
+   - [ ] Kotak hijau muncul berisi **link checkout** + tombol **Salin Link**, dengan
+         peringatan bahwa link hanya tampil sekali.
+   - [ ] Order baru muncul di daftar dengan status **Menunggu Pembayaran**.
+4. Buka link checkout yang disalin → centang:
+   - [ ] Halaman order terbuka dengan nominal + instruksi pembayaran.
+   - [ ] Email **Struk Pesanan** masuk — ada link halaman order **dan** footer
+         Syarat & Ketentuan + Kebijakan Privasi.
+5. Lanjut ke **A3**.
+
+### A2. Jalur checkout publik (sekunder — cukup sekali)
+
 1. Buka `https://<domain-storefront>/checkout` (atau `npm run dev` → `/checkout` bila
    ingin menguji lokal; alur servernya sama).
 2. Buat order test: nama bebas, **email Anda sendiri**, slug test, submit.
 3. Centang:
-   - [ ] Halaman order terbuka dengan nominal + instruksi pembayaran.
-   - [ ] Email **Struk Pesanan** masuk — ada link halaman order **dan** footer
-         Syarat & Ketentuan + Kebijakan Privasi.
-   - [ ] Tombol "Pesan" di checkout menampilkan harga dari **Harga Jual** (bukan angka
-         lama yang tertinggal).
-4. Upload gambar sebagai bukti bayar test, lalu verifikasi lewat jalur owner
-   (tombol Telegram / alur yang tercantum di `docs/operations/BENGKEL_HANDOFF.md`).
-5. Centang:
+   - [ ] Harga di tombol "Pesan" datang dari **Harga Jual** (bukan angka lama tertinggal).
+4. Lanjut ke **A3**.
+
+### A3. Verifikasi & aktivasi (dilanjutkan dari A1/A2)
+
+1. Upload gambar sebagai bukti bayar test, lalu **cek mutasi dulu** — di gladi resik
+   ini cukup dipastikan alurnya benar: bukti terunggah → notifikasi Telegram masuk →
+   **baru** aktivasi (tombol Telegram / tombol Aktifkan di panel / alur di
+   `docs/operations/BENGKEL_HANDOFF.md`). Jangan sebaliknya.
+2. Centang:
    - [ ] Email **"Pembayaran Terverifikasi — Website Sedang Disiapkan"** masuk,
          **tanpa satu pun link** di dalamnya (jaminan kejujuran v1.3.27 — memang
          disengaja; link baru muncul di email tahap online).

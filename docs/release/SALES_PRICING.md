@@ -4,12 +4,12 @@ Dokumen ini adalah baseline komersial untuk menjual Portfolio OS Template. Angka
 
 ## Model Jual
 
-Satu produk, satu kali beli lewat halaman pesan di website (tanpa langganan berulang):
+Satu produk, satu kali beli lewat percakapan WhatsApp dengan owner (tanpa langganan berulang):
 
-- Pembeli mengisi form checkout (`/checkout`); slug website dibuat otomatis sistem dari nama pembeli.
-- Sistem membuat order dengan nominal unik + QRIS/transfer, berlaku 24 jam.
-- Pembeli upload bukti bayar di halaman order, lalu order diverifikasi admin.
-- Setelah verifikasi, order diaktifkan: email "✅ Pembayaran Terverifikasi — Website Sedang Disiapkan" (ringkasan order + janji online maksimal 1×24 jam, TANPA link) dikirim ke email pembeli; kabar "🎉 Website Sudah Online" berikut URL `https://<slug>.workers.dev` dikirim otomatis oleh portal setelah deploy. Akses login diserahkan owner lewat WhatsApp saat serah terima (lihat support-playbook).
+- Pembeli melihat demo template di website, lalu chat owner via WhatsApp. Deal: harga, template, slug.
+- Owner **membuat order dari panel Pesanan** (`/admin/system/orders` → Buat Pesanan) lalu mengirim **link checkout** ke pembeli. (Form checkout publik `/checkout` juga masih terbuka untuk pembeli yang mengisi sendiri — dua jalur ini memakai mesin order yang sama.)
+- Sistem membuat order dengan nominal unik + QRIS/transfer, berlaku 24 jam. Pembeli membuka linknya, lalu upload bukti bayar di halaman order.
+- Owner **cek mutasi rekening**, baru mengaktifkan order. Setelah verifikasi, email "✅ Pembayaran Terverifikasi — Website Sedang Disiapkan" (ringkasan order + janji online maksimal 1×24 jam, TANPA link) dikirim ke email pembeli; kabar "🎉 Website Sudah Online" berikut URL `https://<slug>.workers.dev` dikirim otomatis oleh portal setelah deploy. Akses login diserahkan owner lewat WhatsApp saat serah terima (lihat support-playbook).
 - Tidak ada tagihan bulanan/tahunan. Upgrade quota dijual sebagai add-on, bukan langganan.
 
 Harga dasar disimpan di D1 (`platform_settings`, key `pricing_config`) dan bisa diubah owner kapan saja lewat panel admin **Harga Jual** (`/admin` → zona Sistem) tanpa deploy ulang — nominal order selalu dihitung server dari harga tersebut. `BASE_PRICE` di `src/constants/pricing.ts` (Rp199.000) tetap dipakai sebagai nilai cadangan bila belum pernah disimpan.

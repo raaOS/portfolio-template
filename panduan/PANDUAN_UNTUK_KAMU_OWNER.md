@@ -17,24 +17,46 @@ Kamu di sini bertindak seperti **developer / kontraktor** yang membangun rumah. 
 
 ## 🚀 Alur Kerja Saat Ada Klien Baru Memesan
 
-Ketika ada klien memesan jasa website portofolio ini, ikuti **3 langkah mudah** berikut:
+Ketika ada klien memesan jasa website portofolio ini, ikuti **4 langkah mudah** berikut:
 
 ```
-[LANGKAH 1]                [LANGKAH 2]                [LANGKAH 3]
-Minta Data Singkat  ───►  Pasang ke Cloudflare  ───►  Kirim Kunci ke Klien
-(Nama & Domain)           (Sekali di awal)            (Klien isi sendiri)
+[LANGKAH 1]          [LANGKAH 2]           [LANGKAH 3]            [LANGKAH 4]
+Chat & Deal  ───►  Buat Order + Link  ───►  Pasang ke Cloudflare ──► Kirim Kunci
+di WhatsApp         Checkout (panel)        (Sekali di awal)         ke Klien
 ```
+
+> **Aturan emas pembayaran:** order **bisa** dibuat duluan, tapi **website jangan dipasang
+> sebelum uangnya benar-benar masuk ke rekeningmu**. Notifikasi Telegram atau unggahan
+> bukti bayar bukan bukti bayar — buktinya adalah mutasi rekeningmu sendiri dengan
+> nominal yang persis cocok.
 
 ---
 
-### Langkah 1: Siapkan Informasi Klien
-Cukup tanyakan 2 hal ini ke klien:
+### Langkah 1: Chat, Deal, dan Siapkan Data Klien
+
+Cukup tanyakan / sepakati 3 hal ini di WhatsApp:
 1. **Nama Lengkap / Nama Portofolio** (contoh: *Budi Pratama - Fotografer*)
-2. **Nama Domain / Alamat Website yang diinginkan** (contoh: *budipratama.com* atau subdomain gratisan dari Cloudflare).
+2. **Alamat website yang diinginkan** (contoh: *budipratama* untuk `budipratama.workers.dev`, atau domain sendiri)
+3. **Gaya template**: macOS Desktop OS, Infinite Canvas, atau 3D Spatial Gallery
 
 ---
 
-### Langkah 2: Pasang Website Klien Secara Otomatis (1-Klik Tanpa Terminal!)
+### Langkah 2: Buat Order di Panel, Kirim Link Checkout, Tunggu Bayar
+
+1. Buka **`/admin/system/orders`** (aplikasi **Pesanan** di zona Sistem) → klik **Buat Pesanan**.
+2. Isi nama, email, dan WhatsApp klien (slug boleh dikosongkan — otomatis dari nama). Klik **Buat & Dapatkan Link**.
+3. **Salin link checkout** dari kotak hijau yang muncul, lalu kirim ke klien via WhatsApp.
+   ⚠️ Kotak itu muncul **hanya sekali** — linknya sudah tersimpan juga di email struk klien, jadi kalau terlanjur tertutup, klien tetap punya tautannya.
+4. Klien membuka link, melihat nominal unik + QRIS, lalu upload bukti bayar.
+5. Kamu menerima notifikasi Telegram. **Buka rekening bankmu dan cek mutasinya dulu** — nominal harus persis. Baru setelah cocok, klik **Aktifkan** di panel (atau tombol **Verifikasi & Aktifkan** di Telegram).
+6. Baru lanjut ke Langkah 3.
+
+> Kalau klien ingin mengisi form sendiri tanpa chat, halaman `/checkout` di website juga
+> tetap terbuka — dua jalur ini sama-sama aman dan tercatat di panel Pesanan.
+
+---
+
+### Langkah 3: Pasang Website Klien Secara Otomatis (1-Klik Tanpa Terminal!)
 *Kamu TIDAK PERLU mengetik perintah terminal atau pusing membuka file kode:*
 
 1. Buatkan akun Cloudflare gratis untuk klien (cukup daftar di `dash.cloudflare.com`).
@@ -50,7 +72,7 @@ Cukup tanyakan 2 hal ini ke klien:
 
 ---
 
-### Langkah 3: Serahkan Website ke Klien
+### Langkah 4: Serahkan Website ke Klien
 Setelah websitenya online, tugas teknis kamu sudah selesai! Sekarang tinggal berikan link website, link ruang admin, dan kredensial login (email + password yang tercetak di `arsip-klien/<slug>/SURAT_SERAH_TERIMA.txt` / `config.env`) ke klien.
 
 Kamu tinggal copy-paste pesan WhatsApp di bawah ini:
@@ -58,6 +80,28 @@ Kamu tinggal copy-paste pesan WhatsApp di bawah ini:
 ---
 
 ## 💬 Template Chat WhatsApp untuk Dikirim ke Klien
+
+### Template A — Kirim Link Checkout (saat deal, BELUM bayar)
+
+> *Kirim ini setelah membuat order di panel Pesanan. Ganti tulisan dalam tanda kurung siku.*
+
+```text
+Halo kak [Nama Klien]! Siap ya kita buatkan website portofolionya. 🚀
+
+Berikut link pesanan kakak (berlaku 24 jam):
+[link checkout dari panel Pesanan]
+
+Di dalamnya ada QRIS + nominal unik — mohon transfer sesuai angka pas ya, biar
+otomatis tercatat. Setelah bayar, langsung upload bukti bayarnya di halaman yang sama.
+
+Kalau ada yang kurang jelas, chat saya aja. Makasih kak! 🙏
+```
+
+> ⚠️ Link checkout hanya tampil **sekali** di panel saat order dibuat. Kalau klien
+> bilang linknya hilang, tenang — link yang sama juga dikirim otomatis ke email klien
+> (email struk). 
+
+### Template B — Serah Terima (setelah website online)
 
 > *(Tinggal copy teks di bawah ini dan ganti tulisan di dalam tanda kurung siku)*
 

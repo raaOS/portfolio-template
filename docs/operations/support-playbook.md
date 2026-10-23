@@ -27,7 +27,7 @@ hanya melihat log `wrangler` sukses.
 Sebelum menangani tiket support, pastikan:
 
 - Akses admin tersedia: bisa login ke `/admin` di situs klien (kredensial ada di `arsip-klien/<slug>/config.env` dan di API portal `/api/clients`).
-- Akses portal onboarding `PENGELOLA_KLIEN.bat` (web `localhost:4567`) untuk provisioning dan status klien. Tidak ada panel pusat — panel `clientDashboard`/`orders`/`paymentConfig` sudah dibuang dari registry admin.
+- Akses portal onboarding `PENGELOLA_KLIEN.bat` (web `localhost:4567`) untuk provisioning dan status klien. Tidak ada panel pusat multi-klien — panel `clientDashboard`/`paymentConfig` sudah dibuang dari registry admin; panel **Pesanan** (`/admin/system/orders`, v1.3.29) milik site owner sendiri, bukan panel klien.
 - CLI tersedia di mesin lokal yang sudah clone repo dan `.env.local` menunjuk ke production Cloudflare.
 - Familiar dengan Cloudflare Dashboard untuk cek Worker logs dan D1/R2 status.
 
@@ -38,6 +38,56 @@ npm run monitoring:synthetic -- --url <production-url> --site-slug <slug>
 npm run cf:readiness
 npm run media:audit-projects
 ```
+
+## 0. Alur Order & Pembayaran (Chat-First) — dibaca dulu sebelum sentuh order
+
+**Alur utama sejak v1.3.40 adalah chat-first:** pembeli menghubungi owner lewat WhatsApp
+dulu, deal, **lalu owner membuat order dari panel Pesanan** dan menyalin link checkout ke
+pembeli. Form checkout publik (`/checkout`) tetap terbuka untuk pembeli yang mengisi
+sendiri — keduanya memakai mesin order yang sama.
+
+Alur owner (ringkas):
+
+1. Chat dengan pembeli → sepakati harga, template, dan slug.
+2. `/admin/system/orders` → **Buat Pesanan** → isi nama, email, WA, slug, template.
+3. **Salin link checkout** dari kotak hijau yang muncul → kirim ke pembeli via WhatsApp.
+   ⚠️ Link hanya tampil **sekali** saat pembuatan (token tidak disimpan mentah di server).
+   Pembeli yang kehilangan link bisa dibantu lewat email struk (ada tautan yang sama).
+4. Pembeli bayar + upload bukti → notifikasi Telegram masuk.
+5. **Cek mutasi rekening → baru klik Aktifkan** (lihat kotak peringatan di bawah).
+6. Lanjut ke Bengkel 6 langkah (deploy) → serah terima.
+
+### ⚠️ Kebiasaan wajib: Cek Mutasi → Aktifkan → Deploy
+
+Tiga langkah ini **berurutan dan tidak boleh dilompati**:
+
+- **Notifikasi Telegram / bukti terunggah BUKAN izin deploy.** Bukti bayar bisa berupa
+  gambar hasil suntingan. Satu-satunya bukti nyata adalah **mutasi di rekening Anda sendiri**
+  dengan nominal yang cocok (kolom `amount` di panel = kode unik yang harus persis masuk).
+- Urutan benar: **cek mutasi → klik Aktifkan di panel (atau tombol Telegram) → deploy.**
+- Terlanjur ada yang minta "langsung saja"? Order tetap bisa diaktifkan telat
+  (aksi Aktifkan pada order `expired`, otomatis pakai `allowExpired`) — jangan pernah
+  deploy dari order yang belum `activated`.
+
+### Pembeli bayar telat (order sudah kedaluwarsa)
+
+Gejala: pembeli bilang "sudah saya transfer" padahal ordernya `expired`/`canceled`, atau
+link checkout sudah mati (24 jam).
+
+1. **Jangan minta transfer ulang.** Minta ID ordernya, lalu cek mutasi Anda sendiri —
+   nominal unik menunjuk ordernya mana.
+2. Uang benar masuk → **Buka Kembali** order (tombol di panel, atau tombol Telegram
+   "Buka Kembali Order"). Dari `canceled` bukti lama sudah dibersihkan → pembeli diminta
+   upload ulang bukti.
+3. Kalau order sudah `expired` dan buktinya jelas → **Aktifkan** (aktivasi telat).
+4. Orderan kedaluwarsa memang sengaja dilepas otomatis 24 jam supaya nominal unik tidak
+   terkunci — ini perilaku normal, bukan gangguan.
+
+### Jangan ubah langsung database
+
+Jangan pernah mengubah `status`/`amount`/`payment_proof_url` di D1 lewat SQL manual.
+Semua transisi status lewat panel Pesanan, tombol Telegram, atau API-nya —
+agar jejak audit (`audit_logs`) tetap utuh dan race condition tetap terkunci.
 
 ## 1. Client Tidak Bisa Login
 
@@ -319,7 +369,7 @@ dipertahankan (rekonsiliasi bayar telat + pembeli masih bisa membuka halaman ord
 
 ### Prosedur operasional (berlaku sekarang)
 
-- Cek status order di tabel `orders` (D1) atau `GET /api/admin/orders` — panel Pesanan sudah dihapus.
+- Cek status order lewat panel **Pesanan** (`/admin/system/orders`) atau `GET /api/admin/orders` — keduanya menampilkan data tabel `orders` yang sama.
 - Jika perlu aktivasi manual: aktifkan ordernya lewat jalur yang tersedia (API/Telegram), atau ubah status site ke `active` via `PUT /api/admin/sites`.
 - Jangan ubah data pembayaran langsung di D1 tanpa melalui API/portal.
 - Refund hanya diproses **owner** (tidak ada tombol otomatis di sistem): catat keputusan +

@@ -26,6 +26,7 @@ echo   [1] Pendaftaran Klien Baru (1-Klik Setup Cloudflare)
 echo   [2] Status Klien (Pantau Online/Offline, Versi ^& Domain Semua Klien)
 echo   [3] Kelola Custom Domain Klien
 echo   [4] Update Versi Template ke Klien (Bugfix ^& Fitur Baru)
+echo   [5] Peta Bisnis (Diagram Alur Jualan ^& Peta Aset - Khusus Owner)
 echo.
 echo JANGAN TUTUP JENDELA INI SELAMA PORTAL SEDANG DIGUNAKAN.
 echo ========================================================
