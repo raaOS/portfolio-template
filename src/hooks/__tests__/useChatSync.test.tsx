@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 
-// soundManager selalu dimock — jangan bunyi/buat Audio di jsdom.
+// soundManager selalu dimock — tidak suara/buat Audio di jsdom.
 vi.mock('@/components/os/utils/SoundManager', () => ({
   soundManager: {
     play: vi.fn(),
@@ -64,6 +64,65 @@ describe('useChatSync — mode jembatan WhatsApp', () => {
   });
 });
 
+describe('useChatSync — mode demo (situs owner tanpa nomor WA, v1.3.70)', () => {
+  const DEMO_TEXTS = {
+    notice: 'ℹ️ Ini halaman DEMO template — chat sungguhan tidak berjalan di sini.',
+    reply: 'Di situs milik Anda nanti, pesan seperti ini langsung terkirim ke WhatsApp Anda.',
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    localStorage.clear();
+    vi.spyOn(window, 'open').mockImplementation(() => null);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ success: true }), { status: 200 })
+    );
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('kirim → nol fetch & nol window.open; admin membalas simulasi (notice + reply)', async () => {
+    const openSpy = vi.mocked(window.open);
+    const fetchSpy = vi.mocked(globalThis.fetch);
+
+    const { result } = renderHook(() => useChatSync('Halo!', null, DEMO_TEXTS));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.isWhatsAppBridge).toBe(false);
+
+    await act(async () => {
+      await result.current.sendMessage('Tes mode demo');
+    });
+    // Nol jaringan di demo: polling sync mati & POST send dilewati.
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    // Fase 1: indikator "sedang mengetik" aktif.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
+    });
+    expect(result.current.isAdminTyping).toBe(true);
+
+    // Fase 2: notice "ini demo" + balasan simulasi muncul sebagai pesan admin.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1400);
+    });
+    expect(result.current.isAdminTyping).toBe(false);
+    const adminTexts = result.current.messages
+      .filter((m) => m.sender === 'admin')
+      .map((m) => m.text);
+    expect(adminTexts[0]).toBe('Halo!'); // sapaan awal tetap muncul
+    expect(adminTexts).toContain(DEMO_TEXTS.notice);
+    expect(adminTexts).toContain(DEMO_TEXTS.reply);
+    const mine = result.current.messages.find((m) => m.sender === 'visitor');
+    expect(mine?.text).toBe('Tes mode demo');
+  });
+});
+
 describe('useChatSync — mode lama (tanpa WA) tetap tersimpan ke D1', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -95,7 +154,10 @@ describe('useChatSync — mode lama (tanpa WA) tetap tersimpan ke D1', () => {
         );
       }
       // Response sync polling generik (sukses tanpa pesan).
-      return new Response(JSON.stringify({ success: true, messages: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      return new Response(
+        JSON.stringify({ success: true, messages: [] }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
     });
 
     const { result } = renderHook(() => useChatSync('Halo!'));

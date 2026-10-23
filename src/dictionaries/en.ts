@@ -117,6 +117,9 @@ export const en: Dictionary = {
     encrypted: 'End-to-End Encrypted',
     inputPlaceholder: 'Type a message...',
     connectionInterrupted: 'Connection interrupted. Trying to reconnect...',
+    demoNotice: 'ℹ️ This is a TEMPLATE DEMO page — no real chat runs here.',
+    demoReply:
+      'On your own site, a message like this goes straight to your WhatsApp and gets answered right in the app — no bots. 🚀',
     defaultPrompt:
       'Want to talk about collaboration, a project, or anything else? Write here and I will reply soon.',
   },

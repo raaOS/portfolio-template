@@ -33,8 +33,15 @@ export default function FullPageChat({ contactInfo, embedded = false }: FullPage
   // Jembatan WhatsApp (v1.3.68): nomor WA admin dari data contact — dibaca oleh
   // useChatSync untuk mematikan polling & meneruskan pesan ke wa.me.
   const whatsappNumber = contactInfo?.socialMedia?.whatsapp || null;
+  // Mode Demo (v1.3.70): hanya di situs milik owner (yang sengaja tidak diisi
+  // nomor WA pribadi) — kirim memicu balasan simulasi, bukan wa.me/D1.
+  // Di build klien NEXT_PUBLIC_OWNER_MODE dipaksa 'false' → demoReply null.
+  const isDemoSite = process.env.NEXT_PUBLIC_OWNER_MODE === 'true';
+  const demoReply = isDemoSite
+    ? { notice: t.chat.demoNotice, reply: t.chat.demoReply }
+    : null;
   const { messages, sendMessage, isSending, isAdminTyping, isWhatsAppBridge, syncError } =
-    useChatSync(contactInfo?.subtext || t.chat.defaultPrompt, whatsappNumber);
+    useChatSync(contactInfo?.subtext || t.chat.defaultPrompt, whatsappNumber, demoReply);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });

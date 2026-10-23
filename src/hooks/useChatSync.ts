@@ -1,4 +1,4 @@
-import { useState, useEffect, startTransition } from 'react';
+import { useState, useEffect, useRef, startTransition } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import useSWR from 'swr';
 import { soundManager } from '@/components/os/utils/SoundManager';
@@ -16,6 +16,11 @@ import { buildWhatsAppLink } from '@/utils/whatsappLink';
  * Mode WhatsApp (v1.3.68): bila `whatsappNumber` terisi & valid, tombol kirim
  * meneruskan pesan ke `wa.me` milik admin dan polling `/api/chat/sync`
  * dimatikan sama sekali — nol request jaringan, nol tulis D1.
+ *
+ * Mode Demo (v1.3.70): di situs milik owner (demo penjualan template) yang
+ * sengaja tidak diisi nomor WA pribadi, kirim memicu balasan SIMULASI lokal
+ * (indikator mengetik → notice "ini demo" + penjelasan) — tanpa wa.me,
+ * tanpa jaringan, tanpa tulis D1. Di build klien param ini selalu null.
  *
  * @module useChatSync
  */
@@ -41,6 +46,9 @@ const fetcher = async (url: string) => {
  *   hook masuk mode WhatsApp: tombol kirim membuka `wa.me` dengan pesan
  *   prefilled dan polling D1 dimatikan (tanpa jaringan). Bila kosong/invalid,
  *   perilaku lama dipakai (simpan D1 + polling).
+ * @param demoReply - Hanya di situs demo milik owner (NEXT_PUBLIC_OWNER_MODE)
+ *   TANPA nomor WA: kalimat notice + simulasi balasan admin dari kamus.
+ *   Keberadaan param ini = mode demo aktif (kirim → balasan simulasi lokal).
  * @returns Object berisi messages, sendMessage, typing indicator, dan sync error
  *
  * @example
@@ -50,7 +58,8 @@ const fetcher = async (url: string) => {
  */
 export function useChatSync(
   initialGreeting?: string,
-  whatsappNumber?: string | null
+  whatsappNumber?: string | null,
+  demoReply?: { notice: string; reply: string } | null
 ) {
   const [visitorId, setVisitorId] = useState<string>('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -108,6 +117,22 @@ export function useChatSync(
   /** Mode jembatan WhatsApp: nomor valid → percakapan diteruskan ke app WA admin. */
   const isWhatsAppBridge = !!buildWhatsAppLink(whatsappNumber);
 
+  /**
+   * Mode Demo (v1.3.70): situs milik owner TANPA nomor WA — pengunjung berhak
+   * merasakan fitur tanpa menembak WA pribadi owner, dan DEMO TIDAK MENULIS
+   * D1 (jalur legacy "nyimpan diam-diam" mati di demo).
+   */
+  const isDemoChat = !!demoReply && !isWhatsAppBridge;
+
+  // Timer simulasi demo — dibersihkan saat unmount agar tidak bocor state.
+  const demoTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(
+    () => () => {
+      demoTimersRef.current.forEach(clearTimeout);
+    },
+    []
+  );
+
   // Polling with Smart Interval — Cloudflare/D1 quota guard.
   //
   // Sebelumnya: 3s active / 30s background. Untuk 1 visitor yang buka chat
@@ -121,7 +146,7 @@ export function useChatSync(
   // tapi invocations turun ~62%. Untuk skala 250 visitor/bulan ini
   // bedanya signifikan dari "boros" jadi "hemat ratusan invocations".
   const { data: _syncData, error: swrError } = useSWR(
-    visitorId && !isWhatsAppBridge ? `/api/chat/sync?visitorId=${visitorId}` : null,
+    visitorId && !isWhatsAppBridge && !isDemoChat ? `/api/chat/sync?visitorId=${visitorId}` : null,
     fetcher,
     {
       refreshInterval: isPageVisible ? 8000 : 60000,
@@ -189,7 +214,8 @@ export function useChatSync(
   );
 
   const sendMessage = async (text: string) => {
-    if (!text.trim() || isSending || !visitorId) return;
+    if (!text.trim() || isSending) return;
+    if (!visitorId && !isDemoChat) return;
 
     const trimmed = text.trim();
     setIsSending(true);
@@ -217,6 +243,39 @@ export function useChatSync(
       }
       // Nomor tidak valid walau flag banner aktif (jarang: race) → jatuh
       // ke jalur lama di bawah supaya pesan tetap disimpan, tidak hilang.
+    }
+
+    // Mode Demo (v1.3.70): indikator mengetik → notice "ini demo" +
+    // penjelasan simulasi. Nol jaringan, nol tulis D1, tanpa nomor apa pun.
+    if (isDemoChat && demoReply) {
+      const t1 = setTimeout(() => {
+        setIsAdminTyping(true);
+        const t2 = setTimeout(() => {
+          setIsAdminTyping(false);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: 'demo-notice',
+              text: demoReply.notice,
+              sender: 'admin',
+              timestamp: Date.now(),
+            },
+            {
+              id: 'demo-reply',
+              text: demoReply.reply,
+              sender: 'admin',
+              timestamp: Date.now() + 1,
+            },
+          ]);
+          if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+            soundManager.play('notification');
+          }
+        }, 1400);
+        demoTimersRef.current.push(t2);
+      }, 600);
+      demoTimersRef.current.push(t1);
+      setIsSending(false);
+      return;
     }
 
     try {

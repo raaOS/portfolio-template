@@ -3,6 +3,18 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.70] - 2026-10-24
+
+### 🎭 Mode Demo Chat: Balasan Simulasi di Situs Milik Owner — Nol Nomor HP Terlibat
+
+Lanjutan keputusan owner (2026-10-24): *"kalau untuk demo template macOS gak perlu; ada solusi?"* — owner menolak memasang nomor WA pribadi untuk di-demos, dan memilih **mode demo: balasan simulasi**.
+
+- Demo desktop (`/preview/os-desktop`, situs milik owner — ditandai `NEXT_PUBLIC_OWNER_MODE=true` yang dihasilkan saat build): tombol kirim di jendela Contact **TIDAK** membuka `wa.me` dan **TIDAK** menulis D1. Setelah kirim, muncul indikator "sedang mengetik" lalu dua bubble admin dari kamus: pemberitahuan *'ℹ️ Ini halaman DEMO template — chat sungguhan tidak berjalan di sini.'* dan penjelasan *'Di situs milik Anda nanti, pesan seperti ini langsung terkirim ke WhatsApp Anda… '*.
+- **Situs klien selalu perilaku nyata**: `deployClient()` memaksa `NEXT_PUBLIC_OWNER_MODE='false'` (dua lapis fail-closed, perilaku yang telah ada) sehingga param demo selalu `null` di sana — jembatan WhatsApp v1.3.68 + jalur legacy tetap seperti biasa, tanpa sedikit pun terganggu.
+- Pada mode demo, jalur legacy "menyimpan pesan D1 tak dibaca" **mati juga** di demo (kirim nyata tidak menulis apa pun). Jika someday owner mengisi nomor WA di `/admin`, jembatan WhatsApp spektakuler langsung digunakan dan mengesampingkan simulasi (aturan di hook: nomor WA valid mengalahkan demo).
+- Kamus baru `chat.demoNotice` + `chat.demoReply` (id/en); test hook baru (fake timers): nol `fetch`, nol `window.open`, urutan mengetik → pemberitahuan → balasan siap. Suite penuh **144 file / 1197 test PASS**, tsc 0, lint 0.
+- `APP_VERSION` bump → `1.3.70`.
+
 ## [1.3.69] - 2026-10-23
 
 ### 🧹 Bersih-bersih Chat: Rute Mikrofon Diratakan, Versi Health Dibump

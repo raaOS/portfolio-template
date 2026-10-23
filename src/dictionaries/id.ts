@@ -115,6 +115,9 @@ export const id = {
     encrypted: 'End-to-End Encrypted',
     inputPlaceholder: 'Ketik pesan...',
     connectionInterrupted: 'Koneksi terganggu. Mencoba menghubungkan kembali...',
+    demoNotice: 'ℹ️ Ini halaman DEMO template — chat sungguhan tidak berjalan di sini.',
+    demoReply:
+      'Di situs milik Anda nanti, pesan seperti ini langsung terkirim ke WhatsApp Anda dan dijawab langsung dari aplikasi — tanpa bot. 🚀',
     defaultPrompt:
       'Mau ngobrol soal kerja sama, project, atau hal lainnya? Tulis di sini, nanti aku segera balas.',
   },
