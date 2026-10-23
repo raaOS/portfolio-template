@@ -730,8 +730,10 @@ describe('orderService', () => {
     });
 
     it('still succeeds when Telegram is not configured', async () => {
-      delete process.env.TELEGRAM_BOT_TOKEN;
-      delete process.env.TELEGRAM_ADMIN_CHAT_ID;
+      // Lewat `unsetEnv` seperti baris di bawahnya — `delete` langsung gagal
+      // type-check begitu `cloudflare-env.d.ts` ikut memuat key ini.
+      unsetEnv('TELEGRAM_BOT_TOKEN');
+      unsetEnv('TELEGRAM_ADMIN_CHAT_ID');
       unsetEnv('NOTIFICATION_PROVIDER');
 
       const fetchMock = vi.fn().mockResolvedValue({ ok: true });

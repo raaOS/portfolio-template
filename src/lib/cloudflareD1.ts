@@ -116,7 +116,11 @@ async function getD1Binding(): Promise<D1Binding | null> {
   try {
     const { getCloudflareContext } = await import('@opennextjs/cloudflare');
     const context = await getCloudflareContext({ async: true });
-    const env = context?.env as Record<string, unknown> | undefined;
+    // Cast lewat `unknown`: `CloudflareEnv` (di-generate `npm run cf:typegen`)
+    // adalah interface tanpa index signature, jadi cast langsung ke
+    // `Record<string, unknown>` ditolak TypeScript. Pola yang sama sudah dipakai
+    // `r2Storage.ts` untuk membaca binding dengan nama.
+    const env = context?.env as unknown as Record<string, unknown> | undefined;
     return (env?.DB as D1Binding | undefined) ?? null;
   } catch {
     return null;
