@@ -45,6 +45,8 @@ Dua hal yang dijaga ketat:
 - **Tidak ada fallback setelah pernyataan dikirim ke binding.** Kalau binding gagal di tengah jalan, galat diteruskan — bukan diulang lewat REST — karena pernyataan mungkin sudah dieksekusi. Mengulangnya berarti menulis dua kali.
 - **Jalur REST dipertahankan utuh** sebagai fallback untuk dev lokal, unit test, dan 23 script pemeliharaan yang dijalankan lewat `tsx`. Karena itu binding diimpor **secara dinamis di dalam `try/catch`**: import statis `@opennextjs/cloudflare` akan ikut dimuat oleh modul ini dan berpotensi mematikan semua alat operasional itu di luar runtime Cloudflare.
 
+**Hasil akhir — terverifikasi, bukan diklaim.** Deploy `cbf69f4e-edfa-4402-8ebe-ada4b7d6b490` menampilkan `env.DB (portfolio-template-prod)` di daftar binding. Uji multi-run: **9 putaran berturut-turut, 9 tulisan masuk**, tiap putaran dibaca langsung dari D1 (bukan dari respons cron) — termasuk putaran pertama pada isolate dingin, kondisi yang dulu **pasti** gagal. Sebelum remediasi: 1 dari 5. Saat verifikasi `/api/health`: `stale false`, rasio cache 100%, p95 156 ms.
+
 ## [1.3.66] - 2026-10-23
 
 ###🗂️ Redesain Desktop Admin: 4 Zone Langsung Terbuka 2×2, Kartu Folder Dihapus
