@@ -156,6 +156,87 @@ Jadi `passed` akan selalu `true` dalam **kedua** kondisi, sehat maupun sakit. La
 
 > **Verifikasi pasca-deploy wajib memeriksa *apa yang benar-benar terukur*, bukan hanya apakah kode berjalan tanpa error.** v1.3.64 lolos semua gerbang (21 test, tsc 0, lint 0, cron sukses, 32/32) tapi tetap cacat rancangan — karena tidak ada satu pun test yang memeriksa apakah `x-opennext-cache` benar-benar `MISS`. Test hanya memverifikasi apa yang dirancang untuk dipercaya, bukan apa yang penting.
 
+---
+
+## 🛑 Temuan Kedua (v1.3.67): Hasil Probe Tidak Pernah Tersimpan
+
+Ketika verifikasi v1.3.65 diulang beberapa kali, terdeteksi ketidakcocokan: cron melapor sukses dengan `probedAt` segar, tapi `/api/health` membaca nilai lama.
+
+### Angka yang diukur (bukan ditebak)
+
+| Fakta | Bukti |
+|---|---|
+| Cron melapor sukses setiap kali | Respons `probedAt 19:28:56.882Z`, semua field ada, `passed true` |
+| D1 tidak pernah menerimanya | `worker-health/latest` masih `updated_at 19:18:58.851Z` — **19 menit kemudian, tidak berubah** |
+| Riwayat cuma berisi 1 entri | `worker-health/history` = **1 entri** (19:18:59), padahal cron dipanggil 5 kali |
+| Tail tidak menangkap apa pun | 4922 baris log, **0** kemunculan `cron` / `worker health` / error apa pun |
+
+Jadi `recordWorkerHealth()` **hanya pernah berhasil sekali**, dari 5 pemanggilan.
+
+### Akar masalah yang terbukti ada di kode
+
+```ts
+workerHealth = await probeWorkerHealth();   // baris 66 — hasil di-assign
+await recordWorkerHealth(workerHealth);     // baris 67 — tulisan gagal di sini
+// ...
+// catch (err) { console.error(...) }         // baris 77 — ditelan
+return NextResponse.json({ ..., workerHealth }); // baris 82 — tetap memamerkan angka
+```
+
+Karena `workerHealth` sudah terisi **sebelum** pemanggilan tulis, kegagalan menulis tidak pernah mengubah apa pun yang tampak di luar. Inilah yang membuat portal menampilkan `HIT 100%` dari data berjam 19:18 seolah itu pembacaan hari ini.
+
+### Yang sudah dikesampingkan lewat pengujian
+
+| Hipotesis | Hasil pengujian |
+|---|---|
+| Skema `app_kv` rusak / baris ganda | **Gugur.** `key TEXT PRIMARY KEY` + index unik; hanya 1 baris ada |
+| REST API / rate limit | **Gugur.** Dijalankan dari luar: UPSERT + jalur UPDATE OK, 30 query beruntun **0 gagal** |
+| Pernyataan SQL bermasalah | **Gugur.** Kode asli `bootstrapD1Schema()` sukses — 24 statement, **0 gagal**, 6098 ms |
+| "Binding D1 bekerja, REST gagal" | **Gugur — dan ini koreksi atas laporan sebelumnya.** `db` di `src/lib/database.ts` **bukan** pembungkus binding; `db.ref(...).transaction(...)` berakhir di `setD1Value`/`queryD1` yang sama. `rateLimits` dan worker-health sama-sama lewat REST |
+
+### Penyebab — TERBUKTI (bukan lagi hipotesis)
+
+Kalimat error aslinya, ditangkap oleh `workerHealthRecordError` yang baru ditambahkan:
+
+```
+Too many subrequests by single Worker invocation. To configure this limit, refer to
+https://developers.cloudflare.com/workers/wrangler/configuration/#limits
+```
+
+**Temuan arsitektural yang menjadi landasannya:** Worker ini **tidak punya binding D1 sama sekali** — daftar binding hanya `NEXT_INC_CACHE_KV`, `NEXT_TAG_CACHE_KV`, `MEDIA_BUCKET`, `WORKER_SELF_REFERENCE`, `ASSETS`. Jadi setiap operasi D1 ditempuh **keluar** lewat `fetch()` ke `api.cloudflare.com`, yang menurut dokumentasi Cloudflare terhitung **subrequest eksternal** (batas 50 per invokasi di paket Free). Dan `bootstrapD1Schema()` sendiri butuh **24 panggilan** itu tiap isolate dingin.
+
+#### Pemisahan variabel (3 putaran bergantian, dibaca langsung dari D1)
+
+| Putaran | Alat | Durasi run | Hasil tulisan |
+|---|---|---|---|
+| 1 | curl | 3829 ms | ❌ `Too many subrequests` |
+| 2 | Node fetch | 3954 ms | ❌ `Too many subrequests` |
+| 3 | curl | **1373 ms** | ✅ **MASUK** |
+
+**Dua tebakan gugur sekaligus:**
+
+- **"Alat pemicu" gugur** — putaran 1 (curl) dan 2 (Node) sama-sama gagal, lintas alat.
+- **"Waktu sejak deploy" gugur** — putaran 3 justru *paling jauh* dari deploy tapi berhasil; putaran 1 & 2 lebih dekat tapi gagal.
+
+Yang membedakan adalah **durasi run**. Itu pola memoisasi `bootstrapD1Schema()` per isolate: isolate yang sudah pernah mem-bootstrap cukup membayar **2 tulisan**; isolate dingin harus membayar **24 lebih dulu**, lalu meledakkan batas 50.
+
+Ini juga menjelaskan pola sebelumnya yang sempat menyesatkan — "tulisan sukses tepat setelah deploy" ternyata kebetulan, karena sukses pertama v1.3.65 (19:18:58) dan sukses v1.3.67 (00:02) sama-sama terjadi pada isolate yang kebetulan sudah mem-bootstrap.
+
+### Perbaikan v1.3.67 (disetujui owner)
+
+| Perubahan | Berkas |
+|---|---|
+| Kegagalan **menyimpan** kini ikut dilaporkan: `workerHealthRecorded` + `workerHealthRecordError`. Hasil probe yang sah tetap dibalikkan — membuangnya justru menyembunyikan pengukurannya | `src/app/api/cron/daily/route.ts` |
+| `/api/health` menyertakan penanda **`stale`** (usia > `WORKER_HEALTH_STALE_AFTER_MS` = 25 jam = satu siklus cron). Helper murni `isWorkerHealthStale()` | `src/lib/workerHealthProbe.ts`, `src/app/api/health/route.ts` |
+| Portal menampilkan badge **kuning `KUNO …`** + usianya, bukan badge hijau `HIT 100%`. Angka lama tetap disimpan apa adanya — menyembunyikannya justru menghapus satu-satunya petunjuk bahwa probe sudah lama berhenti menyimpan | `scripts/onboarding/public/index.html` |
+| **Binding D1 `env.DB`** — remediasi sebenarnya. Upaya pertama (`limits.subrequests: 500`) **gagal di-deploy**: `CPU limits are not supported for the Free plan [code: 100328]` | `wrangler.jsonc` |
+| **`queryD1()` memakai binding di produksi, REST tetap sebagai fallback** | `src/lib/cloudflareD1.ts` |
+| 19 test baru | 5 `isWorkerHealthStale`, 3 route cron, 4 route health, **7 jalur binding `queryD1`** |
+
+> **Urutan kerjanya penting dicatat:** observability dipasang **dulu**, dan justru ia yang membongkar penyebabnya. Tanpa `workerHealthRecordError`, kegagalan tetap akan ditebak-tebak seperti yang terlihat di bagian sebelumnya.
+
+**Catatan pengujian:** mock `@/lib/cloudflareD1` yang mengganti seluruh modul **mematikan** `/api/health` (500 di semua test) karena jalur rate-limit juga memakainya. Pola yang benar: `vi.mock(path, async (importOriginal) => ({ ...(await importOriginal()), override }))`.
+
 ## 🔍 Temuan Sampingan: Site Owner Tidak Pernah Muncul di Portal
 
 Saat menyiapkan tampilan portal, ditemukan **celah yang sudah lama ada** dan tidak pernah terlihat:
@@ -190,16 +271,26 @@ Kondisi akhir setelah v1.3.65 (perbaikan rancangan):
 | `scripts/onboarding/public/index.html` | `renderProbeBadge()` (badge `HIT 100%`, fallback format lama untuk entri pra-v1.3.65) + kolom **"Kesehatan Cache Worker"** (header + sel). |
 | `arsip-klien/00_site-owner/config.env` | **Baru, gitignored.** Entry site owner untuk portal. |
 | `CHANGELOG.md` | Entri `## [1.3.65]` + penanda koreksi ⚠️ di badan `## [1.3.64]`. |
-| `src/lib/constants.ts` | `APP_VERSION` 1.3.63 → 1.3.64 → **1.3.65**. |
+| `src/lib/constants.ts` | `APP_VERSION` 1.3.63 → 1.3.64 → 1.3.65 → **1.3.67**. |
 
-## 🧪 Hasil Gerbang (v1.3.65, final)
+**Ditambahkan v1.3.67** (perbaikan kegagalan diam-diam):
 
-| Gerbang | Hasil |
+| Berkas | Perubahan |
 |---|---|
-| `npx vitest run` (2 berkas target) | **24 PASS** |
-| `npm test` (seluruh suite) | **141 berkas / 1.167 test PASS** (**nol regresi**) |
-| `npm run lint` | **bersih**, exit 0 |
-| `npx tsc --noEmit` | **exit 0** |
+| `src/app/api/cron/daily/route.ts` | Pemanggilan tulis dipecah dari pemanggilan probe. Kegagalan menyimpan kini menghasilkan `workerHealthRecorded: false` + `workerHealthRecordError` di respons; sukses menghasilkan `true`/`null`; site klien `null`/`null`. |
+| `src/lib/workerHealthProbe.ts` | Konstan `WORKER_HEALTH_STALE_AFTER_MS` (25 jam) + helper murni `isWorkerHealthStale()`. |
+| `src/app/api/health/route.ts` | `workerHealth` kini menyertakan field `stale`. **Tetap tidak** mengubah `checks.status` — probe berhenti menyimpan bukan "site sakit". |
+| `scripts/onboarding/public/index.html` | `formatProbeAge()` + cabang `stale` di `renderProbeBadge()` → badge kuning `KUNO …` + usianya. |
+| 3 berkas test | +12 test (5 helper, 3 cron route, 4 health route). |
+
+## 🧪 Hasil Gerbang
+
+| Gerbang | v1.3.65 | v1.3.67 |
+|---|---|---|
+| Berkas test target | 24 PASS | **40 PASS** |
+| `npm test` (seluruh suite) | 141 berkas / 1.167 test | **142 berkas / 1.183 test PASS** (nol regresi) |
+| `npm run lint` | bersih, exit 0 | **bersih**, exit 0 |
+| `npx tsc --noEmit` | exit 0 | **exit 0** |
 
 > **Catatan:** pre-commit hook `.husky/pre-commit` repo ini masih bug — ia mengetes `$?` dari `head`, bukan dari `tsc`, sehingga error TypeScript bisa lolos dengan pesan "✅ Pre-commit checks passed!". Karena itu `npx tsc --noEmit` **wajib dijalankan terpisah**, seperti yang dilakukan di sini.
 
@@ -211,6 +302,9 @@ Kondisi akhir setelah v1.3.65 (perbaikan rancangan):
 4. **Sampah cache berkurang**: query unik tetap menyisakan entri di Cache API, tapi semuanya kedaluwarsa sendiri dalam 300 detik dan tidak pernah memicu render.
 5. **Ambang 0,90 adalah pilihan terukur, bukan kebenaran mutlak.** Ia memberi ruang untuk beberapa miss wajar (mis. entri baru pertama kali sehari). Kalau kelak terbukti terlalu longgar/ketat, angkanya ada di `PROBE_MIN_CACHE_HIT_RATIO` — satu baris.
 6. **Jalur retroaktif tidak tersedia** tanpa pekerjaan tambahan: butuh token API Cloudflare sebagai secret + izin Analytics + verifikasi nama field GraphQL yang sebelumnya gagal.
+7. **⚠️ Penyimpanan perlu dipantau beberapa run lagi.** Penyebabnya sudah terbukti (`Too many subrequests`) dan remediasi `limits.subrequests: 500` sudah dipasang, tapi itu **belum** diuji lintas banyak run — data sebelumnya hanya 1 dari 5 tulisan yang masuk, dan satu keberhasilan tidak cukup untuk menyatakan selesai. Selama belum terbukti, portal bisa menampilkan badge `KUNO` — dan badge itu harus dianggap **sinyal yang jujur**, bukan gangguan visual. Menyembunyikannya akan mengembalikan lampu hijau palsu.
+8. **Paket akun = Free (terkonfirmasi 2026-10-23).** Upaya `limits.subrequests: 500` ditolak API dengan `CPU limits are not supported for the Free plan [code: 100328]` — jadi batas 50 subrequest eksternal memang **tidak bisa dinaikkan** di paket ini. Jalan satu-satunya adalah mengurangi subrequest eksternal, dan itu sudah dilakukan dengan binding `env.DB`.
+9. **Binding D1 belum dipasang di konfigurasi wrangler klien.** `writeWranglerClientConfig()` membangun config dari nol (hanya meminjam `compatibility_date`/`compatibility_flags`), jadi binding owner **tidak bocor** ke klien — dan klien juga belum mendapatkannya. Klien tetap lewat REST seperti sebelumnya (nol regresi), tapi **backup harian klien berisiko menghantam batas 50 yang sama** karena jalurnya identik: bootstrap 24 panggilan + pembacaan seluruh tabel. Ini belum diverifikasi dan layak dijadikan keputusan terpisah.
 
 ## 🔭 Tindak Lanjut (Opsional, Tidak Mendesak)
 

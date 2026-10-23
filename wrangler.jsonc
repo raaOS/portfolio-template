@@ -15,6 +15,28 @@
       "bucket_name": "portfolio-template-media"
     }
   ],
+  // Binding D1.
+  //
+  // Sebelumnya Worker memanggil database-nya SENDIRI lewat fetch() ke
+  // api.cloudflare.com. Itu terhitung subrequest eksternal — batas 50 per
+  // invokasi pada paket Free — dan terbukti membuat cron harian gagal menyimpan
+  // hasil probe dengan pesan "Too many subrequests by single Worker invocation"
+  // (2026-10-23, lihat docs/tracker/logs/worker_health_daily_probe_2026_10_23.md).
+  //
+  // Lewat binding, operasi D1 menjadi subrequest internal (batas 1.000) dan
+  // tidak lagi membayar round-trip HTTP ~200-400ms. Jalur REST di
+  // `src/lib/cloudflareD1.ts` tetap ada sebagai fallback kalau binding tidak
+  // tersedia (dev lokal, unit test, deploy lama).
+  //
+  // `database_name` / `database_id` diverifikasi 2026-10-23 lewat
+  // GET /d1/database/{id}: portfolio-template-prod, 19 tabel.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "portfolio-template-prod",
+      "database_id": "7a8b4eaa-d1cd-4912-9d1a-fafe86af4a5c"
+    }
+  ],
   "kv_namespaces": [
     {
       "binding": "NEXT_INC_CACHE_KV",
@@ -43,21 +65,6 @@
     // satu pun invocation `scheduled`. Jadwal uji sudah dilepas kembali; lihat
     // `docs/tracker/logs/cron_worker_secrets_2026_10_03.md` bagian uji fire.
     "crons": ["0 18 * * *"]
-  },
-  // Batas subrequest per invokasi.
-  //
-  // Diperlukan oleh cron harian: Worker ini TIDAK punya binding D1, sehingga
-  // setiap operasi D1 ditempuh keluar lewat fetch() ke api.cloudflare.com, yang
-  // terhitung subrequest eksternal. `bootstrapD1Schema()` saja memakai 24
-  // panggilan per isolate dingin, ditambah backup harian dan 2 tulisan hasil
-  // probe — melewati batas 50 bawaan dan membuat tulisan gagal dengan pesan
-  // "Too many subrequests by single Worker invocation" (terbukti 2026-10-23).
-  //
-  // Nilai 500 memberi ruang besar untuk cron sekaligus tetap membatasi runaway.
-  // Kalau paket akun ternyata gratis (dibatasi 50), nilai ini akan di-clamp dan
-  // kegagalannya terlihat lagi lewat `workerHealthRecordError` di respons cron.
-  "limits": {
-    "subrequests": 500
   },
   "observability": {
     "enabled": true

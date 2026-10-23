@@ -75,10 +75,122 @@ export function getD1Config(): D1Config {
   return { accountId, databaseId, apiToken };
 }
 
+// ---------------------------------------------------------------------------
+// Binding D1 (jalur utama) — REST tetap dipertahankan sebagai fallback
+// ---------------------------------------------------------------------------
+
+/**
+ * Bentuk minimal binding D1 (`env.DB`) yang benar-benar dipakai di sini.
+ *
+ * Sengaja bukan tipe resmi `D1Database` dari `@cloudflare/workers-types`:
+ * dependensi itu tidak ikut terpasang di repo ini, dan cukup strutural sesuai
+ * panggilan yang dipakai (`prepare().bind().all()`).
+ */
+interface D1BindingStatement {
+  bind(...params: D1Param[]): D1BindingStatement;
+  all<T>(): Promise<{ results?: T[]; success?: boolean; error?: string }>;
+}
+
+interface D1Binding {
+  prepare(sql: string): D1BindingStatement;
+}
+
+/**
+ * Ambil binding D1 `env.DB`, atau `null` bila tidak tersedia.
+ *
+ * Sengaja import **dinamis** di dalam `try/catch`, dua alasan:
+ *
+ * 1. `cloudflareD1.ts` juga diimpor oleh 23 script pemeliharaan yang dijalankan
+ *    lewat `tsx` di luar Cloudflare. Import statis `@opennextjs/cloudflare`
+ *    akan dimuat saat modul dibuka — dan kalau paket itu tidak bisa dimuat di
+ *    luar runtime, semua alat operasional ikut mati.
+ * 2. Di luar produksi (dev lokal, unit test, script) memang tidak ada binding,
+ *    jadi jalur REST lama tetap dipakai persis seperti sebelumnya.
+ *
+ * Hasilnya sengaja **tidak** di-memoisasi: kalau konteks belum siap pada
+ * panggilan pertama, cache `null` akan menahan isolate itu pada REST selamanya
+ * — dan kegagalan semacam itu justru yang paling sulit didiagnosis.
+ */
+async function getD1Binding(): Promise<D1Binding | null> {
+  if (process.env.NODE_ENV !== 'production') return null;
+  try {
+    const { getCloudflareContext } = await import('@opennextjs/cloudflare');
+    const context = await getCloudflareContext({ async: true });
+    const env = context?.env as Record<string, unknown> | undefined;
+    return (env?.DB as D1Binding | undefined) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Kirim pernyataan lewat binding D1.
+ *
+ * ⚠️ **Peringatan keselamatan data:** sekali pernyataan lepas ke binding,
+ * kesalahan **apapun** wajib diteruskan ke pemanggil — tidak boleh jatuh kembali
+ * ke REST. Pernyataan itu mungkin **sudah** dieksekusi, dan mengulanginya lewat
+ * jalur lain berarti menulis dua kali (baris audit ganda, backup terduplikasi,
+ * dsb.). Fallback hanya sah **sebelum** ada pernyataan yang dikirim, yaitu saat
+ * binding tidak ditemukan sama sekali — lihat `getD1Binding()`.
+ *
+ * Pesan galat sengaja dibuat identik dengan jalur REST (`Cloudflare D1 query
+ * failed:` / `Cloudflare D1 SQL failed:`) supaya pemanggil tidak bisa
+ * membedakan jalur mana yang dipakai.
+ */
+async function queryViaD1Binding<T>(
+  binding: D1Binding,
+  sql: string,
+  params: D1Param[]
+): Promise<T[]> {
+  let payload: { results?: T[]; success?: boolean; error?: string };
+  try {
+    payload = await binding.prepare(sql).bind(...params).all<T>();
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    logOperationalEvent({
+      event: 'd1.query_error',
+      level: 'error',
+      status: 'failure',
+      message: 'Cloudflare D1 binding query failed',
+      metadata: { ...summarizeSqlOperation(sql), detail },
+    });
+    throw new Error(`Cloudflare D1 query failed: ${detail}`);
+  }
+
+  if (payload?.success === false) {
+    const detail = payload.error || 'SQL failed';
+    logOperationalEvent({
+      event: 'd1.query_error',
+      level: 'error',
+      status: 'failure',
+      message: 'Cloudflare D1 SQL failed',
+      metadata: { ...summarizeSqlOperation(sql), detail },
+    });
+    throw new Error(`Cloudflare D1 SQL failed: ${detail}`);
+  }
+
+  return payload?.results ?? [];
+}
+
+/**
+ * Kirim pernyataan SQL ke D1.
+ *
+ * Di runtime produksi pernyataan dikirim lewat **binding** `env.DB`
+ * (subrequest internal, tanpa round-trip HTTP). Lewat fetch() ke
+ * api.cloudflare.com pernyataan terhitung subrequest eksternal dengan batas 50
+ * per invokasi pada paket Free — terbukti membuat cron harian gagal menyimpan
+ * hasil probe dengan "Too many subrequests by single Worker invocation"
+ * (2026-10-23). REST tetap dipakai sebagai fallback bila binding tidak ada.
+ */
 export async function queryD1<T = Record<string, unknown>>(
   sql: string,
   params: D1Param[] = []
 ): Promise<T[]> {
+  const binding = await getD1Binding();
+  if (binding) {
+    return queryViaD1Binding<T>(binding, sql, params);
+  }
+
   const config = getD1Config();
   const response = await fetch(
     `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/d1/database/${config.databaseId}/query`,

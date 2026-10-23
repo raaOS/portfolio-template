@@ -22,8 +22,27 @@ Temuan pasca-deploy v1.3.65: **hasil probe harian tidak pernah tersimpan**, tapi
 - Kegagalan **menyimpan** kini ikut dilaporkan di respons cron (`workerHealthRecorded` + `workerHealthRecordError`) — tidak lagi ditelan diam-diam. Hasil probe yang sah tetap dibalikkan, karena membuangnya justru menyembunyikan pengukurannya.
 - `/api/health` kini menyertakan penanda **`stale`**: bacaan lebih tua dari **25 jam** (satu siklus cron) ditandai.
 - Portal menampilkan badge **kuning `KUNO …`** untuk bacaan usang, lengkap dengan usianya — bukan lagi badge hijau `HIT 100%` yang bisa disalahartikan sebagai kondisi hari ini. Angka lama tetap disimpan apa adanya, karena menyembunyikannya justru menghapus satu-satunya petunjuk bahwa probe sudah lama berhenti menyimpan.
+- Operasi D1 kini berjalan lewat **binding `env.DB`**, bukan `fetch()` ke `api.cloudflare.com`. Itu remediasi sebenarnya: melalui binding, operasi D1 jadi *subrequest internal* (batas 1.000) alih-alih eksternal (batas 50), dan tidak lagi membayar round-trip HTTP ~200-400 ms per query.
 
-> ⚠️ **Belum beres — penyebab akhir belum terbukti.** Yang sudah dikesampingkan lewat pengujian, bukan ditebak: skema `app_kv` benar (`key TEXT PRIMARY KEY`), REST API sehat dari luar (jalur kode aslinya sukses: bootstrap 6098 ms, tulis 192 ms, baca 146 ms; 30 query beruntun 0 gagal), dan bootstrap 24 statement tidak pernah gagal. Kandidat tersisa: **batas 50 subrequest eksternal per invokasi di paket Free** — Worker ini **tidak punya binding D1**, jadi setiap operasi D1 ditempuh keluar lewat `fetch()` ke `api.cloudflare.com`, sementara `bootstrapD1Schema()` sendiri butuh 24 panggilan tiap isolate dingin. Penanda `stale` dipasang lebih dulu supaya selama penyelidikan berlangsung tidak ada angka palsu yang dipajang.
+**Penyebabnya terbukti** — dan justru `workerHealthRecordError` yang baru dipasang itu yang membongkarnya:
+
+```
+Too many subrequests by single Worker invocation. To configure this limit, refer to
+https://developers.cloudflare.com/workers/wrangler/configuration/#limits
+```
+
+Worker ini **tidak punya binding D1**, sehingga setiap operasi D1 ditempuh **keluar** lewat `fetch()` ke `api.cloudflare.com` — terhitung **subrequest eksternal** (batas 50 per invokasi). `bootstrapD1Schema()` sendiri memakai **24 panggilan** tiap isolate dingin. Isolate yang sudah pernah mem-bootstrap cukup membayar 2 tulisan; isolate dingin harus membayar 24 lebih dulu, lalu meledakkan batasnya.
+
+Penyebab lain sudah **dikesampingkan lewat pengujian, bukan ditebak**: skema `app_kv` benar (`key TEXT PRIMARY KEY`), REST API sehat dari luar (jalur kode aslinya sukses: bootstrap 6098 ms, tulis 192 ms, baca 146 ms; 30 query beruntun 0 gagal), bootstrap 24 statement tidak pernah gagal, dan **alat pemicu maupun waktu-sejak-deploy bukan penyebabnya** (uji 3 putaran curl/Node bergantian: yang membedakan durasi run — 1373 ms sukses vs ~3900 ms gagal).
+
+**Remediasi — binding D1.** Perbaikan pertama yang dicoba adalah `limits.subrequests: 500` di `wrangler.jsonc`, karena itu yang ditunjuk pesan error itu sendiri. **Gagal:** deploy ditolak API dengan `CPU limits are not supported for the Free plan [code: 100328]` — jadi akun ini **paket Free**, dan batas 50 subrequest eksternal memang tidak bisa dinaikkan.
+
+Jalan buntu itu justru menegaskan arah perbaikan yang benar: **Worker ini tidak seharusnya memanggil database-nya sendiri lewat internet.** `wrangler.jsonc` kini memasang binding `d1_databases` (`env.DB` → `portfolio-template-prod`, diverifikasi 19 tabel lewat API), dan `queryD1()` menggunakannya di runtime produksi. Karena `queryD1` adalah satu-satunya titik leher — 43 pemanggilan, semua operasi D1 melewatinya — satu perbaikan ini menutup masalahnya untuk probe, backup, sweep, bootstrap, sekaligus seluruh fitur lain.
+
+Dua hal yang dijaga ketat:
+
+- **Tidak ada fallback setelah pernyataan dikirim ke binding.** Kalau binding gagal di tengah jalan, galat diteruskan — bukan diulang lewat REST — karena pernyataan mungkin sudah dieksekusi. Mengulangnya berarti menulis dua kali.
+- **Jalur REST dipertahankan utuh** sebagai fallback untuk dev lokal, unit test, dan 23 script pemeliharaan yang dijalankan lewat `tsx`. Karena itu binding diimpor **secara dinamis di dalam `try/catch`**: import statis `@opennextjs/cloudflare` akan ikut dimuat oleh modul ini dan berpotensi mematikan semua alat operasional itu di luar runtime Cloudflare.
 
 ## [1.3.66] - 2026-10-23
 
