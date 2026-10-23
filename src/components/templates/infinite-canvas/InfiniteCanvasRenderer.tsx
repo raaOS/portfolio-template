@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { TemplateRendererProps } from '@/types/template';
 import type { Project } from '@/types/projects';
 import { Languages } from 'lucide-react';
@@ -86,51 +86,40 @@ export default function InfiniteCanvasRenderer({ data }: TemplateRendererProps) 
   // State untuk panel slide-over kiri on-demand
   const [activeLeftPanel, setActiveLeftPanel] = useState<CanvasLeftPanelType | null>(null);
 
-  // State gaya grid latar belakang kanvas (dots, blueprint grid, blank) dengan localStorage
-  const [gridStyle, setGridStyle] = useState<CanvasGridStyle>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('canvas_grid_style');
-        if (saved === 'dots' || saved === 'grid' || saved === 'blank') {
-          return saved;
-        }
-      } catch {
-        // ignore
+  // State gaya grid latar belakang kanvas (dots, blueprint grid, blank) dengan localStorage.
+  // Nilai tersimpan dibaca SETELAH hydration (useEffect) agar HTML server & client sama.
+  const [gridStyle, setGridStyle] = useState<CanvasGridStyle>('dots');
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('canvas_grid_style');
+      if (saved === 'dots' || saved === 'grid' || saved === 'blank') {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- sinkronisasi satu-kali dari localStorage pasca-hydration (pola sama dengan Dock.tsx)
+        setGridStyle(saved);
       }
+    } catch {
+      // ignore
     }
-    return 'dots';
-  });
+  }, []);
 
   // Inisialisasi posisi: baca dari database Cloudflare D1 (about.desktopPreferences.iconPositions),
-  // lalu cache lokal, lalu fallback ke SCATTERED_PROJECT_POSITIONS
+  // lalu fallback ke SCATTERED_PROJECT_POSITIONS. Cache lokal (localStorage) dibaca SETELAH
+  // hydration agar HTML server & client sama (hindari hydration mismatch).
   const [projectPositions, setProjectPositions] = useState<
     Record<string, { offsetX: number; offsetY: number; rotate: number }>
   >(() => {
     const initial: Record<string, { offsetX: number; offsetY: number; rotate: number }> = {};
     const savedInDb = about?.desktopPreferences?.iconPositions || {};
 
-    let savedInLocal: Record<string, { x: number; y: number }> = {};
-    if (typeof window !== 'undefined') {
-      try {
-        const raw = localStorage.getItem('infinite_canvas_admin_positions');
-        if (raw) savedInLocal = JSON.parse(raw);
-      } catch {
-        // ignore
-      }
-    }
-
     displayProjects.forEach((p, index) => {
       const defaultPos = getProjectPosition(index);
       const localKey = `canvas-${p.id}`;
-      const localPos = savedInLocal[localKey];
       const rawDbPos = savedInDb[localKey];
       const dbPos = (rawDbPos && typeof rawDbPos.x === 'number' && typeof rawDbPos.y === 'number')
         ? rawDbPos
         : undefined;
 
-      if (localPos && typeof localPos.x === 'number') {
-        initial[p.id] = { offsetX: localPos.x, offsetY: localPos.y, rotate: defaultPos.rotate };
-      } else if (dbPos) {
+      if (dbPos) {
         initial[p.id] = { offsetX: dbPos.x, offsetY: dbPos.y, rotate: defaultPos.rotate };
       } else {
         initial[p.id] = defaultPos;
@@ -139,6 +128,32 @@ export default function InfiniteCanvasRenderer({ data }: TemplateRendererProps) 
 
     return initial;
   });
+
+  useEffect(() => {
+    let savedInLocal: Record<string, { x: number; y: number }> = {};
+    try {
+      const raw = localStorage.getItem('infinite_canvas_admin_positions');
+      if (raw) savedInLocal = JSON.parse(raw);
+    } catch {
+      // ignore
+    }
+    if (Object.keys(savedInLocal).length === 0) return;
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- overlay posisi lokal pasca-hydration (sekali jalan)
+    setProjectPositions((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      displayProjects.forEach((p) => {
+        const localPos = savedInLocal[`canvas-${p.id}`];
+        if (localPos && typeof localPos.x === 'number' && next[p.id]) {
+          next[p.id] = { ...next[p.id], offsetX: localPos.x, offsetY: localPos.y };
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- displayProjects tidak perlu jadi dependency (isi konstan per render data)
+  }, []);
 
   const {
     zoom,

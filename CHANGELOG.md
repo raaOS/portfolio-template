@@ -3,6 +3,14 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.35] - 2026-10-11
+
+### 🧹 Infinite Canvas: hydration mismatch diperbaiki (error kuning di console)
+
+- **Laporan:** halaman preview Infinite Canvas memunculkan error "Hydration failed because the server rendered HTML didn't match the client" di console — React me-regenerate tree di klien (FOUC ringan + warning merah).
+- **Penyebab:** state `gridStyle` (gaya latar dots/grid/blank) dan posisi kartu proyek dibaca dari `localStorage` langsung di dalam `useState` initializer. Server selalu render nilai default (`dots`), sedangkan browser klien render nilai tersimpan pengguna (`blank`, dsb) → HTML berbeda.
+- **Perbaikan:** nilai kini diinisialisasi default lalu di-sync dari `localStorage` lewat `useEffect` setelah hydration — preferensi pengguna tetap tersimpan, console bersih. File: `InfiniteCanvasRenderer.tsx`; 13 unit test lulus, tipe & lint bersih.
+
 ## [1.3.34] - 2026-10-11
 
 ### 🖼️ Spatial Gallery: poster awal loading diperbaiki (tidak lagi meregang/crop)
