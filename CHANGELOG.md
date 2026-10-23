@@ -23,6 +23,7 @@ Temuan pasca-deploy v1.3.65: **hasil probe harian tidak pernah tersimpan**, tapi
 - `/api/health` kini menyertakan penanda **`stale`**: bacaan lebih tua dari **25 jam** (satu siklus cron) ditandai.
 - Portal menampilkan badge **kuning `KUNO …`** untuk bacaan usang, lengkap dengan usianya — bukan lagi badge hijau `HIT 100%` yang bisa disalahartikan sebagai kondisi hari ini. Angka lama tetap disimpan apa adanya, karena menyembunyikannya justru menghapus satu-satunya petunjuk bahwa probe sudah lama berhenti menyimpan.
 - Operasi D1 kini berjalan lewat **binding `env.DB`**, bukan `fetch()` ke `api.cloudflare.com`. Itu remediasi sebenarnya: melalui binding, operasi D1 jadi *subrequest internal* (batas 1.000) alih-alih eksternal (batas 50), dan tidak lagi membayar round-trip HTTP ~200-400 ms per query.
+- Binding itu **tidak dipakai saat `next build` melakukan prerender**. Prerender ternyata juga berjalan dengan `NODE_ENV = production`, tapi D1 yang dijangkaunya adalah proxy miniflare **lokal yang kosong** — sehingga build gagal dengan `no such table: projects`. Prerender tetap membaca database produksi remote lewat REST, persis seperti perilaku lama yang berfungsi. Pembedanya: apakah konteks Cloudflare hidup di global scope, yang hanya terjadi di dalam Worker.
 
 **Penyebabnya terbukti** — dan justru `workerHealthRecordError` yang baru dipasang itu yang membongkarnya:
 

@@ -237,6 +237,14 @@ Ini juga menjelaskan pola sebelumnya yang sempat menyesatkan — "tulisan sukses
 
 **Catatan pengujian:** mock `@/lib/cloudflareD1` yang mengganti seluruh modul **mematikan** `/api/health` (500 di semua test) karena jalur rate-limit juga memakainya. Pola yang benar: `vi.mock(path, async (importOriginal) => ({ ...(await importOriginal()), override }))`.
 
+**Catatan gerbang (cacat proses yang sempat memakan satu siklus deploy):** `npx tsc --noEmit` **tidak setara** dengan type check `npm run build`. Penyebabnya `cloudflare-env.d.ts` — hasil `npm run cf:typegen` (`wrangler types`), **gitignored**, jadi tidak ikut ke worktree. Di worktree tipe `context.env` longgar sehingga cast lolos; di checkout owner `CloudflareEnv` (interface tanpa index signature) menolaknya dengan TS2352 dan build gagal.
+
+Tiga akibat yang perlu diketahui AI berikutnya:
+
+1. **Jalankan `npm run cf:typegen` sebelum `tsc`** — selain menyamakan kondisi type check, typegen juga **memvalidasi `wrangler.jsonc`** (berhasil men-generate `DB: D1Database` = binding diterima wrangler).
+2. File itu **usang** di checkout owner (tidak memuat `TELEGRAM_*`), padahal `tsconfig.include` = `**/*.ts` tanpa pengecualian test — jadi **build mengecek file test**, dan regenerasi file akan menyingkap error yang selama ini tertutup.
+3. Error yang tersingkap itu nyata tapi sudah ada helper-nya: `delete process.env.X` → TS2790 begitu key dideklarasikan wajib. `orderService.test.ts` sudah punya `unsetEnv()` yang berdokumentasi tepat untuk ini; hanya 2 baris `TELEGRAM_*` yang terlewat dikonversi.
+
 ## 🔍 Temuan Sampingan: Site Owner Tidak Pernah Muncul di Portal
 
 Saat menyiapkan tampilan portal, ditemukan **celah yang sudah lama ada** dan tidak pernah terlihat:
@@ -305,6 +313,7 @@ Kondisi akhir setelah v1.3.65 (perbaikan rancangan):
 7. **⚠️ Penyimpanan perlu dipantau beberapa run lagi.** Penyebabnya sudah terbukti (`Too many subrequests`) dan remediasi `limits.subrequests: 500` sudah dipasang, tapi itu **belum** diuji lintas banyak run — data sebelumnya hanya 1 dari 5 tulisan yang masuk, dan satu keberhasilan tidak cukup untuk menyatakan selesai. Selama belum terbukti, portal bisa menampilkan badge `KUNO` — dan badge itu harus dianggap **sinyal yang jujur**, bukan gangguan visual. Menyembunyikannya akan mengembalikan lampu hijau palsu.
 8. **Paket akun = Free (terkonfirmasi 2026-10-23).** Upaya `limits.subrequests: 500` ditolak API dengan `CPU limits are not supported for the Free plan [code: 100328]` — jadi batas 50 subrequest eksternal memang **tidak bisa dinaikkan** di paket ini. Jalan satu-satunya adalah mengurangi subrequest eksternal, dan itu sudah dilakukan dengan binding `env.DB`.
 9. **Binding D1 belum dipasang di konfigurasi wrangler klien.** `writeWranglerClientConfig()` membangun config dari nol (hanya meminjam `compatibility_date`/`compatibility_flags`), jadi binding owner **tidak bocor** ke klien — dan klien juga belum mendapatkannya. Klien tetap lewat REST seperti sebelumnya (nol regresi), tapi **backup harian klien berisiko menghantam batas 50 yang sama** karena jalurnya identik: bootstrap 24 panggilan + pembacaan seluruh tabel. Ini belum diverifikasi dan layak dijadikan keputusan terpisah.
+10. **Jangan pakai binding D1 tanpa penjaga build-time — ini pernah menggagalkan build.** `NODE_ENV === 'production'` **berlaku juga saat `next build` melakukan prerender**, jadi gerbang itu sendirian tidak cukup. Saat prerender, `getCloudflareContext({ async: true })` tidak melempar — ia jatuh ke `getPlatformProxy()` milik wrangler dan menyerahkan **D1 miniflare lokal yang kosong**, sehingga `/projects` gagal dengan `no such table: projects` (terbukti 2026-10-23, memakan satu siklus deploy). Pembeda yang benar dan sudah dipakai: konteks Cloudflare hidup di global scope (`Symbol.for('__cloudflare-context__')`), yang hanya dipasang entrypoint Worker — `next.config.mjs` repo ini tidak memanggil `initOpenNextCloudflareForDev()`. Jalur cron sendiri aman karena `scheduled` mencapai aplikasi lewat `env.WORKER_SELF_REFERENCE.fetch()`, yang masuk ke `runWithCloudflareRequestContext()`.
 
 ## 🔭 Tindak Lanjut (Opsional, Tidak Mendesak)
 

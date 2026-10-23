@@ -96,16 +96,50 @@ interface D1Binding {
 }
 
 /**
+ * Simbol yang memegang konteks Cloudflare di global scope.
+ *
+ * Kontrak antar modul milik `@opennextjs/cloudflare`: dipasang oleh entrypoint
+ * Worker (`dist/cli/templates/init.js`) dan dibaca oleh
+ * `getCloudflareContextFromGlobalScope()`. `Symbol.for` dipakai di kedua sisi,
+ * jadi identik walau lewat dua jalur modul berbeda.
+ */
+const CLOUDFLARE_CONTEXT_SYMBOL = Symbol.for('__cloudflare-context__');
+
+/**
+ * True bila konteks Cloudflare hidup di global scope, artinya kode sedang
+ * berjalan **di dalam Worker** (baik fetch biasa maupun handler cron — yang
+ * mencapai aplikasi lewat `env.WORKER_SELF_REFERENCE.fetch()`).
+ *
+ * Pemeriksaan ini wajib, dan `NODE_ENV` saja tidak cukup. Saat `next build`
+ * melakukan prerender, `NODE_ENV` **juga** `'production'`, tapi `getCloudflareContext({ async: true })`
+ * tidak melempar — ia jatuh ke `getPlatformProxy()` milik wrangler, yang
+ * menyerahkan **D1 miniflare lokal yang kosong**. Akibatnya prerender membaca
+ * database yang salah dan build gagal dengan `no such table: projects`
+ * (terbukti 2026-10-23). Prerender harus tetap membaca database produksi
+ * remote lewat REST — itulah perilaku lama yang berfungsi.
+ *
+ * Simbol ini absen saat build karena `next.config.mjs` repo ini tidak memanggil
+ * `initOpenNextCloudflareForDev()`.
+ */
+function hasLiveCloudflareContext(): boolean {
+  return Reflect.get(globalThis, CLOUDFLARE_CONTEXT_SYMBOL) !== undefined;
+}
+
+/**
  * Ambil binding D1 `env.DB`, atau `null` bila tidak tersedia.
  *
- * Sengaja import **dinamis** di dalam `try/catch`, dua alasan:
+ * Tiga penjaga berlapis, masing-masing menutup satu lingkungan yang memang
+ * tidak boleh memakai binding:
  *
- * 1. `cloudflareD1.ts` juga diimpor oleh 23 script pemeliharaan yang dijalankan
- *    lewat `tsx` di luar Cloudflare. Import statis `@opennextjs/cloudflare`
- *    akan dimuat saat modul dibuka — dan kalau paket itu tidak bisa dimuat di
- *    luar runtime, semua alat operasional ikut mati.
- * 2. Di luar produksi (dev lokal, unit test, script) memang tidak ada binding,
- *    jadi jalur REST lama tetap dipakai persis seperti sebelumnya.
+ * 1. `NODE_ENV !== 'production'` — dev lokal, unit test, dan 23 script
+ *    pemeliharaan yang dijalankan lewat `tsx` di luar Cloudflare. Untuk yang
+ *    terakhir, import **dinamis** di dalam `try/catch` juga diperlukan: import
+ *    statis `@opennextjs/cloudflare` akan dimuat saat modul dibuka, dan kalau
+ *    paket itu gagal dimuat di luar runtime, semua alat operasional ikut mati.
+ * 2. `hasLiveCloudflareContext()` — menyingkirkan prerender `next build`, yang
+ *    `NODE_ENV`-nya ikut `'production'` tapi D1-nya proxy lokal yang kosong.
+ * 3. `try/catch` — kalau konteks tetap tidak bisa diambil, diam-diam kembali ke
+ *    REST, yang selalu berfungsi di semua lingkungan.
  *
  * Hasilnya sengaja **tidak** di-memoisasi: kalau konteks belum siap pada
  * panggilan pertama, cache `null` akan menahan isolate itu pada REST selamanya
@@ -113,6 +147,7 @@ interface D1Binding {
  */
 async function getD1Binding(): Promise<D1Binding | null> {
   if (process.env.NODE_ENV !== 'production') return null;
+  if (!hasLiveCloudflareContext()) return null;
   try {
     const { getCloudflareContext } = await import('@opennextjs/cloudflare');
     const context = await getCloudflareContext({ async: true });

@@ -17,6 +17,13 @@ const originalApiToken = process.env.CLOUDFLARE_D1_API_TOKEN;
 const fetchMock = vi.fn();
 
 /**
+ * Sama dengan simbol di `cloudflareD1.ts` — kontrak yang dipasang entrypoint
+ * Worker di global scope. Dipakai test untuk mematikan/menyalakan "kondisi
+ * Worker runtime" buatan.
+ */
+const CLOUDFLARE_CONTEXT_SYMBOL = Symbol.for('__cloudflare-context__');
+
+/**
  * Binding tiruan dengan bentuk persis yang dipanggil `queryD1`
  * (`prepare(sql).bind(...params).all()`). `bind` mengembalikan statement itu
  * sendiri supaya rantainya bisa disambung apa adanya.
@@ -47,11 +54,15 @@ describe('queryD1 — jalur binding D1', () => {
     process.env.CLOUDFLARE_D1_API_TOKEN = 'token-test';
     fetchMock.mockReset();
     vi.stubGlobal('fetch', fetchMock);
+    // Default: konteks hidup di global scope, yaitu kondisi Worker runtime.
+    // Test prerender mematikannya secara manual.
+    Reflect.set(globalThis, CLOUDFLARE_CONTEXT_SYMBOL, {});
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
+    Reflect.deleteProperty(globalThis, CLOUDFLARE_CONTEXT_SYMBOL);
     for (const [key, value] of [
       ['CLOUDFLARE_ACCOUNT_ID', originalAccountId],
       ['CLOUDFLARE_D1_DATABASE_ID', originalDatabaseId],
@@ -108,6 +119,42 @@ describe('queryD1 — jalur binding D1', () => {
 
     expect(getCloudflareContextMock).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  // Regression 2026-10-23 — kasus yang menggagalkan build. `NODE_ENV` juga
+  // `'production'` saat `next build` melakukan prerender, jadi gerbang NODE_ENV
+  // saja tidak cukup: tanpa konteks hidup di global scope, binding akan
+  // menyerahkan D1 miniflare lokal yang kosong dan prerender gagal dengan
+  // "no such table: projects".
+  it('keeps using REST while prerendering at build time', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    // Simulasi prerender: konteks tidak pernah terpasang, karena
+    // `next.config.mjs` repo ini tidak memanggil `initOpenNextCloudflareForDev()`.
+    Reflect.deleteProperty(globalThis, CLOUDFLARE_CONTEXT_SYMBOL);
+    // Kalau ini sempat dipanggil, hasilnya proxy miniflare — D1 lokal yang kosong.
+    getCloudflareContextMock.mockResolvedValue({ env: { DB: makeBinding(async () => ({})) } });
+    fetchMock.mockResolvedValue(restSuccess([{ id: 'p1' }]));
+
+    const rows = await queryD1('SELECT id FROM projects');
+
+    // REST membaca database produksi remote — itulah perilaku lama yang berfungsi.
+    expect(rows).toEqual([{ id: 'p1' }]);
+    expect(String(fetchMock.mock.calls[0][0])).toContain('api.cloudflare.com');
+    // Tidak boleh sempat menyentuh binding proxy sama sekali.
+    expect(getCloudflareContextMock).not.toHaveBeenCalled();
+  });
+
+  it('uses the binding once the Worker context is live on the global scope', async () => {
+    // Kondisi cron: route dicapai lewat env.WORKER_SELF_REFERENCE.fetch(), yang
+    // masuk ke runWithCloudflareRequestContext() dan menghidupkan konteks ALS.
+    vi.stubEnv('NODE_ENV', 'production');
+    const binding = makeBinding(async () => ({ success: true, results: [{ key: 'k' }] }));
+    getCloudflareContextMock.mockResolvedValue({ env: { DB: binding } });
+
+    const rows = await queryD1('SELECT key FROM app_kv');
+
+    expect(rows).toEqual([{ key: 'k' }]);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   // Dua test berikut mengunci aturan keselamatan paling penting di perubahan ini:
