@@ -19,7 +19,11 @@
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/react';
-import MagazineShowcase, { type MagazineImage } from '@/components/landing/MagazineShowcase';
+import MagazineShowcase, {
+  type MagazineImage,
+  sameOriginMediaUrl,
+  previewVideoOf,
+} from '@/components/landing/MagazineShowcase';
 
 const IMAGES: MagazineImage[] = [
   { src: '/landing/os-desktop.webp', alt: 'OS Desktop', previewUrl: '/preview/os-desktop' },
@@ -120,5 +124,63 @@ describe('MagazineShowcase', () => {
     fireEvent.click(cardsOf(container)[0]);
 
     expect(openSpy).not.toHaveBeenCalled();
+  });
+
+  // Guardregresi SecurityError texImage2D (video lintas domain jadi tekstur WebGL).
+  describe('sameOriginMediaUrl', () => {
+    it('URL R2 absolut lintas domain dialihkan ke proxy same-origin /r2/', () => {
+      expect(
+        sameOriginMediaUrl('https://pub-abc.r2.dev/assets/hero-videos/os-desktop.mp4')
+      ).toBe('/r2/assets/hero-videos/os-desktop.mp4');
+    });
+
+    it('parameter ?v= (anti-cache) ikut dibuang — key R2 tanpa query', () => {
+      expect(
+        sameOriginMediaUrl(
+          'https://cdn.example.com/assets/hero-videos/a.mp4?v=2026-10-23T01%3A02%3A03'
+        )
+      ).toBe('/r2/assets/hero-videos/a.mp4');
+    });
+
+    it('path relatif & URL eksternal yang bukan media R2 tidak diubah', () => {
+      expect(sameOriginMediaUrl('/landing/os-desktop.webp')).toBe('/landing/os-desktop.webp');
+      expect(sameOriginMediaUrl('https://images.unsplash.com/photo-1.jpg')).toBe(
+        'https://images.unsplash.com/photo-1.jpg'
+      );
+      expect(sameOriginMediaUrl('')).toBe('');
+    });
+  });
+
+  // Guard `texImage2D SecurityError`: tekstur WebGL hanya boleh dari sumber
+  // same-origin. URL eksternal non-R2 = video DILEWATI (pakai poster statis).
+  describe('previewVideoOf', () => {
+    it('video R2 lintas domain → /r2/ (same-origin, tetap diputar)', () => {
+      expect(
+        previewVideoOf({
+          src: '/x.webp',
+          previewVideo: 'https://pub-abc.r2.dev/assets/hero-videos/a.mp4?v=1',
+        })
+      ).toBe('/r2/assets/hero-videos/a.mp4');
+    });
+
+    it('video absolut same-origin dinormalkan ke jalur /r2/ (tetap dipakai)', () => {
+      const same = `${window.location.origin}/assets/hero-videos/a.mp4`;
+      expect(previewVideoOf({ src: '/x.webp', previewVideo: same })).toBe(
+        '/r2/assets/hero-videos/a.mp4'
+      );
+    });
+
+    it('video eksternal non-R2 DIKOSONGKAN — mencegah SecurityError tiap frame', () => {
+      expect(
+        previewVideoOf({
+          src: '/x.webp',
+          previewVideo: 'https://cdn.example.com/video/hero.mp4',
+        })
+      ).toBe('');
+    });
+
+    it('slot tanpa video tetap kosong', () => {
+      expect(previewVideoOf({ src: '/x.webp' })).toBe('');
+    });
   });
 });

@@ -49,6 +49,7 @@ import * as React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { ExternalLink } from 'lucide-react';
+import { extractStoragePath } from '@/lib/urlResolver';
 
 const CAM_FOV = 75;
 const CAM_Z = 6;
@@ -127,7 +128,7 @@ function clamp(v: number, lo: number, hi: number, fallback: number): number {
 }
 
 function srcOf(image: MagazineImage): string {
-  return image?.src ?? '';
+  return sameOriginMediaUrl(image?.src ?? '');
 }
 
 function altOf(image: MagazineImage): string {
@@ -143,12 +144,36 @@ function previewUrlOf(image: MagazineImage): string {
   return image?.previewUrl ?? '';
 }
 
+/** Media lintas domain → lewat proxy same-origin `/r2/` (jalur media resmi
+    repo, mendukung Range + CORS `*`). Diperlukan karena WebGL MENOLAK
+    `texImage2D` untuk video/gambar lintas domain tanpa header CORS
+    (SecurityError) — domain R2 publik belum tentu mengirimkannya. Key yang
+    tidak dikenal (URL eksternal) dikembalikan apa adanya. */
+export function sameOriginMediaUrl(url: string): string {
+  const key = extractStoragePath(url);
+  return key ? `/r2/${key}` : url;
+}
+
 /** Video preview rekaman demo (v1.3.49, dirapikan v1.3.53): HANYA URL dari
     panel admin "Video Hero" (D1) yang diputar. Fallback video default
     bawaan (/landing/*.mp4) DIHAPUS atas permintaan owner — slot tanpa
-    rekaman menampilkan gambar screenshot statis, tanpa animasi bawaan. */
-function previewVideoOf(image: MagazineImage): string {
-  return image?.previewVideo ?? '';
+    rekaman menampilkan gambar screenshot statis, tanpa animasi bawaan.
+
+    v1.3.67 — **hanya URL same-origin** yang dikembalikan. Tekstur WebGL
+    (`texImage2D`) MENOLAK data lintas domain tanpa CORS, dan three.js
+    menelan error itu sendiri (log `THREE.WebGLState:`) sehingga tak bisa
+    ditangkap `try/catch` di loop render. Proxy `/r2/` membuat media R2
+    tetap same-origin; URL eksternal lain (tanpa ACAO) dilewati → lembaran
+    memakai gambar poster statis, bukan video yang bikin error tiap frame. */
+export function previewVideoOf(image: MagazineImage): string {
+  const url = sameOriginMediaUrl(image?.previewVideo ?? '');
+  if (!url || typeof window === 'undefined') return url;
+  if (!/^https?:\/\//i.test(url)) return url; // relatif = same-origin
+  try {
+    return new URL(url).origin === window.location.origin ? url : '';
+  } catch {
+    return '';
+  }
 }
 
 /** Modulo gaya GLSL (hasil selalu non-negatif untuk y > 0). */
@@ -873,6 +898,12 @@ class MagazineScene {
       el.loop = true;
       el.playsInline = true;
       el.preload = 'auto';
+      // CORS-clean: video dipakai sebagai tekstur WebGL (texImage2D menolak
+      // data lintas domain). Lewat proxy /r2/ sudah same-origin; atribut ini
+      // tetap dipasang sebagai jaring pengaman bila URL ternyata eksternal —
+      // kalau server tak mengirim ACAO, video gagal muat → jatuh ke gambar
+      // statis (handler `error` di bawah), bukan SecurityError di loop render.
+      el.crossOrigin = 'anonymous';
       el.setAttribute('aria-hidden', 'true');
       el.src = url;
       el.style.cssText =
@@ -1050,6 +1081,16 @@ class MagazineScene {
 
     const previous = this.mesh.material;
     this.mesh.material = this.pickMaterial;
+
+    // Pass pick menulis kode index lembaran di KANAL MERAH (`(i+1)/255`).
+    // Lapisan video preview menulis warna video apa adanya dengan alpha 1
+    // dan tebal menonjol 1.6× — ikut ter-render di scene yang sama → pixel
+    // video merusak kode index (nilai merah sembarang), dan klik jatuh ke
+    // lembaran lain (bug: klik template A membuka template B/C). Sembunyikan
+    // sementara selama pick; visibilitas asli dipulihkan setelahnya.
+    const videoVisible = this.videoMeshes.map((m) => m.visible);
+    for (const m of this.videoMeshes) m.visible = false;
+
     this.renderer.setRenderTarget(this.pickTarget);
 
     this.renderer.setClearColor(0x000000, 1);
@@ -1065,6 +1106,9 @@ class MagazineScene {
     this.renderer.setRenderTarget(null);
     this.renderer.setClearColor(0x000000, 0);
     this.mesh.material = previous;
+    for (let i = 0; i < this.videoMeshes.length; i++) {
+      this.videoMeshes[i].visible = videoVisible[i];
+    }
 
     const hit = this.pickBuffer[0] - 1;
     return hit >= 0 && hit < this.settings().pages ? hit : -1;

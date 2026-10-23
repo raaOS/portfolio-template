@@ -3,6 +3,18 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.71] - 2026-10-24
+
+### 🐛 Backport ke `main`: `SecurityError` `texImage2D` Video Hero + Klik Lembaran Akurat
+
+Perbaikan yang sudah ada di branch `fix/landing-click` (commit `c17107f`, `34ee75b`, `bfac743`) **belum pernah masuk `main`**, sehingga dev server `localhost:3000` masih menampilkan error ini tiap frame. Sekarang di-backport utuh:
+
+- `SecurityError: Failed to execute 'texImage2D' ... video element contains cross-origin data` **hilang**: media ber-key R2 (video & poster hero) dialihkan ke proxy **same-origin `/r2/…`**, `crossOrigin="anonymous"` dipasang, dan `previewVideoOf()` hanya mengembalikan URL same-origin — video eksternal non-R2 dilewati (lembaran memakai poster statis) alih-alih memicu error di loop render.
+- Klik lembaran hero kembali akurat: lapisan video disembunyikan sementara selama pass pick, jadi template yang dibuka selalu sesuai lembaran yang diketuk.
+- Tanpa perubahan perilaku lain: gerak koridor, snap, siklus demo live, dan tampilan video tetap sama.
+
+**Verifikasi:** `vitest` magazine-showcase PASS, `tsc --noEmit` 0 error, `eslint` bersih.
+
 ## [1.3.70] - 2026-10-24
 
 ### 🎭 Mode Demo Chat: Balasan Simulasi di Situs Milik Owner — Nol Nomor HP Terlibat
