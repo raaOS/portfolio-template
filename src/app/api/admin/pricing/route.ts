@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { validateAdminRequest, checkAdminAuth } from '@/lib/auth';
+import { validateAdminRequest } from '@/lib/auth';
 import { getBasePrice, updateBasePrice } from '@/lib/services/pricingConfigService';
 
 /**
  * GET /api/admin/pricing
  * Membaca harga dasar template (admin-only).
+ *
+ * Auth memakai `validateAdminRequest` (bukan `checkAdminAuth` polos) karena
+ * login admin saat ini hanya menerbitkan sesi customer `site_user_token`
+ * (`/api/auth/login` → `createLoginResponse`); `checkAdminAuth` hanya
+ * mengenali cookie legacy `admin_token` → 401 untuk sesi yang ada (bug
+ * 2026-10-08: panel Harga Jual selalu "Gagal memuat harga"). Pola identik
+ * dengan GET route admin lain (backup, storage-stats).
  */
 export async function GET(request: NextRequest) {
   try {
-    if (!checkAdminAuth(request)) {
+    if (!(await validateAdminRequest(request, { checkCsrf: false }))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

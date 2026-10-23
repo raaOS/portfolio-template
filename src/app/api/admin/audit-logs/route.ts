@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/database';
-import { checkAdminAuth } from '@/lib/auth';
+import { validateAdminRequest } from '@/lib/auth';
 import { queryD1, isD1Configured } from '@/lib/cloudflareD1';
 import { SITE_ID } from '@/crud/shared/config';
 
@@ -74,8 +74,11 @@ async function readRelationalTable(): Promise<MergedLog[]> {
 
 export async function GET(request: NextRequest) {
   try {
-    const isAuthenticated = checkAdminAuth(request);
-    if (!isAuthenticated) {
+    // Auth memakai validateAdminRequest (bukan checkAdminAuth polos): login
+    // admin kini hanya menerbitkan sesi customer site_user_token, sedangkan
+    // checkAdminAuth hanya mengenali cookie legacy admin_token → 401 (bug
+    // panel Log Aktivitas, 2026-10-08). GET tanpa CSRF, pola route backup.
+    if (!(await validateAdminRequest(request, { checkCsrf: false }))) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { validateAdminRequest, checkAdminAuth } from '@/lib/auth';
+import { validateAdminRequest } from '@/lib/auth';
 import {
   getAdminPaymentConfig,
   updatePaymentConfig,
@@ -11,7 +11,10 @@ import {
  */
 export async function GET(request: NextRequest) {
   try {
-    if (!checkAdminAuth(request)) {
+    // validateAdminRequest (bukan checkAdminAuth polos) — mengenali sesi
+    // customer site_user_token; checkAdminAuth hanya tahu cookie legacy
+    // admin_token → 401. GET tanpa CSRF, pola route admin lain (2026-10-08).
+    if (!(await validateAdminRequest(request, { checkCsrf: false }))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
