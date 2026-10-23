@@ -97,7 +97,10 @@ async function createHardSkill(
   };
 
   const updatedSkills = [...currentSkills, newSkill];
-  await saveHardSkills(updatedSkills, `Add hard skill: ${newSkill.name}`, siteId);
+  const success = await saveHardSkills(updatedSkills, `Add hard skill: ${newSkill.name}`, siteId);
+  if (!success) {
+    throw new Error('Failed to save new hard skill');
+  }
 
   return newSkill;
 }
@@ -116,7 +119,14 @@ async function updateHardSkill(id: string, updates: Partial<HardSkill>, siteId =
   };
 
   currentSkills[index] = updatedSkill;
-  await saveHardSkills(currentSkills, `Update hard skill: ${updatedSkill.name}`, siteId);
+  const success = await saveHardSkills(
+    currentSkills,
+    `Update hard skill: ${updatedSkill.name}`,
+    siteId
+  );
+  if (!success) {
+    throw new Error('Failed to save hard skill update');
+  }
 
   return updatedSkill;
 }
@@ -133,7 +143,10 @@ async function deleteHardSkill(id: string, siteId = 'default-site'): Promise<boo
   }
 
   const filtered = currentSkills.filter((s) => s.id !== id);
-  await saveHardSkills(filtered, `Delete hard skill ID: ${id}`, siteId);
+  const success = await saveHardSkills(filtered, `Delete hard skill ID: ${id}`, siteId);
+  if (!success) {
+    throw new Error('Failed to delete hard skill');
+  }
   return true;
 }
 

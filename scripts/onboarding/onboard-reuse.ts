@@ -73,6 +73,32 @@ export function findArchiveForSlug(archiveDir: string, clientSlug: string): Arch
 }
 
 /**
+ * Tolak slug yang sudah menjadi arsip milik AKUN CLOUDFLARE BERBEDA
+ * (audit business flow 2026-10-08, temuan #6).
+ *
+ * Re-provision untuk akun yang SAMA adalah operasi sah (perbaikan/upgrade klien
+ * yang sama — lihat kebijakan di atas). Tetapi slug dengan akun berbeda =
+ * klien lain: menimpanya akan menimpa config.env, surat serah terima, dan
+ * mengarahkan deploy ke database milik klien lain. Dilempar sebagai error
+ * sebelum ada resource yang dibuat.
+ *
+ * Bila arsip lama tidak punya CLOUDFLARE_ACCOUNT_ID (arsip rusak/tidak lengkap)
+ * guard dilewatkan — deteksi selanjutnya tetap ada di kebijakan password admin
+ * (resolveProvisionedAdminPassword) yang gagal keras.
+ */
+export function guardCrossClientSlug(hit: ArchiveHit | null, accountId: string): void {
+  if (!hit) return;
+  const archiveAccount = (hit.env.CLOUDFLARE_ACCOUNT_ID || '').trim();
+  if (archiveAccount && archiveAccount !== accountId.trim()) {
+    throw new Error(
+      `Slug ini sudah dipakai klien lain: arsip "${hit.folderName}" tercatat untuk akun Cloudflare ` +
+        `${archiveAccount}, sedangkan onboarding ini memakai akun ${accountId}. ` +
+        `Gunakan slug berbeda untuk klien baru — menimpa arsip klien lama tidak diizinkan.`
+    );
+  }
+}
+
+/**
  * Buat folder arsip BARU bernomor (`01_slug`, `02_slug`, ...).
  * HANYA dipanggil kalau `findArchiveForSlug` tidak menemukan arsip lama.
  */

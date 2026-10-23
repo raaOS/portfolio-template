@@ -46,7 +46,10 @@ export const stickyNotesService = {
 
   async saveNotes(notes: NoteData[], siteId = 'default-site') {
     const normalizedNotes = notes.map((note, index) => normalizeNote(note, index));
-    await service.saveData(normalizedNotes, 'Update sticky notes contents', siteId);
+    const success = await service.saveData(normalizedNotes, 'Update sticky notes contents', siteId);
+    if (!success) {
+      throw new Error('Failed to save sticky notes');
+    }
     return normalizedNotes;
   },
 };

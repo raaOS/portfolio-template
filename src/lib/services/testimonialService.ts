@@ -101,7 +101,14 @@ export const testimonialService = {
     currentData.testimonials.push(newTestimonial);
     currentData.lastUpdated = new Date().toISOString();
 
-    await service.saveData(currentData, `Add testimonial: ${newTestimonial.name}`, siteId);
+    const success = await service.saveData(
+      currentData,
+      `Add testimonial: ${newTestimonial.name}`,
+      siteId
+    );
+    if (!success) {
+      throw new Error('Failed to save new testimonial');
+    }
     return newTestimonial;
   },
 
@@ -124,7 +131,14 @@ export const testimonialService = {
     currentData.testimonials[index] = updatedTestimonial;
     currentData.lastUpdated = new Date().toISOString();
 
-    await service.saveData(currentData, `Update testimonial: ${updatedTestimonial.name}`, siteId);
+    const success = await service.saveData(
+      currentData,
+      `Update testimonial: ${updatedTestimonial.name}`,
+      siteId
+    );
+    if (!success) {
+      throw new Error('Failed to save testimonial update');
+    }
     return updatedTestimonial;
   },
 
@@ -144,7 +158,14 @@ export const testimonialService = {
 
     currentData.testimonials = currentData.testimonials.filter((t) => t.id !== normalizedId);
     currentData.lastUpdated = new Date().toISOString();
-    await service.saveData(currentData, `Delete testimonial ID: ${id}`, siteId);
+    const success = await service.saveData(
+      currentData,
+      `Delete testimonial ID: ${id}`,
+      siteId
+    );
+    if (!success) {
+      throw new Error('Failed to delete testimonial');
+    }
     return true;
   },
 };

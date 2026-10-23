@@ -15,7 +15,7 @@
  * Alur per klien di `deployClient()`:
  *   amankan rahasia klien -> bersihkan cache build -> build dengan env klien
  *   -> tulis ulang next-env.mjs (buang kunci owner) -> tulis wrangler config
- *   klien -> `wrangler deploy --config <config-klien>`.
+ *   klien -> `wrangler deploy --config <config-klien>` -> verifikasi site hidup.
  *
  * Env klien ditekan di TIGA lapis:
  *   a. env proses anak `next build` (kunci `.env.local` TIDAK menimpa env yang
@@ -497,6 +497,65 @@ export function cleanNextBuildCache(rootDir: string): void {
   // dihapus di sini.
 }
 
+// ---------------------------------------------------------------------------
+// Verifikasi site hidup pasca-deploy
+// ---------------------------------------------------------------------------
+
+export interface SiteLivenessResult {
+  alive: boolean;
+  /** URL terakhir yang berhasil direspons (kosong kalau tidak ada). */
+  url: string;
+  /** Rangkuman percobaan terakhir (untuk catatan deploy & pesan error). */
+  detail: string;
+}
+
+/**
+ * Pastikan site benar-benar bisa diakses publik setelah `wrangler deploy`
+ * sukses (audit Temuan 15). Tiap percobaan mengecek `/api/health` dulu; kalau
+ * endpoint itu tidak ada (404/405) atau tidak bisa dihubungi, jatuh ke halaman
+ * utama. Maksimal 3 percobaan dengan backoff singkat (cold start worker pertama
+ * kadang butuh beberapa detik). Respons HTTP apa pun dianggap site hidup —
+ * status non-200 tetap dicatat supaya owner bisa memeriksa.
+ */
+export async function verifySiteLiveness(
+  baseUrl: string,
+  onLog: (line: string) => void,
+  options: { attempts?: number; timeoutMs?: number; backoffMs?: number } = {}
+): Promise<SiteLivenessResult> {
+  const { attempts = 3, timeoutMs = 15000, backoffMs = 2000 } = options;
+  const rootUrl = baseUrl.replace(/\/+$/, '');
+  const targets = [`${rootUrl}/api/health`, rootUrl];
+  let lastNote = 'belum ada percobaan';
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    for (const target of targets) {
+      try {
+        const res = await fetch(target, {
+          redirect: 'follow',
+          signal: AbortSignal.timeout(timeoutMs),
+        });
+        // 404/405 di /api/health = endpoint memang tidak ada; bukti site hidup
+        // diambil dari halaman utama.
+        if (target.endsWith('/api/health') && (res.status === 404 || res.status === 405)) {
+          lastNote = `${target}: HTTP ${res.status} (endpoint health tidak ada)`;
+          continue;
+        }
+        return { alive: true, url: target, detail: `HTTP ${res.status} dari ${target}` };
+      } catch (err) {
+        lastNote = `${target}: ${err instanceof Error ? err.message : String(err)}`;
+      }
+    }
+    if (attempt < attempts) {
+      onLog(
+        `>>> [VERIFIKASI] Site belum merespon (percobaan ${attempt}/${attempts}) — coba lagi dalam ${backoffMs / 1000} detik...`
+      );
+      await new Promise((resolve) => setTimeout(resolve, backoffMs));
+    }
+  }
+
+  return { alive: false, url: '', detail: lastNote };
+}
+
 export interface HandoverNoteInput {
   clientName: string;
   slug: string;
@@ -772,10 +831,27 @@ export async function deployClient(options: DeployClientOptions): Promise<Deploy
     onLog
   );
 
+  const finalUrl = config.WEBSITE_URL || websiteUrl;
+
+  // 8.5 Verifikasi site hidup (audit Temuan 15): `wrangler deploy` sukses belum
+  //     menjamin site bisa diakses publik (worker gagal start, route bermasalah,
+  //     dsb). Cek /api/health (fallback halaman utama), maksimal 3 percobaan.
+  let siteAlive = true;
+  if (deploy.code === 0 && !dryRun && finalUrl) {
+    onLog(`>>> [VERIFIKASI] Cek site hidup: ${finalUrl}`);
+    const liveness = await verifySiteLiveness(finalUrl, onLog);
+    if (liveness.alive) {
+      onLog(`>>> [VERIFIKASI] Site hidup — ${liveness.detail}`);
+      notes.push(`Verifikasi site hidup: ${liveness.detail}`);
+    } else {
+      siteAlive = false;
+      notes.push(`Verifikasi site hidup GAGAL: ${liveness.detail}`);
+    }
+  }
+
   // 9. CATATAN_SERAH_TERIMA.md (PK8): hanya saat deploy sukses, dan kegagalan
   //    menulis catatan TIDAK boleh mengubah status deploy yang sudah sukses.
   if (deploy.code === 0 && !dryRun) {
-    const finalUrl = config.WEBSITE_URL || websiteUrl;
     const notePath = path.join(path.dirname(configPath), 'CATATAN_SERAH_TERIMA.md');
     try {
       const note = renderHandoverNote({
@@ -798,15 +874,22 @@ export async function deployClient(options: DeployClientOptions): Promise<Deploy
     }
   }
 
+  let error: string | undefined;
+  if (deploy.code !== 0) {
+    error = `Wrangler keluar dengan kode ${deploy.code}`;
+  } else if (!siteAlive) {
+    error = `Deploy sukses tapi site tidak merespon: ${finalUrl}`;
+  }
+
   return {
-    ok: deploy.code === 0,
+    ok: deploy.code === 0 && siteAlive,
     slug,
     clientName,
-    websiteUrl: config.WEBSITE_URL || websiteUrl,
+    websiteUrl: finalUrl,
     buildCode: build.code,
     deployCode: deploy.code,
     wranglerConfig,
     notes,
-    error: deploy.code === 0 ? undefined : `Wrangler keluar dengan kode ${deploy.code}`,
+    error,
   };
 }

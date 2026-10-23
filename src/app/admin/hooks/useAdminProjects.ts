@@ -211,6 +211,14 @@ export function useAdminProjects() {
 
   const handleBulkUpdate = async (action: 'publish' | 'draft' | 'delete') => {
     if (selectedProjectIds.size === 0) return;
+    // Hapus massal bersifat destruktif → wajib konfirmasi dulu.
+    // Publish/draft tidak perlu karena masih bisa dibalik.
+    if (action === 'delete') {
+      const confirmed = window.confirm(
+        `Hapus ${selectedProjectIds.size} project terpilih?\n\nTindakan ini tidak bisa dibatalkan.`
+      );
+      if (!confirmed) return;
+    }
     setIsBulkUpdating(true);
     try {
       const token = getWritableCsrfToken(csrfToken);

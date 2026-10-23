@@ -101,13 +101,40 @@ function fileExists(relativePath) {
   return fs.existsSync(path.join(root, relativePath));
 }
 
-function parseEnvKeys(text) {
+function parseEnvEntries(text) {
   return text
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line && !line.startsWith('#'))
-    .map((line) => line.match(/^([A-Z0-9_]+)=/i)?.[1])
-    .filter(Boolean);
+    .map((line) => line.match(/^([A-Z0-9_]+)=(.*)$/i))
+    .filter(Boolean)
+    .map((match) => ({
+      key: match[1],
+      // Strip pasangan kutip pembungkus ("", '') supaya value placeholder
+      // kosong tidak dianggap sebagai rahasia nyata.
+      value: match[2].trim().replace(/^(['"])([\s\S]*)\1$/, '$2').trim(),
+    }));
+}
+
+function parseEnvKeys(text) {
+  return parseEnvEntries(text).map((entry) => entry.key);
+}
+
+// Guard value-level: .env.example adalah template yang ikut ter-bundle ke paket
+// jualan — kunci rahasia wajib KOSONG. Key existence check di bawah tidak
+// menangkap value nyata yang tertempel (mis. JWT_SECRET="rahasia123").
+const secretEnvKeyPatterns = [/_TOKEN$/, /_SECRET$/, /_KEY$/, /_PASSWORD$/, /_SALT$/];
+const explicitSecretEnvKeys = new Set([
+  'JWT_SECRET',
+  'PASSWORD_SALT',
+  'ADMIN_PIN',
+  'CRON_SECRET',
+  'REVALIDATION_TOKEN',
+  'ADMIN_PASSWORD_SCRYPT',
+]);
+
+function isSecretEnvKey(key) {
+  return explicitSecretEnvKeys.has(key) || secretEnvKeyPatterns.some((pattern) => pattern.test(key));
 }
 
 function checkRequiredFiles() {
@@ -167,6 +194,19 @@ function checkEnvExample() {
     pass('FFmpeg base URL defaults to R2 proxy');
   } else {
     fail('FFmpeg base URL defaults to R2 proxy');
+  }
+}
+
+function checkEnvExampleSecretValues() {
+  // Hanya kunci yang dilaporkan — value rahasia tidak pernah ditampilkan di log.
+  const leaked = parseEnvEntries(readText('.env.example'))
+    .filter((entry) => isSecretEnvKey(entry.key) && entry.value !== '')
+    .map((entry) => entry.key);
+
+  if (leaked.length === 0) {
+    pass('No non-empty secret values in .env.example');
+  } else {
+    fail('No non-empty secret values in .env.example', leaked.join(', '));
   }
 }
 
@@ -248,6 +288,7 @@ function printResults() {
 checkRequiredFiles();
 checkPackageScripts();
 checkEnvExample();
+checkEnvExampleSecretValues();
 checkCloudflareDocs();
 checkSecretFileProtection();
 printResults();

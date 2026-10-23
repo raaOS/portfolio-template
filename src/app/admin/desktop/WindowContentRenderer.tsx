@@ -105,6 +105,11 @@ const BackupPanel = dynamic(() => import('./panels/BackupPanel'), {
   loading: () => <AdminLoading size="page" />,
 });
 
+const OrdersPanel = dynamic(() => import('./panels/OrdersPanel'), {
+  ssr: false,
+  loading: () => <AdminLoading size="page" />,
+});
+
 const PANEL_MAP: Record<string, React.ComponentType> = {
   projects: ProjectsPanel,
   profile: ProfilePanel,
@@ -125,6 +130,7 @@ const PANEL_MAP: Record<string, React.ComponentType> = {
   contacts: ContactsPanel,
   activityLog: ActivityLogPanel,
   backup: BackupPanel,
+  orders: OrdersPanel,
 };
 
 interface WindowContentRendererProps {

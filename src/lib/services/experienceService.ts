@@ -75,7 +75,10 @@ export const experienceService = {
       lastUpdated: new Date().toISOString(),
     };
 
-    await service.saveData(mergedData, 'Update experience content', siteId);
+    const success = await service.saveData(mergedData, 'Update experience content', siteId);
+    if (!success) {
+      throw new Error('Failed to save experience data');
+    }
     return mergedData;
   },
 };

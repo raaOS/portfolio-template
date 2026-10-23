@@ -71,7 +71,10 @@ export async function PUT(request: NextRequest) {
       return validationError(validation.error);
     }
 
-    await saveLabels(validation.data, siteId);
+    const saved = await saveLabels(validation.data, siteId);
+    if (!saved) {
+      throw new Error('ContentService failed to save labels');
+    }
 
     await revalidateSiteContentPaths(siteId, ['/']);
 

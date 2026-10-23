@@ -15,6 +15,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { spawn } from 'child_process';
 import { SHARED_SCHEMA_QUERIES } from '../../src/crud/shared/db/schema';
+import { D1_SCHEMA_QUERIES } from '../../src/lib/d1-schema';
 import { hashPasswordScrypt } from '../../src/crud/shared/auth/password';
 import { deployClient, resolveWorkersSubdomain } from './client-deploy';
 import { sendWebsiteOnlineEmail } from './notify-online';
@@ -29,8 +30,8 @@ import {
 import {
   findArchiveForSlug,
   createArchiveDir,
-  pickD1Rows,
   resolveProvisionedAdminPassword,
+  guardCrossClientSlug,
 } from './onboard-reuse';
 
 const ROOT_DIR = process.cwd();
@@ -98,6 +99,45 @@ async function cfApi(url: string, token: string, options: RequestInit = {}) {
     result?: unknown;
   };
   return { ok: res.ok && data.success, status: res.status, data };
+}
+
+/**
+ * Jalankan satu statement D1 dengan BINDING PARAMETER (`?`).
+ *
+ * Audit 2026-10-08 (temuan #5): SQL dulu disusun lewat interpolasi string —
+ * teks berupa potongan SQL bisa mematahkan/menyuntik statement. Semua nilai
+ * kini masuk lewat `params`. LEMPAR ERROR kalau statement gagal
+ * (audit temuan #2: hasil tulis D1 dulu diabaikan → database kosong pun
+ * dilaporkan sukses). Identik dengan helper di server.ts (jalur portal).
+ */
+async function d1Query(
+  accountId: string,
+  apiToken: string,
+  databaseId: string,
+  sql: string,
+  params: Array<string | number | null> = []
+): Promise<Array<Record<string, unknown>>> {
+  const res = await cfApi(`/accounts/${accountId}/d1/database/${databaseId}/query`, apiToken, {
+    method: 'POST',
+    body: JSON.stringify({ sql, params }),
+  });
+
+  const statements = Array.isArray(res.data?.result)
+    ? (res.data.result as Array<{
+        success?: boolean;
+        error?: string;
+        results?: Array<Record<string, unknown>>;
+      }>)
+    : [];
+  const first = statements[0];
+  const statementError = first && first.success === false ? first.error || '' : '';
+  const topError = res.data?.errors?.map((e) => e.message).filter(Boolean).join('; ') || '';
+
+  if (!res.ok || statementError || topError) {
+    throw new Error(`Query D1 gagal: ${statementError || topError || `HTTP ${res.status}`}`);
+  }
+
+  return Array.isArray(first?.results) ? first.results : [];
 }
 
 // Generate folder arsip bernomor (01_slug, 02_slug, ...) — kini ada di
@@ -181,12 +221,21 @@ async function handleOnboard() {
   const dbName = `db-${clientSlug}`;
   const r2BucketName = `media-${clientSlug}`;
 
+  // Penjaga slug lintas klien (audit 2026-10-08, temuan #6) — kebijakan sama
+  // dengan portal server.ts: slug yang sudah jadi arsip akun Cloudflare LAIN
+  // adalah klien berbeda; ditolak SEBELUM ada resource (D1/R2/Worker) dibuat.
+  const existingArchive = findArchiveForSlug(ARCHIVE_DIR, clientSlug);
+  guardCrossClientSlug(existingArchive, accountId);
+
   console.log(`👤 Klien: ${clientName} (${clientSlug})`);
   console.log(`🎨 Template: ${templateKey}`);
   console.log(`📧 Email: ${adminEmail}`);
-  // Password sengaja TIDAK dicetak ke log (log job tersimpan lama di GitHub).
-  // Password tersedia di Job Summary, file SURAT_SERAH_TERIMA.txt, dan config.env.
-  console.log(`🔐 Password Admin: (lihat ringkasan job di bawah / file SURAT_SERAH_TERIMA.txt)`);
+  // Password sengaja TIDAK dicetak ke log (log job tersimpan lama di GitHub)
+  // dan TIDAK ditampilkan di Job Summary (audit 2026-10-08, temuan #7: halaman
+  // ringkasan GitHub tersimpan lama & terlihat semua kolaborator repo).
+  // Password hanya ada di arsip klien: arsip-klien/<folder>/config.env dan
+  // arsip-klien/<folder>/SURAT_SERAH_TERIMA.txt.
+  console.log(`🔐 Password Admin: (lihat arsip-klien/<folder>/SURAT_SERAH_TERIMA.txt)`);
   console.log(`☁️ Cloudflare Account ID: ${accountId.slice(0, 6)}...${accountId.slice(-4)}`);
 
   // 1. Verifikasi Kredensial
@@ -236,47 +285,56 @@ async function handleOnboard() {
   }
 
   // 4. Migrasi Skema Tabel
-  console.log(`\n[4/7] Memasang Tabel Database D1 (${SHARED_SCHEMA_QUERIES.length} query)...`);
-  for (const sql of SHARED_SCHEMA_QUERIES) {
-    await cfApi(`/accounts/${accountId}/d1/database/${databaseId}/query`, apiToken, {
-      method: 'POST',
-      body: JSON.stringify({ sql }),
-    });
+  // Dua skema dipasang berurutan (audit 2026-10-08, temuan #1 & #14 — identik
+  // dengan jalur portal server.ts):
+  //   1. SHARED_SCHEMA_QUERIES — inti site/login/konten.
+  //   2. D1_SCHEMA_QUERIES — tabel runtime (orders, site_analytics,
+  //      platform_settings, project_narratives, ...).
+  // Dulu HANYA skema 1 dipasang → tabel orders dkk. tidak pernah ada di DB
+  // klien. Urutan penting: SHARED dulu supaya bentuk kolom projects/media_assets
+  // milik SHARED menang; CREATE IF NOT EXISTS milik D1 otomatis skip.
+  const totalSchemaQueries = SHARED_SCHEMA_QUERIES.length + D1_SCHEMA_QUERIES.length;
+  console.log(`\n[4/7] Memasang Tabel Database D1 (${totalSchemaQueries} query)...`);
+  try {
+    for (const sql of [...SHARED_SCHEMA_QUERIES, ...D1_SCHEMA_QUERIES]) {
+      await d1Query(accountId, apiToken, databaseId, sql);
+    }
+  } catch (err) {
+    throw new Error(`STEP 4 gagal memasang tabel database: ${(err as Error).message}`);
   }
 
-  // Seed site
+  // Seed site — binding parameter (audit temuan #5: tanpa interpolasi SQL).
   const seedSiteSql = `
     INSERT INTO sites (id, slug, name, status, active_template_key, created_at, updated_at)
-    VALUES ('${siteId}', '${clientSlug}', '${clientName.replace(/'/g, "''")}', 'active', '${templateKey}', datetime('now'), datetime('now'))
+    VALUES (?, ?, ?, 'active', ?, datetime('now'), datetime('now'))
     ON CONFLICT(id) DO UPDATE SET
       name = excluded.name,
       active_template_key = excluded.active_template_key,
       updated_at = datetime('now');
   `;
-  await cfApi(`/accounts/${accountId}/d1/database/${databaseId}/query`, apiToken, {
-    method: 'POST',
-    body: JSON.stringify({ sql: seedSiteSql }),
-  });
+  await d1Query(accountId, apiToken, databaseId, seedSiteSql, [
+    siteId,
+    clientSlug,
+    clientName,
+    templateKey,
+  ]);
 
   // --- Penjagaan re-provision (audit MEDIUM M4, 2026-10-06) -----------------
   // Kalau slug ini sudah pernah onboarding: pakai arsip lama + password lama,
   // jangan rotasi diam-diam dan jangan gandakan folder arsip.
-  const existingArchive = findArchiveForSlug(ARCHIVE_DIR, clientSlug);
+  // (`existingArchive` sudah dibaca di awal fungsi — lihat guard slug di atas.)
   let adminExists = false;
   if (!adminPassword) {
-    const adminCheckRes = await cfApi(`/accounts/${accountId}/d1/database/${databaseId}/query`, apiToken, {
-      method: 'POST',
-      body: JSON.stringify({
-        sql: `SELECT id FROM site_users WHERE site_id = '${siteId}' AND email = '${adminEmail.toLowerCase()}' LIMIT 1;`,
-      }),
-    });
-    if (!adminCheckRes.ok) {
-      // Gagal memeriksa = tidak boleh menebak: rotasi diam-diam lebih berbahaya daripada error.
-      throw new Error(
-        `Gagal memeriksa apakah admin sudah ada: ${adminCheckRes.data?.errors?.[0]?.message || 'query D1 gagal'}`
-      );
-    }
-    adminExists = pickD1Rows(adminCheckRes.data).length > 0;
+    // Gagal memeriksa = tidak boleh menebak: rotasi diam-diam lebih berbahaya
+    // daripada error. d1Query melempar error kalau query gagal.
+    const adminRows = await d1Query(
+      accountId,
+      apiToken,
+      databaseId,
+      `SELECT id FROM site_users WHERE site_id = ? AND email = ? LIMIT 1`,
+      [siteId, adminEmail.toLowerCase()]
+    );
+    adminExists = adminRows.length > 0;
   }
   const adminDecision = resolveProvisionedAdminPassword({
     explicitPassword: adminPassword,
@@ -293,18 +351,72 @@ async function handleOnboard() {
     const userId = `user-${crypto.randomUUID()}`;
     const seedUserSql = `
       INSERT INTO site_users (id, site_id, email, password_hash, password_salt, password_algorithm, role, created_at)
-      VALUES ('${userId}', '${siteId}', '${adminEmail.toLowerCase()}', '${passwordHash}', '${salt}', 'scrypt', 'admin', datetime('now'))
+      VALUES (?, ?, ?, ?, ?, 'scrypt', 'admin', datetime('now'))
       ON CONFLICT(site_id, email) DO UPDATE SET
         password_hash = excluded.password_hash,
         password_salt = excluded.password_salt;
     `;
-    await cfApi(`/accounts/${accountId}/d1/database/${databaseId}/query`, apiToken, {
-      method: 'POST',
-      body: JSON.stringify({ sql: seedUserSql }),
-    });
+    await d1Query(accountId, apiToken, databaseId, seedUserSql, [
+      userId,
+      siteId,
+      adminEmail.toLowerCase(),
+      passwordHash,
+      salt,
+    ]);
     console.log('✓ Skema database dan akun admin klien berhasil dipasang.');
   } else {
     console.log('✓ Admin sudah ada — password lama dipertahankan (tidak dirotasi).');
+  }
+
+  // 4b. VERIFIKASI hasil tulis (audit 2026-10-08, temuan #2) — identik dengan
+  // jalur portal. Dulu semua hasil query diabaikan → database kosong pun
+  // dilaporkan sukses dan email "Website Sudah Online" tetap terkirim.
+  // Kegagalan di sini menghentikan provisioning SEBELUM build/deploy/email.
+  const requiredTables = [
+    'sites',
+    'site_users',
+    'projects',
+    'project_narratives',
+    'media_assets',
+    'orders',
+    'platform_settings',
+  ];
+  const tableRows = await d1Query(
+    accountId,
+    apiToken,
+    databaseId,
+    `SELECT name FROM sqlite_master WHERE type = 'table'`
+  );
+  const presentTables = new Set(tableRows.map((row) => String(row.name || '')));
+  const missingTables = requiredTables.filter((name) => !presentTables.has(name));
+  if (missingTables.length > 0) {
+    throw new Error(
+      `Verifikasi STEP 4 gagal — tabel berikut tidak terbentuk di database: ${missingTables.join(', ')}`
+    );
+  }
+
+  const seededSiteRows = await d1Query(
+    accountId,
+    apiToken,
+    databaseId,
+    `SELECT id FROM sites WHERE id = ? LIMIT 1`,
+    [siteId]
+  );
+  if (seededSiteRows.length === 0) {
+    throw new Error('Verifikasi STEP 4 gagal — baris site tidak tersimpan di database.');
+  }
+
+  if (adminDecision.seedUser) {
+    const seededAdminRows = await d1Query(
+      accountId,
+      apiToken,
+      databaseId,
+      `SELECT id FROM site_users WHERE site_id = ? AND email = ? LIMIT 1`,
+      [siteId, adminEmail.toLowerCase()]
+    );
+    if (seededAdminRows.length === 0) {
+      throw new Error('Verifikasi STEP 4 gagal — akun admin tidak tersimpan di database.');
+    }
   }
 
   // 5. Arsipkan Kredensial
@@ -445,11 +557,14 @@ async function handleOnboard() {
   console.log(`🌐 Website URL : ${websiteUrl}`);
   console.log(`🔐 Admin URL   : ${adminUrl}`);
   console.log(`📧 Email       : ${adminEmail}`);
-  // Password tidak dicetak ke log — ada di Job Summary & arsip klien.
-  console.log(`🔑 Password    : (lihat ringkasan job di bawah / file SURAT_SERAH_TERIMA.txt)`);
+  // Password tidak dicetak ke log & tidak ada di Job Summary (audit temuan #7)
+  // — hanya di arsip klien.
+  console.log(`🔑 Password    : (lihat arsip-klien/${folderName}/SURAT_SERAH_TERIMA.txt)`);
   console.log('========================================================\n');
 
-  // Format WhatsApp message
+  // Format WhatsApp message — PASSWORD diganti placeholder (audit 2026-10-08,
+  // temuan #7): pesan ini ikut tampil di Job Summary GitHub yang tersimpan lama.
+  // Owner mengambil password dari arsip klien lalu menempelnya sebelum mengirim.
   const whatsappMsg = [
     `Halo kak ${clientName}! 👋`,
     `Website portofolio interaktif kamu sudah resmi aktif dan siap dipakai! 🚀`,
@@ -460,7 +575,7 @@ async function handleOnboard() {
     `🔐 Ruang Admin Pribadi (untuk kelola karya, foto, & profil):`,
     `${adminUrl}`,
     `Email    : ${adminEmail}`,
-    `Password : ${adminPassword}`,
+    `Password : (isi dari arsip-klien/${folderName}/SURAT_SERAH_TERIMA.txt)`,
     ``,
     `Semua foto, video karya, dan kontak bisa kamu tambahkan sendiri dengan sangat mudah di ruang admin. Selamat berkarya dan sukses selalu! 🎉✨`,
   ].join('\n');
@@ -476,7 +591,7 @@ async function handleOnboard() {
 | **Alamat Website** | [${websiteUrl}](${websiteUrl}) |
 | **Ruang Admin** | [${adminUrl}](${adminUrl}) |
 | **Email Login** | \`${adminEmail}\` |
-| **Password Admin** | \`${adminPassword}\` |
+| **Password Admin** | ⚠️ sengaja tidak ditampilkan di sini (audit keamanan #7) — ambil dari \`arsip-klien/${folderName}/SURAT_SERAH_TERIMA.txt\` (atau download artifact \`arsip-klien\` di run ini) |
 | **Database D1** | \`${dbName}\` (\`${databaseId}\`) |
 | **Storage R2** | \`${r2BucketName}\` |
 | **Lokasi Arsip** | \`arsip-klien/${folderName}\` |
@@ -511,6 +626,61 @@ function findConfigEnv(slugOrFolder: string): string | null {
     if (env.CUSTOMER_SLUG === slugOrFolder || folder === slugOrFolder) return envPath;
   }
   return null;
+}
+
+/**
+ * Backup D1 milik 1 klien SEBELUM deploy update template
+ * (audit 2026-10-08, temuan #10 — dulu update jalan tanpa titik pulih).
+ *
+ * Best-effort: kalau backup gagal, update TETAP dilanjutkan (cron backup
+ * harian klien jam 01:00 WIB ke R2 klien tetap pelindung utama), tapi
+ * kegagalannya dilaporkan jelas di log. Mengembalikan path output backup
+ * atau null kalau gagal/dilewati.
+ */
+async function backupClientD1PreUpdate(
+  t: { slug: string; configPath: string },
+  onLog: (line: string) => void
+): Promise<string | null> {
+  try {
+    const cfg = parseEnv(fs.readFileSync(t.configPath, 'utf-8'));
+    const accountId = cfg.CLOUDFLARE_ACCOUNT_ID;
+    const databaseId = cfg.CLOUDFLARE_D1_DATABASE_ID;
+    const apiToken = cfg.CLOUDFLARE_D1_API_TOKEN || cfg.CLOUDFLARE_API_TOKEN;
+    if (!accountId || !databaseId || !apiToken) {
+      onLog('   [backup] ⚠️ Dilewati — kredensial D1 tidak lengkap di config.env klien.');
+      return null;
+    }
+
+    const stamp = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 12);
+    const outDir = path.join(ROOT_DIR, 'backups', 'd1', stamp, `preupdate-${t.slug}`);
+
+    // Re-use script backup:d1 yang sudah ada. loadProductEnv() memakai dotenv
+    // override:false → 3 env klien di bawah MENANG atas .env.local owner.
+    const { code } = await runCommandStreaming(
+      'npx',
+      ['tsx', 'scripts/cloudflare/backup-d1.ts', '--out', outDir],
+      {
+        cwd: ROOT_DIR,
+        env: {
+          ...process.env,
+          CLOUDFLARE_ACCOUNT_ID: accountId,
+          CLOUDFLARE_D1_DATABASE_ID: databaseId,
+          CLOUDFLARE_D1_API_TOKEN: apiToken,
+        },
+      },
+      onLog
+    );
+    if (code !== 0) {
+      onLog(`   [backup] ⚠️ Backup pre-update gagal (kode ${code}) — update tetap dilanjutkan.`);
+      return null;
+    }
+    return outDir;
+  } catch (err) {
+    onLog(
+      `   [backup] ⚠️ Backup pre-update gagal: ${(err as Error).message} — update tetap dilanjutkan.`
+    );
+    return null;
+  }
 }
 
 async function handleUpdate() {
@@ -573,6 +743,9 @@ async function handleUpdate() {
     const t = targets[i];
     console.log(`\n>>> [${i + 1}/${targets.length}] Build + deploy ke: ${t.name} (${t.slug})...`);
 
+    // Titik pulih pre-update (audit temuan #10) — lihat backupClientD1PreUpdate.
+    await backupClientD1PreUpdate(t, (line) => console.log(line));
+
     const outcome = await deployClient({
       rootDir: ROOT_DIR,
       configPath: t.configPath,
@@ -606,6 +779,7 @@ ${results.map((r) => `| **${r.name}** | \`${r.slug}\` | ${r.success ? '✅ Berha
 
 ---
 *Catatan: Seluruh data proyek, foto/video di R2, database D1, dan akun login klien tetap 100% aman dan tidak terhapus.*
+*Cadangan D1 pre-update (per klien, best-effort): \`backups/d1/<timestamp>/preupdate-<slug>\`.*
 `;
   appendToGitHubSummary(summaryMarkdown);
 }

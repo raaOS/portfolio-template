@@ -72,7 +72,7 @@ describe('PUT /api/about/labels', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     validateSiteMutationRequestMock.mockResolvedValue({ role: 'admin' });
-    serviceSaveDataMock.mockResolvedValue(undefined);
+    serviceSaveDataMock.mockResolvedValue(true);
     revalidatePathMock.mockResolvedValue(undefined);
   });
 
@@ -102,6 +102,14 @@ describe('PUT /api/about/labels', () => {
 
   it('handles save failure', async () => {
     serviceSaveDataMock.mockRejectedValue(new Error('D1 write failed'));
+    const res = await PUT(buildPutRequest(mockLabels));
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toBe('Failed to update labels');
+  });
+
+  it('returns 500 when saveData resolves to false', async () => {
+    serviceSaveDataMock.mockResolvedValue(false);
     const res = await PUT(buildPutRequest(mockLabels));
     expect(res.status).toBe(500);
     const body = await res.json();

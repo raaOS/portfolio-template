@@ -58,7 +58,8 @@ Jangan tutup jendela terminal selama portal dipakai.
 - Di balik layar portal memanggil `deployClient()` (`scripts/onboarding/client-deploy.ts`):
   build dengan env klien dari `arsip-klien/<slug>/config.env`, lalu
   `npx wrangler deploy --config .open-next/wrangler.client.<slug>.jsonc`
-  ke akun klien. `scripts/deploy/deploy-customer.sh` tidak dipanggil portal.
+  ke akun klien. (Script lama `scripts/deploy/deploy-customer.sh` sudah dihapus
+  pada audit 2026-10-08 — memang tidak pernah dipanggil portal.)
 - Hasil akhir: `https://<slug>.workers.dev` (atau custom domain klien).
 
 ### 6. Serah terima + tandai selesai
