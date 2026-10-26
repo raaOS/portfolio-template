@@ -18,6 +18,7 @@ Sistem dokumentasi pelacakan pekerjaan (Tracker) telah diaktifkan untuk menghema
 1. **MANDATORY READ (Saat Sesi Baru):**
    Setiap AI **wajib** mengawali sesi dengan membaca file [INDEX_TRACKER.md](file:///C:/Users/USER/Documents/portfolio-template/docs/tracker/INDEX_TRACKER.md). Jangan membaca dokumen panjang sebelum membaca index. AI harus langsung membaca file log spesifik yang dirujuk oleh index.
    Untuk pekerjaan yang menyentuh env, integrasi eksternal, AI provider, contact, atau data pribadi, baca juga `docs/agent-context/09_PRODUCT_BOUNDARY_CONTEXT.md` dan `docs/product-boundary/env-inventory.md`.
+   Untuk pekerjaan yang menyentuh **domain, custom domain, DNS, nameserver, atau deploy klien**, baca juga [`docs/agent-context/10_DOMAIN_INVENTORY.md`](docs/agent-context/10_DOMAIN_INVENTORY.md). Ringkasnya: owner punya dua domain yang sengaja dipisah — `makeitbetter.my.id` (utama/produksi, jangan disentuh) dan `makeitbatter.my.id` (uji, dipakai gladi). Jangan dipindahkan, digabung, atau dihapus.
    
 2. **MANDATORY WRITE (Saat Pekerjaan Selesai / Handoff):**
    Setiap AI yang menyelesaikan task, memperbaiki bug, atau meninggalkan pekerjaan yang belum selesai (handoff) **wajib** memperbarui file log yang relevan di `docs/tracker/logs/`. Tambahkan daftar file yang dimodifikasi dan bug yang diperbaiki.

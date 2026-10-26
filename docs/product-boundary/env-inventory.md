@@ -8,6 +8,11 @@ This document records environment variable **names only**. Do not paste secret v
 
 Use these with the owner's own Cloudflare account dedicated to the sellable template product (tooling: bootstrap, demo seed, monitoring). Each client's site lives in a **separate Cloudflare account owned by that client** — those per-client credentials are archived per client in `arsip-klien/<slug>/config.env`, not here.
 
+> **Domain bukan env.** Daftar domain owner dan aturan pemakaiannya ada di
+> [`docs/agent-context/10_DOMAIN_INVENTORY.md`](../agent-context/10_DOMAIN_INVENTORY.md).
+> Ringkas: `makeitbetter.my.id` = domain utama/produksi (jangan disentuh),
+> `makeitbatter.my.id` = domain uji (gladi). Dua domain ini sengaja dipisah.
+
 - `CLOUDFLARE_ACCOUNT_ID`
 - `PRODUCT_CLOUDFLARE_ENV_CONFIRMED`
 - `CLOUDFLARE_D1_DATABASE_ID`

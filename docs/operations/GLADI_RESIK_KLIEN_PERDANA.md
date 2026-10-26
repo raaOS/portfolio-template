@@ -130,7 +130,8 @@ Baru** — detail langkah ada di `docs/release/CLIENT_OPERATIONS.md`:
 - [ ] `npm run audit` (integritas data relasi) bersih.
 - [ ] `npm test` hijau (skrip gerbang: tsc 0, eslint 0, seluruh test lolos).
 - [ ] Backup terakhir ada di `backups\` dan **sudah disalin** ke flashdisk lewat
-      `SALIN_CADANGAN.bat` (petunjuk: `cadangan-flashdisk/README.txt`).
+      menu **[2] Salin Cadangan** di `PENGELOLA_KLIEN.bat`
+      (petunjuk: `cadangan-flashdisk/README.txt`).
 - [ ] Backup otomatis harian (cron Worker 01:00 WIB) terpasang & terverifikasi —
       jadwal dan cara cek ada di `docs/operations/backup-restore-runbook.md`
       (bagian "Backup Otomatis Harian").

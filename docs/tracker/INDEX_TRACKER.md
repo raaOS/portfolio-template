@@ -18,6 +18,22 @@
 
 > **ARCHIVED (Sprint 0-74):** Sprint lama mencatat evolusi dari portofolio pribadi → multi-tenant SaaS → managed service. Log sprint lama masih relevan untuk memahami _why_ keputusan desain, tapi kode dan arsitektur yang dijelaskan sudah **tidak merepresentasikan kondisi terkini**. AI wajib merujuk Sprint 75+ untuk arsitektur current.
 
+## 🌐 Domain Owner — BACA SEBELUM MENYENTUH DNS / CUSTOM DOMAIN
+
+**Sumber kebenaran:** [`docs/agent-context/10_DOMAIN_INVENTORY.md`](file:///C:/Users/USER/Documents/tamplate-portofolio/docs/agent-context/10_DOMAIN_INVENTORY.md)
+
+Owner punya **DUA domain** yang sengaja dipisah dan hanya beda **satu huruf**:
+
+| Domain | Peran | Akun Cloudflare |
+|---|---|---|
+| `makeitbetter.my.id` (**e**) | domain utama / produksi owner — **jangan disentuh** | akun utama owner |
+| `makeitbatter.my.id` (**a**) | domain **uji** untuk gladi resik / calon klien | akun test milik arsip gladi |
+
+- `gladi.makeitbatter.my.id` **dan** root `makeitbatter.my.id` sama-sama menunjuk Worker gladi (root dipasang 2026-10-26, keduanya HTTP 200).
+- **JANGAN** memindahkan zona `makeitbatter.my.id` ke akun utama, menggabungkan, mengganti nama, atau menghapus salah satu domain.
+- Portal menampilkan `belum ada (...)` **bukan berarti** domain tidak terpasang — bisa jadi baris `CUSTOM_DOMAIN` di `arsip-klien/<folder>/config.env` yang hilang. Cek `POST /api/custom-domain/status` (read-only) dulu.
+- Token di repo **tidak berizin** menambah zona (`POST /zones` → 403). Pemindahan zona/nameserver hanya lewat dashboard owner + panel registrar.
+
 ## 📂 Daftar Modul / Log Pekerjaan (Logs)
 
 Berikut adalah daftar aktivitas yang telah atau sedang dikerjakan. Pilih log yang sesuai dengan permintaan user:
@@ -40,6 +56,9 @@ Berikut adalah daftar aktivitas yang telah atau sedang dikerjakan. Pilih log yan
 6. **[Sprint E - Frontend UI Migration & Cleanup](file:///C:/Users/USER/Documents/portfolio-template/docs/tracker/logs/sprint_e_frontend.md)**
    - _Status:_ 🟢 Completed
    - _Isi:_ Memperbaiki _bug_ posisi ikon (_overlap_) dengan mengatur ulang _spacing_ Grid dan mengubah urutan slot (ala macOS).
+7. **[Perbaikan Launcher PENGELOLA_KLIEN.bat](file:///C:/Users/USER/Documents/tamplate-portofolio/docs/tracker/logs/fix_launcher_pengelola_klien_2026_10_26.md)**
+   - _Status:_ 🟢 Completed (2026-10-26)
+   - _Isi:_ Menghapus ketergantungan `npx` (penyebab prompt `Ok to proceed? (y)`), memperbaiki dua `&` yang tidak di-escape (`'PORTAL' is not recognized`), menambah `cd /d "%~dp0"`, deteksi portal yang sudah berjalan, dan jendela tidak lagi menutup sendiri saat server gagal. Diuji 4 skenario (normal, cwd lain, port terpakai, `node_modules` hilang).
 
 ## 🛠️ Aturan Pengisian Log
 

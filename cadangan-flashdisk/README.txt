@@ -2,14 +2,15 @@ CADANGAN FLASHDISK
 ===================
 
 Folder ini adalah tempat salinan cadangan di komputer (dipakai oleh
-SALIN_CADANGAN.bat saat Anda menekan Enter tanpa memasukkan huruf
-flashdisk). Isinya TIDAK ikut di-commit ke GitHub (di-kecualikan di
-.gitignore) kecuali file README ini.
+menu [2] Salin Cadangan di PENGELOLA_KLIEN.bat saat Anda menekan Enter
+tanpa memasukkan huruf flashdisk). Isinya TIDAK ikut di-commit ke GitHub
+(di-kecualikan di .gitignore) kecuali file README ini.
 
 
 ISI SALINAN (per tanggal)
 -------------------------
-SALIN_CADANGAN.bat menyalin TIGA hal ke dalam subfolder bertanggal:
+Menu [2] Salin Cadangan (PENGELOLA_KLIEN.bat) menyalin TIGA hal ke dalam
+subfolder bertanggal:
 
    cadangan-flashdisk\YYYY-MM-DD\        (di komputer ini)
    E:\cadangan-portfolio\YYYY-MM-DD\     (di flashdisk, misal drive E)
@@ -30,7 +31,7 @@ CARA PAKAI (pemilik, tanpa tim teknis)
       npm run backup:d1      <- cadangan database
       npm run backup:r2      <- cadangan media/foto-video
 
-2. Double-click SALIN_CADANGAN.bat, lalu:
+2. Double-click PENGELOLA_KLIEN.bat, pilih [2] Salin Cadangan, lalu:
    - Ketik huruf flashdisk (mis. E) lalu Enter
      -> tersalin ke E:\cadangan-portfolio\YYYY-MM-DD\
    - Atau tekan Enter saja

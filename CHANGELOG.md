@@ -5,6 +5,27 @@ Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **U
 
 ## [1.3.71] - 2026-10-24
 
+### 🛡️ Portal Aman & Jujur: Site Owner Tidak Bisa Dideploy + Versi Tampil di Kartu (2026-10-26)
+
+Perbaikan khusus portal owner (`scripts/onboarding/`) — **tidak ada perubahan kode aplikasi/Worker**, jadi tidak perlu deploy dan tidak menaikkan versi template.
+
+**Kenapa penting:** portal dulu memperlakukan *semua* folder di `arsip-klien/` sebagai klien yang bisa di-update, dan tombol update ada di tab yang tidak menampilkan versi terpasang. Dua hal itu diperbaiki sekarang.
+
+- **Site Owner tidak lagi bisa dideploy dari portal.** Status "siap deploy" dihitung dengan fungsi yang sama yang dipakai server (`buildClientEnvPlan`), bukan tebakan 4 kunci. Kartu Site Owner tampil tanpa tombol update, diganti keterangan *"Produksi owner — update lewat `npm run deploy`, bukan portal"* + tombol salin perintah. Ini penting: `deployClient()` selalu memaksa `OWNER_MODE=false`, jadi deploy site owner lewat portal akan **menghilangkan panel Harga Jual & Order**.
+- **"Update Semua" mengirim daftar folder eksplisit**, bukan `all: true`. Filter yang terlihat di layar = target yang dikirim. Arsip yang tidak siap masuk laporan **"↷ DILEWATI"** (bukan "GAGAL").
+- **Versi terpasang tampil langsung di kartu update:** `v1.3.71 · terbaru`, `· perlu update`, atau `· lebih baru dari repo` (biru). Data diambil dari `/api/status` di latar belakang, jadi kartu tetap muncul cepat meski health-check lambat.
+- **Filter template:** chip **Semua / macOS / Canvas / Spatial** dengan jumlah klien. Label template kini benar untuk 3 template (sebelumnya `spatial-gallery` salah dilabeli "Infinite Canvas").
+- **Acuan "terbaru" = `APP_VERSION` di kode**, bukan judul `CHANGELOG.md`. Bila keduanya berbeda, muncul peringatan kuning (mis. "kode v1.3.73, catatan v1.3.71").
+- **Peringatan downgrade:** bila klien memakai versi lebih baru daripada repo, konfirmasi menyebutkan bahwa melanjutkan akan **menurunkan** versi.
+- **Deploy tidak bisa dobel:** kunci server menolak permintaan kedua dengan **HTTP 409** ("Pembaruan lain sedang berjalan"). Dua build bersamaan bisa saling menimpa `.open-next`.
+- **Verifikasi pasca-deploy tidak lagi menghukum DNS:** kalau custom domain belum menyebar, portal mengecek `workers.dev` sebagai cadangan dan menulis di catatan bahwa site diverifikasi lewat alamat cadangan. `CATATAN_SERAH_TERIMA.md` hanya ditulis bila deploy **dan** verifikasi berhasil, supaya status portal dan catatan serah terima tidak pernah berbeda.
+- **UI tidak diam saat error:** balasan JSON (400/409/413/500) ditampilkan sebagai pesan, stream yang putus tanpa `complete` dilaporkan, dan bar progres berubah merah. Panel progres juga **tidak hilang** saat pindah tab.
+- **Penulisan log aman:** stream yang ditutup pengguna tidak lagi bisa memicu `EPIPE` yang mematikan portal.
+- **Validasi & batas:** `folders`/`folderName` divalidasi, body dibatasi 16 KB, path `--config` dikutip untuk Windows, dan `CUSTOMER_SLUG` yang aneh ditolak sebelum menyentuh filesystem.
+- **Kerapian:** checkbox "Kompilasi build baru" dihapus (server memang selalu build ulang), dan "Waktu Build Terakhir" dibaca dari berkas hasil build, bukan mtime folder.
+
+**Verifikasi:** `npx vitest run scripts/onboarding` → **9 file / 103 test PASS** (16 test baru: deployable, pemisahan target, versi, fallback verifikasi, slug). `npx tsc --noEmit` 0 error. `node --check` skrip inline `index.html` 0 error. Uji hidup di **port 4568** (portal 4567 tidak dipakai): `/api/clients` menandai `00_site-owner` **deployable=false** dengan 4 kunci kurang; `POST /api/deploy-client` ke Site Owner → **400** tanpa build; folder traversal → **400**; body >16 KB → **413**; dua permintaan bersamaan → yang kedua **409** dan kunci lepas setelahnya; `/api/status` melaporkan `appVersion=1.3.71`, `changelogVersion=1.3.71`; kartu Site Owner tanpa tombol; filter Canvas → 0 siap + tombol massal mati; panel progres tetap terlihat setelah pindah tab; error JSON tampil di kotak merah. **Tidak ada deploy ke klien mana pun dalam pengujian ini.**
+
 ### 🐛 Backport ke `main`: `SecurityError` `texImage2D` Video Hero + Klik Lembaran Akurat
 
 Perbaikan yang sudah ada di branch `fix/landing-click` (commit `c17107f`, `34ee75b`, `bfac743`) **belum pernah masuk `main`**, sehingga dev server `localhost:3000` masih menampilkan error ini tiap frame. Sekarang di-backport utuh:
@@ -14,6 +35,50 @@ Perbaikan yang sudah ada di branch `fix/landing-click` (commit `c17107f`, `34ee7
 - Tanpa perubahan perilaku lain: gerak koridor, snap, siklus demo live, dan tampilan video tetap sama.
 
 **Verifikasi:** `vitest` magazine-showcase PASS, `tsc --noEmit` 0 error, `eslint` bersih.
+
+### 🐞 Launcher `PENGELOLA_KLIEN.bat` Tidak Lagi Menutup Sendiri (2026-10-26)
+
+Perbaikan khusus file peluncur lokal — **tidak ada perubahan kode aplikasi/Worker**, jadi tidak perlu deploy dan tidak menaikkan versi template:
+
+- **Pertanyaan `npx` "Ok to proceed? (y)" dihapus dari alur.** Penyebab jendela gagal: launcher memakai `npx tsx`, dan bila `tsx` tidak terdeteksi `npx` menawarkan unduh dari internet. Kini launcher memakai `node_modules\.bin\tsx.cmd` langsung, jadi pertanyaan itu tidak pernah muncul lagi.
+- **Dua bug `&` diperbaiki** pada baris `title` dan judul header. Sebelumnya CMD mencetak `'PORTAL' is not recognized as an internal or external command` dan judul terpotong.
+- **`cd /d "%~dp0"`** — launcher tetap menemukan `scripts\onboarding\server.ts` walau dibuka lewat shortcut atau dari folder lain.
+- **Deteksi portal yang sudah berjalan** (port 4567) — yang muncul pesan ramah "Portal sudah berjalan" + browser dibuka, bukan stack trace `EADDRINUSE`.
+- **Jendela tidak menutup sendiri saat gagal** — semua jalur berakhir dengan "Tekan Enter untuk menutup jendela ini" beserta kode error, dan browser baru dibuka setelah 4 detik (bukan 2 detik) agar server sempat menyala.
+
+**Verifikasi:** diuji 4 skenario — (1) normal: server listen + HTTP 200; (2) dibuka dari `C:\Windows`: tetap 200; (3) port sudah dipakai: pesan ramah, exit 0; (4) `node_modules` hilang: pesan `npm install`, exit 1. Tidak ada lagi keluaran `'PORTAL' is not recognized`.
+
+### 🗂️ Satu File Launcher: Menu Portal + Salin Cadangan (2026-10-26)
+
+Permintaan owner: *"aku mau file bat itu satu, kalau ada banyak file bat aku tidak suka."* Sekarang hanya ada **satu** file `.bat` di folder proyek:
+
+- `PENGELOLA_KLIEN.bat` menjadi menu: **[1] Buka Portal**, **[2] Salin Cadangan**, **[3] Keluar** (tanpa memilih → otomatis [1] setelah 15 detik).
+- **`SALIN_CADANGAN.bat` dihapus**; seluruh logika robocopy dipindah ke subroutine `:cadangan` di file yang sama. Perilaku dipertahankan: menyalin `backups\` + `arsip-klien\` + `.env.local` ke folder bertanggal, validasi huruf drive, guard bila `backups\` belum ada, dan exit code gagal.
+- Pintasan untuk otomatisasi: `PENGELOLA_KLIEN.bat portal` dan `PENGELOLA_KLIEN.bat cadangan`.
+- Rujukan ikut diperbarui agar tidak menunjuk file yang sudah tidak ada: catatan serah terima otomatis (`client-deploy.ts`) + test-nya, `cadangan-flashdisk/README.txt`, dan `docs/operations/GLADI_RESIK_KLIEN_PERDANA.md`.
+
+**Verifikasi:** uji di folder percobaan (data dummy, bukan data asli) — 3 aset tersalin lengkap; tanpa `backups\` → exit 1; drive salah (`Z`) → exit 1; menu [3] → exit 0; portal → HTTP 200; `npx vitest run scripts/onboarding` **8 file / 79 test PASS**. Hanya tersisa satu file `.bat`.
+
+### 🔌 Status Board Portal Tidak Lagi "Offline" Palsu (2026-10-26)
+
+Perbaikan khusus portal owner (`scripts/onboarding/`) — **tidak ada perubahan kode aplikasi/Worker**, jadi tidak perlu deploy dan tidak menaikkan versi template:
+
+- **Penyebab nyata:** portal mengecek hanya satu alamat (`WEBSITE_URL`). Saat custom domain `makeitbatter.my.id` baru dipasang, DNS di jaringan owner masih menyimpan jawaban lama "domain tidak ada". Permintaan gagal sebelum sampai ke Cloudflare (`httpStatus=null`), lalu portal menulis **Offline** padahal `/api/health` lewat alamat `workers.dev` menjawab **200** (v1.3.72, DB connected).
+- **Cadangan otomatis `workers.dev`:** kalau alamat utama gagal di tingkat jaringan (DNS/timeout/koneksi ditolak), pengecekan mengulang ke `<slug>.<subdomain>.workers.dev`. Modul baru `portal-status.ts` (`probeClientHealth`, `answeredBy`, `viaFallback`); `workersDevUrl` diekstrak di `client-deploy.ts` dan dipakai ulang `clientUrls`.
+- **Batas waktu 8 detik → 12 detik.** Site owner butuh ~4,5–5,2 detik; batas lama membuat situs hidup bisa tercatat Offline saat jaringan sedikit lambat.
+- **UI jujur:** baris status menampilkan label kecil **"· via workers.dev"** hanya ketika yang menjawab alamat cadangan, dengan tooltip bahwa situsnya tetap hidup.
+
+**Verifikasi:** `npx vitest run scripts/onboarding/portal-status.test.ts scripts/onboarding/client-deploy.test.ts` → **2 file / 28 test PASS** (6 test probe: utama, fallback, semua gagal, anti-duplikat, non-JSON, timeout). `tsc --noEmit` 0 error. Uji hidup di portal terpisah port `4568` (portal owner di 4567 tidak diganggu): `site-owner` online 200 / 5233 ms / v1.3.70, `gladi-2026-10-24` online 200 / 1129 ms / v1.3.72, keduanya `viaFallback=false` karena cache DNS lokal sudah kedaluwarsa.
+
+### 📊 Bar Progres di "Update Klien Ini" + Ringkasan Hasil Tidak Lagi Hilang (2026-10-26)
+
+Khusus UI portal owner (`scripts/onboarding/public/index.html`) — tanpa perubahan aplikasi/Worker, tanpa menaikkan versi template:
+
+- **Bar progres 6px** muncul di atas kotak log saat pembaruan berjalan. Lebarnya mengikuti tahap nyata dari server, bukan timer: 4% mulai → 8% build → **82%** setelah baris `Uploaded …` → **90%** setelah `Deployed … triggers` → **96%** setelah `[VERIFIKASI] Site hidup` → **100%** saat `complete`. Corak garis bergerak hanya penanda proses masih hidup. Mode "Update Semua Klien" memakai `current/total` untuk membagi rentang antar klien.
+- **Gagal = merah:** bar penuh merah, judul kartu hasil berubah menjadi "Pembaruan Gagal" + ikon ✕. Sebelumnya judul selalu "Pembaruan Berhasil Dikirim!" walau semua klien gagal.
+- **Bug lama diperbaiki:** blok `finally` memanggil `loadUpdateView()`, yang menyembunyikan panel progres + kotak hasil sepersekian detik setelah selesai — jadi ringkasan deploy tidak pernah sempat terbaca. Panggilan itu dihapus (daftar klien tetap segar saat tab dibuka lagi).
+- **Verifikasi jalur sukses:** tombol diuji nyata lewat endpoint portal (`POST /api/deploy-client`) pada Gladi di port 4568 — build + deploy **3,1 menit**, `complete {success:true}`, verifikasi `HTTP 200` dari `https://makeitbatter.my.id/api/health`, versi berubah **1.3.72 → 1.3.71** (sesuai isi repo utama).
+- **Verifikasi jalur gagal:** diklik pada Site Owner → bar merah + pesan "Konfigurasi klien belum lengkap: CLOUDFLARE_ACCOUNT_ID, …" tampil dan tetap terbaca. `node --check` pada skrip inline = 0 error.
 
 ## [1.3.70] - 2026-10-24
 
