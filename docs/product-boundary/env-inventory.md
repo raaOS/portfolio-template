@@ -6,7 +6,7 @@ This document records environment variable **names only**. Do not paste secret v
 
 ## Product Required
 
-Use these with the owner's own Cloudflare account dedicated to the sellable template product (tooling: bootstrap, demo seed, monitoring). Each client's site lives in a **separate Cloudflare account owned by that client** — those per-client credentials are archived per client in `arsip-klien/<slug>/config.env`, not here.
+Use these with the owner's own Cloudflare account dedicated to the sellable template product (tooling: bootstrap, demo seed, monitoring). Each client's site lives in a **separate Cloudflare account owned by that client** - those per-client credentials are archived per client in `arsip-klien/<slug>/config.env`, not here.
 
 > **Domain bukan env.** Daftar domain owner dan aturan pemakaiannya ada di
 > [`docs/agent-context/10_DOMAIN_INVENTORY.md`](../agent-context/10_DOMAIN_INVENTORY.md).
@@ -54,6 +54,15 @@ These are platform-owned product integrations, not personal portfolio integratio
 - `AI_API_KEY`
 - Additional notification-specific variables if another provider is added later.
 - `CLOUDFLARE_R2_BINDING` (default `MEDIA_BUCKET`; only needed if the Worker binding name differs from `wrangler.jsonc`)
+
+## Owner Portal Local Only (never deploy to client)
+
+These belong only to the local onboarding portal in the owner's `.env.local`; they are not read by the Next.js app in production. `buildClientEnvPlan()` resets unknown owner keys and `rewriteNextEnvFile()` drops them from the client artifact.
+
+- `PORTAL_VAULT_HASH` (scrypt hash of the portal vault password; created by the portal)
+- `PORTAL_VAULT_SALT` (random scrypt salt; created by the portal)
+- `PORTAL_ENV_LOCAL_PATH` (test-only override for the portal env file path; production uses `.env.local`)
+
 - `NEXT_PUBLIC_FFMPEG_BASE_URL` (default `/r2/ffmpeg`; browser FFmpeg core files are stored in R2 keys `ffmpeg/*` and served through the app proxy)
 - `CLOUDFLARE_D1_RESTORE_DATABASE_ID` (optional staging/restore D1 target for backup/restore drill; never point this to production during normal drills)
 - `CRON_SECRET` (optional token for the daily Worker cron trigger; when set, `scheduled` calls `POST /api/cron/daily` with header `x-cron-secret`, when empty the daily run is skipped with a warning)

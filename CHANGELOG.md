@@ -3,6 +3,30 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.74] - 2026-10-26
+
+### 🛡️ Audit Kesiapan Produksi: Klien Baru Bisa Login, Kunci Tidak Bocor, Gerbang Mutu
+
+Rilis ini memindahkan hasil audit kesiapan produksi (2026-10-24/25) dari salinan kerja ke `main`. **Kode aplikasi berubah**, jadi situs owner perlu `npm run deploy` untuk ikut versi ini — deploy **belum** dijalankan.
+
+> **Catatan nomor versi:** di salinan kerja, pekerjaan ini sempat diberi nomor 1.3.72 dan 1.3.73. Catatan rilis untuk kedua nomor itu tertimpa saat penyamaan dokumen dan tidak bisa dipulihkan; isinya dirangkum ulang di entri 1.3.74 ini supaya tidak ada dua sumber yang berbeda.
+
+- **K1 (KRITIS) — klien baru tidak bisa menyimpan apa pun.** Database yang dibuat portal onboarding memakai `app_kv` dengan kolom `id` wajib, sedangkan penulis data hanya mengirim `key` → `NOT NULL constraint failed: app_kv.id`, rate-limit login gagal (**429**), dan seluruh simpan konten mati. Penulis kini mendeteksi bentuk tabel (`PRAGMA table_info`, memoized) dan mengisi `id` bila diperlukan; onboarding juga menolak lanjut bila uji tulis `app_kv` gagal. Database owner tidak pernah terkena karena bentuknya berbeda sejak awal.
+- **K2 — kunci database tidak lagi ditanam di situs klien.** Worker klien memakai binding `env.DB` (bukan REST + token di `vars`); `next-env.mjs` fail-closed; verifikasi pasca-deploy wajib `200` + `status:ok`.
+- **Backup D1 jujur.** Satu tabel gagal → dicoba ulang sekali, lalu **seluruh backup dibatalkan** tanpa meninggalkan file separuh yang tampak sah.
+- **Upload tidak bisa diakali.** Kuota memakai ukuran byte aktual saat `Content-Length` tidak dikirim; ekstensi file diambil dari content-type (bukan nama kiriman); path `assets/...` selalu di-scope ke `sites/<siteId>/...`; isi `backups/` tidak dihitung sebagai pemakaian media.
+- **SVG tidak bisa jadi halaman jahat.** `/r2/...` menyajikan SVG sebagai lampiran (`Content-Disposition: attachment`) + CSP ketat, menutup celah stored XSS.
+- **Header keamanan tidak lagi dobel.** Header statis hanya dari `next.config.mjs`; middleware hanya memasang CSP. Sebelumnya HSTS muncul dua kali dengan nilai berbeda sehingga tidak valid.
+- **Alat owner tertutup di situs klien.** `/api/admin/sites` dan entitlement memasang `requireOwnerMode()` → **404** di deployment klien.
+- **Bucket media gagal = berhenti, bukan "sukses".** Jalur CLI (`cloud-manager.ts`) kini fail-closed seperti portal: akun baru tanpa R2 aktif berhenti dengan pesan yang bisa ditindaklanjuti, bukan build 5–10 menit lalu gagal di `wrangler deploy`.
+- **Gerbang mutu otomatis.** `.github/workflows/quality.yml` menjalankan tsc + lint + unit test pada push/PR, dan `npm run deploy` kini juga menjalankan ketiganya (plus wajib `CRON_SECRET`).
+  - **Temuan saat verifikasi:** gerbang versi awal menjalankan tes dengan `.env.local` yang sudah dimuat, sehingga tes rate-limit menembak D1 asli (timeout 5 detik) dan tes "notifikasi belum dikonfigurasi" benar-benar mengirim email. Tes sekarang dijalankan dengan environment **sebelum** `.env.local` dimuat.
+- **Portal owner (dari pekerjaan yang sama):** tombol **Detail** di Status Klien, brankas scrypt (`PORTAL_VAULT_HASH`/`PORTAL_VAULT_SALT`, auto-hide 30 detik, sesi 120 detik, 5× salah → kunci 5 menit), `/api/clients` tidak lagi mengirim `adminPassword`, rahasia hanya lewat allowlist, endpoint portal menolak Host non-loopback dan wajib `X-Portal-Request`.
+
+**Verifikasi:** `npx tsc --noEmit` **0 error**; `npm run lint` bersih; `npm run pre-deploy` **exit 0** dengan **150 file / 1266 test PASS**; `node --check` skrip portal 0 error. Sisa risiko yang belum ditutup tetap dicatat di `docs/tracker/logs/audit_production_readiness_2026_10_24.md` (kuota lock per-isolat, validasi dimensi wallpaper masih no-op, `/api/health` publik menampilkan versi/memori, `public/` ~118 MB).
+
+**Perlu tindakan:** (1) tutup lalu buka lagi `PENGELOLA_KLIEN.bat` agar portal memakai kode baru, (2) jalankan `npm run deploy` bila ingin situs owner ikut 1.3.74, (3) brankas portal belum pernah dibuat — buat kata sandinya langsung di modal Detail (jangan dikirim ke siapa pun).
+
 ## [1.3.71] - 2026-10-24
 
 ### 🛡️ Portal Aman & Jujur: Site Owner Tidak Bisa Dideploy + Versi Tampil di Kartu (2026-10-26)

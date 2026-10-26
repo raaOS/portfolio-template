@@ -195,6 +195,21 @@ Kabar jujur: fitur AI **belum aktif** di build yang beredar sekarang. Tiga lapis
 
 ---
 
+### 6b. Bagaimana Melihat Detail Klien & Kredensial dengan Aman?
+
+Di tab **Status Klien**, setiap baris klien sekarang punya tombol **Detail**. Isinya: nama, slug, template, alamat website/admin, Custom Domain, Worker, status kesehatan, serta infrastruktur Cloudflare (Account ID, D1, R2, KV).
+
+1. **Buka Detail:** klik `PENGELOLA_KLIEN.bat` → tab **Status Klien** → tombol **Detail** di baris klien.
+2. **Buat kata sandi brankas (sekali saja):** saat pertama kali membuka Detail, portal meminta kata sandi brankas minimal 12 karakter. **Buat kata sandi baru yang berbeda** dari password admin website dan password Cloudflare. Simpan di password manager atau catatan offline. Jangan kirim kata sandi ini ke AI, WhatsApp, atau chat mana pun.
+3. **Lihat infrastruktur:** Account ID, D1, R2, dan KV langsung terlihat dalam bentuk disamarkan (contoh `3bc768...27d9`). Ini bukan rahasia penuh, jadi aman untuk pengecekan cepat.
+4. **Buka kredensial:** masukkan kata sandi brankas. Password admin, Cloudflare API token, dan D1 API token akan terlihat. Portal menyembunyikannya otomatis setelah **30 detik**, saat modal ditutup, atau saat tombol **Sembunyikan Sekarang** diklik.
+5. **Kalau salah 5 kali:** brankas dikunci 5 menit. Tutup modal, tunggu, lalu coba lagi.
+6. **Kalau lupa kata sandi brankas:** minta bantuan AI untuk menghapus baris `PORTAL_VAULT_HASH` dan `PORTAL_VAULT_SALT` dari `.env.local`, lalu restart portal dan buat kata sandi baru. **Jangan pernah mengirim kata sandi brankas ke AI.**
+
+> 🔒 **Catatan keamanan:** portal ini hanya untuk laptop kamu (`127.0.0.1`). Jangan membuka port `4567` ke jaringan publik. File `arsip-klien/<slug>/config.env` tetap menyimpan kredensial asli dalam teks biasa; brankas portal hanya melindungi tampilan di layar, bukan mengenkripsi file arsip.
+
+---
+
 ### 7. Bagaimana Cara Memasang Custom Domain Klien (Otomatis 1-Klik)?
 
 Jika suatu saat klien baru membeli nama domain sendiri (contoh: `budipratama.com`), kamu **tidak perlu membuka dashboard Cloudflare atau mengetik token lagi**:
