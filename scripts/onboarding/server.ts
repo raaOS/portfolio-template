@@ -6,7 +6,8 @@ import { spawn } from 'child_process';
 import { SHARED_SCHEMA_QUERIES } from '../../src/crud/shared/db/schema';
 import { D1_SCHEMA_QUERIES } from '../../src/lib/d1-schema';
 import { hashPasswordScrypt } from '../../src/crud/shared/auth/password';
-import { clientUrls, deployClient, resolveWorkersSubdomain } from './client-deploy';
+import { clientUrls, deployClient, ensureR2Bucket, resolveWorkersSubdomain, workersDevUrl } from './client-deploy';
+import { probeClientHealth } from './portal-status';
 import { sendWebsiteOnlineEmail, listOrderSlugs } from './notify-online';
 import { attachWorkerDomain, findWorkerDomain, buildDomainHandoverMessage, guardWorkerDomainAttach } from './custom-domain';
 import {
@@ -15,11 +16,43 @@ import {
   resolveProvisionedAdminPassword,
   guardCrossClientSlug,
 } from './onboard-reuse';
+import { verifyAppKvWritable } from './app-kv-preflight';
+import { parseEnv } from './env-file';
+import {
+  VAULT_COOKIE_NAME,
+  VAULT_SESSION_TTL_MS,
+  VaultAttemptLimiter,
+  VaultSessionStore,
+  createVaultPassword,
+  getCookie,
+  isVaultConfigured,
+  validateNewVaultPassword,
+  verifyVaultPassword,
+} from './portal-vault';
+import {
+  isSafeArchiveFolderName,
+  listClientSummaries,
+  partitionDeployTargets,
+  readClientDetail,
+  readClientSecrets,
+  readProjectVersions,
+} from './portal-clients';
 
 const PORT = Number(process.env.PORT) || 4567;
 const ROOT_DIR = process.cwd();
 const PUBLIC_DIR = path.join(ROOT_DIR, 'scripts', 'onboarding', 'public');
 const ARCHIVE_DIR = path.join(ROOT_DIR, 'arsip-klien');
+/**
+ * Kunci deploy proses-tunggal. Build OpenNext menulis ke `.open-next` yang sama
+ * untuk semua klien, jadi hanya satu deploy boleh berjalan pada satu waktu.
+ */
+let deployInProgress = false;
+// PORTAL_ENV_LOCAL_PATH hanya dipakai saat pengujian lokal; produksi memakai .env.local.
+const ENV_LOCAL_PATH = process.env.PORTAL_ENV_LOCAL_PATH
+  ? path.resolve(ROOT_DIR, process.env.PORTAL_ENV_LOCAL_PATH)
+  : path.join(ROOT_DIR, '.env.local');
+const vaultAttempts = new VaultAttemptLimiter();
+const vaultSessions = new VaultSessionStore();
 
 if (!fs.existsSync(ARCHIVE_DIR)) {
   fs.mkdirSync(ARCHIVE_DIR, { recursive: true });
@@ -198,12 +231,13 @@ async function provisionClient(
 
   // STEP 3: Storage Media R2
   onProgress(3, 'Menyiapkan Storage Media R2...', `Membuat bucket R2: ${r2BucketName}`);
-  const createR2Res = await cfApi(`/accounts/${accountId}/r2/buckets/${r2BucketName}`, apiToken, {
-    method: 'PUT',
-  });
-  if (!createR2Res.ok && createR2Res.status !== 409) {
-    // 409 means bucket already exists, which is acceptable
-    console.warn('R2 bucket creation warning:', createR2Res.data?.errors);
+  // FAIL-CLOSED (audit 2026-10-24, temuan K8): dulu kegagalan di sini hanya
+  // `console.warn`, lalu portal tetap mengklaim "Infrastruktur Siap" dan build
+  // 5–10 menit berujung gagal saat wrangler deploy (bucket tidak ada).
+  // Sekarang provisioning berhenti dengan pesan yang bisa ditindaklanjuti.
+  const r2 = await ensureR2Bucket(accountId, apiToken, r2BucketName, { create: true });
+  if (!r2.ok) {
+    throw new Error(`STEP 3 gagal menyiapkan bucket R2: ${r2.detail}`);
   }
 
   // STEP 4: Migrasi Skema Tabel & Data Awal
@@ -235,6 +269,13 @@ async function provisionClient(
   } catch (err) {
     throw new Error(`STEP 4 gagal memasang tabel database: ${(err as Error).message}`);
   }
+
+  // STEP 4b: probe tulis app_kv (audit 2026-10-24, temuan K1). Skema bersama
+  // membuat app_kv berbeda bentuk dari yang ditulis aplikasi; tanpa probe,
+  // klien menerima situs yang tidak bisa login / menyimpan konten.
+  await verifyAppKvWritable((sql, params) =>
+    d1Query(accountId, apiToken, databaseId, sql, params)
+  );
 
   // Seed site row — binding parameter (audit temuan #5: tanpa interpolasi SQL).
   const seedSiteSql = `
@@ -482,6 +523,86 @@ async function provisionClient(
 // - Tidak ada CORS wildcard lagi — halaman portal (localhost:4567) memang
 //   same-origin, jadi header CORS tidak diperlukan.
 const ALLOWED_ORIGINS = new Set([`http://localhost:${PORT}`, `http://127.0.0.1:${PORT}`]);
+const VAULT_COOKIE_MAX_AGE_SECONDS = Math.floor(VAULT_SESSION_TTL_MS / 1000);
+
+function sendJson(
+  res: http.ServerResponse,
+  status: number,
+  payload: unknown,
+  headers: Record<string, string> = {}
+): void {
+  res.writeHead(status, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
+    ...headers,
+  });
+  res.end(JSON.stringify(payload));
+}
+
+function isAllowedPortalHost(req: http.IncomingMessage): boolean {
+  const host = String(req.headers.host || '').toLowerCase();
+  return host === `localhost:${PORT}` || host === `127.0.0.1:${PORT}`;
+}
+
+function requirePortalHost(req: http.IncomingMessage, res: http.ServerResponse): boolean {
+  if (isAllowedPortalHost(req)) return true;
+  sendJson(res, 403, { success: false, message: 'Host tidak diizinkan.' });
+  return false;
+}
+
+function setVaultCookie(res: http.ServerResponse, token: string): void {
+  res.setHeader(
+    'Set-Cookie',
+    `${VAULT_COOKIE_NAME}=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${VAULT_COOKIE_MAX_AGE_SECONDS}`
+  );
+}
+
+function clearVaultCookie(res: http.ServerResponse): void {
+  res.setHeader(
+    'Set-Cookie',
+    `${VAULT_COOKIE_NAME}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0`
+  );
+}
+
+function readJsonBody(req: http.IncomingMessage): Promise<Record<string, unknown>> {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    let tooLarge = false;
+
+    req.on('data', (chunk: Buffer) => {
+      if (tooLarge) return;
+      body += chunk.toString();
+      if (Buffer.byteLength(body, 'utf-8') > 16_384) tooLarge = true;
+    });
+    req.on('end', () => {
+      if (tooLarge) {
+        reject(new Error('TOO_LARGE'));
+        return;
+      }
+      try {
+        const parsed = JSON.parse(body || '{}');
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          reject(new Error('INVALID'));
+          return;
+        }
+        resolve(parsed as Record<string, unknown>);
+      } catch {
+        reject(new Error('INVALID'));
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+function requestKey(req: http.IncomingMessage): string {
+  return req.socket.remoteAddress || 'local';
+}
+
+function retryAfterSeconds(ms: number): number {
+  return Math.max(1, Math.ceil(ms / 1000));
+}
+
 
 const server = http.createServer(async (req, res) => {
   const requestOrigin = req.headers.origin;
@@ -492,12 +613,22 @@ const server = http.createServer(async (req, res) => {
   }
 
   const url = req.url?.split('?')[0] || '/';
+  const sensitiveUrl =
+    url.startsWith('/api/vault/') ||
+    url === '/api/client-detail' ||
+    url === '/api/client-secrets';
+
+  // Cegah DNS rebinding: endpoint brankas hanya boleh dipanggil lewat host loopback.
+  if (sensitiveUrl && !requirePortalHost(req, res)) return;
 
   // Static files
   if (url === '/' || url === '/index.html') {
     const htmlPath = path.join(PUBLIC_DIR, 'index.html');
     if (fs.existsSync(htmlPath)) {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store',
+      });
       res.end(fs.readFileSync(htmlPath));
       return;
     }
@@ -684,44 +815,222 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // API: List archived clients
+  // API: List archived clients (tanpa password/token)
   if (url === '/api/clients' && req.method === 'GET') {
     try {
-      if (!fs.existsSync(ARCHIVE_DIR)) {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, clients: [] }));
+      sendJson(res, 200, {
+        success: true,
+        clients: listClientSummaries(ARCHIVE_DIR),
+      });
+    } catch (err) {
+      sendJson(res, 500, { success: false, message: (err as Error).message });
+    }
+    return;
+  }
+
+  // API: Detail klien — infrastruktur non-rahasia + status kredensial.
+  if (url === '/api/client-detail' && req.method === 'GET') {
+    try {
+      const folderName =
+        new URL(req.url || '/', 'http://localhost').searchParams.get('folder') || '';
+
+      if (!isSafeArchiveFolderName(folderName)) {
+        sendJson(res, 400, { success: false, message: 'Nama folder klien tidak valid.' });
         return;
       }
 
-      const folders = fs
-        .readdirSync(ARCHIVE_DIR, { withFileTypes: true })
-        .filter((d) => d.isDirectory())
-        .map((d) => d.name)
-        .sort((a, b) => b.localeCompare(a)); // Newest first
+      const client = readClientDetail(ARCHIVE_DIR, folderName);
+      if (!client) {
+        sendJson(res, 404, { success: false, message: 'Arsip klien tidak ditemukan.' });
+        return;
+      }
 
-      const clients = folders.map((folderName) => {
-        const envPath = path.join(ARCHIVE_DIR, folderName, 'config.env');
-        const env = fs.existsSync(envPath) ? parseEnv(fs.readFileSync(envPath, 'utf-8')) : {};
-        const urls = clientUrls(env, folderName);
-        return {
-          id: folderName,
-          clientName: env.CUSTOMER_NAME || folderName,
-          clientSlug: env.CUSTOMER_SLUG || folderName.replace(/^\d+_/, ''),
-          adminEmail: env.ADMIN_EMAIL || '',
-          adminPassword: env.ADMIN_PASSWORD || '',
-          websiteUrl: urls.websiteUrl,
-          adminUrl: urls.adminUrl,
-          customDomain: env.CUSTOM_DOMAIN || '',
-          templateKey: env.ACTIVE_TEMPLATE_KEY || 'os-desktop',
-        };
+      sendJson(res, 200, {
+        success: true,
+        client,
+        vaultConfigured: isVaultConfigured(ENV_LOCAL_PATH),
       });
-
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: true, clients }));
     } catch (err) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: false, message: (err as Error).message }));
+      sendJson(res, 500, { success: false, message: (err as Error).message });
     }
+    return;
+  }
+
+  // API: Rahasia klien — HANYA setelah brankas dibuka (cookie sesi pendek).
+  if (url === '/api/client-secrets' && req.method === 'GET') {
+    try {
+      const folderName =
+        new URL(req.url || '/', 'http://localhost').searchParams.get('folder') || '';
+
+      if (!isSafeArchiveFolderName(folderName)) {
+        sendJson(res, 400, { success: false, message: 'Nama folder klien tidak valid.' });
+        return;
+      }
+
+      const token = getCookie(req.headers.cookie, VAULT_COOKIE_NAME);
+      if (!vaultSessions.verify(token)) {
+        sendJson(res, 401, {
+          success: false,
+          code: 'VAULT_LOCKED',
+          message: 'Brankas terkunci. Masukkan kata sandi brankas.',
+        });
+        return;
+      }
+
+      const secrets = readClientSecrets(ARCHIVE_DIR, folderName);
+      if (!secrets) {
+        sendJson(res, 404, { success: false, message: 'Arsip klien tidak ditemukan.' });
+        return;
+      }
+
+      sendJson(res, 200, { success: true, secrets });
+    } catch (err) {
+      sendJson(res, 500, { success: false, message: (err as Error).message });
+    }
+    return;
+  }
+
+  // API: Buat kata sandi brankas (sekali saja; tidak menyimpan password asli).
+  if (url === '/api/vault/setup' && req.method === 'POST') {
+    if (req.headers['x-portal-request'] !== '1') {
+      sendJson(res, 400, { success: false, message: 'Permintaan portal tidak valid.' });
+      return;
+    }
+
+    try {
+      if (isVaultConfigured(ENV_LOCAL_PATH)) {
+        sendJson(res, 409, {
+          success: false,
+          code: 'VAULT_ALREADY_CONFIGURED',
+          message: 'Brankas sudah dibuat. Masukkan kata sandi brankas untuk membukanya.',
+        });
+        return;
+      }
+
+      const body = await readJsonBody(req);
+      const password = typeof body.password === 'string' ? body.password : '';
+      const confirm = typeof body.confirm === 'string' ? body.confirm : '';
+      const policyError = validateNewVaultPassword(password);
+      if (policyError) {
+        sendJson(res, 400, { success: false, message: policyError });
+        return;
+      }
+      if (password !== confirm) {
+        sendJson(res, 400, { success: false, message: 'Ulangan kata sandi tidak sama.' });
+        return;
+      }
+
+      createVaultPassword(ENV_LOCAL_PATH, password);
+      const token = vaultSessions.create();
+      setVaultCookie(res, token);
+      sendJson(res, 200, {
+        success: true,
+        unlocked: true,
+        expiresInSeconds: VAULT_COOKIE_MAX_AGE_SECONDS,
+        message: 'Brankas dibuat. Kredensial dibuka selama 30 detik.',
+      });
+    } catch (err) {
+      sendJson(res, 500, {
+        success: false,
+        message: `Gagal membuat brankas: ${(err as Error).message}`,
+      });
+    }
+    return;
+  }
+
+  // API: Buka brankas (rate-limit 5 gagal → kunci 5 menit).
+  if (url === '/api/vault/unlock' && req.method === 'POST') {
+    if (req.headers['x-portal-request'] !== '1') {
+      sendJson(res, 400, { success: false, message: 'Permintaan portal tidak valid.' });
+      return;
+    }
+
+    try {
+      const key = requestKey(req);
+      const limit = vaultAttempts.check(key);
+      if (!limit.allowed) {
+        sendJson(
+          res,
+          429,
+          {
+            success: false,
+            code: 'VAULT_LOCKED_OUT',
+            message: `Terlalu banyak percobaan. Coba lagi dalam ${retryAfterSeconds(limit.retryAfterMs)} detik.`,
+            retryAfterSeconds: retryAfterSeconds(limit.retryAfterMs),
+          },
+          { 'Retry-After': String(retryAfterSeconds(limit.retryAfterMs)) }
+        );
+        return;
+      }
+
+      const body = await readJsonBody(req);
+      const password = typeof body.password === 'string' ? body.password : '';
+      if (!password || password.length > 1024) {
+        sendJson(res, 400, { success: false, message: 'Kata sandi brankas wajib diisi.' });
+        return;
+      }
+
+      const verification = verifyVaultPassword(ENV_LOCAL_PATH, password);
+      if (!verification.configured) {
+        sendJson(res, 400, {
+          success: false,
+          code: 'VAULT_NOT_CONFIGURED',
+          message: 'Brankas belum dibuat. Buat kata sandi brankas terlebih dahulu.',
+        });
+        return;
+      }
+
+      if (!verification.valid) {
+        const next = vaultAttempts.recordFailure(key);
+        if (!next.allowed) {
+          sendJson(
+            res,
+            429,
+            {
+              success: false,
+              code: 'VAULT_LOCKED_OUT',
+              message: `Terlalu banyak percobaan. Coba lagi dalam ${retryAfterSeconds(next.retryAfterMs)} detik.`,
+              retryAfterSeconds: retryAfterSeconds(next.retryAfterMs),
+            },
+            { 'Retry-After': String(retryAfterSeconds(next.retryAfterMs)) }
+          );
+          return;
+        }
+        sendJson(res, 401, {
+          success: false,
+          code: 'VAULT_INVALID',
+          message: 'Kata sandi brankas salah.',
+          attemptsLeft: next.attemptsLeft,
+        });
+        return;
+      }
+
+      vaultAttempts.reset(key);
+      const token = vaultSessions.create();
+      setVaultCookie(res, token);
+      sendJson(res, 200, {
+        success: true,
+        unlocked: true,
+        expiresInSeconds: VAULT_COOKIE_MAX_AGE_SECONDS,
+        message: 'Brankas dibuka. Kredensial disembunyikan otomatis dalam 30 detik.',
+      });
+    } catch {
+      sendJson(res, 400, { success: false, message: 'Permintaan tidak valid.' });
+    }
+    return;
+  }
+
+  // API: Tutup brankas + hapus token sesi.
+  if (url === '/api/vault/lock' && req.method === 'POST') {
+    if (req.headers['x-portal-request'] !== '1') {
+      sendJson(res, 400, { success: false, message: 'Permintaan portal tidak valid.' });
+      return;
+    }
+
+    const token = getCookie(req.headers.cookie, VAULT_COOKIE_NAME);
+    vaultSessions.revoke(token);
+    clearVaultCookie(res);
+    sendJson(res, 200, { success: true, message: 'Brankas dikunci.' });
     return;
   }
 
@@ -830,7 +1139,6 @@ const server = http.createServer(async (req, res) => {
             clientName,
             clientSlug,
             adminEmail: env.ADMIN_EMAIL || '',
-            adminPassword: env.ADMIN_PASSWORD || '',
             whatsappMessage: buildDomainHandoverMessage({ clientName, domain }),
             message: 'Custom domain tersambung ke Worker klien — DNS & HTTPS dibuat otomatis Cloudflare.',
           })
@@ -900,11 +1208,20 @@ const server = http.createServer(async (req, res) => {
   if (url === '/api/build-status' && req.method === 'GET') {
     try {
       const openNextDir = path.join(ROOT_DIR, '.open-next');
-      const hasBuild = fs.existsSync(openNextDir);
+      // R6 (audit 2026-10-26): mtime FOLDER `.open-next` berubah setiap kali isi
+      // ditulis/hapus, bukan hanya saat build selesai, sehingga "terakhir dibangun"
+      // bisa menyesatkan. Pakai berkas hasil build yang sebenarnya.
+      const buildArtifacts = [
+        path.join(openNextDir, 'worker.js'),
+        path.join(openNextDir, 'cloudflare', 'worker.js'),
+        path.join(openNextDir, 'cloudflare', 'next-env.mjs'),
+      ];
+      const existing = buildArtifacts.filter((p) => fs.existsSync(p));
+      const hasBuild = existing.length > 0;
       let lastBuilt: string | null = null;
       if (hasBuild) {
-        const stats = fs.statSync(openNextDir);
-        lastBuilt = stats.mtime.toLocaleString('id-ID');
+        const newest = Math.max(...existing.map((p) => fs.statSync(p).mtimeMs));
+        lastBuilt = new Date(newest).toLocaleString('id-ID');
       }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, hasBuild, lastBuilt }));
@@ -1046,165 +1363,248 @@ const server = http.createServer(async (req, res) => {
 
   // API: Deploy / Update Client Template (Server-Sent Events for live streaming)
   if (url === '/api/deploy-client' && req.method === 'POST') {
-    let body = '';
-    req.on('data', (chunk) => (body += chunk));
-    req.on('end', async () => {
-      try {
-        // `forceBuild` tidak lagi dipakai: bundle dibangun ulang untuk tiap
-        // klien karena env build-nya berbeda (lihat deployClient()).
-        // `notifyOnline` = konteks retry deploy PERTAMA dari kartu sukses
-        // onboarding (PK2) — batch update sengaja tidak mengirimnya.
-        const { folderName, all, notifyOnline } = JSON.parse(body || '{}');
+    // KUNCI DEPLOY (audit 2026-10-26, temuan K2): build OpenNext menghapus dan
+    // menulis ulang `.open-next` di folder yang sama. Dua deploy bersamaan akan
+    // saling menimpa artefak, jadi permintaan kedua ditolak sebelum build.
+    if (deployInProgress) {
+      sendJson(res, 409, {
+        success: false,
+        message: 'Pembaruan lain sedang berjalan. Tunggu sampai selesai sebelum memulai lagi.',
+      });
+      return;
+    }
+    deployInProgress = true;
 
-        res.writeHead(200, {
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          Connection: 'keep-alive',
+    let deployLockReleased = false;
+    const releaseDeployLock = () => {
+      if (deployLockReleased) return;
+      deployLockReleased = true;
+      deployInProgress = false;
+    };
+
+    try {
+      const payload = await readJsonBody(req);
+      // `forceBuild` tidak lagi dipakai: bundle dibangun ulang untuk tiap klien
+      // karena env build-nya berbeda (lihat deployClient()).
+      // `notifyOnline` = konteks retry deploy PERTAMA dari kartu sukses onboarding
+      // (PK2) — batch update sengaja tidak mengirimnya.
+      const notifyOnline = payload.notifyOnline === true;
+
+      // Target SELALU berupa daftar folder eksplisit (temuan R1 + koreksi
+      // rencana): `all: true` tidak lagi menghasilkan daftar dari readdir, jadi
+      // filter di UI dan daftar di server tidak mungkin berbeda.
+      const requested: unknown[] = Array.isArray(payload.folders)
+        ? payload.folders
+        : payload.folderName
+          ? [payload.folderName]
+          : [];
+
+      if (requested.length === 0) {
+        sendJson(res, 400, {
+          success: false,
+          message: 'Pilih salah satu klien atau pilih opsi update semua klien.',
         });
-
-        const sendEvent = (type: string, data: unknown) => {
-          res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
-        };
-
-        if (!fs.existsSync(ARCHIVE_DIR)) {
-          sendEvent('error', { message: 'Direktori arsip-klien/ belum ada di laptop.' });
-          res.end();
-          return;
-        }
-
-        let targetFolders: string[] = [];
-        if (all) {
-          targetFolders = fs
-            .readdirSync(ARCHIVE_DIR, { withFileTypes: true })
-            .filter((d) => d.isDirectory())
-            .map((d) => d.name)
-            .sort((a, b) => a.localeCompare(b));
-        } else if (folderName) {
-          targetFolders = [folderName];
-        } else {
-          sendEvent('error', { message: 'Pilih salah satu klien atau pilih opsi update semua klien.' });
-          res.end();
-          return;
-        }
-
-        // Filter valid client folders with config.env
-        targetFolders = targetFolders.filter((f) =>
-          fs.existsSync(path.join(ARCHIVE_DIR, f, 'config.env'))
-        );
-
-        if (targetFolders.length === 0) {
-          sendEvent('error', {
-            message: 'Tidak ada arsip klien yang ditemukan untuk diperbarui. Daftarkan klien terlebih dahulu.',
-          });
-          res.end();
-          return;
-        }
-
-        // STEP 1: Build + deploy per klien. Env tiap klien berbeda (D1/R2/secret
-        // milik klien), jadi bundle harus dibangun ulang untuk tiap klien.
-        sendEvent('progress', {
-          stage: 'deploy',
-          message: `Mulai build & deploy ${targetFolders.length} website klien...`,
-        });
-
-        const results: Array<{
-          clientName: string;
-          clientSlug: string;
-          success: boolean;
-          error?: string;
-          url?: string;
-          emailNote?: string;
-        }> = [];
-
-        for (let i = 0; i < targetFolders.length; i++) {
-          const folder = targetFolders[i];
-          const envPath = path.join(ARCHIVE_DIR, folder, 'config.env');
-          const env = parseEnv(fs.readFileSync(envPath, 'utf-8'));
-
-          const clientName = env.CUSTOMER_NAME || folder;
-          const clientSlug = env.CUSTOMER_SLUG || folder;
-
-          sendEvent('progress', {
-            stage: 'deploying',
-            message: `[${i + 1}/${targetFolders.length}] Build & deploy ke ${clientName}...`,
-            current: i + 1,
-            total: targetFolders.length,
-          });
-
-          sendEvent('log', {
-            text: `\n------------------------------------------------------------\n>>> [${i + 1}/${targetFolders.length}] Build + deploy ke Cloudflare Worker: ${clientName} (${clientSlug})\n------------------------------------------------------------`,
-          });
-
-          const outcome = await deployClient({
-            rootDir: ROOT_DIR,
-            configPath: envPath,
-            dryRun: false,
-            run: runCommandStreaming,
-            onLog: (line) => {
-              sendEvent('log', { text: line });
-            },
-          });
-
-          if (outcome.ok) {
-            sendEvent('log', {
-              text: `✓ BERHASIL! Website ${clientName} telah diperbarui ke versi template terbaru: ${outcome.websiteUrl}`,
-            });
-
-            // PK2 — retry deploy pertama dari kartu sukses onboarding:
-            // kirim email "Website Sudah Online" (best-effort).
-            let emailNote = '';
-            if (notifyOnline === true) {
-              try {
-                const emailResult = await sendWebsiteOnlineEmail({
-                  slug: outcome.slug || clientSlug,
-                  websiteUrl: outcome.websiteUrl || `https://${clientSlug}.workers.dev`,
-                });
-                emailNote = emailResult.reason;
-                sendEvent('log', {
-                  text: emailResult.sent ? `📧 ${emailResult.reason}` : `ℹ️ ${emailResult.reason}`,
-                });
-              } catch (emailErr) {
-                emailNote = `Email "Sudah Online" gagal: ${(emailErr as Error).message}`;
-                sendEvent('log', { text: `⚠️ ${emailNote}` });
-              }
-            }
-
-            results.push({
-              clientName,
-              clientSlug: outcome.slug || clientSlug,
-              success: true,
-              url: outcome.websiteUrl,
-              emailNote,
-            });
-          } else {
-            const errDetail = outcome.error || 'Deploy gagal';
-            sendEvent('log', { text: `✗ GAGAL deploy ke ${clientName}. ${errDetail}` });
-            results.push({
-              clientName,
-              clientSlug: outcome.slug || clientSlug,
-              success: false,
-              error: errDetail,
-            });
-          }
-        }
-
-        sendEvent('progress', {
-          stage: 'done',
-          message: 'Semua proses pembaruan telah selesai!',
-        });
-
-        sendEvent('complete', {
-          success: results.some((r) => r.success),
-          results,
-        });
-      } catch (err) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: false, message: (err as Error).message }));
         return;
-      } finally {
-        res.end();
       }
-    });
+
+      const invalid = requested.filter((f) => !isSafeArchiveFolderName(f));
+      if (invalid.length > 0) {
+        sendJson(res, 400, {
+          success: false,
+          message: 'Nama folder klien tidak valid.',
+        });
+        return;
+      }
+
+      if (!fs.existsSync(ARCHIVE_DIR)) {
+        sendJson(res, 400, {
+          success: false,
+          message: 'Direktori arsip-klien/ belum ada di laptop.',
+        });
+        return;
+      }
+
+      const targets = partitionDeployTargets(
+        listClientSummaries(ARCHIVE_DIR),
+        requested as string[]
+      );
+
+      if (targets.deployable.length === 0) {
+        sendJson(res, 400, {
+          success: false,
+          message:
+            'Tidak ada klien yang siap diperbarui. ' +
+            (targets.skipped.length > 0
+              ? targets.skipped.map((s) => `${s.clientName}: ${s.reason}`).join(' ')
+              : 'Daftarkan klien terlebih dahulu.'),
+          skipped: targets.skipped,
+        });
+        return;
+      }
+
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      });
+
+      // K3: menulis ke koneksi yang sudah ditutup memicu EPIPE/unhandled error
+      // yang bisa mematikan portal. Semua tulisan SSE lewat satu gerbang ini dan
+      // tidak pernah melempar.
+      let streamClosed = false;
+      res.on('close', () => {
+        streamClosed = true;
+      });
+      res.on('error', () => {
+        streamClosed = true;
+      });
+
+      const sendEvent = (type: string, data: unknown) => {
+        if (streamClosed || res.writableEnded || res.destroyed) return;
+        try {
+          res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
+        } catch {
+          streamClosed = true;
+        }
+      };
+
+      const skipped = targets.skipped;
+      if (skipped.length > 0) {
+        sendEvent('skipped', skipped);
+        for (const s of skipped) {
+          sendEvent('log', { text: `↷ DILEWATI: ${s.clientName} — ${s.reason}` });
+        }
+      }
+
+      const targetFolders = targets.deployable.map((c) => c.id);
+
+      // STEP 1: Build + deploy per klien. Env tiap klien berbeda (D1/R2/secret
+      // milik klien), jadi bundle harus dibangun ulang untuk tiap klien.
+      sendEvent('progress', {
+        stage: 'deploy',
+        message: `Mulai build & deploy ${targetFolders.length} website klien...`,
+        current: 0,
+        total: targetFolders.length,
+      });
+
+      const results: Array<{
+        clientName: string;
+        clientSlug: string;
+        success: boolean;
+        error?: string;
+        url?: string;
+        emailNote?: string;
+      }> = [];
+
+      for (let i = 0; i < targetFolders.length; i++) {
+        const folder = targetFolders[i];
+        const envPath = path.join(ARCHIVE_DIR, folder, 'config.env');
+        const env = parseEnv(fs.readFileSync(envPath, 'utf-8'));
+
+        const clientName = env.CUSTOMER_NAME || folder;
+        const clientSlug = env.CUSTOMER_SLUG || folder;
+
+        sendEvent('progress', {
+          stage: 'deploying',
+          message: `[${i + 1}/${targetFolders.length}] Build & deploy ke ${clientName}...`,
+          current: i + 1,
+          total: targetFolders.length,
+        });
+
+        sendEvent('log', {
+          text: `\n------------------------------------------------------------\n>>> [${i + 1}/${targetFolders.length}] Build + deploy ke Cloudflare Worker: ${clientName} (${clientSlug})\n------------------------------------------------------------`,
+        });
+
+        const outcome = await deployClient({
+          rootDir: ROOT_DIR,
+          configPath: envPath,
+          dryRun: false,
+          run: runCommandStreaming,
+          onLog: (line) => {
+            sendEvent('log', { text: line });
+          },
+        });
+
+        if (outcome.ok) {
+          sendEvent('log', {
+            text: `✓ BERHASIL! Website ${clientName} telah diperbarui ke versi template terbaru: ${outcome.websiteUrl}`,
+          });
+
+          // PK2 — retry deploy pertama dari kartu sukses onboarding:
+          // kirim email "Website Sudah Online" (best-effort).
+          let emailNote = '';
+          if (notifyOnline === true) {
+            try {
+              const emailResult = await sendWebsiteOnlineEmail({
+                slug: outcome.slug || clientSlug,
+                websiteUrl: outcome.websiteUrl || `https://${clientSlug}.workers.dev`,
+              });
+              emailNote = emailResult.reason;
+              sendEvent('log', {
+                text: emailResult.sent ? `📧 ${emailResult.reason}` : `ℹ️ ${emailResult.reason}`,
+              });
+            } catch (emailErr) {
+              emailNote = `Email "Sudah Online" gagal: ${(emailErr as Error).message}`;
+              sendEvent('log', { text: `⚠️ ${emailNote}` });
+            }
+          }
+
+          results.push({
+            clientName,
+            clientSlug: outcome.slug || clientSlug,
+            success: true,
+            url: outcome.websiteUrl,
+            emailNote,
+          });
+        } else {
+          const errDetail = outcome.error || 'Deploy gagal';
+          sendEvent('log', { text: `✗ GAGAL deploy ke ${clientName}. ${errDetail}` });
+          results.push({
+            clientName,
+            clientSlug: outcome.slug || clientSlug,
+            success: false,
+            error: errDetail,
+          });
+        }
+      }
+
+      sendEvent('progress', {
+        stage: 'done',
+        message: 'Semua proses pembaruan telah selesai!',
+        current: targetFolders.length,
+        total: targetFolders.length,
+      });
+
+      sendEvent('complete', {
+        success: results.some((r) => r.success),
+        results,
+        skipped,
+      });
+    } catch (err) {
+      const message = (err as Error).message;
+      if (message === 'TOO_LARGE') {
+        sendJson(res, 413, { success: false, message: 'Permintaan terlalu besar.' });
+      } else if (message === 'INVALID') {
+        sendJson(res, 400, { success: false, message: 'Format permintaan tidak valid.' });
+      } else if (!res.headersSent) {
+        sendJson(res, 500, { success: false, message });
+      } else if (!res.writableEnded && !res.destroyed) {
+        try {
+          res.end();
+        } catch {
+          /* koneksi sudah hilang */
+        }
+      }
+    } finally {
+      releaseDeployLock();
+      if (!res.writableEnded && !res.destroyed) {
+        try {
+          res.end();
+        } catch {
+          /* koneksi sudah hilang */
+        }
+      }
+    }
     return;
   }
 
@@ -1212,8 +1612,17 @@ const server = http.createServer(async (req, res) => {
   if (url === '/api/status' && req.method === 'GET') {
     try {
       if (!fs.existsSync(ARCHIVE_DIR)) {
+        const versions = readProjectVersions(ROOT_DIR);
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, clients: [], latestVersion: null }));
+        res.end(
+          JSON.stringify({
+            success: true,
+            clients: [],
+            latestVersion: versions.latestVersion,
+            appVersion: versions.appVersion,
+            changelogVersion: versions.changelogVersion,
+          })
+        );
         return;
       }
 
@@ -1237,72 +1646,35 @@ const server = http.createServer(async (req, res) => {
             adminUrl: urls.adminUrl,
             customDomain: env.CUSTOM_DOMAIN || '',
             templateKey: env.ACTIVE_TEMPLATE_KEY || 'os-desktop',
+            // Alamat pertama = yang tampil di UI; cadangan = workers.dev yang selalu
+            // hidup selama Worker ada, supaya DNS yang belum menyebar tidak membuat
+            // status "Offline" palsu (kejadian 2026-10-26).
+            healthUrls: [urls.websiteUrl, workersDevUrl(env, folderName)].filter(Boolean),
           };
         });
 
-      // Health-check paralel: fetch ringan dengan timeout 8 detik per klien.
+      // Health-check paralel. Tiap klien punya batas 12 detik per alamat dan
+      // otomatis mencoba workers.dev bila alamat utama gagal di tingkat jaringan.
       const checked = await Promise.all(
-        clients.map(async (c) => {
-          try {
-            const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), 8000);
-            const start = Date.now();
-            const healthRes = await fetch(`${c.websiteUrl.replace(/\/+$/, '')}/api/health`, {
-              signal: controller.signal,
-            });
-            clearTimeout(timer);
-            const latencyMs = Date.now() - start;
-            let version: string | null = null;
-            let dbStatus: string | null = null;
-            let workerHealth: Record<string, unknown> | null = null;
-            try {
-              const body = (await healthRes.json()) as {
-                version?: string;
-                database?: string;
-                status?: string;
-                workerHealth?: Record<string, unknown> | null;
-              };
-              version = body.version || null;
-              dbStatus = body.database || null;
-              // Hanya site owner yang mengisinya (lihat OWNER_MODE di route health);
-              // site klien selalu null sehingga kolomnya tampil kosong.
-              workerHealth = body.workerHealth || null;
-            } catch {
-              // health endpoint merespon non-JSON — anggap hidup tanpa detail.
-            }
-            return {
-              ...c,
-              online: healthRes.ok,
-              httpStatus: healthRes.status,
-              latencyMs,
-              deployedVersion: version,
-              database: dbStatus,
-              workerHealth,
-            };
-          } catch {
-            return {
-              ...c,
-              online: false,
-              httpStatus: null,
-              latencyMs: null,
-              deployedVersion: null,
-              database: null,
-              workerHealth: null,
-            };
-          }
-        })
+        clients.map(async ({ healthUrls, ...c }) => ({
+          ...c,
+          ...(await probeClientHealth(healthUrls)),
+        }))
       );
 
-      // Versi template lokal (CHANGELOG.md paling atas) untuk perbandingan.
-      let latestVersion: string | null = null;
-      const changelogPath = path.join(ROOT_DIR, 'CHANGELOG.md');
-      if (fs.existsSync(changelogPath)) {
-        const match = fs.readFileSync(changelogPath, 'utf-8').match(/##\s*\[([^\]]+)\]/);
-        latestVersion = match ? match[1] : null;
-      }
+      // Versi acuan = versi kode (APP_VERSION), bukan judul CHANGELOG (S5).
+      const versions = readProjectVersions(ROOT_DIR);
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: true, clients: checked, latestVersion }));
+      res.end(
+        JSON.stringify({
+          success: true,
+          clients: checked,
+          latestVersion: versions.latestVersion,
+          appVersion: versions.appVersion,
+          changelogVersion: versions.changelogVersion,
+        })
+      );
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: false, message: (err as Error).message }));
@@ -1314,25 +1686,6 @@ const server = http.createServer(async (req, res) => {
   res.writeHead(404, { 'Content-Type': 'text/plain' });
   res.end('Not Found');
 });
-
-// Helper simple env parser
-function parseEnv(content: string): Record<string, string> {
-  const result: Record<string, string> = {};
-  for (const line of content.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const eqIdx = trimmed.indexOf('=');
-    if (eqIdx !== -1) {
-      const key = trimmed.slice(0, eqIdx).trim();
-      let val = trimmed.slice(eqIdx + 1).trim();
-      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-        val = val.slice(1, -1);
-      }
-      result[key] = val;
-    }
-  }
-  return result;
-}
 
 // Hanya loopback (127.0.0.1) — lihat penjagaan akses di atas: portal ini
 // memuat kredensial klien dan tidak boleh terbuka ke jaringan lokal.

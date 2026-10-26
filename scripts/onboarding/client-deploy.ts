@@ -120,16 +120,35 @@ export function upsertConfigEnv(filePath: string, updates: EnvMap): void {
  * deploy; kalau belum ada, dipakai host provisional yang nanti diperbaiki oleh
  * `deployClient()`.
  */
+/**
+ * URL workers.dev klien — alamat yang selalu ada selama Worker hidup, terlepas
+ * dari custom domain. Dipakai sebagai cadangan health-check Status Board portal.
+ */
+export function workersDevUrl(config: EnvMap, fallbackSlug = ''): string {
+  const slug = config.CUSTOMER_SLUG || fallbackSlug;
+  if (!slug) return '';
+  const host = config.WORKERS_SUBDOMAIN
+    ? `${slug}.${config.WORKERS_SUBDOMAIN}.workers.dev`
+    : `${slug}.workers.dev`;
+  return `https://${host}`;
+}
+
+/**
+ * Slug klien dipakai sebagai nama Worker sekaligus nama berkas
+ * `wrangler.client.<slug>.jsonc`, jadi hanya huruf/angka/tanda hubung yang
+ * diizinkan (R4 audit 2026-10-26: mencegah slug aneh menulis ke path lain).
+ */
+export function isSafeCustomerSlug(slug: unknown): slug is string {
+  return typeof slug === 'string' && /^[A-Za-z0-9][A-Za-z0-9-]{0,62}$/.test(slug);
+}
+
 export function clientUrls(
   config: EnvMap,
   fallbackSlug = ''
 ): { websiteUrl: string; adminUrl: string } {
-  const slug = config.CUSTOMER_SLUG || fallbackSlug;
-  if (!slug) return { websiteUrl: '', adminUrl: '' };
-  const host = config.WORKERS_SUBDOMAIN
-    ? `${slug}.${config.WORKERS_SUBDOMAIN}.workers.dev`
-    : `${slug}.workers.dev`;
-  const websiteUrl = config.WEBSITE_URL || `https://${host}`;
+  const devUrl = workersDevUrl(config, fallbackSlug);
+  if (!devUrl) return { websiteUrl: '', adminUrl: '' };
+  const websiteUrl = config.WEBSITE_URL || devUrl;
   return { websiteUrl, adminUrl: config.ADMIN_URL || `${websiteUrl}/admin` };
 }
 
@@ -165,6 +184,17 @@ export function ensureClientSecrets(config: EnvMap): string[] {
 export interface ClientEnvPlan {
   /** Nilai runtime per klien: dipakai untuk `vars` wrangler + next-env.mjs. */
   overrides: EnvMap;
+  /**
+   * Nilai yang HANYA boleh ada selama proses build, tidak boleh masuk `vars`
+   * Worker maupun `next-env.mjs` final.
+   *
+   * Kenapa perlu: `next build` melakukan prerender di luar Worker, sehingga
+   * `getD1Binding()` mengembalikan null dan pembacaan D1 jatuh ke REST — yang
+   * butuh token. Kalau token tidak ada saat build, prerender gagal
+   * (`Cloudflare D1 env is incomplete`). Token ini dipakai build lalu dibuang
+   * oleh `rewriteNextEnvFile()` dan tidak ditulis ke wrangler `vars`.
+   */
+  buildOnly: EnvMap;
   /** Kunci wajib yang nilainya masih kosong. */
   missing: string[];
 }
@@ -177,7 +207,9 @@ export function buildClientEnvPlan(config: EnvMap): ClientEnvPlan {
     CUSTOMER_SITE_ID: config.CUSTOMER_SITE_ID || slug,
     CLOUDFLARE_ACCOUNT_ID: config.CLOUDFLARE_ACCOUNT_ID || '',
     CLOUDFLARE_D1_DATABASE_ID: config.CLOUDFLARE_D1_DATABASE_ID || '',
-    CLOUDFLARE_D1_API_TOKEN: config.CLOUDFLARE_D1_API_TOKEN || config.CLOUDFLARE_API_TOKEN || '',
+    // Token D1 TIDAK dimasukkan ke `overrides`: Worker klien memakai binding
+    // `env.DB` (lihat writeWranglerClientConfig). Token tetap hidup di
+    // config.env untuk pemeliharaan owner, bukan di runtime klien.
     CLOUDFLARE_R2_ACCOUNT_ID: config.CLOUDFLARE_R2_ACCOUNT_ID || config.CLOUDFLARE_ACCOUNT_ID || '',
     CLOUDFLARE_R2_BUCKET:
       config.CLOUDFLARE_R2_BUCKET || config.CLOUDFLARE_R2_BUCKET_NAME || `media-${slug}`,
@@ -206,7 +238,13 @@ export function buildClientEnvPlan(config: EnvMap): ClientEnvPlan {
 
   const missing = REQUIRED_VALUE_KEYS.filter((key) => !overrides[key] && !config[key]);
 
-  return { overrides, missing };
+  // Build-only: dipakai prerender REST, lalu dibuang dari artefak runtime.
+  const buildOnly: EnvMap = {
+    CLOUDFLARE_D1_API_TOKEN:
+      config.CLOUDFLARE_D1_API_TOKEN || config.CLOUDFLARE_API_TOKEN || '',
+  };
+
+  return { overrides, buildOnly, missing };
 }
 
 /** Baca daftar KUNCI (bukan nilai) dari file `.env*` milik owner. */
@@ -317,6 +355,8 @@ export interface WranglerClientInput {
   overrides: EnvMap;
   kvIncId?: string;
   kvTagId?: string;
+  /** Nama database D1 klien (informasional di wrangler; `database_id` yang mengikat). */
+  d1DatabaseName?: string;
 }
 
 function readRootCompatFlags(rootDir: string): { date: string; flags: string[] } {
@@ -339,8 +379,17 @@ function readRootCompatFlags(rootDir: string): { date: string; flags: string[] }
  * `assets.directory` menunjuk ke `worker.js` + `assets` hasil build.
  */
 export function writeWranglerClientConfig(input: WranglerClientInput): string {
-  const { rootDir, slug, overrides, kvIncId, kvTagId } = input;
+  const { rootDir, slug, overrides, kvIncId, kvTagId, d1DatabaseName } = input;
   const compat = readRootCompatFlags(rootDir);
+
+  const databaseId = overrides.CLOUDFLARE_D1_DATABASE_ID || '';
+  if (!databaseId) {
+    // Fail-closed: Worker klien tanpa binding D1 akan jatuh ke REST tanpa token
+    // (token sengaja tidak lagi ditanam di `vars`) → login & simpan konten mati.
+    throw new Error(
+      'CLOUDFLARE_D1_DATABASE_ID kosong — binding D1 klien tidak bisa ditulis. Periksa arsip-klien/<slug>/config.env.'
+    );
+  }
 
   const vars: EnvMap = {};
   for (const [key, value] of Object.entries(overrides)) {
@@ -362,6 +411,16 @@ export function writeWranglerClientConfig(input: WranglerClientInput): string {
       {
         binding: 'MEDIA_BUCKET',
         bucket_name: overrides.CLOUDFLARE_R2_BUCKET || `media-${slug}`,
+      },
+    ],
+    // Binding D1 = jalur utama runtime klien. Token REST sengaja TIDAK lagi
+    // ditanam di `vars` (audit 2026-10-24); `queryD1` memakai `env.DB` dan hanya
+    // jatuh ke REST dengan kredensial eksplisit bila binding tidak ada.
+    d1_databases: [
+      {
+        binding: 'DB',
+        database_name: d1DatabaseName || slug,
+        database_id: databaseId,
       },
     ],
     services: [
@@ -405,7 +464,7 @@ export function writeWranglerClientConfig(input: WranglerClientInput): string {
 /** Amplop respons API Cloudflare v4 — hanya bagian yang dipakai skrip ini. */
 interface CfEnvelope {
   success?: boolean;
-  errors?: Array<{ message?: string }>;
+  errors?: Array<{ code?: number; message?: string }>;
   result?: unknown;
 }
 
@@ -489,6 +548,81 @@ export async function ensureClientKvNamespaces(
   return { incId: incId || undefined, tagId: tagId || undefined, notes };
 }
 
+export interface R2BucketCheck {
+  ok: boolean;
+  detail: string;
+}
+
+/**
+ * Pastikan bucket R2 klien benar-benar ada (audit 2026-10-24, temuan K8).
+ *
+ * Latar belakang: portal dulu hanya `console.warn` saat pembuatan bucket gagal.
+ * Akibatnya provisioning tetap mengklaim "Infrastruktur Siap", build berjalan
+ * 5–10 menit, lalu `wrangler deploy` gagal karena binding R2 menunjuk bucket
+ * yang tidak ada. Sekarang kegagalan R2 menghentikan proses lebih awal dengan
+ * pesan yang bisa ditindaklanjuti (aktifkan R2 / buat bucket).
+ *
+ * `create: true` dipakai saat provisioning; `create: false` (default) hanya
+ * memverifikasi, dipakai sebelum build/deploy.
+ */
+export async function ensureR2Bucket(
+  accountId: string,
+  apiToken: string,
+  bucketName: string,
+  options: { create?: boolean } = {}
+): Promise<R2BucketCheck> {
+  const bucketPath = `/r2/buckets/${encodeURIComponent(bucketName)}`;
+
+  if (options.create) {
+    const created = await cfFetch(accountId, apiToken, bucketPath, { method: 'PUT' });
+    if (created.ok) return { ok: true, detail: `Bucket R2 "${bucketName}" dibuat.` };
+    // Sudah ada / balapan dengan proses lain: verifikasi lewat GET di bawah.
+  }
+
+  const res = await cfFetch(accountId, apiToken, bucketPath);
+  if (res.ok) {
+    return {
+      ok: true,
+      detail: options.create
+        ? `Bucket R2 "${bucketName}" sudah tersedia.`
+        : `Bucket R2 "${bucketName}" ada.`,
+    };
+  }
+
+  const firstError = res.json?.errors?.[0];
+  const detail = firstError?.message || `HTTP ${res.status || 'tanpa respons'}`;
+
+  if (firstError?.code === 10042) {
+    return {
+      ok: false,
+      detail:
+        `R2 belum diaktifkan di akun Cloudflare ini. Buka dashboard Cloudflare → R2 → ` +
+        `Enable R2 (butuh kartu/PayPal; kuota gratis tetap $0), lalu ulangi. ` +
+        `Bucket yang dibutuhkan: "${bucketName}".`,
+    };
+  }
+  if (res.status === 404) {
+    return {
+      ok: false,
+      detail:
+        `Bucket R2 "${bucketName}" tidak ditemukan. Aktifkan R2 lalu buat bucket ` +
+        `dengan nama tersebut, atau jalankan ulang provisioning.`,
+    };
+  }
+  if (res.status === 403) {
+    return {
+      ok: false,
+      detail:
+        `Token Cloudflare tidak punya izin R2 (403). Tambahkan permission ` +
+        `"Workers R2 Storage: Edit" pada token, lalu ulangi. Detail: ${detail}`,
+    };
+  }
+  return {
+    ok: false,
+    detail: `Tidak bisa memastikan bucket R2 "${bucketName}" (${detail}).`,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Build & deploy
 // ---------------------------------------------------------------------------
@@ -514,6 +648,8 @@ export interface SiteLivenessResult {
   url: string;
   /** Rangkuman percobaan terakhir (untuk catatan deploy & pesan error). */
   detail: string;
+  /** true bila site hanya merespons lewat alamat cadangan (workers.dev). */
+  viaFallback?: boolean;
 }
 
 /**
@@ -521,46 +657,102 @@ export interface SiteLivenessResult {
  * sukses (audit Temuan 15). Tiap percobaan mengecek `/api/health` dulu; kalau
  * endpoint itu tidak ada (404/405) atau tidak bisa dihubungi, jatuh ke halaman
  * utama. Maksimal 3 percobaan dengan backoff singkat (cold start worker pertama
- * kadang butuh beberapa detik). Respons HTTP apa pun dianggap site hidup —
- * status non-200 tetap dicatat supaya owner bisa memeriksa.
+ * kadang butuh beberapa detik).
+ *
+ * Audit 2026-10-24: dulu **HTTP apa pun** dianggap hidup, sehingga halaman 500
+ * atau 503 `error code: 1102` lolos sebagai "sukses". Sekarang:
+ * - `/api/health` wajib HTTP 200 dan JSON `status === 'ok'`.
+ * - Halaman utama wajib HTTP 2xx.
+ * Status lain dicatat sebagai bukti site belum sehat.
+ *
+ * K1 (audit 2026-10-26): alamat utama adalah custom domain, yang bisa belum
+ * menyebar (DNS/proxy) walau Worker sudah hidup. Karena itu `fallbackUrls`
+ * (biasanya workers.dev) ikut dicek — deploy yang sukses tidak boleh dilaporkan
+ * GAGAL hanya karena DNS belum siap.
  */
 export async function verifySiteLiveness(
   baseUrl: string,
   onLog: (line: string) => void,
-  options: { attempts?: number; timeoutMs?: number; backoffMs?: number } = {}
+  options: {
+    attempts?: number;
+    timeoutMs?: number;
+    backoffMs?: number;
+    fallbackUrls?: string[];
+  } = {}
 ): Promise<SiteLivenessResult> {
-  const { attempts = 3, timeoutMs = 15000, backoffMs = 2000 } = options;
-  const rootUrl = baseUrl.replace(/\/+$/, '');
-  const targets = [`${rootUrl}/api/health`, rootUrl];
+  const { attempts = 3, timeoutMs = 15000, backoffMs = 2000, fallbackUrls = [] } = options;
+  const primary = baseUrl.replace(/\/+$/, '');
+
+  const bases: string[] = [];
+  for (const candidate of [primary, ...fallbackUrls]) {
+    const trimmed = (candidate || '').replace(/\/+$/, '');
+    if (trimmed && !bases.includes(trimmed)) bases.push(trimmed);
+  }
+  if (bases.length === 0) {
+    return { alive: false, url: '', detail: 'tidak ada alamat untuk diverifikasi' };
+  }
+
   let lastNote = 'belum ada percobaan';
 
   for (let attempt = 1; attempt <= attempts; attempt++) {
-    for (const target of targets) {
-      try {
-        const res = await fetch(target, {
-          redirect: 'follow',
-          signal: AbortSignal.timeout(timeoutMs),
-        });
-        // 404/405 di /api/health = endpoint memang tidak ada; bukti site hidup
-        // diambil dari halaman utama.
-        if (target.endsWith('/api/health') && (res.status === 404 || res.status === 405)) {
-          lastNote = `${target}: HTTP ${res.status} (endpoint health tidak ada)`;
-          continue;
+    for (const base of bases) {
+      const isFallback = base !== primary;
+      const source = isFallback ? ` (via ${base.replace(/^https?:\/\//, '')})` : '';
+      const targets = [`${base}/api/health`, base];
+
+      for (const target of targets) {
+        try {
+          const res = await fetch(target, {
+            redirect: 'follow',
+            signal: AbortSignal.timeout(timeoutMs),
+          });
+
+          if (target.endsWith('/api/health')) {
+            // 404/405 = endpoint memang tidak ada; bukti diambil dari halaman utama.
+            if (res.status === 404 || res.status === 405) {
+              lastNote = `${target}: HTTP ${res.status} (endpoint health tidak ada)`;
+              continue;
+            }
+            if (res.status !== 200) {
+              lastNote = `${target}: HTTP ${res.status}`;
+              continue;
+            }
+            const body = (await res.json().catch(() => null)) as { status?: string } | null;
+            if (body?.status === 'ok') {
+              return {
+                alive: true,
+                url: target,
+                detail: `HTTP ${res.status} status ok dari ${target}${source}`,
+                viaFallback: isFallback,
+              };
+            }
+            lastNote = `${target}: HTTP 200 tapi status "${body?.status ?? 'tidak terbaca'}"`;
+            continue;
+          }
+
+          if (res.ok) {
+            return {
+              alive: true,
+              url: target,
+              detail: `HTTP ${res.status} dari ${target}${source}`,
+              viaFallback: isFallback,
+            };
+          }
+          lastNote = `${target}: HTTP ${res.status}`;
+        } catch (err) {
+          lastNote = `${target}: ${err instanceof Error ? err.message : String(err)}`;
         }
-        return { alive: true, url: target, detail: `HTTP ${res.status} dari ${target}` };
-      } catch (err) {
-        lastNote = `${target}: ${err instanceof Error ? err.message : String(err)}`;
       }
     }
     if (attempt < attempts) {
       onLog(
-        `>>> [VERIFIKASI] Site belum merespon (percobaan ${attempt}/${attempts}) — coba lagi dalam ${backoffMs / 1000} detik...`
+        `>>> [VERIFIKASI] Site belum sehat (percobaan ${attempt}/${attempts}) — coba lagi dalam ${backoffMs / 1000} detik...`
       );
       await new Promise((resolve) => setTimeout(resolve, backoffMs));
     }
   }
 
-  return { alive: false, url: '', detail: lastNote };
+  return { alive: false, url: '', detail: lastNote, viaFallback: false };
 }
 
 export interface HandoverNoteInput {
@@ -628,7 +820,7 @@ export function renderHandoverNote(input: HandoverNoteInput): string {
     '## Rutin & referensi',
     '',
     '- Backup D1 + media: `npm run backup:d1` / `npm run backup:r2`, lalu salin ke',
-    '  flashdisk dengan `SALIN_CADANGAN.bat` (petunjuk: `cadangan-flashdisk/README.txt`),',
+    '  flashdisk lewat menu [2] "Salin Cadangan" di `PENGELOLA_KLIEN.bat` (petunjuk: `cadangan-flashdisk/README.txt`),',
     '  detail: `docs/operations/backup-restore-runbook.md`.',
     '- Operasional klien: `docs/release/CLIENT_OPERATIONS.md`.',
     '- Gladi resik klien berikutnya: `docs/operations/GLADI_RESIK_KLIEN_PERDANA.md`.',
@@ -676,6 +868,21 @@ export async function deployClient(options: DeployClientOptions): Promise<Deploy
   const slug = config.CUSTOMER_SLUG || '';
   const websiteUrl = config.WEBSITE_URL || (slug ? `https://${slug}.workers.dev` : '');
 
+  // R4: slug dipakai sebagai nama Worker dan nama berkas wrangler — tolak
+  // sebelum menyentuh filesystem daripada menulis ke path yang tak diharapkan.
+  if (slug && !isSafeCustomerSlug(slug)) {
+    return {
+      ok: false,
+      slug,
+      clientName,
+      websiteUrl,
+      buildCode: -1,
+      deployCode: -1,
+      notes,
+      error: `CUSTOMER_SLUG "${slug}" tidak valid. Gunakan huruf, angka, dan tanda hubung saja.`,
+    };
+  }
+
   // 1. Secret klien (persist ke config.env) + rencana env.
   const generated = ensureClientSecrets(config);
   if (generated.length > 0) {
@@ -706,6 +913,12 @@ export async function deployClient(options: DeployClientOptions): Promise<Deploy
   const blanks = collectOwnerBlankKeys(rootDir, plan.overrides);
   const buildEnv: EnvMap = { ...plan.overrides };
   for (const key of blanks) buildEnv[key] = '';
+  // Token build-only dipasang SETELAH reset kunci owner: prerender `next build`
+  // butuh REST, sedangkan `rewriteNextEnvFile()` + wrangler `vars` hanya
+  // memakai `plan.overrides` sehingga token tidak ikut ke runtime klien.
+  for (const [key, value] of Object.entries(plan.buildOnly)) {
+    if (value) buildEnv[key] = value;
+  }
 
   onLog(
     `>>> [ENV] Klien: ${slug} | override ${Object.keys(plan.overrides).length} kunci, reset ${blanks.length} kunci owner`
@@ -751,6 +964,32 @@ export async function deployClient(options: DeployClientOptions): Promise<Deploy
     buildEnv.NEXT_PUBLIC_SITE_URL = plan.overrides.NEXT_PUBLIC_SITE_URL;
   }
 
+  // 2b. Verifikasi bucket R2 SEBELUM build (audit 2026-10-24, temuan K8).
+  //     Dulu bucket yang gagal dibuat baru ketahuan setelah build 5–10 menit,
+  //     saat wrangler deploy menolak binding R2. Gagal cepat + pesan jelas.
+  if (!dryRun) {
+    const bucketName =
+      config.CLOUDFLARE_R2_BUCKET || config.CLOUDFLARE_R2_BUCKET_NAME || `media-${slug}`;
+    const r2 = await ensureR2Bucket(
+      config.CLOUDFLARE_ACCOUNT_ID,
+      config.CLOUDFLARE_API_TOKEN,
+      bucketName
+    );
+    if (!r2.ok) {
+      return {
+        ok: false,
+        slug,
+        clientName,
+        websiteUrl,
+        buildCode: -1,
+        deployCode: -1,
+        notes,
+        error: r2.detail,
+      };
+    }
+    notes.push(r2.detail);
+  }
+
   // 3. Bersihkan cache build lama (nilai env klien sebelumnya tidak boleh tersisa).
   cleanNextBuildCache(rootDir);
 
@@ -776,8 +1015,26 @@ export async function deployClient(options: DeployClientOptions): Promise<Deploy
     };
   }
 
-  // 5. Buang rahasia owner dari next-env.mjs.
+  // 5. Buang rahasia owner dari next-env.mjs — FAIL-CLOSED (audit 2026-10-24).
+  //    Kalau file tidak ada atau formatnya berubah sehingga tidak ada ekspor yang
+  //    dikenali, deploy DIBATALKAN. Dulu deploy lanjut dan rahasia owner bisa
+  //    ikut ke Worker klien tanpa terdeteksi.
+  const nextEnvPath = path.join(rootDir, '.open-next', 'cloudflare', 'next-env.mjs');
   const rewrite = rewriteNextEnvFile(path.join(rootDir, '.open-next'), plan.overrides);
+  if (!fs.existsSync(nextEnvPath) || rewrite.modes.length === 0) {
+    notes.push('next-env.mjs tidak ditemukan / format tidak dikenali — deploy dibatalkan');
+    return {
+      ok: false,
+      slug,
+      clientName,
+      websiteUrl,
+      buildCode: build.code,
+      deployCode: -1,
+      notes,
+      error:
+        'next-env.mjs tidak ditemukan atau formatnya tidak dikenali. Deploy dibatalkan agar rahasia owner tidak ikut ke Worker klien.',
+    };
+  }
   if (rewrite.written) {
     onLog(
       `>>> [ENV] next-env.mjs ditulis ulang (${rewrite.modes.join(', ')}) — ${rewrite.dropped.length} kunci owner dibuang, ${rewrite.kept.length} kunci diwariskan.`
@@ -785,7 +1042,7 @@ export async function deployClient(options: DeployClientOptions): Promise<Deploy
     if (rewrite.dropped.length > 0) onLog(`    dibuang: ${rewrite.dropped.join(', ')}`);
     notes.push(`next-env.mjs: buang ${rewrite.dropped.length} kunci owner`);
   } else {
-    notes.push('next-env.mjs tidak ditemukan / tidak berubah');
+    notes.push('next-env.mjs sudah bersih (tidak ada kunci owner yang perlu dibuang)');
   }
 
   // 6. KV ISR (hanya deploy sungguhan; id idempoten disimpan di config.env).
@@ -814,6 +1071,7 @@ export async function deployClient(options: DeployClientOptions): Promise<Deploy
     overrides: plan.overrides,
     kvIncId,
     kvTagId,
+    d1DatabaseName: config.CLOUDFLARE_D1_DATABASE_NAME,
   });
   onLog(`>>> [CONFIG] wrangler config klien: ${path.relative(rootDir, wranglerConfig)}`);
 
@@ -821,7 +1079,12 @@ export async function deployClient(options: DeployClientOptions): Promise<Deploy
   //    `opennextjs-cloudflare deploy` (yang butuh binding KV saat populateCache).
   const deployArgs = ['wrangler', 'deploy'];
   if (dryRun) deployArgs.push('--dry-run');
-  deployArgs.push('--config', wranglerConfig);
+  // R3: `runCommandStreaming` memakai `shell: true` di Windows, jadi path yang
+  // mengandung spasi harus dikutip. Di platform lain argumen harus polos.
+  deployArgs.push(
+    '--config',
+    process.platform === 'win32' ? `"${wranglerConfig}"` : wranglerConfig
+  );
 
   const deployEnv: EnvMap = {
     CLOUDFLARE_ACCOUNT_ID: config.CLOUDFLARE_ACCOUNT_ID,
@@ -843,22 +1106,37 @@ export async function deployClient(options: DeployClientOptions): Promise<Deploy
   // 8.5 Verifikasi site hidup (audit Temuan 15): `wrangler deploy` sukses belum
   //     menjamin site bisa diakses publik (worker gagal start, route bermasalah,
   //     dsb). Cek /api/health (fallback halaman utama), maksimal 3 percobaan.
+  //     K1: custom domain bisa belum menyebar, jadi workers.dev ikut dicek
+  //     sebagai cadangan supaya deploy sukses tidak dilaporkan GAGAL.
   let siteAlive = true;
   if (deploy.code === 0 && !dryRun && finalUrl) {
+    const fallbackUrl = workersDevUrl(config, slug);
+    const fallbackUrls = fallbackUrl && fallbackUrl !== finalUrl ? [fallbackUrl] : [];
+
     onLog(`>>> [VERIFIKASI] Cek site hidup: ${finalUrl}`);
-    const liveness = await verifySiteLiveness(finalUrl, onLog);
+    if (fallbackUrls.length > 0) {
+      onLog(`>>> [VERIFIKASI] Cadangan bila domain belum menyebar: ${fallbackUrl}`);
+    }
+
+    const liveness = await verifySiteLiveness(finalUrl, onLog, { fallbackUrls });
     if (liveness.alive) {
       onLog(`>>> [VERIFIKASI] Site hidup — ${liveness.detail}`);
       notes.push(`Verifikasi site hidup: ${liveness.detail}`);
+      if (liveness.viaFallback) {
+        notes.push(
+          `Catatan: alamat utama ${finalUrl} belum merespons; site diverifikasi lewat ${fallbackUrl}. Periksa DNS/custom domain.`
+        );
+      }
     } else {
       siteAlive = false;
       notes.push(`Verifikasi site hidup GAGAL: ${liveness.detail}`);
     }
   }
 
-  // 9. CATATAN_SERAH_TERIMA.md (PK8): hanya saat deploy sukses, dan kegagalan
-  //    menulis catatan TIDAK boleh mengubah status deploy yang sudah sukses.
-  if (deploy.code === 0 && !dryRun) {
+  // 9. CATATAN_SERAH_TERIMA.md (PK8): hanya saat deploy sukses DAN site sudah
+  //    terbukti hidup, supaya isi catatan tidak pernah berbeda dari status
+  //    portal. Kegagalan menulis catatan tidak mengubah status deploy.
+  if (deploy.code === 0 && siteAlive && !dryRun) {
     const notePath = path.join(path.dirname(configPath), 'CATATAN_SERAH_TERIMA.md');
     try {
       const note = renderHandoverNote({

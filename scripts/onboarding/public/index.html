@@ -553,6 +553,248 @@
       color: var(--text);
     }
 
+    /* Detail Klien & Brankas */
+    body.modal-open { overflow: hidden; }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(17, 24, 39, 0.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      z-index: 200;
+    }
+
+    .modal-overlay.is-open { display: flex; }
+
+    .modal-panel {
+      width: min(780px, 100%);
+      max-height: min(90vh, 900px);
+      overflow-y: auto;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 24px 64px rgba(15, 23, 42, 0.22);
+    }
+
+    .modal-header {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1.1rem 1.5rem;
+      background: #ffffff;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .modal-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text);
+      margin: 0;
+    }
+
+    .modal-subtitle {
+      margin: 0.2rem 0 0;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .modal-close {
+      width: 32px;
+      height: 32px;
+      flex: 0 0 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #ffffff;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+
+    .modal-close:hover {
+      background: var(--surface-subtle);
+      color: var(--text);
+    }
+
+    .modal-body { padding: 1.25rem 1.5rem 1.5rem; }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+      gap: 0.85rem;
+    }
+
+    .detail-section {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+      min-width: 0;
+    }
+
+    .detail-section-title {
+      font-size: 0.6875rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      padding-bottom: 0.5rem;
+      margin-bottom: 0.15rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.4rem 0;
+      border-bottom: 1px dashed #eef0f3;
+      font-size: 0.8125rem;
+    }
+
+    .detail-row:last-child { border-bottom: none; }
+
+    .detail-label {
+      color: var(--text-muted);
+      flex: 0 0 auto;
+    }
+
+    .detail-value {
+      color: var(--text);
+      font-weight: 500;
+      text-align: right;
+      word-break: break-word;
+      min-width: 0;
+    }
+
+    .detail-value.mono {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 400;
+    }
+
+    .detail-value a {
+      color: var(--primary);
+      text-decoration: none;
+      border-bottom: 1px dotted currentColor;
+    }
+
+    .secret-value { color: #92400e; }
+
+    .vault-panel {
+      margin-top: 1rem;
+      padding: 1rem;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    .vault-panel h3 {
+      margin: 0 0 0.25rem;
+      font-size: 0.875rem;
+      color: var(--text);
+    }
+
+    .vault-panel p {
+      margin: 0 0 0.75rem;
+      font-size: 0.78125rem;
+      line-height: 1.5;
+      color: var(--text-muted);
+    }
+
+    .vault-form {
+      display: flex;
+      align-items: flex-end;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .vault-form .form-group {
+      flex: 1 1 220px;
+      margin-bottom: 0;
+    }
+
+    .vault-form .form-group label {
+      font-size: 0.75rem;
+    }
+
+    .vault-form button {
+      width: auto;
+      flex: 0 0 auto;
+      margin-top: 0;
+      padding: 0.625rem 0.9rem;
+    }
+
+    .vault-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .vault-countdown {
+      font-size: 0.75rem;
+      color: #047857;
+      font-weight: 600;
+    }
+
+    .vault-message {
+      display: none;
+      margin-top: 0.75rem;
+      padding: 0.6rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.78125rem;
+      line-height: 1.45;
+    }
+
+    .vault-message.is-error {
+      display: block;
+      background: var(--error-bg);
+      border: 1px solid var(--error-border);
+      color: var(--error);
+    }
+
+    .vault-message.is-info {
+      display: block;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1d4ed8;
+    }
+
+    .btn-detail {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      background: transparent;
+      border: none;
+      padding: 0;
+      margin-right: 0.75rem;
+      color: var(--text-muted);
+      font-family: inherit;
+      font-size: 0.75rem;
+      font-weight: 500;
+      cursor: pointer;
+      border-bottom: 1px dotted currentColor;
+    }
+
+    .btn-detail:hover { color: var(--primary); }
+
+    @media (max-width: 640px) {
+      .modal-header { padding: 0.9rem 1rem; }
+      .modal-body { padding: 1rem; }
+      .detail-row { flex-direction: column; gap: 0.1rem; }
+      .detail-value { text-align: left; }
+      .modal-panel { max-height: 94vh; }
+    }
+
     /* Changelog Card & Modern Fluid Accordion */
     .changelog-card {
       background: #ffffff;
@@ -720,6 +962,39 @@
         opacity: 1;
         transform: translateY(0);
       }
+    }
+
+    /* Bar progres "Update Klien Ini" — lebar = tahap nyata, corak bergerak
+       hanya penanda bahwa proses masih berjalan. */
+    #update-progress-track {
+      height: 6px;
+      background: #e5e7eb;
+      border-radius: 9999px;
+      overflow: hidden;
+      margin-bottom: 0.75rem;
+    }
+
+    #update-progress-bar {
+      height: 100%;
+      width: 0%;
+      background: #10b981;
+      border-radius: 9999px;
+      transition: width 0.4s ease;
+    }
+
+    #update-progress-bar.is-running {
+      background-image: repeating-linear-gradient(135deg, #10b981 0 8px, #34d399 8px 16px);
+      background-size: 23px 100%;
+      animation: updateBarFlow 0.7s linear infinite;
+    }
+
+    #update-progress-bar.is-error {
+      background: #ef4444;
+    }
+
+    @keyframes updateBarFlow {
+      from { background-position: 0 0; }
+      to { background-position: 23px 0; }
     }
   </style>
 </head>
@@ -944,7 +1219,7 @@
           </thead>
           <tbody id="status-table-body">
             <tr>
-              <td colspan="6" style="padding: 1.5rem 0.75rem; text-align: center; color: var(--text-muted);">
+              <td colspan="7" style="padding: 1.5rem 0.75rem; text-align: center; color: var(--text-muted);">
                 Memeriksa status seluruh website klien...
               </td>
             </tr>
@@ -1097,18 +1372,17 @@
         </div>
       </div>
 
-      <div class="form-group" style="margin-bottom: 1.25rem;">
-        <label style="display: flex; align-items: flex-start; gap: 0.625rem; font-weight: normal; cursor: pointer;">
-          <input type="checkbox" id="forceBuildCheck" style="width: auto; margin-top: 0.2rem;" checked>
-          <span>
-            <strong style="color: var(--text);">Kompilasi build baru terlebih dahulu (npm run cf:build)</strong>
-            <br>
-            <span style="font-size: 0.75rem; color: var(--text-muted); display: inline-block; margin-top: 0.15rem;">
-              Centang jika kamu baru saja mengedit kode, memperbaiki bug, atau menambah fitur baru ke template.
-            </span>
-          </span>
-        </label>
+      <!-- Versi acuan (S5) + peringatan bila catatan rilis berbeda dari kode -->
+      <div class="info-summary-card" style="margin-bottom: 1rem;">
+        <div class="row">
+          <span class="key">Versi template di laptop ini:</span>
+          <span class="val" id="update-latest-version">Memeriksa…</span>
+        </div>
+        <div id="update-version-warning" style="display: none; margin-top: 0.6rem; font-size: 0.75rem; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; border-radius: 6px; padding: 0.5rem 0.65rem;"></div>
       </div>
+
+      <!-- Filter template (S4): tombol massal hanya menyentuh yang terlihat -->
+      <div id="update-filter-row" style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1rem;"></div>
 
       <!-- Action Row: Update All Button -->
       <div style="display: flex; gap: 0.75rem; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border);">
@@ -1118,7 +1392,7 @@
         </div>
         <button type="button" class="btn-submit" id="btn-update-all" style="width: auto; padding: 0.5rem 1rem; font-size: 0.8125rem; margin-top: 0; display: inline-flex; align-items: center; gap: 0.45rem;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>
-          <span>Update Semua Klien Sekaligus</span>
+          <span id="btn-update-all-text">Update Semua Klien</span>
         </button>
       </div>
 
@@ -1131,6 +1405,7 @@
       <div id="update-progress-container" style="display: none; margin-top: 1.5rem;">
         <div class="section-title" style="margin-bottom: 0.5rem;" id="update-progress-title">Proses Pembaruan Sedang Berjalan...</div>
         <div style="font-size: 0.8125rem; color: var(--text-muted); margin-bottom: 0.75rem;" id="update-progress-status">Menyiapkan...</div>
+        <div id="update-progress-track"><div id="update-progress-bar"></div></div>
         <div id="update-console-log" style="background: #0f172a; color: #38bdf8; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; padding: 1rem; border-radius: 8px; max-height: 280px; overflow-y: auto; white-space: pre-wrap; line-height: 1.5; border: 1px solid #1e293b;"></div>
       </div>
 
@@ -1172,12 +1447,74 @@
 
 <div class="toast" id="toast">Pesan berhasil disalin ke clipboard.</div>
 
+<!-- Modal Detail Klien + Brankas -->
+<div class="modal-overlay" id="client-detail-modal" aria-hidden="true">
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="client-detail-title">
+    <div class="modal-header">
+      <div>
+        <h2 class="modal-title" id="client-detail-title">Detail Klien</h2>
+        <p class="modal-subtitle" id="client-detail-subtitle">Infrastruktur &amp; kredensial tersimpan</p>
+      </div>
+      <button type="button" class="modal-close" id="btn-close-client-detail" aria-label="Tutup detail klien">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div id="client-detail-content" style="color: var(--text-muted); font-size: 0.8125rem;">Memuat detail klien...</div>
+
+      <div class="vault-panel" id="vault-panel">
+        <div id="vault-setup-box" style="display: none;">
+          <h3>Buat kata sandi brankas</h3>
+          <p>Brankas belum dibuat. Kata sandi ini hanya untuk portal lokal — beda dari password admin website dan password Cloudflare. Minimal 12 karakter. Password asli tidak disimpan; hanya hash-nya di <code class="inline-code">.env.local</code>.</p>
+          <form id="vault-setup-form" class="vault-form" novalidate>
+            <div class="form-group">
+              <label for="vault-new-password">Kata sandi brankas baru</label>
+              <input type="password" id="vault-new-password" minlength="12" maxlength="200" autocomplete="new-password" placeholder="Minimal 12 karakter" required>
+            </div>
+            <div class="form-group">
+              <label for="vault-confirm-password">Ulangi kata sandi</label>
+              <input type="password" id="vault-confirm-password" minlength="12" maxlength="200" autocomplete="new-password" placeholder="Ketik ulang" required>
+            </div>
+            <button type="submit" class="btn-submit" id="btn-vault-setup">Buat &amp; Buka</button>
+          </form>
+        </div>
+
+        <div id="vault-unlock-box" style="display: none;">
+          <h3>Brankas terkunci</h3>
+          <p>Masukkan kata sandi brankas untuk menampilkan password admin dan token Cloudflare. Kredensial akan disembunyikan otomatis setelah 30 detik.</p>
+          <form id="vault-unlock-form" class="vault-form" novalidate>
+            <div class="form-group">
+              <label for="vault-password">Kata sandi brankas</label>
+              <input type="password" id="vault-password" maxlength="200" autocomplete="current-password" placeholder="Kata sandi brankas" required>
+            </div>
+            <button type="submit" class="btn-submit" id="btn-vault-unlock">Buka Kredensial</button>
+          </form>
+        </div>
+
+        <div id="vault-unlocked-box" style="display: none;">
+          <div class="vault-actions">
+            <div>
+              <h3>Kredensial terbuka</h3>
+              <p style="margin: 0;">Jangan biarkan layar ini terbuka tanpa pengawasan.</p>
+            </div>
+            <button type="button" class="btn-reset" id="btn-hide-credentials" style="width: auto; padding: 0.5rem 0.8rem; font-size: 0.75rem;">Sembunyikan Sekarang</button>
+          </div>
+          <div class="vault-countdown" id="vault-countdown">Sembunyi otomatis dalam 30 detik.</div>
+        </div>
+
+        <div class="vault-message" id="vault-message" role="status" aria-live="polite"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
   let selectedTemplate = 'os-desktop';
   let lastWhatsappText = '';
   let provisionLastData = null;
   let lastDomainWhatsappText = '';
   let archivedClients = [];
+  let statusClients = [];
 
   // Navigation Tabs Switching
   const appContainer = document.querySelector('.container');
@@ -1727,6 +2064,17 @@ Anda dapat mengelola karya proyek, profil, kontak, dan keahlian secara langsung 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ folderName, notifyOnline: true }),
       });
+      const retryContentType = response.headers.get('content-type') || '';
+      if (!response.ok || !retryContentType.includes('text/event-stream')) {
+        let message = `Server menolak deploy (HTTP ${response.status}).`;
+        try {
+          const errData = await response.json();
+          if (errData && errData.message) message = errData.message;
+        } catch (parseErr) {
+          /* balasan bukan JSON */
+        }
+        throw new Error(message);
+      }
       if (!response.body) throw new Error('Gagal membuka streaming log dari server.');
 
       const reader = response.body.getReader();
@@ -2050,6 +2398,11 @@ Website bisa dibuka di https://${data.domain} (aktif dalam 5-15 menit). 🚀`;
       : '<span style="display: inline-flex; align-items: center; gap: 0.3rem; color: #b91c1c; font-weight: 600;"><span style="width: 0.5rem; height: 0.5rem; border-radius: 9999px; background: #ef4444; display: inline-block;"></span>Offline</span>';
 
     const latency = c.latencyMs != null ? `${c.latencyMs} ms` : '-';
+    // Ditandai hanya bila alamat utama (custom domain) gagal dihubungi dari laptop
+    // ini, lalu pengecekan berhasil lewat workers.dev. Bukan error situs.
+    const viaNote = isOnline && c.viaFallback
+      ? ' <span title="Alamat domain utama belum bisa dihubungi (DNS/cache). Pengecekan berhasil lewat alamat workers.dev — situsnya hidup." style="font-size: 0.6875rem; color: #6b7280; white-space: nowrap;">· via workers.dev</span>'
+      : '';
     const dbBadge = c.database === 'connected'
       ? ' <span style="font-size: 0.6875rem; color: #6b7280;">· DB OK</span>'
       : (c.database ? ' <span style="font-size: 0.6875rem; color: #b45309;">· DB ' + c.database + '</span>' : '');
@@ -2070,12 +2423,16 @@ Website bisa dibuka di https://${data.domain} (aktif dalam 5-15 menit). 🚀`;
           <div style="font-weight: 600;">${c.clientName}</div>
           <div style="font-size: 0.75rem; color: var(--text-muted);">${c.clientSlug}</div>
         </td>
-        <td style="padding: 0.75rem; vertical-align: top;">${statusBadge}${dbBadge}</td>
+        <td style="padding: 0.75rem; vertical-align: top;">${statusBadge}${viaNote}${dbBadge}</td>
         <td style="padding: 0.75rem; vertical-align: top; color: var(--text-muted);">${latency}</td>
         <td style="padding: 0.75rem; vertical-align: top;">${versionBadge}</td>
         <td style="padding: 0.75rem; vertical-align: top;">${renderProbeBadge(c.workerHealth)}</td>
         <td style="padding: 0.75rem; vertical-align: top; font-size: 0.75rem;">${domainText}</td>
         <td style="padding: 0.75rem; vertical-align: top;">
+          <button type="button" class="btn-detail" data-client-detail="${escapeHtml(c.id)}" title="Lihat detail klien">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+            Detail
+          </button>
           <a href="${c.websiteUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--primary, #4f46e5); font-size: 0.75rem; font-weight: 500; text-decoration: none; border-bottom: 1px dotted currentColor; margin-right: 0.75rem;">Kunjungi</a>
           <a href="${c.adminUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--text-muted); font-size: 0.75rem; font-weight: 500; text-decoration: none; border-bottom: 1px dotted currentColor;">Admin</a>
         </td>
@@ -2087,7 +2444,7 @@ Website bisa dibuka di https://${data.domain} (aktif dalam 5-15 menit). 🚀`;
     if (!statusTableBody) return;
 
     statusTableBody.innerHTML = `
-      <tr><td colspan="6" style="padding: 1.5rem 0.75rem; text-align: center; color: var(--text-muted);">
+      <tr><td colspan="7" style="padding: 1.5rem 0.75rem; text-align: center; color: var(--text-muted);">
         Memeriksa status seluruh website klien...
       </td></tr>
     `;
@@ -2104,7 +2461,7 @@ Website bisa dibuka di https://${data.domain} (aktif dalam 5-15 menit). 🚀`;
 
       if (!data.success) {
         statusTableBody.innerHTML = `
-          <tr><td colspan="6" style="padding: 1.5rem 0.75rem; text-align: center; color: #b91c1c;">
+          <tr><td colspan="7" style="padding: 1.5rem 0.75rem; text-align: center; color: #b91c1c;">
             Gagal memuat status klien: ${data.message || 'kesalahan tidak diketahui'}
           </td></tr>
         `;
@@ -2112,6 +2469,7 @@ Website bisa dibuka di https://${data.domain} (aktif dalam 5-15 menit). 🚀`;
       }
 
       const clients = data.clients || [];
+      statusClients = clients;
 
       if (data.latestVersion && statusLatestVersion) {
         statusLatestVersion.textContent = 'Template terbaru: v' + data.latestVersion;
@@ -2120,7 +2478,7 @@ Website bisa dibuka di https://${data.domain} (aktif dalam 5-15 menit). 🚀`;
 
       if (clients.length === 0) {
         statusTableBody.innerHTML = `
-          <tr><td colspan="6" style="padding: 1.5rem 0.75rem; text-align: center; color: var(--text-muted);">
+          <tr><td colspan="7" style="padding: 1.5rem 0.75rem; text-align: center; color: var(--text-muted);">
             Belum ada arsip klien di folder <code>arsip-klien/</code>. Silakan daftarkan klien baru di tab Pendaftaran Klien Baru terlebih dahulu.
           </td></tr>
         `;
@@ -2138,7 +2496,7 @@ Website bisa dibuka di https://${data.domain} (aktif dalam 5-15 menit). 🚀`;
       statusTableBody.innerHTML = clients.map(c => renderStatusRow(c, data.latestVersion)).join('');
     } catch (err) {
       statusTableBody.innerHTML = `
-        <tr><td colspan="6" style="padding: 1.5rem 0.75rem; text-align: center; color: #b91c1c;">
+        <tr><td colspan="7" style="padding: 1.5rem 0.75rem; text-align: center; color: #b91c1c;">
           Gagal terhubung ke asisten portal. Pastikan jendela portal masih berjalan.
         </td></tr>
       `;
@@ -2155,19 +2513,403 @@ Website bisa dibuka di https://${data.domain} (aktif dalam 5-15 menit). 🚀`;
     });
   }
 
+  // --- DETAIL KLIEN & BRANKAS ---
+  const detailModal = document.getElementById('client-detail-modal');
+  const detailModalTitle = document.getElementById('client-detail-title');
+  const detailModalSubtitle = document.getElementById('client-detail-subtitle');
+  const detailContent = document.getElementById('client-detail-content');
+  const vaultPanel = document.getElementById('vault-panel');
+  const vaultSetupBox = document.getElementById('vault-setup-box');
+  const vaultUnlockBox = document.getElementById('vault-unlock-box');
+  const vaultUnlockedBox = document.getElementById('vault-unlocked-box');
+  const vaultSetupForm = document.getElementById('vault-setup-form');
+  const vaultUnlockForm = document.getElementById('vault-unlock-form');
+  const vaultNewPassword = document.getElementById('vault-new-password');
+  const vaultConfirmPassword = document.getElementById('vault-confirm-password');
+  const vaultPassword = document.getElementById('vault-password');
+  const btnVaultSetup = document.getElementById('btn-vault-setup');
+  const btnVaultUnlock = document.getElementById('btn-vault-unlock');
+  const btnHideCredentials = document.getElementById('btn-hide-credentials');
+  const btnCloseClientDetail = document.getElementById('btn-close-client-detail');
+  const vaultCountdown = document.getElementById('vault-countdown');
+  const vaultMessage = document.getElementById('vault-message');
+
+  let activeDetailFolder = null;
+  let detailVaultConfigured = false;
+  let credentialHideTimer = null;
+  let credentialCountdownTimer = null;
+
+  function templateLabel(key) {
+    if (key === 'infinite-canvas') return 'Infinite Canvas';
+    if (key === 'spatial-gallery') return '3D Spatial Gallery';
+    return 'macOS Desktop';
+  }
+
+  function detailRow(label, value, options = {}) {
+    const classes = ['detail-value'];
+    if (options.mono) classes.push('mono');
+
+    let display;
+    if (options.link && /^https?:\/\//i.test(options.link)) {
+      display = `<a href="${escapeHtml(options.link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(value || options.link)}</a>`;
+    } else {
+      display = escapeHtml(value == null || value === '' ? '-' : value);
+    }
+
+    if (options.secret) {
+      const masked = options.masked || display;
+      display = `<span class="secret-value" data-secret="${escapeHtml(options.secret)}" data-masked="${escapeHtml(masked)}">${escapeHtml(masked)}</span>`;
+    }
+
+    return `<div class="detail-row"><span class="detail-label">${escapeHtml(label)}</span><span class="${classes.join(' ')}">${display}</span></div>`;
+  }
+
+  function renderClientDetail(data) {
+    const c = data.client;
+    detailModalTitle.textContent = c.clientName;
+    detailModalSubtitle.textContent = `${c.clientSlug} · ${templateLabel(c.templateKey)}`;
+
+    const status = statusClients.find((item) => item.id === c.id);
+    let healthText = 'Belum diperiksa';
+    if (status) {
+      healthText = status.online ? 'Online' : 'Offline';
+      if (status.latencyMs != null) healthText += ` · ${status.latencyMs} ms`;
+      if (status.database) healthText += ` · DB ${status.database}`;
+      if (status.deployedVersion) healthText += ` · v${status.deployedVersion}`;
+    }
+
+    const missing = '(belum tersimpan)';
+    const passwordMask = c.credentialStatus.adminPassword ? '••••••••' : missing;
+    const apiTokenMask = c.credentialStatus.cloudflareApiToken ? '••••••••' : missing;
+    const d1TokenMask = c.credentialStatus.cloudflareD1ApiToken ? '••••••••' : missing;
+
+    detailContent.innerHTML = `
+      <div class="detail-grid">
+        <section class="detail-section">
+          <div class="detail-section-title">Identitas</div>
+          ${detailRow('Nama klien', c.clientName)}
+          ${detailRow('Slug', c.clientSlug)}
+          ${detailRow('Template', templateLabel(c.templateKey))}
+          ${detailRow('Site ID', c.siteId, { mono: true })}
+          ${detailRow('Folder arsip', c.archiveFolder, { mono: true })}
+        </section>
+
+        <section class="detail-section">
+          <div class="detail-section-title">Alamat</div>
+          ${detailRow('Website', c.websiteUrl, { link: c.websiteUrl })}
+          ${detailRow('Admin', c.adminUrl, { link: c.adminUrl })}
+          ${detailRow('Custom domain', c.customDomain || 'Belum ada')}
+          ${detailRow('Worker', c.workerName, { mono: true })}
+          ${detailRow('Kesehatan terakhir', healthText)}
+        </section>
+
+        <section class="detail-section">
+          <div class="detail-section-title">Infrastruktur Cloudflare</div>
+          ${detailRow('Account ID', c.infra.accountIdMasked || missing, { mono: true, secret: 'accountId', masked: c.infra.accountIdMasked || missing })}
+          ${detailRow('D1 name', c.infra.d1DatabaseName || missing, { mono: true })}
+          ${detailRow('D1 ID', c.infra.d1DatabaseIdMasked || missing, { mono: true, secret: 'd1DatabaseId', masked: c.infra.d1DatabaseIdMasked || missing })}
+          ${detailRow('R2 bucket', c.infra.r2BucketName || missing, { mono: true })}
+          ${detailRow('KV incremental', c.infra.kvIncNamespaceIdMasked || missing, { mono: true, secret: 'kvIncNamespaceId', masked: c.infra.kvIncNamespaceIdMasked || missing })}
+          ${detailRow('KV tag', c.infra.kvTagNamespaceIdMasked || missing, { mono: true, secret: 'kvTagNamespaceId', masked: c.infra.kvTagNamespaceIdMasked || missing })}
+        </section>
+
+        <section class="detail-section">
+          <div class="detail-section-title">Kredensial</div>
+          ${detailRow('Email admin', c.adminEmail || missing, { mono: true })}
+          ${detailRow('Password admin', passwordMask, { mono: true, secret: 'adminPassword', masked: passwordMask })}
+          ${detailRow('Cloudflare API token', apiTokenMask, { mono: true, secret: 'cloudflareApiToken', masked: apiTokenMask })}
+          ${detailRow('D1 API token', d1TokenMask, { mono: true, secret: 'cloudflareD1ApiToken', masked: d1TokenMask })}
+        </section>
+      </div>
+    `;
+  }
+
+  function hideVaultMessage() {
+    vaultMessage.textContent = '';
+    vaultMessage.className = 'vault-message';
+  }
+
+  function showVaultMessage(message, type = 'error') {
+    vaultMessage.textContent = message;
+    vaultMessage.className = `vault-message ${type === 'error' ? 'is-error' : 'is-info'}`;
+  }
+
+  function hideVaultBoxes() {
+    [vaultSetupBox, vaultUnlockBox, vaultUnlockedBox].forEach((box) => {
+      if (box) box.style.display = 'none';
+    });
+  }
+
+  function showSetupBox() {
+    hideVaultBoxes();
+    vaultSetupBox.style.display = 'block';
+    setTimeout(() => vaultNewPassword && vaultNewPassword.focus(), 50);
+  }
+
+  function showUnlockBox() {
+    hideVaultBoxes();
+    vaultUnlockBox.style.display = 'block';
+    setTimeout(() => vaultPassword && vaultPassword.focus(), 50);
+  }
+
+  function showUnlockedBox() {
+    hideVaultBoxes();
+    vaultUnlockedBox.style.display = 'block';
+  }
+
+  function clearCredentialTimers() {
+    if (credentialHideTimer) clearTimeout(credentialHideTimer);
+    if (credentialCountdownTimer) clearInterval(credentialCountdownTimer);
+    credentialHideTimer = null;
+    credentialCountdownTimer = null;
+  }
+
+  function maskSecretFields() {
+    detailContent.querySelectorAll('[data-secret]').forEach((el) => {
+      el.textContent = el.getAttribute('data-masked') || '••••••••';
+    });
+  }
+
+  function revealSecretFields(secrets) {
+    detailContent.querySelectorAll('[data-secret]').forEach((el) => {
+      const key = el.getAttribute('data-secret');
+      const value = secrets[key];
+      el.textContent = value ? value : '(kosong)';
+    });
+  }
+
+  function startCredentialCountdown() {
+    clearCredentialTimers();
+    let remaining = 30;
+    vaultCountdown.textContent = `Sembunyi otomatis dalam ${remaining} detik.`;
+    credentialCountdownTimer = setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        clearInterval(credentialCountdownTimer);
+        credentialCountdownTimer = null;
+        return;
+      }
+      vaultCountdown.textContent = `Sembunyi otomatis dalam ${remaining} detik.`;
+    }, 1000);
+    credentialHideTimer = setTimeout(() => hideCredentials(), 30_000);
+  }
+
+  function lockVaultSession() {
+    fetch('/api/vault/lock', {
+      method: 'POST',
+      headers: { 'X-Portal-Request': '1' },
+      cache: 'no-store',
+    }).catch(() => {});
+  }
+
+  function hideCredentials() {
+    clearCredentialTimers();
+    maskSecretFields();
+    lockVaultSession();
+    if (activeDetailFolder) {
+      if (detailVaultConfigured) showUnlockBox();
+      else showSetupBox();
+      showVaultMessage('Kredensial disembunyikan. Masukkan kata sandi brankas untuk membuka lagi.', 'info');
+    }
+  }
+
+  async function loadClientSecrets() {
+    if (!activeDetailFolder) return;
+    const folderId = activeDetailFolder;
+    try {
+      const res = await fetch('/api/client-secrets?folder=' + encodeURIComponent(folderId), { cache: 'no-store' });
+      const data = await res.json().catch(() => ({}));
+      if (activeDetailFolder !== folderId) return;
+
+      if (!res.ok || !data.success) {
+        if (res.status === 401) {
+          detailVaultConfigured = true;
+          showUnlockBox();
+        }
+        showVaultMessage(data.message || 'Gagal membuka kredensial.', 'error');
+        return;
+      }
+
+      revealSecretFields(data.secrets || {});
+      hideVaultMessage();
+      showUnlockedBox();
+      startCredentialCountdown();
+    } catch {
+      showVaultMessage('Gagal membaca kredensial. Pastikan portal masih berjalan.', 'error');
+    }
+  }
+
+  async function openClientDetail(folderId) {
+    if (!folderId) return;
+    activeDetailFolder = folderId;
+    detailVaultConfigured = false;
+    clearCredentialTimers();
+    hideVaultMessage();
+    hideVaultBoxes();
+    vaultPanel.style.display = 'block';
+    detailContent.textContent = 'Memuat detail klien...';
+    detailModalTitle.textContent = 'Detail Klien';
+    detailModalSubtitle.textContent = 'Infrastruktur & kredensial tersimpan';
+    detailModal.classList.add('is-open');
+    detailModal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+
+    try {
+      const res = await fetch('/api/client-detail?folder=' + encodeURIComponent(folderId), { cache: 'no-store' });
+      const data = await res.json().catch(() => ({}));
+      if (activeDetailFolder !== folderId) return;
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Gagal memuat detail klien.');
+      }
+
+      renderClientDetail(data);
+      detailVaultConfigured = Boolean(data.vaultConfigured);
+      if (detailVaultConfigured) showUnlockBox();
+      else showSetupBox();
+    } catch (err) {
+      if (activeDetailFolder !== folderId) return;
+      detailContent.textContent = 'Gagal memuat detail: ' + err.message;
+      vaultPanel.style.display = 'none';
+    }
+  }
+
+  function closeClientDetail() {
+    clearCredentialTimers();
+    maskSecretFields();
+    lockVaultSession();
+    activeDetailFolder = null;
+    detailVaultConfigured = false;
+    detailModal.classList.remove('is-open');
+    detailModal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('modal-open');
+    hideVaultBoxes();
+    hideVaultMessage();
+    detailContent.innerHTML = '';
+    detailModalTitle.textContent = 'Detail Klien';
+    detailModalSubtitle.textContent = 'Infrastruktur & kredensial tersimpan';
+  }
+
+  if (statusTableBody) {
+    statusTableBody.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-client-detail]');
+      if (!button) return;
+      openClientDetail(button.getAttribute('data-client-detail'));
+    });
+  }
+
+  if (btnCloseClientDetail) btnCloseClientDetail.addEventListener('click', closeClientDetail);
+  if (detailModal) {
+    detailModal.addEventListener('click', (event) => {
+      if (event.target === detailModal) closeClientDetail();
+    });
+  }
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && detailModal.classList.contains('is-open')) closeClientDetail();
+  });
+  if (btnHideCredentials) btnHideCredentials.addEventListener('click', hideCredentials);
+
+  if (vaultSetupForm) {
+    vaultSetupForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      hideVaultMessage();
+      const password = vaultNewPassword.value;
+      const confirm = vaultConfirmPassword.value;
+
+      if (password.length < 12) {
+        showVaultMessage('Kata sandi brankas minimal 12 karakter.', 'error');
+        vaultNewPassword.focus();
+        return;
+      }
+      if (password !== confirm) {
+        showVaultMessage('Ulangan kata sandi tidak sama.', 'error');
+        vaultConfirmPassword.focus();
+        return;
+      }
+
+      btnVaultSetup.disabled = true;
+      btnVaultSetup.textContent = 'Menyimpan...';
+      try {
+        const res = await fetch('/api/vault/setup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Portal-Request': '1' },
+          cache: 'no-store',
+          body: JSON.stringify({ password, confirm }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) {
+          if (data.code === 'VAULT_ALREADY_CONFIGURED') {
+            detailVaultConfigured = true;
+            showUnlockBox();
+          }
+          throw new Error(data.message || 'Gagal membuat brankas.');
+        }
+
+        detailVaultConfigured = true;
+        vaultSetupForm.reset();
+        await loadClientSecrets();
+      } catch (err) {
+        showVaultMessage(err.message, 'error');
+      } finally {
+        btnVaultSetup.disabled = false;
+        btnVaultSetup.textContent = 'Buat & Buka';
+      }
+    });
+  }
+
+  if (vaultUnlockForm) {
+    vaultUnlockForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      hideVaultMessage();
+      const password = vaultPassword.value;
+      if (!password) {
+        showVaultMessage('Kata sandi brankas wajib diisi.', 'error');
+        vaultPassword.focus();
+        return;
+      }
+
+      btnVaultUnlock.disabled = true;
+      btnVaultUnlock.textContent = 'Membuka...';
+      try {
+        const res = await fetch('/api/vault/unlock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Portal-Request': '1' },
+          cache: 'no-store',
+          body: JSON.stringify({ password }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) {
+          const extra = data.attemptsLeft != null ? ` Sisa ${data.attemptsLeft} percobaan.` : '';
+          throw new Error((data.message || 'Kata sandi brankas salah.') + extra);
+        }
+
+        vaultUnlockForm.reset();
+        await loadClientSecrets();
+      } catch (err) {
+        showVaultMessage(err.message, 'error');
+      } finally {
+        btnVaultUnlock.disabled = false;
+        btnVaultUnlock.textContent = 'Buka Kredensial';
+      }
+    });
+  }
+
   // --- TAB 4: UPDATE TEMPLATE LOGIC ---
   const buildStatusText = document.getElementById('build-status-text');
   const buildLastTime = document.getElementById('build-last-time');
-  const forceBuildCheck = document.getElementById('forceBuildCheck');
   const clientCountText = document.getElementById('client-count-text');
   const updateClientList = document.getElementById('update-client-list');
   const updateErrorMessage = document.getElementById('update-error-message');
   const updateProgressContainer = document.getElementById('update-progress-container');
   const updateProgressStatus = document.getElementById('update-progress-status');
+  const updateProgressBar = document.getElementById('update-progress-bar');
   const updateConsoleLog = document.getElementById('update-console-log');
   const updateSuccessBox = document.getElementById('update-success-box');
   const updateSummaryResults = document.getElementById('update-summary-results');
   const btnUpdateAll = document.getElementById('btn-update-all');
+  const btnUpdateAllText = document.getElementById('btn-update-all-text');
+  const updateLatestVersionEl = document.getElementById('update-latest-version');
+  const updateVersionWarning = document.getElementById('update-version-warning');
+  const updateFilterRow = document.getElementById('update-filter-row');
   const changelogVersionBadge = document.getElementById('changelog-version-badge');
   const changelogDate = document.getElementById('changelog-date');
   const changelogContent = document.getElementById('changelog-content');
@@ -2190,8 +2932,234 @@ Website bisa dibuka di https://${data.domain} (aktif dalam 5-15 menit). 🚀`;
   let lastUpdateWhatsappMessages = {
     'os-desktop': '',
     'infinite-canvas': '',
+    'spatial-gallery': '',
     'general': ''
   };
+
+  // --- Status versi & filter template untuk kartu update ---
+  const TEMPLATE_LABELS = {
+    'os-desktop': 'macOS Desktop',
+    'infinite-canvas': 'Infinite Canvas',
+    'spatial-gallery': 'Spatial Gallery',
+  };
+  let updateTemplateFilter = 'all';
+  let updateVersions = {
+    latestVersion: null,
+    appVersion: null,
+    changelogVersion: null,
+    byId: {},       // id arsip -> versi terpasang (dari /api/status)
+  };
+
+  function templateLabel(key) {
+    return TEMPLATE_LABELS[key] || (key ? String(key) : 'Tidak diketahui');
+  }
+
+  /** Versi terpasang untuk satu arsip, kalau /api/status sudah menjawab. */
+  function deployedVersionFor(client) {
+    if (!client) return null;
+    const hit = updateVersions.byId[client.id];
+    if (hit) return hit;
+    const bySlug = statusClients.find(
+      (s) => s.clientSlug && client.clientSlug && s.clientSlug === client.clientSlug
+    );
+    return bySlug && bySlug.deployedVersion ? bySlug.deployedVersion : null;
+  }
+
+  function versionBadgeHtml(client) {
+    const deployed = deployedVersionFor(client);
+    const latest = updateVersions.latestVersion;
+    const base = 'font-size: 0.6875rem; padding: 0.1rem 0.4rem; border-radius: 4px; white-space: nowrap;';
+    if (!deployed) {
+      return `<span style="${base} color: var(--text-muted); background: var(--surface-subtle);">versi belum terbaca</span>`;
+    }
+    if (!latest) {
+      return `<span style="${base} color: var(--text-muted); background: var(--surface-subtle);">v${escapeHtml(deployed)}</span>`;
+    }
+    const cmp = compareVersions(deployed, latest);
+    if (cmp < 0) {
+      return `<span style="${base} color: #92400e; background: #fef3c7;">v${escapeHtml(deployed)} · perlu update</span>`;
+    }
+    if (cmp > 0) {
+      return `<span style="${base} color: #1e40af; background: #dbeafe;">v${escapeHtml(deployed)} · lebih baru dari repo</span>`;
+    }
+    return `<span style="${base} color: #065f46; background: #d1fae5;">v${escapeHtml(deployed)} · terbaru</span>`;
+  }
+
+  /** Arsip yang memang tidak boleh dideploy dari portal (site owner). */
+  function isOwnerArchive(client) {
+    return /site-owner/i.test(client.id || '') || /site-owner/i.test(client.clientSlug || '');
+  }
+
+  function visibleUpdateClients() {
+    if (updateTemplateFilter === 'all') return archivedClients;
+    return archivedClients.filter((c) => (c.templateKey || 'os-desktop') === updateTemplateFilter);
+  }
+
+  function renderUpdateFilterChips() {
+    if (!updateFilterRow) return;
+    const counts = { all: archivedClients.length, 'os-desktop': 0, 'infinite-canvas': 0, 'spatial-gallery': 0 };
+    for (const c of archivedClients) {
+      const key = c.templateKey || 'os-desktop';
+      if (counts[key] === undefined) counts[key] = 0;
+      counts[key] += 1;
+    }
+
+    const chips = [
+      { key: 'all', label: 'Semua', count: counts.all },
+      { key: 'os-desktop', label: 'macOS', count: counts['os-desktop'] },
+      { key: 'infinite-canvas', label: 'Canvas', count: counts['infinite-canvas'] },
+      { key: 'spatial-gallery', label: 'Spatial', count: counts['spatial-gallery'] },
+    ];
+
+    updateFilterRow.innerHTML = chips
+      .map((chip) => {
+        const active = updateTemplateFilter === chip.key;
+        const dis = chip.count === 0 && chip.key !== 'all' ? ' opacity: 0.45;' : '';
+        return `<button type="button" class="btn-reset btn-interactive btn-update-filter" data-filter="${chip.key}" style="width: auto; padding: 0.3rem 0.65rem; font-size: 0.75rem; font-weight: 600; border-radius: 999px; border: 1px solid ${active ? '#111827' : 'var(--border)'}; background: ${active ? '#111827' : '#ffffff'}; color: ${active ? '#ffffff' : 'var(--text)'};${dis}">${chip.label} (${chip.count})</button>`;
+      })
+      .join('');
+
+    updateFilterRow.querySelectorAll('.btn-update-filter').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        updateTemplateFilter = btn.getAttribute('data-filter') || 'all';
+        renderUpdateFilterChips();
+        renderUpdateClientList();
+      });
+    });
+  }
+
+  function renderUpdateClientList() {
+    const clients = visibleUpdateClients();
+    const ready = clients.filter((c) => c.deployable);
+    const skipped = clients.length - ready.length;
+
+    if (clientCountText) {
+      const total = archivedClients.length;
+      clientCountText.textContent =
+        (updateTemplateFilter === 'all' ? `${total} klien terdaftar` : `${clients.length} dari ${total} klien`) +
+        ` · ${ready.length} siap diupdate` +
+        (skipped > 0 ? ` · ${skipped} dilewati` : '');
+    }
+
+    if (btnUpdateAllText) {
+      const label = updateTemplateFilter === 'all' ? 'semua klien' : `semua ${templateLabel(updateTemplateFilter)}`;
+      btnUpdateAllText.textContent = `Update ${label} (${ready.length})`;
+    }
+    if (btnUpdateAll) {
+      const blocked = ready.length === 0 || isUpdating;
+      btnUpdateAll.disabled = blocked;
+      btnUpdateAll.style.opacity = blocked ? '0.5' : '1';
+    }
+
+    if (clients.length === 0) {
+      updateClientList.innerHTML =
+        '<div style="color: var(--text-muted); font-size: 0.8125rem; padding: 0.75rem; background: var(--surface-subtle); border-radius: 6px;">Tidak ada klien pada filter ini.</div>';
+      return;
+    }
+
+    let html = '';
+    for (const client of clients) {
+      const versionBadge = versionBadgeHtml(client);
+      let actionHtml = '';
+      if (client.deployable) {
+        actionHtml = `<button type="button" class="btn-reset btn-update-single" data-folder="${escapeHtml(client.id)}" ${isUpdating ? 'disabled' : ''} style="width: auto; padding: 0.45rem 0.85rem; font-size: 0.75rem; font-weight: 600; white-space: nowrap;">Update Klien Ini</button>`;
+      } else if (isOwnerArchive(client)) {
+        actionHtml = `
+          <span style="font-size: 0.75rem; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; border-radius: 6px; padding: 0.35rem 0.6rem; max-width: 320px;">
+            Produksi owner — update lewat <code>npm run deploy</code>, bukan portal.
+          </span>
+          <button type="button" class="btn-reset btn-interactive btn-copy-owner-command" data-command="npm run deploy" title="Salin perintah deploy site owner" style="width: auto; padding: 0.45rem 0.7rem; font-size: 0.75rem; font-weight: 600; white-space: nowrap;">Salin perintah</button>
+        `;
+      } else {
+        const missing = (client.missingKeys || []).join(', ') || 'kredensial Cloudflare';
+        actionHtml = `
+          <span style="font-size: 0.75rem; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; border-radius: 6px; padding: 0.35rem 0.6rem; max-width: 320px;">
+            Belum siap deploy: ${escapeHtml(missing)}
+          </span>
+        `;
+      }
+
+      html += `
+        <div class="client-card" style="border: 1px solid var(--border); border-radius: 8px; padding: 0.875rem 1rem; display: flex; justify-content: space-between; align-items: center; background: #ffffff; gap: 0.75rem; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 240px;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+              <span style="font-weight: 600; font-size: 0.875rem; color: var(--text);">${escapeHtml(client.clientName)}</span>
+              <span style="font-size: 0.6875rem; color: var(--text-muted); background: var(--surface-subtle); padding: 0.1rem 0.4rem; border-radius: 4px;">${escapeHtml(templateLabel(client.templateKey))}</span>
+              ${versionBadge}
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+              <a href="${escapeHtml(client.websiteUrl)}" target="_blank" rel="noopener" style="color: var(--text-muted); text-decoration: underline;">${escapeHtml(client.websiteUrl)}</a>
+              ${client.customDomain ? ` • <strong style="color: var(--success);">${escapeHtml(client.customDomain)}</strong>` : ''}
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
+            <button type="button" class="btn-reset btn-interactive btn-copy-client-wa" data-name="${escapeHtml(client.clientName)}" data-template="${escapeHtml(client.templateKey || 'os-desktop')}" title="Salin pesan WA personal khusus untuk ${escapeHtml(client.clientName)}" style="width: auto; padding: 0.45rem 0.75rem; font-size: 0.75rem; font-weight: 600; white-space: nowrap; background: var(--surface-subtle); color: var(--text); border: 1px solid var(--border); display: flex; align-items: center; gap: 0.35rem;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+              <span>📱 Salin WA</span>
+            </button>
+            ${actionHtml}
+          </div>
+        </div>
+      `;
+    }
+    updateClientList.innerHTML = html;
+
+    document.querySelectorAll('.btn-update-single').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const folderName = btn.getAttribute('data-folder');
+        const client = archivedClients.find((c) => c.id === folderName);
+        if (!client) return;
+        if (!client.deployable) {
+          showToast('Klien ini belum siap dideploy dari portal.');
+          return;
+        }
+        if (confirm(buildDeployConfirmation([client]))) {
+          triggerDeploy({ folders: [client.id] });
+        }
+      });
+    });
+
+    document.querySelectorAll('.btn-copy-owner-command').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        copyTextToClipboard(btn.getAttribute('data-command') || 'npm run deploy', 'Perintah deploy site owner disalin.');
+      });
+    });
+
+    document.querySelectorAll('.btn-copy-client-wa').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const clientName = btn.getAttribute('data-name') || 'Kak';
+        const templateKey = btn.getAttribute('data-template') || 'os-desktop';
+        let baseMessage = lastUpdateWhatsappMessages[templateKey] || lastUpdateWhatsappMessages['general'] || lastUpdateWhatsappText || '';
+
+        if (clientName && clientName !== 'Kak') {
+          baseMessage = baseMessage.replace(/^Halo Kak! 👋/m, `Halo Kak ${clientName}! 👋`);
+        }
+
+        copyTextToClipboard(baseMessage, `Pesan WA untuk ${clientName} (${templateLabel(templateKey)}) berhasil disalin!`);
+      });
+    });
+  }
+
+  /** Konfirmasi sebelum deploy, termasuk peringatan downgrade (S6). */
+  function buildDeployConfirmation(targets) {
+    const names = targets.map((c) => c.clientName).join(', ');
+    const latest = updateVersions.latestVersion;
+    const downgrades = latest
+      ? targets.filter((c) => {
+          const v = deployedVersionFor(c);
+          return v && compareVersions(v, latest) > 0;
+        })
+      : [];
+
+    let msg = `Yakin ingin mengupdate website ${names} ke versi template terbaru?`;
+    if (downgrades.length > 0) {
+      msg +=
+        `\n\nPERINGATAN: ${downgrades.length} klien saat ini memakai versi LEBIH BARU daripada repo ini ` +
+        `(${downgrades.map((c) => `${c.clientName}: v${deployedVersionFor(c)}`).join(', ')}). ` +
+        `Melanjutkan akan MENURUNKAN versi mereka ke v${latest}.`;
+    }
+    return msg;
+  }
 
   // Helper Collapse / Expand Changelog with Smooth Accordion Animation
   function setChangelogCollapsed(collapsed) {
@@ -2379,19 +3347,20 @@ Website bisa dibuka di https://${data.domain} (aktif dalam 5-15 menit). 🚀`;
   if (btnCopyTabWa) {
     btnCopyTabWa.addEventListener('click', () => {
       const text = lastUpdateWhatsappMessages[activeChangelogTab] || lastUpdateWhatsappMessages['general'] || lastUpdateWhatsappText;
-      const label = activeChangelogTab === 'os-desktop' ? 'macOS Desktop' : 'Infinite Canvas';
+      const label = templateLabel(activeChangelogTab);
       copyTextToClipboard(text, `Pesan WA untuk template ${label} berhasil disalin!`);
     });
   }
 
   async function loadUpdateView() {
-    updateErrorMessage.style.display = 'none';
-    updateProgressContainer.style.display = 'none';
-    updateSuccessBox.style.display = 'none';
+    // S2: JANGAN menyembunyikan panel progres/kotak hasil. Deploy berjalan di
+    // server; kalau panel disembunyikan saat pindah tab, pemilik kehilangan
+    // satu-satunya cara memantau proses yang masih hidup.
+    if (!isUpdating) updateErrorMessage.style.display = 'none';
 
     // Fetch Changelog
     await fetchChangelog(false);
-    
+
     // Check build status
     try {
       const res = await fetch('/api/build-status');
@@ -2402,95 +3371,115 @@ Website bisa dibuka di https://${data.domain} (aktif dalam 5-15 menit). 🚀`;
       } else {
         buildStatusText.innerHTML = '<span style="color: #d97706; font-weight: 600;">⚠ Belum Ada Build (Akan dikompilasi otomatis)</span>';
         buildLastTime.textContent = 'Belum pernah dibuild';
-        forceBuildCheck.checked = true;
       }
     } catch (e) {
       buildStatusText.textContent = 'Gagal memeriksa status build';
     }
 
-    // Load clients
+    // Load clients (cepat — tidak menunggu health-check /api/status)
     try {
       const res = await fetch('/api/clients');
       const data = await res.json();
       const clients = data.clients || [];
       archivedClients = clients;
-      clientCountText.textContent = `${clients.length} klien terdaftar di arsip-klien/`;
 
       if (clients.length === 0) {
         updateClientList.innerHTML = '<div style="color: var(--text-muted); font-size: 0.8125rem; padding: 0.75rem; background: var(--surface-subtle); border-radius: 6px;">Belum ada arsip klien di folder <code>arsip-klien/</code>. Silakan daftarkan klien baru di Tab 1 terlebih dahulu.</div>';
-        btnUpdateAll.disabled = true;
-        btnUpdateAll.style.opacity = '0.5';
+        renderUpdateFilterChips();
+        renderUpdateClientList();
         return;
       }
 
-      btnUpdateAll.disabled = false;
-      btnUpdateAll.style.opacity = '1';
+      renderUpdateFilterChips();
+      renderUpdateClientList();
 
-      let html = '';
-      for (const client of clients) {
-        html += `
-          <div class="client-card" style="border: 1px solid var(--border); border-radius: 8px; padding: 0.875rem 1rem; display: flex; justify-content: space-between; align-items: center; background: #ffffff; gap: 0.75rem; flex-wrap: wrap;">
-            <div style="flex: 1; min-width: 240px;">
-              <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <span style="font-weight: 600; font-size: 0.875rem; color: var(--text);">${escapeHtml(client.clientName)}</span>
-                <span style="font-size: 0.6875rem; color: var(--text-muted); background: var(--surface-subtle); padding: 0.1rem 0.4rem; border-radius: 4px;">${client.templateKey === 'os-desktop' ? 'macOS Desktop' : 'Infinite Canvas'}</span>
-              </div>
-              <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
-                <a href="${client.websiteUrl}" target="_blank" style="color: var(--text-muted); text-decoration: underline;">${client.websiteUrl}</a>
-                ${client.customDomain ? ` • <strong style="color: var(--success);">${escapeHtml(client.customDomain)}</strong>` : ''}
-              </div>
-            </div>
-            <div style="display: flex; align-items: center; gap: 0.45rem;">
-              <button type="button" class="btn-reset btn-interactive btn-copy-client-wa" data-name="${escapeHtml(client.clientName)}" data-template="${client.templateKey || 'os-desktop'}" title="Salin pesan WA personal khusus untuk ${escapeHtml(client.clientName)}" style="width: auto; padding: 0.45rem 0.75rem; font-size: 0.75rem; font-weight: 600; white-space: nowrap; background: var(--surface-subtle); color: var(--text); border: 1px solid var(--border); display: flex; align-items: center; gap: 0.35rem;">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-                <span>📱 Salin WA</span>
-              </button>
-              <button type="button" class="btn-reset btn-update-single" data-folder="${client.id}" style="width: auto; padding: 0.45rem 0.85rem; font-size: 0.75rem; font-weight: 600; white-space: nowrap;">
-                Update Klien Ini
-              </button>
-            </div>
-          </div>
-        `;
-      }
-      updateClientList.innerHTML = html;
-
-      // Attach single click events
-      document.querySelectorAll('.btn-update-single').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const folderName = btn.getAttribute('data-folder');
-          const client = archivedClients.find((c) => c.id === folderName);
-          const name = client ? client.clientName : folderName;
-          if (confirm(`Yakin ingin mengupdate website ${name} ke versi template terbaru?`)) {
-            triggerDeploy({ folderName });
-          }
-        });
-      });
-
-      // Attach client personal WA copy events
-      document.querySelectorAll('.btn-copy-client-wa').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const clientName = btn.getAttribute('data-name') || 'Kak';
-          const templateKey = btn.getAttribute('data-template') || 'os-desktop';
-          let baseMessage = lastUpdateWhatsappMessages[templateKey] || lastUpdateWhatsappMessages['general'] || lastUpdateWhatsappText || '';
-
-          if (clientName && clientName !== 'Kak') {
-            baseMessage = baseMessage.replace(/^Halo Kak! 👋/m, `Halo Kak ${clientName}! 👋`);
-          }
-
-          copyTextToClipboard(baseMessage, `Pesan WA untuk ${clientName} (${templateKey === 'os-desktop' ? 'macOS' : 'Canvas'}) berhasil disalin!`);
-        });
-      });
+      // Versi terpasang menyusul di latar belakang: /api/status bisa memakan
+      // 12 detik per alamat, jadi kartu tidak boleh menunggu (koreksi rencana #3).
+      refreshUpdateVersions();
     } catch (e) {
       updateClientList.innerHTML = '<div style="color: var(--error); font-size: 0.8125rem;">Gagal memuat daftar klien.</div>';
     }
   }
 
+  /**
+   * Ambil versi terpasang tiap klien dan versi acuan repo tanpa memblokir UI.
+   * Perbandingan memakai APP_VERSION (S5), bukan judul CHANGELOG.
+   */
+  async function refreshUpdateVersions() {
+    try {
+      const res = await fetch('/api/status');
+      const data = await res.json();
+      if (!data.success) return;
+
+      updateVersions.latestVersion = data.latestVersion || null;
+      updateVersions.appVersion = data.appVersion || null;
+      updateVersions.changelogVersion = data.changelogVersion || null;
+      updateVersions.byId = {};
+      for (const c of data.clients || []) {
+        if (c.id && c.deployedVersion) updateVersions.byId[c.id] = c.deployedVersion;
+      }
+
+      if (updateLatestVersionEl) {
+        const parts = [];
+        if (updateVersions.appVersion) parts.push(`kode v${updateVersions.appVersion}`);
+        if (updateVersions.changelogVersion) parts.push(`catatan v${updateVersions.changelogVersion}`);
+        updateLatestVersionEl.textContent = parts.join(' · ') || 'tidak terbaca';
+      }
+
+      if (updateVersionWarning) {
+        const app = updateVersions.appVersion;
+        const log = updateVersions.changelogVersion;
+        if (app && log && app !== log) {
+          updateVersionWarning.style.display = 'block';
+          updateVersionWarning.innerHTML =
+            `⚠ Versi kode <strong>v${escapeHtml(app)}</strong> berbeda dari catatan rilis teratas ` +
+            `<strong>v${escapeHtml(log)}</strong>. Acuan "terbaru" memakai versi kode. ` +
+            `Lengkapi <code>CHANGELOG.md</code> bila perlu.`;
+        } else {
+          updateVersionWarning.style.display = 'none';
+        }
+      }
+
+      renderUpdateFilterChips();
+      renderUpdateClientList();
+    } catch (e) {
+      if (updateLatestVersionEl) updateLatestVersionEl.textContent = 'gagal membaca versi';
+    }
+  }
+
   btnUpdateAll.addEventListener('click', () => {
-    if (archivedClients.length === 0) return;
-    if (confirm(`PENTING: Yakin ingin mengupdate SEMUA (${archivedClients.length}) klien sekaligus ke versi template terbaru?`)) {
-      triggerDeploy({ all: true });
+    const targets = visibleUpdateClients().filter((c) => c.deployable);
+    if (targets.length === 0) {
+      showToast('Tidak ada klien siap update pada filter ini.');
+      return;
+    }
+    const filterNote =
+      updateTemplateFilter === 'all' ? '' : ` (filter: ${templateLabel(updateTemplateFilter)})`;
+    if (confirm(`PENTING: Yakin ingin mengupdate ${targets.length} klien sekaligus${filterNote}?\n\n${buildDeployConfirmation(targets)}`)) {
+      // Daftar folder eksplisit: server tidak lagi membaca ulang semua arsip.
+      triggerDeploy({ folders: targets.map((c) => c.id) });
     }
   });
+
+  let updateProgressPct = 0;
+
+  /**
+   * Atur bar progres pembaruan klien.
+   * state: 'running' (corak bergerak), 'done', 'error'.
+   * Lebar mengikuti tahap nyata dari log server, bukan timer.
+   */
+  function setUpdateProgress(pct, state) {
+    if (!updateProgressBar) return;
+    updateProgressPct = Math.max(0, Math.min(100, pct));
+    updateProgressBar.style.width = updateProgressPct + '%';
+    updateProgressBar.classList.toggle('is-running', state === 'running');
+    updateProgressBar.classList.toggle('is-error', state === 'error');
+  }
+
+  /** Naikkan progres hanya bila tahap baru lebih maju (tidak pernah mundur). */
+  function bumpUpdateProgress(pct) {
+    if (pct > updateProgressPct) setUpdateProgress(pct, 'running');
+  }
 
   async function triggerDeploy(payload) {
     if (isUpdating) return;
@@ -2500,21 +3489,35 @@ Website bisa dibuka di https://${data.domain} (aktif dalam 5-15 menit). 🚀`;
     updateProgressContainer.style.display = 'block';
     updateConsoleLog.textContent = '';
     updateProgressStatus.textContent = 'Memulai proses pembaruan...';
+    setUpdateProgress(4, 'running');
     btnUpdateAll.disabled = true;
     document.querySelectorAll('.btn-update-single').forEach((b) => (b.disabled = true));
 
-    const forceBuild = forceBuildCheck.checked;
-    const requestBody = { ...payload, forceBuild };
+    let receivedComplete = false;
 
     try {
       const response = await fetch('/api/deploy-client', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify(payload),
       });
 
+      // S1: server bisa membalas JSON (400/409/413/500), bukan SSE. Dulu UI
+      // diam saja dan hanya menunggu stream yang tidak pernah datang.
+      const contentType = response.headers.get('content-type') || '';
+      if (!response.ok || !contentType.includes('text/event-stream')) {
+        let message = `Server menolak permintaan (HTTP ${response.status}).`;
+        try {
+          const errData = await response.json();
+          if (errData && errData.message) message = errData.message;
+        } catch (parseErr) {
+          /* balasan bukan JSON — pakai pesan default */
+        }
+        throw new Error(message);
+      }
+
       if (!response.body) {
-        throw new Error('Gagal membuka streaming log dari server.');
+        throw new Error('Streaming log tidak tersedia dari server.');
       }
 
       const reader = response.body.getReader();
@@ -2535,13 +3538,36 @@ Website bisa dibuka di https://${data.domain} (aktif dalam 5-15 menit). 🚀`;
           const matchData = block.match(/^data: (.*)$/m);
 
           const eventType = matchEvent ? matchEvent[1].trim() : 'message';
-          const eventData = matchData ? JSON.parse(matchData[1]) : {};
+          let eventData = {};
+          if (matchData) {
+            try {
+              eventData = JSON.parse(matchData[1]);
+            } catch (parseErr) {
+              appendLog(`[PERINGATAN] Baris log tidak terbaca: ${matchData[1]}`);
+              continue;
+            }
+          }
 
           if (eventType === 'log') {
             appendLog(eventData.text);
+            // Titik kemajuan nyata dari keluaran build/deploy.
+            const line = eventData.text || '';
+            if (line.includes('Uploaded ')) bumpUpdateProgress(82);
+            else if (line.includes('Deployed ') && line.includes('triggers')) bumpUpdateProgress(90);
+            else if (line.includes('[VERIFIKASI] Site hidup')) bumpUpdateProgress(96);
           } else if (eventType === 'progress') {
             updateProgressStatus.textContent = eventData.message || 'Memproses...';
+            if (eventData.current && eventData.total) {
+              // Batch: bagi rentang 8-80% rata antar klien.
+              bumpUpdateProgress(8 + (eventData.current / eventData.total) * 72);
+            } else {
+              bumpUpdateProgress(8);
+            }
+          } else if (eventType === 'skipped') {
+            // Server sudah melaporkan arsip yang dilewati lewat event terpisah.
+            bumpUpdateProgress(8);
           } else if (eventType === 'complete') {
+            receivedComplete = true;
             handleDeployComplete(eventData);
             return;
           } else if (eventType === 'error') {
@@ -2549,16 +3575,26 @@ Website bisa dibuka di https://${data.domain} (aktif dalam 5-15 menit). 🚀`;
           }
         }
       }
+
+      // S1: stream tertutup tanpa event `complete` = proses tidak diketahui
+      // hasilnya. Jangan biarkan panel menggantung seolah masih berjalan.
+      if (!receivedComplete) {
+        throw new Error(
+          'Koneksi ke portal terputus sebelum pembaruan selesai. Periksa log di atas; jalankan ulang hanya bila perlu.'
+        );
+      }
     } catch (err) {
       updateErrorMessage.textContent = err.message || 'Terjadi kegagalan jaringan saat deploy.';
       updateErrorMessage.style.display = 'block';
+      setUpdateProgress(100, 'error');
+      updateProgressStatus.textContent = 'Pembaruan gagal.';
       appendLog(`[ERROR FATAL] ${err.message}`);
     } finally {
       isUpdating = false;
       btnUpdateAll.disabled = false;
       document.querySelectorAll('.btn-update-single').forEach((b) => (b.disabled = false));
-      // Refresh build status
-      loadUpdateView();
+      // Segarkan versi terpasang setelah selesai (tanpa menyembunyikan hasil).
+      if (receivedComplete) refreshUpdateVersions();
     }
   }
 
@@ -2569,6 +3605,25 @@ Website bisa dibuka di https://${data.domain} (aktif dalam 5-15 menit). 🚀`;
 
   function handleDeployComplete(data) {
     updateSuccessBox.style.display = 'block';
+    // Semua gagal = jangan tampilkan bar hijau penuh.
+    setUpdateProgress(100, data.success ? 'done' : 'error');
+
+    // Judul kartu hasil harus jujur: dulu selalu "Berhasil" walau gagal total.
+    const titleEl = updateSuccessBox.querySelector('.success-header .title');
+    const subEl = updateSuccessBox.querySelector('.success-header .subtitle');
+    const iconEl = updateSuccessBox.querySelector('.success-icon-badge');
+    if (titleEl) {
+      titleEl.textContent = data.success ? 'Pembaruan Berhasil Dikirim!' : 'Pembaruan Gagal';
+    }
+    if (subEl) {
+      subEl.textContent = data.success
+        ? 'Website klien sekarang sudah menggunakan versi template terbaru.'
+        : 'Tidak ada website yang berhasil diperbarui. Lihat alasan di bawah.';
+    }
+    if (iconEl) {
+      iconEl.textContent = data.success ? '✓' : '✕';
+    }
+
     let resultsHtml = '';
     for (const r of data.results || []) {
       resultsHtml += `
@@ -2578,13 +3633,33 @@ Website bisa dibuka di https://${data.domain} (aktif dalam 5-15 menit). 🚀`;
             ${escapeHtml(r.clientName)} (${escapeHtml(r.clientSlug)})
           </span>
           <span class="result-val">
-            ${r.success ? `<a href="${r.url}" target="_blank" style="color: var(--text); text-decoration: underline;">${r.url}</a>` : `<span style="color: var(--error);">${escapeHtml(r.error || 'Gagal')}</span>`}
+            ${r.success ? `<a href="${escapeHtml(r.url)}" target="_blank" rel="noopener" style="color: var(--text); text-decoration: underline;">${escapeHtml(r.url)}</a>` : `<span style="color: var(--error);">${escapeHtml(r.error || 'Gagal')}</span>`}
           </span>
         </div>
       `;
     }
+
+    // Arsip yang sengaja tidak dideploy (mis. produksi owner) dilaporkan
+    // terpisah sebagai "dilewati", bukan "gagal".
+    for (const s of data.skipped || []) {
+      resultsHtml += `
+        <div class="result-row" style="margin-bottom: 0.5rem;">
+          <span class="result-label" style="display: flex; align-items: center; gap: 0.35rem;">
+            <span style="color: #92400e; font-weight: bold;">↷ DILEWATI</span>
+            ${escapeHtml(s.clientName)} (${escapeHtml(s.clientSlug)})
+          </span>
+          <span class="result-val" style="color: var(--text-muted);">${escapeHtml(s.reason || 'tidak termasuk target')}</span>
+        </div>
+      `;
+    }
+
     updateSummaryResults.innerHTML = resultsHtml || 'Tidak ada target pembaruan.';
-    showToast('Proses pembaruan versi template telah selesai!');
+    const skippedCount = (data.skipped || []).length;
+    showToast(
+      skippedCount > 0
+        ? `Pembaruan selesai. ${skippedCount} arsip dilewati.`
+        : 'Proses pembaruan versi template telah selesai!'
+    );
   }
 
   function escapeHtml(str) {
