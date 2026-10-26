@@ -25,7 +25,7 @@ Rilis ini memindahkan hasil audit kesiapan produksi (2026-10-24/25) dari salinan
 
 **Verifikasi:** `npx tsc --noEmit` **0 error**; `npm run lint` bersih; `npm run pre-deploy` **exit 0** dengan **150 file / 1266 test PASS**; `node --check` skrip portal 0 error. Sisa risiko yang belum ditutup tetap dicatat di `docs/tracker/logs/audit_production_readiness_2026_10_24.md` (kuota lock per-isolat, validasi dimensi wallpaper masih no-op, `/api/health` publik menampilkan versi/memori, `public/` ~118 MB).
 
-**Perlu tindakan:** (1) tutup lalu buka lagi `PENGELOLA_KLIEN.bat` agar portal memakai kode baru, (2) brankas portal belum pernah dibuat — buat kata sandinya langsung di modal Detail (jangan dikirim ke siapa pun).
+**Perlu tindakan:** (1) tutup lalu buka lagi `PENGELOLA_KLIEN.bat` agar portal memakai kode baru. Brankas portal **sudah dibuat** 2026-10-26 (`PORTAL_VAULT_HASH`/`PORTAL_VAULT_SALT` terisi), jadi tidak perlu dibuat ulang — cukup masukkan kata sandi itu saat membuka Detail.
 
 ## [1.3.71] - 2026-10-24
 

@@ -244,10 +244,10 @@ risiko tertinggi tanpa refactor besar dan tanpa mengubah perilaku yang sudah ben
     dibuka. Jangan pernah membuka port 4567 ke jaringan publik.
   - Portal `4567` yang sedang berjalan masih memuat kode lama sampai ditutup lalu
     dibuka ulang lewat `PENGELOLA_KLIEN.bat`.
-  - Brankas asli **belum dibuat** di `.env.local`. Owner harus membuat kata sandi
-    brankas langsung di modal Detail; jangan pernah mengirimkan kata sandi itu ke AI
-    atau menyimpannya di chat. Jika lupa, hapus `PORTAL_VAULT_HASH` +
-    `PORTAL_VAULT_SALT` dari `.env.local`, restart portal, lalu buat ulang.
+  - Brankas **sudah dibuat** owner pada 2026-10-26 (`PORTAL_VAULT_HASH` +
+    `PORTAL_VAULT_SALT` terisi di `.env.local`) — tidak perlu dibuat ulang. Kata
+    sandinya tidak pernah dikirim ke AI atau disimpan di repo/chat. Jika lupa, hapus
+    kedua kunci itu dari `.env.local`, restart portal, lalu buat ulang.
   - `PORTAL_ENV_LOCAL_PATH` hanya override pengujian lokal; produksi tetap memakai
     `.env.local` di root repo.
   - `arsip-klien/<slug>/config.env` menyimpan `CLOUDFLARE_ACCOUNT_ID`,
