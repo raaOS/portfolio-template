@@ -95,8 +95,27 @@ async function readTable(name: string): Promise<D1BackupTable> {
   return { columns, rows };
 }
 
-function sortKeysDesc(keys: string[]) {
-  return [...keys].sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
+/**
+ * Baca satu tabel dengan satu retry singkat. Kegagalan D1 sesaat (burst limit)
+ * tidak boleh langsung membatalkan backup harian, tapi kegagalan yang menetap
+ * HARUS membatalkan — tidak ada backup parsial (audit 2026-10-24).
+ */
+async function readTableWithRetry(name: string, attempts = 2): Promise<D1BackupTable> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await readTable(name);
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+    }
+  }
+  throw lastError;
+}
+
+function sortKeysDesc(keys: string[]) {  return [...keys].sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
 }
 
 /**
@@ -145,12 +164,19 @@ export async function createD1Backup(): Promise<{
 
   for (const row of tableNames) {
     try {
-      const table = await readTable(row.name);
+      const table = await readTableWithRetry(row.name);
       tables[row.name] = table;
       manifestTables.push({ name: row.name, columns: table.columns, rowCount: table.rows.length });
     } catch (error) {
-      // Satu tabel gagal tidak boleh membatalkan seluruh backup.
-      notes.push(`Tabel ${row.name} tidak ikut ter-backup: ${errorMessage(error)}`);
+      // Audit 2026-10-24: dulu tabel yang gagal hanya dicatat lalu backup
+      // parsial tetap diunggah dan dilaporkan sukses. Backup yang diam-diam
+      // kehilangan tabel lebih berbahaya daripada tidak ada backup sama sekali
+      // (restore bisa menimpa data dengan snapshot tidak lengkap).
+      throw new Error(
+        `Backup D1 dibatalkan: tabel "${row.name}" gagal dibaca (${errorMessage(
+          error
+        )}). Tidak ada file backup parsial yang diunggah.`
+      );
     }
   }
 

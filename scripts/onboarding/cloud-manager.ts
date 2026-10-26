@@ -17,7 +17,7 @@ import { spawn } from 'child_process';
 import { SHARED_SCHEMA_QUERIES } from '../../src/crud/shared/db/schema';
 import { D1_SCHEMA_QUERIES } from '../../src/lib/d1-schema';
 import { hashPasswordScrypt } from '../../src/crud/shared/auth/password';
-import { deployClient, resolveWorkersSubdomain } from './client-deploy';
+import { deployClient, ensureR2Bucket, resolveWorkersSubdomain } from './client-deploy';
 import { sendWebsiteOnlineEmail } from './notify-online';
 import {
   attachWorkerDomain,
@@ -33,6 +33,7 @@ import {
   resolveProvisionedAdminPassword,
   guardCrossClientSlug,
 } from './onboard-reuse';
+import { verifyAppKvWritable } from './app-kv-preflight';
 
 const ROOT_DIR = process.cwd();
 const ARCHIVE_DIR = path.join(ROOT_DIR, 'arsip-klien');
@@ -273,16 +274,13 @@ async function handleOnboard() {
 
   // 3. Buat R2 Bucket
   console.log(`\n[3/7] Menyiapkan Bucket Media R2 (${r2BucketName})...`);
-  const createR2Res = await cfApi(`/accounts/${accountId}/r2/buckets/${r2BucketName}`, apiToken, {
-    method: 'PUT',
-  });
-  if (createR2Res.ok) {
-    console.log(`✓ Bucket R2 ${r2BucketName} berhasil dibuat.`);
-  } else if (createR2Res.status === 409) {
-    console.log(`✓ Bucket R2 ${r2BucketName} sudah tersedia.`);
-  } else {
-    console.warn('⚠️ Peringatan R2:', createR2Res.data?.errors);
+  // FAIL-CLOSED (audit 2026-10-24, temuan K8): dulu kegagalan R2 hanya
+  // peringatan, lalu deploy gagal jauh di belakang setelah build panjang.
+  const r2 = await ensureR2Bucket(accountId, apiToken, r2BucketName, { create: true });
+  if (!r2.ok) {
+    throw new Error(`STEP 3 gagal menyiapkan bucket R2: ${r2.detail}`);
   }
+  console.log(`✓ ${r2.detail}`);
 
   // 4. Migrasi Skema Tabel
   // Dua skema dipasang berurutan (audit 2026-10-08, temuan #1 & #14 — identik
@@ -302,6 +300,12 @@ async function handleOnboard() {
   } catch (err) {
     throw new Error(`STEP 4 gagal memasang tabel database: ${(err as Error).message}`);
   }
+
+  // STEP 4b: probe tulis app_kv (audit 2026-10-24, temuan K1). Jalur CLI harus
+  // memakai penjagaan yang sama dengan portal — lihat ./app-kv-preflight.ts.
+  await verifyAppKvWritable((sql, params) =>
+    d1Query(accountId, apiToken, databaseId, sql, params)
+  );
 
   // Seed site — binding parameter (audit temuan #5: tanpa interpolasi SQL).
   const seedSiteSql = `

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateAdminRequest } from '@/lib/auth';
+import { requireOwnerMode } from '@/lib/ownerMode';
 import { templateEntitlementsService } from '@/lib/services/templateEntitlementsService';
 import { queryD1 } from '@/crud/shared/db/connection';
 
@@ -7,6 +8,8 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ siteId: string }> }) {
   try {
+    const ownerDenied = requireOwnerMode();
+    if (ownerDenied) return ownerDenied;
     if (!(await validateAdminRequest(request))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -43,6 +46,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ siteId: string }> }) {
   try {
+    const ownerDenied = requireOwnerMode();
+    if (ownerDenied) return ownerDenied;
     if (!(await validateAdminRequest(request))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -75,6 +80,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ siteId: string }> }) {
   try {
+    const ownerDenied = requireOwnerMode();
+    if (ownerDenied) return ownerDenied;
     if (!(await validateAdminRequest(request, { checkCsrf: false }))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

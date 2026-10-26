@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { validateAdminRequest } from '@/lib/auth';
+import { requireOwnerMode } from '@/lib/ownerMode';
 import { queryD1 } from '@/lib/cloudflareD1';
 import {
   countProjectMediaRefs,
@@ -290,6 +291,9 @@ async function quotaChangeViolationResponse({
 
 export async function GET(request: NextRequest) {
   try {
+    // Tooling owner-only: site klien tidak boleh tahu route ini ada.
+    const ownerDenied = requireOwnerMode();
+    if (ownerDenied) return ownerDenied;
     if (!(await validateAdminRequest(request, { checkCsrf: false }))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -311,6 +315,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const ownerDenied = requireOwnerMode();
+    if (ownerDenied) return ownerDenied;
     if (!(await validateAdminRequest(request))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -374,6 +380,8 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const ownerDenied = requireOwnerMode();
+    if (ownerDenied) return ownerDenied;
     if (!(await validateAdminRequest(request))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -484,6 +492,8 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const ownerDenied = requireOwnerMode();
+    if (ownerDenied) return ownerDenied;
     if (!(await validateAdminRequest(request))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

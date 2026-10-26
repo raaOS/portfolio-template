@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const {
@@ -86,8 +86,15 @@ const SUSPENDED_SITE_ROW = {
 };
 
 describe('GET /api/admin/sites', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   beforeEach(() => {
     vi.resetAllMocks();
+    // Route ini owner-only (requireOwnerMode). Test harus berjalan sebagai
+    // deployment owner, sama seperti produksi makeitbetter.my.id.
+    vi.stubEnv('OWNER_MODE', 'true');
     validateAdminRequestMock.mockResolvedValue(true);
     queryD1Mock.mockResolvedValue([]);
     getSiteStorageUsageSafeMock.mockResolvedValue({
