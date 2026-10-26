@@ -5,6 +5,11 @@
  * @module
  */
 import { SHARED_SCHEMA_QUERIES } from './schema';
+import {
+  getD1Binding,
+  hasLiveCloudflareContext,
+  type D1Binding,
+} from '@/lib/cloudflareBinding';
 
 type D1Param = string | number | boolean | null;
 
@@ -49,7 +54,10 @@ export function getMissingD1EnvKeys() {
 }
 
 export function isD1Configured() {
-  return getMissingD1EnvKeys().length === 0;
+  if (getMissingD1EnvKeys().length === 0) return true;
+  // Worker klien memakai binding `env.DB` (tanpa token di `vars`). Di
+  // lingkungan itu tidak ada kredensial REST, tapi D1 tetap bisa dipakai.
+  return process.env.NODE_ENV === 'production' && hasLiveCloudflareContext();
 }
 
 export function getD1Config(): D1Config {
@@ -68,10 +76,34 @@ export function getD1Config(): D1Config {
   return { accountId, databaseId, apiToken };
 }
 
+async function queryViaBinding<T>(
+  binding: D1Binding,
+  sql: string,
+  params: D1Param[]
+): Promise<T[]> {
+  let payload: { results?: T[]; success?: boolean; error?: string };
+  try {
+    payload = await binding.prepare(sql).bind(...params).all<T>();
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`Cloudflare D1 query failed: ${detail}`);
+  }
+
+  if (payload?.success === false) {
+    throw new Error(`Cloudflare D1 SQL failed: ${payload.error || sql}`);
+  }
+
+  return payload?.results ?? [];
+}
+
 export async function queryD1<T = Record<string, unknown>>(
   sql: string,
   params: D1Param[] = []
 ): Promise<T[]> {
+  // Worker klien: binding `env.DB` (tanpa token REST di `vars`).
+  const binding = await getD1Binding();
+  if (binding) return queryViaBinding<T>(binding, sql, params);
+
   const config = getD1Config();
   const response = await fetch(
     `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/d1/database/${config.databaseId}/query`,
