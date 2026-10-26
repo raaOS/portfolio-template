@@ -7,7 +7,7 @@ Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **U
 
 ### 🛡️ Audit Kesiapan Produksi: Klien Baru Bisa Login, Kunci Tidak Bocor, Gerbang Mutu
 
-Rilis ini memindahkan hasil audit kesiapan produksi (2026-10-24/25) dari salinan kerja ke `main`. **Kode aplikasi berubah**, jadi situs owner perlu `npm run deploy` untuk ikut versi ini — deploy **belum** dijalankan.
+Rilis ini memindahkan hasil audit kesiapan produksi (2026-10-24/25) dari salinan kerja ke `main`. **Kode aplikasi berubah**, jadi situs owner diperbarui lewat `npm run deploy` — **sudah dijalankan 2026-10-27** (hasil verifikasi ada di `docs/tracker/logs/audit_production_readiness_2026_10_24.md`).
 
 > **Catatan nomor versi:** di salinan kerja, pekerjaan ini sempat diberi nomor 1.3.72 dan 1.3.73. Catatan rilis untuk kedua nomor itu tertimpa saat penyamaan dokumen dan tidak bisa dipulihkan; isinya dirangkum ulang di entri 1.3.74 ini supaya tidak ada dua sumber yang berbeda.
 
@@ -25,7 +25,7 @@ Rilis ini memindahkan hasil audit kesiapan produksi (2026-10-24/25) dari salinan
 
 **Verifikasi:** `npx tsc --noEmit` **0 error**; `npm run lint` bersih; `npm run pre-deploy` **exit 0** dengan **150 file / 1266 test PASS**; `node --check` skrip portal 0 error. Sisa risiko yang belum ditutup tetap dicatat di `docs/tracker/logs/audit_production_readiness_2026_10_24.md` (kuota lock per-isolat, validasi dimensi wallpaper masih no-op, `/api/health` publik menampilkan versi/memori, `public/` ~118 MB).
 
-**Perlu tindakan:** (1) tutup lalu buka lagi `PENGELOLA_KLIEN.bat` agar portal memakai kode baru, (2) jalankan `npm run deploy` bila ingin situs owner ikut 1.3.74, (3) brankas portal belum pernah dibuat — buat kata sandinya langsung di modal Detail (jangan dikirim ke siapa pun).
+**Perlu tindakan:** (1) tutup lalu buka lagi `PENGELOLA_KLIEN.bat` agar portal memakai kode baru, (2) brankas portal belum pernah dibuat — buat kata sandinya langsung di modal Detail (jangan dikirim ke siapa pun).
 
 ## [1.3.71] - 2026-10-24
 

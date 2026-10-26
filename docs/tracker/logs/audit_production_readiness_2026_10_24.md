@@ -4,7 +4,7 @@
 **Mulai:** 2026-10-24
 **Selesai:** 2026-10-25
 
-> **Catatan rilis (2026-10-26):** seluruh perubahan di log ini sudah dipindahkan dari salinan kerja ke `main` dan dirilis sebagai **v1.3.74**. Di salinan kerja pekerjaan ini sempat bernomor 1.3.72/1.3.73, tetapi entri CHANGELOG untuk kedua nomor itu tertimpa saat penyamaan dokumen; isinya dirangkum ulang di entri 1.3.74. Verifikasi ulang di `main`: tsc 0 error, eslint bersih, `npm run pre-deploy` exit 0 dengan 150 file / 1266 test PASS. Situs owner **belum** di-deploy ulang (masih 1.3.71).
+> **Catatan rilis (2026-10-26):** seluruh perubahan di log ini sudah dipindahkan dari salinan kerja ke `main` dan dirilis sebagai **v1.3.74**. Di salinan kerja pekerjaan ini sempat bernomor 1.3.72/1.3.73, tetapi entri CHANGELOG untuk kedua nomor itu tertimpa saat penyamaan dokumen; isinya dirangkum ulang di entri 1.3.74. Verifikasi ulang di `main`: tsc 0 error, eslint bersih, `npm run pre-deploy` exit 0 dengan 150 file / 1266 test PASS. Deploy produksi dijalankan **2026-10-27** — hasilnya di bagian "Deploy 1.3.74" paling bawah.
 
 ## 🎯 Tujuan (Objective)
 
@@ -263,3 +263,54 @@ risiko tertinggi tanpa refactor besar dan tanpa mengubah perilaku yang sudah ben
 - `node_modules` worktree sempat kosong; `npm ci` sudah dijalankan (971 paket).
 - Sebelum rilis: putuskan apakah resource gladi resik dihapus atau disimpan sebentar
   untuk inspeksi owner; jalankan `cf:build`/`npm run deploy` hanya saat siap deploy.
+
+## 🚀 Deploy 1.3.74 + Verifikasi Produksi (2026-10-27)
+
+Atas persetujuan owner, seluruh perubahan dipindahkan ke `main` (8 commit,
+`c58d5be..efc779f`), di-deploy ke site owner, lalu di-push ke GitHub.
+
+**Jalur deploy:** `npm run deploy` (bukan portal — portal sengaja menolak site owner).
+Gerbang `pre-deploy` yang baru ikut berjalan di dalam deploy:
+
+- `npx tsc --noEmit` → 0 error; `npm run lint` → bersih.
+- `npm test` → **150 file / 1266 test PASS**.
+- `cf:compat-audit --strict` → 0 blocking (compatibility_date 2026-06-28).
+- `Uploaded portfolio-os-template (31.60 sec)`, `Deployed … triggers (3.70 sec)`,
+  Version ID `b1d96dd1-89a1-4824-b6fd-c923f0b081a3`.
+
+**Verifikasi produksi (`https://makeitbetter.my.id`):**
+
+| Cek | Hasil |
+|---|---|
+| `/api/health` | **200**, `version=1.3.74`, `database=connected`, `databaseLatencyMs=92` |
+| `workerHealth` (owner mode) | ada, `ok=32/32`, `failed1102=0`, `passed=true` |
+| `/` | 200 |
+| `/admin/login` | 200 |
+| `/api/admin/pricing` (owner-only) | 401 (tanpa login) |
+| `/api/admin/orders` (owner-only) | 401 (tanpa login) |
+| `/admin/harga` | 307 → login |
+| `/admin/system/orders` | 307 → login |
+| `portfolio-os-template.m4keitbetter.workers.dev/api/health` | 200 |
+| `/api/projects`, `/api/about`, `/api/hard-skills` | 200 / 200 / 200 (`/api/skills` memang tidak ada → 404) |
+
+**Header (perubahan rilis ini):** `Strict-Transport-Security` muncul **tepat satu**
+(`max-age=31536000; includeSubDomains; preload`), `Referrer-Policy`
+`strict-origin-when-cross-origin` satu nilai, `X-Frame-Options: DENY`,
+`X-Content-Type-Options: nosniff`, CSP ada. Artinya header kembar sudah hilang di
+produksi (sebelumnya dua sumber).
+
+**Catatan jujur — 1102 sementara:** dua permintaan pertama tepat setelah deploy
+(`/api/health` lalu `/`) sempat dibalas `error code: 1102` (Worker melewati batas CPU).
+Uji ulang 4 detik kemudian: **5/5 permintaan 200**, `/` juga 200. Pola ini cocok dengan
+cold start/rollout versi baru, bukan regresi; tetap perlu dipantau karena 1102 adalah
+risiko yang sudah tercatat (probe harian `workerHealth` jadi alat deteksinya).
+
+**CI:** workflow **Quality Gate** pada commit `efc779f` → **success** (±2,3 menit).
+
+**Push:** `c58d5be..efc779f main -> main` (repo `raaOS/portfolio-template`), lokal dan
+remote sama (`efc779f`). Tidak ada tag, tidak ada force push.
+
+**Masih menunggu keputusan owner:** resource gladi resik (Worker/D1/R2/KV/zona uji +
+`arsip-klien/01_gladi-2026-10-24`) belum dihapus, sesuai instruksi untuk tidak menghapus
+tanpa izin.
+
