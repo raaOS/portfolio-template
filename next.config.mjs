@@ -146,9 +146,8 @@ const nextConfig = {
           },
           {
             key: 'Strict-Transport-Security',
-            // Disamakan dengan nilai di src/middleware/utils.ts (sebelumnya
-            // beda: 63072000 di sini vs 31536000 di middleware → header kembar
-            // dengan nilai konflik tergantung jalur mana yang menang).
+            // Satu-satunya sumber header ini. Middleware tidak lagi memasang
+            // HSTS (audit 2026-10-24: dua sumber → header kembar/HSTS rusak).
             value: 'max-age=31536000; includeSubDomains; preload',
           },
           {
@@ -161,8 +160,8 @@ const nextConfig = {
           },
           {
             key: 'Referrer-Policy',
-            // Disamakan dengan src/middleware/utils.ts (nilai lama
-            // `origin-when-cross-origin` bocorkan full URL lintas origin).
+            // `origin-when-cross-origin` lama membocorkan full URL lintas
+            // origin. Header ini hanya dipasang di sini (bukan middleware).
             value: 'strict-origin-when-cross-origin',
           },
           {

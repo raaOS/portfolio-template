@@ -39,13 +39,17 @@ export function emptySiteStorageUsage(siteId: string, warning?: string): SiteSto
 export async function getSiteStorageUsage(siteId: string): Promise<SiteStorageUsage> {
   const prefix = getSiteStoragePrefix(siteId);
   const objects = await listR2Objects({ prefix });
-  const bytes = objects.reduce((total, object) => total + Math.max(0, object.size || 0), 0);
+  // Backup D1 (`sites/<id>/backups/`) sudah dibatasi retensi 7 file dan bukan
+  // media yang bisa dihapus admin. Kalau ikut dihitung, kuota media bisa
+  // "penuh" hanya karena backup (audit 2026-10-24).
+  const mediaObjects = objects.filter((object) => !object.key.startsWith(`${prefix}backups/`));
+  const bytes = mediaObjects.reduce((total, object) => total + Math.max(0, object.size || 0), 0);
 
   return {
     prefix,
     bytes,
     mb: bytesToMb(bytes),
-    objectCount: objects.length,
+    objectCount: mediaObjects.length,
     available: true,
   };
 }

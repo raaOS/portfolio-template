@@ -108,6 +108,14 @@ function buildObjectHeaders(input: {
 
   headers.set('content-type', input.contentType || contentTypeForKey(input.key));
 
+  // SVG bisa mengeksekusi script bila dibuka langsung sebagai dokumen
+  // (stored XSS di origin yang sama). Ikon tetap tampil di dalam `<img>`,
+  // tapi navigasi langsung dipaksa mengunduh dan script diblokir.
+  if (headers.get('content-type') === 'image/svg+xml') {
+    headers.set('content-disposition', 'attachment');
+    headers.set('content-security-policy', "default-src 'none'; style-src 'unsafe-inline'");
+  }
+
   if (typeof input.contentLength === 'number') {
     headers.set('content-length', String(input.contentLength));
   }

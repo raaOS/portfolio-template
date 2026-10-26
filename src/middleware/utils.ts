@@ -41,9 +41,12 @@ export function shouldRedirectToHttps(request: NextRequest): boolean {
 export function addSecurityHeaders(response: NextResponse): NextResponse {
   const isProd = process.env.NODE_ENV === 'production';
 
-  response.headers.set('X-Content-Type-Options', 'nosniff');
-  response.headers.set('X-Frame-Options', 'DENY');
-  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  // Header statis (X-Content-Type-Options, X-Frame-Options, Referrer-Policy,
+  // HSTS) HANYA dipasang sekali lewat `next.config.mjs` (`headers()`).
+  // Sebelumnya middleware memasang nilai yang sama → respons produksi membawa
+  // dua header kembar dan HSTS menjadi tidak valid (audit 2026-10-24).
+  // Middleware tetap memasang CSP karena `headers()` tidak bisa membedakan
+  // production/development untuk directive script-src.
 
   const cspBase =
     [
@@ -72,13 +75,6 @@ export function addSecurityHeaders(response: NextResponse): NextResponse {
     ].join('; ') + ';';
 
   response.headers.set('Content-Security-Policy', cspBase);
-
-  if (isProd) {
-    response.headers.set(
-      'Strict-Transport-Security',
-      'max-age=31536000; includeSubDomains; preload'
-    );
-  }
 
   return response;
 }

@@ -351,12 +351,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Determine Name & Folder
+    // Ekstensi diturunkan dari content-type yang sudah tervalidasi, bukan dari
+    // nama file user (audit 2026-10-24): file `foto.html` berisi gambar tidak
+    // boleh tersimpan sebagai `.html`, dan sebaliknya.
+    const canonicalExt = extFromContentType(contentType);
     const sourceExt = isIcnsFile
       ? contentType === 'image/jpeg'
         ? 'jpg'
         : 'png'
-      : file.name.split('.').pop() || '';
-    const ext = optimizedExtensionOverride || sourceExt || (isVideoUpload ? 'mp4' : 'bin');
+      : canonicalExt || (isVideoUpload ? 'mp4' : 'bin');
+    const ext = optimizedExtensionOverride || sourceExt;
     let finalFilename: string;
     let targetDir: string;
 

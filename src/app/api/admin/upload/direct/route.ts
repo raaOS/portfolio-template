@@ -129,12 +129,19 @@ export async function PUT(req: NextRequest) {
     // Cloudflare R2 accepts the readable half of FixedLengthStream.
     const FixedLengthStream = getFixedLengthStreamConstructor();
     let uploadBody: ReadableStream<Uint8Array> | ArrayBuffer;
+    // Ukuran yang BENAR-BENAR diunggah. Tanpa Content-Length (chunked), nilai
+    // 0 dulu dipakai untuk cek kuota → kuota bisa dilewati sepenuhnya
+    // (audit 2026-10-24). Jalur ArrayBuffer menghitung byte sungguhan.
+    let uploadSize: number;
     if (contentLengthHeader && FixedLengthStream) {
       const fixedLengthStream = new FixedLengthStream(contentLength);
       req.body.pipeTo(fixedLengthStream.writable).catch(() => {});
       uploadBody = fixedLengthStream.readable;
+      uploadSize = contentLength;
     } else {
-      uploadBody = await readBodyWithLimit(req.body, payload.maxSize);
+      const buffered = await readBodyWithLimit(req.body, payload.maxSize);
+      uploadBody = buffered;
+      uploadSize = buffered.byteLength;
     }
 
     try {
@@ -153,7 +160,7 @@ export async function PUT(req: NextRequest) {
         }
 
         const result = await withSiteQuotaLock(siteMatch[1], async () => {
-          await enforceSiteStorageQuotaUnlocked(siteMatch[1], contentLength, site.quota);
+          await enforceSiteStorageQuotaUnlocked(siteMatch[1], uploadSize, site.quota);
           return uploadToR2({
             key: payload.key,
             body: uploadBody,

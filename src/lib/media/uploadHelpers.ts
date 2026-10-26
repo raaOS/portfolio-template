@@ -141,6 +141,27 @@ export function extFromContentType(type: string): string | null {
       return 'mp4';
     case 'video/webm':
       return 'webm';
+    case 'audio/mpeg':
+    case 'audio/mp3':
+      return 'mp3';
+    case 'audio/wav':
+    case 'audio/wave':
+    case 'audio/x-wav':
+      return 'wav';
+    case 'audio/ogg':
+      return 'ogg';
+    case 'audio/webm':
+      return 'webm';
+    case 'audio/aac':
+      return 'aac';
+    case 'audio/mp4':
+    case 'audio/x-m4a':
+      return 'm4a';
+    case 'audio/flac':
+      return 'flac';
+    case 'image/x-icns':
+    case 'image/icns':
+      return 'icns';
     case 'model/gltf-binary':
       return 'glb';
     case 'model/gltf+json':
@@ -161,5 +182,10 @@ export function scopeUploadDirectory(siteId: string, targetDir: string) {
   }
   if (targetDir.startsWith('assets/projects')) return `sites/${siteId}/projects/legacy`;
   if (targetDir.startsWith('assets/media')) return `sites/${siteId}/media`;
+  // Fallback penting: folder `assets/...` lain (mis. `assets/my-folder`) tidak
+  // boleh mendarat di prefix global `assets/` milik owner. Scope ke site.
+  if (targetDir.startsWith('assets/')) {
+    return `sites/${siteId}/${targetDir.slice('assets/'.length)}`;
+  }
   return targetDir;
 }
