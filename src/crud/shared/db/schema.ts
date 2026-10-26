@@ -68,6 +68,12 @@ export const SHARED_SCHEMA_QUERIES = [
     FOREIGN KEY (site_id) REFERENCES sites(id)
   ) STRICT`,
   `CREATE INDEX IF NOT EXISTS idx_projects_site ON projects(site_id)`,
+  // Selaras dengan `src/lib/d1-schema.ts` (UNIQUE(site_id, slug)). Tanpa ini,
+  // database hasil onboarding portal mengizinkan dua project dengan slug sama
+  // → URL publik bentrok (audit 2026-10-24). CREATE IF NOT EXISTS aman diulang;
+  // pada data lama yang sudah duplikat, statement ini gagal dan dilewati oleh
+  // bootstrap (tidak mengubah data).
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_site_slug ON projects(site_id, slug)`,
 
   // ──────────────────────────────────────────────
   // 3b. Project Narratives — studi kasus per project
