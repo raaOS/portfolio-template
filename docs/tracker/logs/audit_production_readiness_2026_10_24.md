@@ -24,7 +24,8 @@ risiko tertinggi tanpa refactor besar dan tanpa mengubah perilaku yang sudah ben
 - [x] Gladi resik onboarding nyata di akun Cloudflare uji (login, konten, health,
       token/vars, header, SVG) — berhasil
 - [x] Verifikasi akhir build situs **owner** (`npm run build` dari worktree) — berhasil
-- [ ] Hapus resource gladi resik (menunggu konfirmasi owner)
+- [x] Resource gladi resik **dipertahankan** sebagai demo & tempat latihan (keputusan
+      owner 2026-10-27). Tidak ada resource yang dihapus.
 
 ## 📂 File yang Dimodifikasi (Modified Files)
 
@@ -219,9 +220,10 @@ risiko tertinggi tanpa refactor besar dan tanpa mengubah perilaku yang sudah ben
     hostname `gladi.makeitbatter.my.id` berhasil di-attach ke Worker
     `gladi-2026-10-24`. Verifikasi HTTPS: `/api/health` **200** (`status:ok`,
     `database:connected`) dan `/admin/login` **200**; sertifikat TLS valid.
-  - Resource uji (Worker/D1/R2/KV + `arsip-klien/01_gladi-2026-10-24`) **masih ada**
-    dan menunggu konfirmasi owner sebelum dihapus. Custom domain juga masih terpasang
-    sampai owner menyetujui cleanup.
+  - Resource uji (Worker/D1/R2/KV + `arsip-klien/01_gladi-2026-10-24`) **dipertahankan**
+    sebagai demo & tempat latihan (keputusan owner 2026-10-27). Custom domain juga tetap
+    terpasang. **Tidak ada resource yang dihapus** — dan tidak akan dihapus tanpa
+    permintaan tegas owner.
 - **Belum diperbaiki / risiko tersisa:**
   - `JWT_SECRET`, `PASSWORD_SALT`, `CRON_SECRET` masih ditulis sebagai `vars`
     `plain_text` (bukan `secret_text`). Untuk klien, pemilik akun memang bisa
@@ -310,7 +312,14 @@ risiko yang sudah tercatat (probe harian `workerHealth` jadi alat deteksinya).
 **Push:** `c58d5be..efc779f main -> main` (repo `raaOS/portfolio-template`), lokal dan
 remote sama (`efc779f`). Tidak ada tag, tidak ada force push.
 
-**Masih menunggu keputusan owner:** resource gladi resik (Worker/D1/R2/KV/zona uji +
-`arsip-klien/01_gladi-2026-10-24`) belum dihapus, sesuai instruksi untuk tidak menghapus
-tanpa izin.
+**Resource gladi resik:** **dipertahankan** sebagai demo & tempat latihan (keputusan owner
+2026-10-27). Tidak ada yang dihapus, dan tidak akan dihapus tanpa permintaan tegas owner.
+
+**Kebijakan resource klien (ditegaskan 2026-10-27):** resource milik klien nyata (Worker,
+D1, R2, KV, zona/domain di akun Cloudflare klien) **bukan target pembersihan**. Tidak ada
+kode di portal onboarding yang bisa menghapusnya — `scripts/onboarding/server.ts` tidak
+memiliki endpoint DELETE sama sekali. Satu-satunya jalur hapus data ada di admin aplikasi
+(`DELETE /api/admin/sites`, owner-only, wajib mengetik slug yang sama + flag `deleteMedia`)
+dan itu hanya menghapus baris D1/R2 **milik deployment sendiri**, bukan akun klien. Domain
+hanya bisa **dilepas** dari Worker (`detachWorkerDomain`), bukan menghapus zona.
 

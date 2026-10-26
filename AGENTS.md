@@ -71,6 +71,7 @@ Sistem dokumentasi pelacakan pekerjaan (Tracker) telah diaktifkan untuk menghema
 - Jangan merancang fitur baru dengan asumsi Vercel project, Vercel Functions, atau quota Vercel. Referensi Vercel yang masih ada di repo adalah legacy/migration debt sampai dibersihkan.
 - Model produk adalah **managed service**: 1 customer = 1 Cloudflare account, bukan multi-tenant single platform.
 - Customer self-service admin panel untuk kelola konten (projects, profile, experience, skills, contact, testimonials).
+- **Resource klien tidak pernah dihapus oleh kita.** Worker/D1/R2/KV/zona milik klien berada di akun Cloudflare klien; menghapusnya = menghancurkan situs & datanya. Pembersihan hanya boleh atas permintaan tegas klien, setelah cadangan, dan dengan konfirmasi per item. "Membersihkan resource uji" hanya berlaku untuk akun uji milik owner (mis. gladi), bukan untuk klien nyata.
 - Owner deploy + maintain via Wrangler CLI, bukan via dashboard web.
 
 ### Karakteristik Utama
