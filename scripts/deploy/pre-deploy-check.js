@@ -11,6 +11,13 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
+// Rekam environment SEBELUM .env.local dimuat. Tes unit dijalankan dengan
+// environment ini, bukan dengan kredensial produksi: dulu `npm test` mewarisi
+// DATA_BACKEND=cloudflare-d1 dan NOTIFICATION_* dari .env.local sehingga tes
+// rate-limit menembak D1 asli (timeout 5 detik) dan tes "notifikasi belum
+// dikonfigurasi" benar-benar mengirim email (fetch dipanggil 2x, bukan 1x).
+const baseEnv = { ...process.env };
+
 const envFile = ['.env.local', '.env'].find((file) => fs.existsSync(file));
 
 if (envFile) {
@@ -41,6 +48,7 @@ const requiredEnvVars = [
   'CLOUDFLARE_R2_PUBLIC_BASE_URL',
   'JWT_SECRET',
   'PASSWORD_SALT',
+  'CRON_SECRET',
   'ADMIN_PASSWORD_SCRYPT',
   'REVALIDATION_TOKEN',
 ];
@@ -147,5 +155,16 @@ console.log('OK no known personal/legacy env keys are set');
 
 console.log('\nRunning Workers compatibility audit...');
 execSync('npm run cf:compat-audit -- --strict', { stdio: 'inherit' });
+
+// Gerbang kualitas (audit 2026-10-24): dulu `pre-deploy` hanya memeriksa file
+// dan env, sehingga kode dengan error TypeScript/lint/test tetap bisa deploy.
+console.log('\nRunning TypeScript check...');
+execSync('npx tsc --noEmit', { stdio: 'inherit' });
+
+console.log('\nRunning ESLint...');
+execSync('npm run lint', { stdio: 'inherit' });
+
+console.log('\nRunning unit tests...');
+execSync('npm test', { stdio: 'inherit', env: baseEnv });
 
 console.log('\nAll Cloudflare pre-deploy checks passed.');
