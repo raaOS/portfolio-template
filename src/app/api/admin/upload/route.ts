@@ -159,7 +159,8 @@ export async function POST(req: NextRequest) {
     //              WallpaperManager. /api/upload/presign juga punya
     //              200 MB ceiling sendiri tapi itu untuk direct-to-R2
     //              path; FormData-based upload di sini harus stricter.
-    //   - Audio  : 25 MB. SoundEffect biasanya pendek (<30 detik).
+    //   - Audio  : 25 MB. Cukup untuk satu trek musik (MP3/M4A) berdurasi
+    //              normal; dipakai pemutar musik, bukan efek suara.
     const originalBuffer = Buffer.from(await file.arrayBuffer());
     let buffer: Buffer<ArrayBufferLike> = originalBuffer;
     let contentType = file.type;

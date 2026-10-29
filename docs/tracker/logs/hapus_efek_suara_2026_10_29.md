@@ -59,6 +59,37 @@ Seluruh mesin efek suara OS dihapus. Pemutar musik (`MusicPlayerContext`, kartu 
 
 ## Catatan
 
-- Baris D1 lama yang masih menyimpan `soundConfig` di `content/about` tidak dimigrasi; tidak ada kode yang membacanya lagi dan kunci itu akan hilang saat admin menyimpan data About berikutnya.
 - `CHANGELOG.md` historis yang menyebut efek suara sengaja **tidak** diubah (catatan rilis lama).
 - Musik: `MusicPlayerContext`, `MusicPlayerControlCard`, dan jalur upload audio tidak disentuh.
+
+## Pembersihan lanjutan — data & media (2026-10-30)
+
+Atas instruksi owner "pokoknya bersihkan tuntas mengenai sound effect", sisa data yang sebelumnya dibiarkan kini dihapus.
+
+### D1 (baris `app_kv`)
+
+| Database | Baris | Sebelum | Sesudah |
+|---|---|---|---|
+| owner | `content` | 31.554 byte, `about` 13 key (ada `soundConfig`) | 31.040 byte, `about` 12 key |
+| owner | `content_default-site` | 32.176 byte, `about` 13 key | 31.662 byte, `about` 12 key |
+| gladi | `content_gladi-2026-10-24` | 14.213 byte, `about` 14 key | 13.657 byte, `about` 13 key |
+
+- Operasi: `UPDATE app_kv SET value = json_remove(value, '$.about.soundConfig')` — hanya kunci `about.soundConfig` yang dibuang; seluruh key lain diverifikasi utuh (`json_valid=1`, tidak ada key `about` lain yang hilang).
+- Backup baris utuh sebelum update: `backups/soundconfig-cleanup/2026-10-29T17-11-22/owner-app_kv-backup.json` + `gladi-app_kv-backup.json`.
+- Pemindaian ulang seluruh tabel di kedua database (`LIKE '%sound%'` pada semua kolom): **0 baris** tersisa. Tabel `_cf_KV` milik infrastruktur Cloudflare tidak dapat dibaca/diubah lewat D1 API (dilindungi `SQLITE_AUTH`) dan tidak berisi konten situs.
+
+### R2
+
+| Bucket | Total objek | File audio | Objek bernama sound |
+|---|---|---|---|
+| `portfolio-template-media` (owner) | 76 | 0 | 0 |
+| `media-gladi-2026-10-24` (gladi) | 0 | 0 | 0 |
+
+- Diverifikasi lewat Cloudflare R2 API (`/accounts/{id}/r2/buckets/{bucket}/objects`), bukan hanya HEAD. **Tidak ada objek SFX yang perlu dihapus** — file SFX dulu memang file statis `public/sounds/` di dalam bundle Worker, bukan objek R2.
+- URL publik `https://makeitbatter.my.id/r2/sites/gladi-2026-10-24/assets/sounds/startup.mp3` → **404**.
+
+### Repo
+
+- `src/app/api/admin/upload/route.ts` — komentar usang "SoundEffect biasanya pendek" diganti menjadi penjelasan batas audio untuk musik.
+- Pencarian ulang `soundConfig|SoundManager|useSystemSound|SoundEffectsManager|SoundConfigLoader|assets/sounds|generate-sounds|Efek Suara` di seluruh file terlacak (kecuali log historis & `CHANGELOG.md` historis) → hanya tersisa dokumentasi tracker ini.
+- Catatan: folder `C:\Users\USER\Documents\tamplate-portofolio\.kilo\worktrees\hip-glitter` masih menyimpan salinan kode SFX lama. Folder itu **bukan** bagian repo (worktree rusak/orphan milik tool lain, tidak terdaftar di `git worktree list`) dan belum dihapus karena berisi 133 MB data milik sesi lain.
