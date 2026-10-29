@@ -55,8 +55,7 @@ export function useWindowActions({
     [csrfToken, isAdmin, saveWindowPreference]
   );
 
-  // Sound ownership lives in Window.tsx / WindowTitleBar.tsx through SoundManager.
-  // Keep state actions silent so opening/closing a window cannot emit duplicate sounds.
+  // Keep state actions silent; opening/closing a window has no side effects.
   const openWindow = useCallback(
     (id: string, customConfig?: Partial<WindowState>) => {
       const newZIndex = bringToFrontZIndex(id, 'window');

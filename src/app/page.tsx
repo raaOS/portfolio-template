@@ -6,7 +6,6 @@ import { getHeroPreviewPosters, getHeroPreviewVideos } from '@/lib/services/hero
 import { loadHomepageData } from '@/lib/loaders';
 import { loadAboutData } from '@/lib/about';
 import { mapD1ToTemplateData } from '@/lib/templates/dataMapper';
-import SoundConfigLoader from '@/components/layout/SoundConfigLoader';
 import LayoutClient from '@/components/layout/LayoutClient';
 import VersionGuard from '@/components/shared/VersionGuard';
 import SmoothScroll from '@/components/layout/SmoothScroll';
@@ -115,7 +114,6 @@ export default async function Home() {
     <LastUpdatedProvider>
       <SmoothScroll />
       <NavDirectionReset />
-      <SoundConfigLoader soundConfig={aboutData?.soundConfig} />
       {loaderConfig?.enabled && (
         <HomepageLoaderGate
           config={loaderConfig}

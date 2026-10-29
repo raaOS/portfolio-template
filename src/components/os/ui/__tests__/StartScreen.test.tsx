@@ -29,13 +29,6 @@ vi.mock('next/dynamic', async () => {
   };
 });
 
-vi.mock('../../utils/SoundManager', () => ({
-  soundManager: {
-    unlock: vi.fn(),
-    play: vi.fn(),
-  },
-}));
-
 describe('StartScreen — HELLO hitam diputar sampai selesai (v1.3.37)', () => {
   const onComplete = () => lottie.props?.onComplete?.();
 

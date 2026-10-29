@@ -131,7 +131,7 @@ src/
 
 - **`context/`**: State global desktop (`OSSystemContext`, `DesktopWindowContext`, `UnifiedZIndexContext`).
 - **`core/`**: Komponen utama shell desktop (`DesktopEnvironment`, `Dock`, `MenuBar`, `Spotlight`).
-- **`hooks/`**: Custom hooks visual simulator (`useWindowManager`, `useSystemSound`, `useQuickLook`, dan folder `window-manager/`).
+- **`hooks/`**: Custom hooks visual simulator (`useWindowManager`, `useQuickLook`, dan folder `window-manager/`).
 - **`layers/`**: Lapisan UI (`DesktopIconsLayer`, `UIOverlaysLayer`, `UnifiedLayer`).
 - **`sections/`**: Konten tab About (`AboutTab`, `CVTab`, `InterestsTab`, `PhilosophyTab`).
 - **`windows/`**: Komponen window simulator (`Window`, `ChatWindow`, `ContactWindow`, `ExplorerWindow`, dll.).
@@ -143,7 +143,7 @@ src/
 > [!IMPORTANT]
 > Daftar ini diperbarui 2026-09-12 setelah audit penuh 24 file terlarang (Sprint refactor v1.2.9–v1.3.0, konsensus dua AI, setiap baris dibaca dan diverifikasi). Klaim lama yang usang (stale) sudah dikoreksi: `AdminExplorerClient` sudah tidak memakai dnd-kit (tabel click-driven), `DesignPhilosophyForm` sudah tidak memakai React Hook Form/Zod (plain `useState`), `upload/route.ts` sudah tidak menjalankan Sharp (`optimizeImageBuffer` = passthrough stub sejak migrasi Cloudflare), dan `ExitIntentFeedback` mendeteksi kursor via hook `useExitIntent` eksternal.
 
-### 3a. Protected Cores — HARAM dipecah/direfaktor (8 inti)
+### 3a. Protected Cores — HARAM dipecah/direfaktor (7 inti)
 
 | # | File Path | Inti yang Terproteksi |
 |---|---|---|
@@ -151,10 +151,9 @@ src/
 | P2 | `src/contexts/BackgroundUploadContext.tsx` | `enqueueWallpaperUpload` + `compressChainRef`/`finalizeChainRef`/`encodingTaskIdRef` — mesin race-condition atomik (serialisasi WASM FFmpeg + read-modify-write koleksi wallpaper). Ekstraksi types/constants/session-effects diizinkan. |
 | P3 | `src/components/canvas/InfiniteCanvasView.tsx` | rAF render loop + `updateDomNodes`/`syncVisibleItems`/`flushRemovals` membaca-tulis ~15 refs bersama per frame. Optimasi Sprint 85 sudah file-structure-independent. Dedup fade-math JSX vs `computeVisualStyle` diizinkan. |
 | P4 | `src/components/os/context/UnifiedZIndexContext.tsx` | Store `useSyncExternalStore` (`_subscribe*`/`_get*` = kontrak publik) + interplay `normalizeZIndexes`→`notifyId`/`notifyGlobal`/`updateTopId`. Ekstraksi types/constants + `hooks.ts` tipis diizinkan. |
-| P5 | `src/components/os/utils/SoundManager.ts` | Singleton: gating unlock/autoplay, suppression timers, `inFlight`, startup-once, pending queue. Ekstraksi constants/types + `AudioElementPool` diizinkan. |
-| P6 | `src/contexts/MusicPlayerContext.tsx` | Dual-engine (HTMLAudio + YT iframe) — `ytPlayerRef` + 4 ref lain dianyam di 25+ lokasi (transport, polling 500ms, volume sync, onReady). Ekstraksi types + pure helpers (`mergeTrackQueue`, `isYt`) diizinkan; ekstraksi `useYouTubePlayer` DILARANG. |
-| P7 | `src/lib/services/explorerService.ts` | `explorerMutationChain` + CAS retry 8x + copy/verify/rollback R2. Ekstraksi pure path/name/tree helpers (`explorerKeys.ts`) diizinkan; rantai mutasi harus satu modul. |
-| P8 | `src/components/os/windows/Window.tsx` | Sisa 773 baris = frame binding rapat (`preSnapFrameRef`, onDrag→onDragEnd ordering, snap priority, originRect morph). Ekstraksi constants block + builder state animasi diizinkan; `useWindowSnap` hanya dengan persetujuan eksplisit. |
+| P5 | `src/contexts/MusicPlayerContext.tsx` | Dual-engine (HTMLAudio + YT iframe) — `ytPlayerRef` + 4 ref lain dianyam di 25+ lokasi (transport, polling 500ms, volume sync, onReady). Ekstraksi types + pure helpers (`mergeTrackQueue`, `isYt`) diizinkan; ekstraksi `useYouTubePlayer` DILARANG. |
+| P6 | `src/lib/services/explorerService.ts` | `explorerMutationChain` + CAS retry 8x + copy/verify/rollback R2. Ekstraksi pure path/name/tree helpers (`explorerKeys.ts`) diizinkan; rantai mutasi harus satu modul. |
+| P7 | `src/components/os/windows/Window.tsx` | Sisa 773 baris = frame binding rapat (`preSnapFrameRef`, onDrag→onDragEnd ordering, snap priority, originRect morph). Ekstraksi constants block + builder state animasi diizinkan; `useWindowSnap` hanya dengan persetujuan eksplisit. |
 
 ### 3b. Core Dock & Upload Queue — sudah dimodularisasi (v1.3.0), jaga intinya
 
@@ -557,7 +556,7 @@ npx wrangler deploy --config .open-next/wrangler.client.<slug>.jsonc
 |---|---|
 | **Konten & Berkas** | Projects, Profile, Experience, Skills, Archive, Labels, Explorer, Event Pages |
 | **Sistem** | AI, Analytics, Activity Log, Backup, Harga Jual, Orders |
-| **Tampilan** | Appearance, Dock, Widgets, Sounds |
+| **Tampilan** | Appearance, Dock, Widgets |
 | **Komunikasi** | Notifications, Messages, Feedback, Contacts |
 
 > Zone "Sistem & Tampilan" lama (10 app) dipecah jadi **Sistem** + **Tampilan** pada 2026-10-09 atas keputusan owner (3 → 4 zone); definisi zona = data di `src/app/admin/desktop/registry.ts` (`ADMIN_ZONES`).

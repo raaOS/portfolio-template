@@ -136,7 +136,7 @@ export const TRANSITIONS = {
  * WAJIB sama dengan entri teratas CHANGELOG.md — dijaga test
  * `src/lib/constants.test.ts` supaya tidak pernah melenceng.
  */
-export const APP_VERSION = '1.3.74';
+export const APP_VERSION = '1.3.75';
 
 /**
  * Canonical site URL — used as fallback when NEXT_PUBLIC_SITE_URL is not set.
@@ -171,16 +171,3 @@ export function getPublicBaseUrl(): string {
 
   return DEFAULT_SITE_URL;
 }
-
-/**
- * Helper to get asset path with automatic cache busting for visitors
- * @param path The relative path to the asset (e.g. '/sounds/click.wav')
- */
-export const getAssetPath = (path: string): string => {
-  if (!path) return '';
-  // If it already has a query param or is external, return as is
-  if (path.includes('?') || path.startsWith('http') || path.startsWith('data:')) {
-    return path;
-  }
-  return `${path}?v=${APP_VERSION}`;
-};

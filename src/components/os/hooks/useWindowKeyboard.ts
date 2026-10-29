@@ -1,5 +1,4 @@
 import { useCallback, KeyboardEvent } from 'react';
-import { soundManager } from '../utils/SoundManager';
 
 interface UseWindowKeyboardProps {
   onClose: () => void;
@@ -13,7 +12,6 @@ export function useWindowKeyboard({ onClose, onMinimize, onMaximize }: UseWindow
       // Keyboard Shortcuts
       if (e.key === 'Escape') {
         e.preventDefault();
-        soundManager.play('window-close');
         onClose();
       }
       if (e.ctrlKey && e.key === 'm') {

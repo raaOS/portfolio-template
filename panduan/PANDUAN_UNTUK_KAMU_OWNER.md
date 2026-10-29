@@ -143,7 +143,7 @@ Tidak ada untuk skala normal. Cloudflare memberikan kuota gratis yang sangat bes
 
 | Fitur / Template | 🍏 Tema 1: `os-desktop` (macOS Desktop) | 🌌 Tema 2: `infinite-canvas` (3D Canvas) |
 | :--- | :--- | :--- |
-| **Konsep Tampilan** | Simulasi laptop Mac interaktif (Menu Bar, Dock, Wallpaper video bergerak, efek suara klik, jendela aplikasi). | Kanvas spasial futuristik melayang tanpa batas (bisa di-zoom in/out, di-pan/geser, dan ada HUD navigasi kompas). |
+| **Konsep Tampilan** | Simulasi laptop Mac interaktif (Menu Bar, Dock, Wallpaper video bergerak, jendela aplikasi). | Kanvas spasial futuristik melayang tanpa batas (bisa di-zoom in/out, di-pan/geser, dan ada HUD navigasi kompas). |
 | **Pusat Pengelolaan (CRUD)** | **Terpusat di Desktop Mac (`/admin`)** | **Terpusat di Desktop Mac (`/admin`)** |
 | **Data yang Ditampilkan** | Menampilkan seluruh modul lengkap: *About, Projects, Experience, Skills, Testimoni, Kontak*. | Menampilkan 100% data terintegrasi: *Profil, Galeri Proyek (+ Modal Detail), Riwayat Karir, Keahlian Teknis, dan Kontak*. *(Otomatis disinkronkan tanpa perlu input ulang).* |
 | **Ruang Kerja CRUD** | **`https://[domain-klien.com]/admin`** | **`https://[domain-klien.com]/admin`** |

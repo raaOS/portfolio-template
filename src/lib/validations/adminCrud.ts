@@ -269,13 +269,6 @@ const windowPreferenceSchema = z
   })
   .strict();
 
-const soundSettingSchema = z
-  .object({
-    path: requiredText(1000),
-    volume: z.coerce.number().min(0).max(1),
-  })
-  .strict();
-
 const islandChatMessageSchema = z
   .object({
     id: z.number().int(),
@@ -343,7 +336,6 @@ export const updateAboutSchema = z
     dockConfig: z.record(z.string(), dockItemConfigSchema).optional(),
     windowPreferences: z.record(z.string(), windowPreferenceSchema).optional(),
     islandNotifications: z.array(islandNotificationSchema).max(100).optional(),
-    soundConfig: z.record(z.string(), soundSettingSchema).optional(),
     labels: aboutLabelsSchema.optional(),
     spatialGalleryConfig: spatialGalleryConfigSchema.optional(),
     loaderConfig: loaderConfigSchema.optional(),

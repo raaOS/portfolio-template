@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback, useEffect, startTransition } from 'react';
-import { soundManager } from '../utils/SoundManager';
 
 interface BootSequenceConfig {
   allowSkip: boolean;
@@ -133,8 +132,6 @@ export function useBootSequence(config: Partial<BootSequenceConfig> = {}) {
   }, [finalConfig.forceSkip]);
 
   const powerOn = useCallback(() => {
-    soundManager.unlock();
-    soundManager.clearCache('startup');
     setNeedsPowerOn(false);
     setIsBooting(true);
     markAsBooted();

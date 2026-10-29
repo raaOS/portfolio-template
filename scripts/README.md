@@ -11,7 +11,7 @@ Direktori ini berisi berbagai script utilitas dan alat bantu untuk Portfolio OS 
 | `explorer/`    | Pengelolaan data Explorer                | `seed-explorer.ts`, `cleanup-explorer.ts`           |
 | `generators/`  | Generator konten dan data testing        | `seed-testimonials.js`, `magic-caption.js`          |
 | `maintenance/` | Kesehatan sistem, audit, dan pembersihan | `audit.ts`, `check-db.mjs`, `check-urls.js`         |
-| `media/`       | Alat bantu aset (Gambar/Video/Suara)     | `optimize-assets.js`, `generate-sounds.js`          |
+| `media/`       | Alat bantu aset (Gambar/Video)           | `optimize-assets.js`                                |
 | `performance/` | Pemantauan dan analisis performa         | `analyze-bundle.js`, `lighthouse.js`, `monitor.js`  |
 | `security/`    | Validasi keamanan dan environment        | `admin-hash.js`, `validate-env.js`                  |
 | `test/`        | Utilitas testing khusus                  | `storage-stats-smoke.mjs`                           |

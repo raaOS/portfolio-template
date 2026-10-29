@@ -1,7 +1,6 @@
 import React from 'react';
 import { X, Minus, Plus, Pin, Lock } from 'lucide-react';
 import { m, AnimatePresence } from 'motion/react';
-import { soundManager } from '../../utils/SoundManager';
 
 interface WindowTitleBarProps {
   title: string;
@@ -85,7 +84,6 @@ export function WindowTitleBar({
           transition={buttonTransition}
           onClick={(e) => {
             e.stopPropagation();
-            soundManager.play('window-close');
             onClose();
           }}
           onPointerDown={handleActionFocus}

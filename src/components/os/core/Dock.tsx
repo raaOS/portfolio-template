@@ -128,7 +128,7 @@ let isClientHydrated = false;
 
 /**
  * Komponen Dock inti. DnD context, sensors, drag handlers, glass material,
- * tooltip suppression, sound integration, bounce animation orchestration.
+ * tooltip suppression, bounce animation orchestration.
  */
 export default function Dock({
   items,

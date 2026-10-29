@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { m, useMotionValue, type PanInfo, type Transition } from 'motion/react';
 import Image from 'next/image';
-import { soundManager } from '../../utils/SoundManager';
 import type { DesktopIconSize } from '@/types/about';
 
 interface DesktopIconProps {
@@ -86,7 +85,6 @@ export default function DesktopIcon({
 
   const [isDragging, setIsDragging] = useState(false);
   const hasMovedRef = useRef(false);
-  const dragSoundPlayedRef = useRef(false);
 
   const requestSizeStep = (direction: 1 | -1) => {
     if (!onSizeChange) return;
@@ -112,7 +110,6 @@ export default function DesktopIcon({
 
   const handleDragStart = () => {
     hasMovedRef.current = false;
-    dragSoundPlayedRef.current = false;
   };
 
   const handleDrag = (_e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
@@ -120,10 +117,6 @@ export default function DesktopIcon({
     if (dist > 5) {
       hasMovedRef.current = true;
       if (!isDragging) setIsDragging(true);
-      if (!dragSoundPlayedRef.current) {
-        dragSoundPlayedRef.current = true;
-        soundManager.play('drag');
-      }
     }
   };
 
@@ -134,7 +127,6 @@ export default function DesktopIcon({
     setTimeout(() => {
       setIsDragging(false);
       hasMovedRef.current = false;
-      dragSoundPlayedRef.current = false;
     }, 60);
 
     if (wasRealDrag && onPositionChange) {
@@ -192,7 +184,6 @@ export default function DesktopIcon({
       data-lenis-prevent
       onClick={(_e) => {
         if (!hasMovedRef.current) {
-          soundManager.play('click');
           onClick();
         }
       }}
@@ -236,7 +227,6 @@ export default function DesktopIcon({
 
         if ((e.key === 'Enter' || e.key === ' ') && !isDragging) {
           e.preventDefault();
-          soundManager.play('click');
           onClick();
         }
       }}

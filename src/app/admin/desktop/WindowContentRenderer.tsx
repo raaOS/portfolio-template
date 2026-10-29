@@ -65,11 +65,6 @@ const WidgetsPanel = dynamic(() => import('./panels/WidgetsPanel'), {
   loading: () => <AdminLoading size="page" />,
 });
 
-const SoundsPanel = dynamic(() => import('./panels/SoundsPanel'), {
-  ssr: false,
-  loading: () => <AdminLoading size="page" />,
-});
-
 const LoaderPanel = dynamic(() => import('./panels/LoaderPanel'), {
   ssr: false,
   loading: () => <AdminLoading size="page" />,
@@ -143,7 +138,6 @@ export const PANEL_MAP: Record<string, React.ComponentType> = {
   appearance: AppearancePanel,
   dock: DockPanel,
   widgets: WidgetsPanel,
-  sounds: SoundsPanel,
   loader: LoaderPanel,
   analytics: AnalyticsPanel,
   notifications: NotificationsPanel,

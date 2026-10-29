@@ -1,6 +1,5 @@
 import React from 'react';
 import { loadAboutData } from '@/lib/about';
-import SoundConfigLoader from '@/components/layout/SoundConfigLoader';
 import LayoutClient from '@/components/layout/LayoutClient';
 import VersionGuard from '@/components/shared/VersionGuard';
 import SmoothScroll from '@/components/layout/SmoothScroll';
@@ -28,7 +27,6 @@ export default async function SiteLayout({
     <LastUpdatedProvider>
       <SmoothScroll />
       <NavDirectionReset />
-      <SoundConfigLoader soundConfig={aboutData?.soundConfig} />
       <LayoutClient modal={modal} dockConfig={aboutData?.dockConfig}>
         {children}
       </LayoutClient>

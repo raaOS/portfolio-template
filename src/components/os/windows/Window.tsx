@@ -8,7 +8,6 @@
 
 import React, { useRef, useEffect, useMemo, useState, useCallback } from 'react';
 import { m, useDragControls, AnimatePresence, Transition, TargetAndTransition } from 'motion/react';
-import { soundManager } from '../utils/SoundManager';
 import { useWindowResize } from '../hooks/useWindowResize';
 import { useWindowKeyboard } from '../hooks/useWindowKeyboard';
 import { useJellyDrag } from '../hooks/useJellyDrag';
@@ -294,17 +293,6 @@ export default function OSWindow({
     },
     [dragControls, jellyEnabled, isMissionControlActive]
   );
-
-  // Sound effect on open - delay until user interaction
-  useEffect(() => {
-    if (isOpen) {
-      // Use setTimeout to ensure user interaction is detected first
-      const timer = setTimeout(() => {
-        soundManager.play('window-open');
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen]);
 
   // Handle auto-focus when window becomes active
   useEffect(() => {

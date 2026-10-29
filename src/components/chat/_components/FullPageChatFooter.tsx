@@ -1,7 +1,6 @@
 import React, { useRef } from 'react';
 import { Plus, Send } from 'lucide-react';
 import EmojiPicker from '@/components/chat/EmojiPicker';
-import { soundManager } from '@/components/os/utils/SoundManager';
 import { useDictionary } from '@/contexts/LanguageContext';
 
 interface FullPageChatFooterProps {
@@ -67,7 +66,6 @@ export default function FullPageChatFooter({
           value={inputValue}
           onChange={(e) => {
             setInputValue(e.target.value);
-            soundManager.play('typing');
           }}
           onKeyDown={handleKeyDown}
           disabled={isSending}

@@ -3,6 +3,21 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.75] - 2026-10-29
+
+### Efek Suara OS Dihapus Menyeluruh (Musik Tetap)
+
+Atas permintaan owner, seluruh mesin efek suara dibersihkan dari template — kode, file, dan panel admin. **Pemutar musik tidak disentuh** dan tetap berfungsi normal.
+
+- **Yang hilang sama sekali:** `SoundManager`, `useSystemSound` (bunyi klik dock), `SoundConfigLoader`, panel admin **Efek Suara** beserta route `/admin/system/sounds`, 3 script maintenance `soundConfig`, generator `generate-sounds.js`, dan seluruh isi `public/sounds/` (19 file mp3/wav).
+- **Pemanggilan SFX dibersihkan** dari: buka/tutup window, tombol Escape, klik & drag ikon desktop, startup OS, chat (kirim/terima/mengetik), dan Control Center.
+- **Data & tipe:** `soundConfig` dihapus dari `AboutData`/`UpdateAboutData`, schema Zod, merge `aboutService`, loader `lib/about.ts`, dan seed `src/data/about.json`. Baris D1 lama yang masih menyimpannya tidak dibaca lagi dan akan hilang saat admin menyimpan About berikutnya.
+- **Konsekuensi lain:** helper `getAssetPath` (hanya dipakai SFX) dan cabang folder `assets/sounds` di pipeline upload ikut dihapus. Dukungan **upload audio tetap ada** untuk musik.
+- **Volume sistem tetap berfungsi:** slider Control Center tetap mengubah `useOSMedia().volume` yang dipakai pemutar musik; yang dihapus hanya penerusan volume ke SoundManager.
+- **Dokumentasi:** entri protected core `SoundManager` di `AGENTS.md` dihapus (P1–P7), daftar app zona Tampilan diperbarui, dan panduan owner tidak lagi menyebut efek suara klik.
+
+**Verifikasi:** `npx tsc --noEmit` **0 error**; ESLint file terkait **bersih**; `npx vitest run` **150 file / 1266 test PASS**; pencarian ulang seluruh pola SFX di luar log historis **0 hit**.
+
 ## [1.3.74] - 2026-10-26
 
 ### 🛡️ Audit Kesiapan Produksi: Klien Baru Bisa Login, Kunci Tidak Bocor, Gerbang Mutu

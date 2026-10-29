@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, startTransition } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import useSWR from 'swr';
-import { soundManager } from '@/components/os/utils/SoundManager';
 import { buildWhatsAppLink } from '@/utils/whatsappLink';
 
 /**
@@ -185,11 +184,6 @@ export function useChatSync(
               });
 
               if (hasNewAdminMessage) {
-                // Hanya bunyikan notifikasi kalau tab visible agar user
-                // tidak ter-distract di background tab.
-                if (typeof document === 'undefined' || document.visibilityState === 'visible') {
-                  soundManager.play('notification');
-                }
                 setIsAdminTyping(false);
               }
 
@@ -228,7 +222,6 @@ export function useChatSync(
     };
 
     setMessages((prev) => [...prev, newMessage]);
-    soundManager.play('sent');
 
     // Mode jembatan WhatsApp (v1.3.68): pesan TIDAK dikirim ke endpoint —
     // langsung dibuka di wa.me milik admin dengan isi pesan prefilled.
@@ -267,9 +260,6 @@ export function useChatSync(
               timestamp: Date.now() + 1,
             },
           ]);
-          if (typeof document === 'undefined' || document.visibilityState === 'visible') {
-            soundManager.play('notification');
-          }
         }, 1400);
         demoTimersRef.current.push(t2);
       }, 600);

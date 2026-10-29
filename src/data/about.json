@@ -427,44 +427,6 @@
       "isOpenByDefault": false
     }
   },
-  "soundConfig": {
-    "startup": {
-      "path": "/sounds/startup.wav",
-      "volume": 1
-    },
-    "click": {
-      "path": "/sounds/click.wav?v=1.3",
-      "volume": 0.5
-    },
-    "window-open": {
-      "path": "/sounds/window-open.wav?v=1.3",
-      "volume": 0.5
-    },
-    "window-close": {
-      "path": "/sounds/window-close.wav?v=1.3",
-      "volume": 0.5
-    },
-    "error": {
-      "path": "/sounds/error.wav?v=1.3",
-      "volume": 0.5
-    },
-    "notification": {
-      "path": "/sounds/notification.wav?v=1.3",
-      "volume": 0.5
-    },
-    "drag": {
-      "path": "/sounds/drag.wav?v=1.3",
-      "volume": 0.5
-    },
-    "typing": {
-      "path": "/sounds/typing.wav",
-      "volume": 0.5
-    },
-    "sent": {
-      "path": "/sounds/notification.wav?v=1.3",
-      "volume": 0.4
-    }
-  },
   "labels": {},
   "notifications": [
     {

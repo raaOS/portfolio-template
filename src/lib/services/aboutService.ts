@@ -16,7 +16,6 @@ import {
   WallpaperConfig,
   DockPreferences,
   WindowPreferences,
-  SoundConfig,
 } from '@/types/about';
 import aboutDataFallback from '@/data/about.json';
 import { deleteStorageAssets } from '@/lib/services/storageCleanup';
@@ -80,12 +79,6 @@ function extractAboutAssets(data: AboutData): string[] {
       if (w.url) assets.push(w.url);
       if (w.posterUrl) assets.push(w.posterUrl);
     });
-  }
-
-  if (data.soundConfig) {
-    for (const setting of Object.values(data.soundConfig)) {
-      if (setting?.path) assets.push(setting.path);
-    }
   }
 
   if (data.spatialGalleryConfig?.centerModelUrl) {
@@ -153,7 +146,6 @@ export const aboutService = {
           current.windowPreferences,
           updates.windowPreferences
         ),
-        soundConfig: { ...current.soundConfig, ...(updates.soundConfig || {}) } as SoundConfig,
         labels: { ...(current.labels || {}), ...(updates.labels || {}) } as AboutData['labels'],
         spatialGalleryConfig:
           updates.spatialGalleryConfig !== undefined

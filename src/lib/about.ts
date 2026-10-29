@@ -15,7 +15,6 @@ import type {
   DesignPhilosophy,
   WallpaperConfig,
   DockPreferences,
-  SoundConfig,
   WindowPreferences,
   AboutIslandNotification,
 } from '@/types/about';
@@ -69,7 +68,6 @@ export async function loadDesignPhilosophy(siteId = 'default-site'): Promise<Des
 export async function loadOSConfig(siteId = 'default-site'): Promise<{
   wallpaperConfig?: WallpaperConfig;
   dockConfig?: DockPreferences;
-  soundConfig?: SoundConfig;
   windowPreferences?: WindowPreferences;
   notifications?: AboutIslandNotification[];
 } | null> {
@@ -79,7 +77,6 @@ export async function loadOSConfig(siteId = 'default-site'): Promise<{
   return {
     wallpaperConfig: data.wallpaperConfig,
     dockConfig: data.dockConfig,
-    soundConfig: data.soundConfig,
     windowPreferences: data.windowPreferences,
     notifications: data.islandNotifications,
   };

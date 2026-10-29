@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
       'image/icns',
       'video/mp4',
       'video/webm',
-      // Audio formats (used by SoundEffectsManager). Compressed server-side
+      // Audio formats (used by music/audio uploads). Compressed server-side
       // to MP3 128k mono via `optimizeAudioForPortfolio`. WAV uploads can
       // shrink dramatically; already-encoded MP3 falls back to original
       // when re-encoding would not help.
@@ -368,13 +368,10 @@ export async function POST(req: NextRequest) {
       finalFilename = `${customFilename}.${ext}`;
       // Pre-existing default for the project form: when a custom filename
       // is provided without an explicit folder, place it under
-      // `assets/projects`. New folders (sounds, wallpapers, …) honor the
+      // `assets/projects`. New folders (wallpapers, models, …) honor the
       // user-supplied folder so a custom filename + dedicated bucket can
-      // coexist (e.g. SoundEffectsManager pins `customFilename=startup`
-      // and expects it to land in `assets/sounds`).
-      if (folderParam === 'sounds') {
-        targetDir = 'assets/sounds';
-      } else if (folderParam === 'wallpapers') {
+      // coexist.
+      if (folderParam === 'wallpapers') {
         targetDir = 'assets/wallpapers';
       } else if (folderParam === 'models') {
         targetDir = 'assets/models';
@@ -405,11 +402,9 @@ export async function POST(req: NextRequest) {
         (folderParam.startsWith('assets/') ||
           folderParam === 'temp' ||
           folderParam === 'wallpapers' ||
-          folderParam === 'sounds' ||
           folderParam === 'models')
       ) {
         if (folderParam === 'wallpapers') targetDir = 'assets/wallpapers';
-        else if (folderParam === 'sounds') targetDir = 'assets/sounds';
         else if (folderParam === 'models') targetDir = 'assets/models';
         else targetDir = folderParam;
       } else {

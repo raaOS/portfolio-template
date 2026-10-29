@@ -1,15 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 
-// soundManager selalu dimock — tidak suara/buat Audio di jsdom.
-vi.mock('@/components/os/utils/SoundManager', () => ({
-  soundManager: {
-    play: vi.fn(),
-    preload: vi.fn(),
-    addSounds: vi.fn(),
-  },
-}));
-
 import { useChatSync } from '../useChatSync';
 
 // Nomor DUMMY — bukan nomor asli siapa pun (owner minta uji pakai nomor dummy).

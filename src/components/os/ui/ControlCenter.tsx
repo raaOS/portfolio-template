@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { Wifi, Bluetooth, Airplay, Moon, Sun, Volume2 } from 'lucide-react';
-import { soundManager } from '../utils/SoundManager';
 import { useOSMedia } from '../context/OSSystemContext';
 import { Z_LAYERS } from '../utils/zIndexLayers';
 import { useDictionary } from '@/contexts/LanguageContext';
@@ -12,20 +11,13 @@ interface ControlCenterProps {
   onClose?: () => void;
 }
 
-export default function ControlCenter({ isOpen, onClose: _onClose }: ControlCenterProps) {
+export default function ControlCenter({ isOpen: _isOpen, onClose: _onClose }: ControlCenterProps) {
   const { brightness, setBrightness, volume, setVolume } = useOSMedia();
   const t = useDictionary();
   const [wifiState, setWifiState] = useState(true);
   const [bluetoothState, setBluetoothState] = useState(true);
   const [airdropState, setAirdropState] = useState(false);
   const [dndState, setDndState] = useState(false);
-
-  // Sync volume with soundManager on mount or change
-  useEffect(() => {
-    if (isOpen) {
-      soundManager.setVolume(volume / 100);
-    }
-  }, [isOpen, volume]);
 
   // Apply brightness filter to the root element reactively.
   // Cleanup restores full brightness on unmount so the filter
@@ -202,8 +194,6 @@ export default function ControlCenter({ isOpen, onClose: _onClose }: ControlCent
                 onChange={(e) => {
                   const val = parseInt(e.target.value);
                   setVolume(val);
-                  // Real 0-100% volume control
-                  soundManager.setVolume(val / 100);
                 }}
                 aria-label={t.common.volume}
                 aria-valuenow={volume}

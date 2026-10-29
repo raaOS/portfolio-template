@@ -10,7 +10,6 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { m, useTransform, useSpring, AnimatePresence, MotionValue } from 'motion/react';
-import { useSystemSound } from '@/components/os/hooks/useSystemSound';
 // next-view-transitions/Link wraps next/link tapi auto-trigger
 // document.startViewTransition() di setiap klik. Tanpa ini, slide animation
 // antara halaman tidak akan jalan saat user klik dock dari /projects ke
@@ -63,7 +62,6 @@ export function DockItem({
   const ref = useRef<HTMLDivElement>(null);
   const navigationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useTransitionRouter();
-  const { playPop } = useSystemSound();
   // Aman dipanggil di luar <Link>: Next.js mengembalikan { pending: false }
   // ketika tidak ada Link parent.
   const { pending } = useLinkStatus();
@@ -104,10 +102,9 @@ export function DockItem({
   }, []);
 
   const triggerLocalFeedback = useCallback(() => {
-    playPop();
     setIsBouncing(true);
     setBounceKey((prev) => prev + 1);
-  }, [playPop]);
+  }, []);
 
   const isLinkWrapped = !!href;
 

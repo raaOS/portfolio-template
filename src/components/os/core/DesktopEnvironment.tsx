@@ -2,7 +2,7 @@
 // SECTION MAP
 // Imports, dynamic imports, and entrance timing constants
 // DesktopEnvironment: data preparation, boot skeleton, and providers
-// DesktopMainWithLogout: logout sound wrapper
+// DesktopMainWithLogout: logout wrapper
 // DesktopMain: window management, visitor session, layout persistence,
 // keyboard shortcuts, wallpaper transitions, and layer rendering
 // Mission Control layout math lives in ../utils/missionControlLayout.
@@ -32,7 +32,6 @@ import type { Project } from '@/types/projects';
 import type { TestimonialData } from '@/types/testimonial';
 import type { ContactData } from '@/types/contact';
 import type { WindowState } from '@/components/os/hooks/useWindowManager';
-import { soundManager } from '../utils/SoundManager';
 import { createInitialWindows } from '../utils/windowFactory';
 import { clearVisitorPositions } from '../utils/positionSync';
 import {
@@ -501,18 +500,7 @@ function DesktopMain({
     return () => window.clearTimeout(timer);
   }, [hiddenNoteIds, isAdmin, isAuthLoading, notes, notesLoaded, notesVisible, visitorNotesReady]);
 
-  useEffect(() => {
-    if (aboutData?.soundConfig) {
-      soundManager.loadConfig(aboutData.soundConfig);
-    }
-    if (needsPowerOn) {
-      soundManager.preload('startup');
-    }
-  }, [aboutData?.soundConfig, needsPowerOn]);
-
   const handleBootComplete = useCallback(() => {
-    soundManager.suppressSound('window-open', 1500);
-    soundManager.suppressSound('notification', 1000);
     startTransition(() => setIsRevealed(true));
     finishBooting();
   }, [finishBooting, setIsRevealed]);
@@ -520,14 +508,6 @@ function DesktopMain({
   const releaseBootCover = useCallback(() => {
     document.documentElement.removeAttribute('data-os-needs-boot');
   }, []);
-
-  // Handle initial sound suppression if boot is skipped
-  useEffect(() => {
-    if (!needsPowerOn && !isBooting) {
-      soundManager.suppressSound('window-open', 800);
-      soundManager.suppressSound('notification', 800);
-    }
-  }, [needsPowerOn, isBooting]);
 
   // Synchronize OS states for skipped boot to ensure immediate visibility on refresh
   useEffect(() => {
@@ -701,8 +681,6 @@ function DesktopMain({
                 // Reveal desktop layers while the Lottie boot fades out so
                 // user langsung lihat
                 // wallpaper, icons, dock, menubar — bukan layar kosong.
-                soundManager.suppressSound('window-open', 2500);
-                soundManager.suppressSound('notification', 1500);
                 startTransition(() => setIsRevealed(true));
               }}
             />

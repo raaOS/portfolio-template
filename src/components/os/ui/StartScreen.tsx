@@ -4,7 +4,6 @@ import dynamic from 'next/dynamic';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { m } from 'motion/react';
 import helloAnimationData from '../../../../public/lottie/hello hitam.json';
-import { soundManager } from '../utils/SoundManager';
 
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
@@ -55,7 +54,7 @@ const StartScreen = ({ onStart, isActive, onReady, onReveal }: StartScreenProps)
     timersRef.current.push(timer);
   }, []);
 
-  const handleStart = useCallback((options: { playSound: boolean } = { playSound: true }) => {
+  const handleStart = useCallback(() => {
     if (screenState !== 'idle' || hasStartedRef.current) {
       return;
     }
@@ -64,10 +63,6 @@ const StartScreen = ({ onStart, isActive, onReady, onReveal }: StartScreenProps)
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
 
-    if (options.playSound) {
-      soundManager.unlock();
-      soundManager.play('startup');
-    }
     setScreenState('booting');
 
     queueTimer(() => {
@@ -96,7 +91,7 @@ const StartScreen = ({ onStart, isActive, onReady, onReveal }: StartScreenProps)
     // Jaring pengaman saja — jalur normal selesai lewat onComplete lottie
     // (animasi HELLO 6 detik) di JSX bawah.
     const timer = setTimeout(() => {
-      handleStart({ playSound: false });
+      handleStart();
     }, BOOT_CONFIG.safetyFallbackDelay);
 
     return () => clearTimeout(timer);
@@ -109,7 +104,7 @@ const StartScreen = ({ onStart, isActive, onReady, onReveal }: StartScreenProps)
       }
 
       event.preventDefault();
-      handleStart({ playSound: true });
+      handleStart();
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -134,7 +129,7 @@ const StartScreen = ({ onStart, isActive, onReady, onReveal }: StartScreenProps)
         duration: BOOT_CONFIG.slideDuration / 1000,
         ease: [0.76, 0, 0.24, 1],
       }}
-      onClick={() => handleStart({ playSound: true })}
+      onClick={() => handleStart()}
     >
       <span className="sr-only">Mulai Portfolio OS</span>
       <m.div
@@ -154,7 +149,7 @@ const StartScreen = ({ onStart, isActive, onReady, onReveal }: StartScreenProps)
           animationData={helloAnimationData}
           loop={false}
           autoplay
-          onComplete={() => handleStart({ playSound: false })}
+          onComplete={() => handleStart()}
           className="h-full w-full"
         />
       </m.div>

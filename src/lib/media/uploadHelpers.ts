@@ -175,7 +175,6 @@ export function extFromContentType(type: string): string | null {
 export function scopeUploadDirectory(siteId: string, targetDir: string) {
   if (siteId === 'default-site') return targetDir;
   if (targetDir === 'assets/wallpapers') return `sites/${siteId}/wallpapers`;
-  if (targetDir === 'assets/sounds') return `sites/${siteId}/sounds`;
   if (targetDir === 'assets/models') return `sites/${siteId}/models`;
   if (targetDir.startsWith('assets/projects/comparisons')) {
     return `sites/${siteId}/projects/comparisons`;

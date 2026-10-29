@@ -175,15 +175,6 @@ export interface WindowPreferences {
   [key: string]: WindowPreference;
 }
 
-export interface SoundSetting {
-  path: string;
-  volume: number;
-}
-
-export interface SoundConfig {
-  [key: string]: SoundSetting;
-}
-
 export type LoaderStyle = 'deck-reveal' | 'hello';
 
 export interface LoaderConfig {
@@ -215,7 +206,6 @@ export interface AboutData {
   dockConfig?: DockPreferences;
   windowPreferences?: WindowPreferences;
   islandNotifications?: AboutIslandNotification[];
-  soundConfig?: SoundConfig;
   spatialGalleryConfig?: SpatialGalleryConfig;
   loaderConfig?: LoaderConfig;
 
@@ -248,7 +238,6 @@ export interface UpdateAboutData {
   dockConfig?: DockPreferences;
   windowPreferences?: WindowPreferences;
   islandNotifications?: AboutIslandNotification[];
-  soundConfig?: SoundConfig;
   spatialGalleryConfig?: SpatialGalleryConfig;
   loaderConfig?: LoaderConfig;
 

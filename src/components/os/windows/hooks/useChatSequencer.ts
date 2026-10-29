@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, startTransition } from 'react';
-import { soundManager } from '../../utils/SoundManager';
 import type { ContactProfile, ChatMessage } from '../../data/mockChats';
 
 export function useChatSequencer(activeContact: ContactProfile | null, showList: boolean) {
@@ -67,7 +66,6 @@ export function useChatSequencer(activeContact: ContactProfile | null, showList:
             if (prev?.find?.((m) => m.id === msg.id)) return prev;
             return [...prev, msg];
           });
-          soundManager.play('notification');
           currentIndex++;
           sequencerRef.current = setTimeout(nextStep, 1500);
         }, 2000);
