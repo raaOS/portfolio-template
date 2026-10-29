@@ -3,6 +3,20 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.76] - 2026-10-30
+
+### Lembaran Hero Diperbesar & Koridor Dirapatkan (Tanpa Mengubah Hit-Test)
+
+Atas permintaan owner: lembaran koridor hero (`MagazineShowcase`) terasa kecil dan jaraknya terlalu renggang. Hanya **enam konstanta** yang diubah — state machine, snap, overlay demo live, dan jalur hit-test tidak disentuh sama sekali.
+
+- **Ukuran lembaran:** `pageWidth/pageHeight` `720×450` → **`960×600`** design px (rasio 16:10 dipertahankan karena overlay demo live memakai viewport 1440×900 — kalau rasio berubah, iframe jadi gepeng/bercelah). Di titik tengah koridor lembaran kini setinggi **67% viewport** (sebelumnya 50%).
+- **Jarak antar lembaran:** `spacing` `5` → **`2`** (faktor jarak 0,5× → 0,26× lebar lembaran, **−31%**).
+- **Ritme luncur dijaga:** `drift` `1.2` → **`0.62`** supaya otomatis-luncur tetap ±3,5 detik per jarak lembaran (tanpa ini koridor terasa ngebut).
+- **Ketajaman:** `CELL_MAX` `1024` → **`1536`** (atlas 3 gambar jadi 3072², masih di bawah `ATLAS_MAX` 4096) — lembaran tidak makin blur saat diperbesar.
+- **Presisi klik:** `PICK_MAX` `1600` → **`2048`** — downscale pass pick lebih halus di monitor besar. Hit-test tetap memakai vertex shader + objek uniforms yang sama dengan material utama, jadi klik lembaran A tetap membuka A (render pick hanya 1× per pointerdown).
+- **Ukuran lembaran terangkat + demo live tidak berubah** (tetap 80% tinggi viewport, `DEFAULT_VIEW.zoom` 5).
+- **Verifikasi:** `npm run dev` + uji ketuk di area tumpang-tindih 3 template (label header demo live harus sama dengan lembaran yang diketuk), drag/scroll snap, resize saat live terbuka, dan mobile 390×844.
+
 ## [1.3.75] - 2026-10-29
 
 ### Efek Suara OS Dihapus Menyeluruh (Musik Tetap)

@@ -37,6 +37,12 @@
  *    = gambar screenshot statis). Sembunyi otomatis saat lembaran
  *    terangkat/live tayang, tab tersembunyi, atau video gagal dimuat
  *    (kembali ke gambar).
+ * 8. (v1.3.76) **Ukuran & kerapatan**: lembaran 720×450 → 960×600
+ *    (rasio 16:10 dipertahankan — syarat overlay live 1440×900), spacing
+ *    5 → 2 (jarak 0.5× → 0.26× lebar lembaran, −31%) dan drift 1.2 → 0.62
+ *    supaya ritme luncur tetap ±3,5 dtk/lembaran. Sel atlas 1024 → 1536
+ *    dan resolusi pass pick 1600 → 2048. Nol perubahan logika: hit-test
+ *    tetap memakai vertex shader + uniforms yang sama dengan scene.
  *
  * Interaksi bawaan terjaga: drag/scroll menjelajah koridor (guliran
  * halaman TIDAK tertelan — touchAction pan-y; drag berakhir = snap ke
@@ -59,28 +65,36 @@ const PAGE_SEGMENTS = 40;
 const MAX_PAGES = 60;
 const THICKNESS_RATIO = 0.005;
 const OFFSET_RANGE = 250;
-/** Penyesuaian #1: 512 → 1024 (sumber tangkapan layar 800px an). */
-const CELL_MAX = 1024;
+/** Penyesuaian #1: 512 → 1024 (sumber tangkapan layar 800px an).
+    v1.3.76: 1024 → 1536 — lembaran diperbesar 720→960 design px, jadi
+    sel 1024 mulai ter-upscale (~1,4×) saat lembaran terangkat. 3 gambar
+    → atlas 2×2 sel = 3072² (masih di bawah ATLAS_MAX 4096). */
+const CELL_MAX = 1536;
 const ATLAS_MAX = 4096;
 const PLACEHOLDER_ASPECTS = [0.72, 1.5, 0.78, 1.33, 1.0, 1.62, 0.68, 1.2, 0.86, 1.45];
 
-/* Default hero: tap to focus ke depan, drift halus 1.2, rasio layar 16:10 */
+/* Default hero: tap to focus ke depan, drift halus, rasio layar 16:10.
+   v1.3.76: spacing 5 → 2 & drift 1.2 → 0.62 (jarak 250px ≈ −31%, ritme
+   luncur tetap ±3,5 dtk/lembaran: 0.26 / (0.12 × 0.62)). */
 const DEFAULT_VIEW = { tap: true, zoom: 5, speed: 8 };
-const DEFAULT_TRAVEL = { drift: 1.2, smoothing: 5, wave: 5 };
+const DEFAULT_TRAVEL = { drift: 0.62, smoothing: 5, wave: 5 };
 const DEFAULTS = {
   pages: 20,
-  spacing: 5,
+  spacing: 2,
   tilt: 0,
   turn: 0,
-  pageWidth: 720,
-  pageHeight: 450,
+  pageWidth: 960,
+  pageHeight: 600,
   scrollSens: 5,
 };
 
 const CORRIDOR_DIM = 0.22;
 const TAP_SLOP = 6;
 const TAP_MS = 600;
-const PICK_MAX = 1600;
+/** v1.3.76: 1600 → 2048 — lembaran lebih besar & lebih rapat, jadi
+    downscale pass pick dibuat lebih halus agar tepi tumpang-tindih tetap
+    menunjuk lembaran yang benar-benar diketuk (1× render per klik). */
+const PICK_MAX = 2048;
 /** Batas default pemilih slot `videoSlotIndices` (fungsional murni).
     Koridor sendiri kini memakai jumlah lembaran ber-video dinamis (v1.3.55). */
 const VIDEO_LAYERS = 2;
