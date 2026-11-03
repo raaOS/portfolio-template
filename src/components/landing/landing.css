@@ -38,17 +38,46 @@
   font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
 }
 
+/* Pola Dots di area atas */
+.wave-landing-viewport.pattern-dots {
+  background-image: radial-gradient(rgba(11, 11, 15, 0.22) 1.2px, transparent 1.2px);
+  background-size: 26px 26px;
+  background-position: 0 0;
+}
+
+/* Pola Grid di area atas */
+.wave-landing-viewport.pattern-grid {
+  background-image:
+    linear-gradient(to right, rgba(11, 11, 15, 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(11, 11, 15, 0.08) 1px, transparent 1px);
+  background-size: 32px 32px, 32px 32px;
+  background-position: 0 0, 0 0;
+}
+
 /* Split latar 50/50 — atas kertas off-white, bawah biru logo — dengan tepi
-   keras lurus persis di tengah viewport (permintaan owner: "setengah putih
-   setengah biru, di tengah-tengah itu iframe live web"). Blok datar via
-   pseudo-element, BUKAN gradient. Z-index auto → panggung (`.mag-stage`
-   z-index 5) & navbar (z 25) tetap di atasnya. */
+   keras lurus persis di tengah viewport. */
 .wave-landing-viewport::after {
   content: '';
   position: absolute;
   inset: 50% 0 0 0;
-  background: var(--wr-accent);
+  background-color: var(--wr-accent);
   pointer-events: none;
+}
+
+/* Pola Dots di area bawah biru */
+.wave-landing-viewport.pattern-dots::after {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.35) 1.2px, transparent 1.2px);
+  background-size: 26px 26px;
+  background-position: 0 0;
+}
+
+/* Pola Grid di area bawah biru */
+.wave-landing-viewport.pattern-grid::after {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.14) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.14) 1px, transparent 1px);
+  background-size: 32px 32px, 32px 32px;
+  background-position: 0 0, 0 0;
 }
 
 /* ---------- Stage (panggung majalah WebGL — MagazineShowcase) ----------
@@ -69,6 +98,11 @@
 
 body.mag-live-active .mag-stage {
   z-index: 35;
+}
+
+body.mag-live-active .wave-nav-floating {
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* ==========================================================================
@@ -116,6 +150,77 @@ body.mag-live-active .mag-stage {
 
 .wave-nav-center {
   pointer-events: auto;
+}
+
+.wave-pattern-switcher {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  background: var(--wr-card-bg);
+  border: 1px solid var(--wr-border);
+  border-radius: 999px;
+  box-sizing: border-box;
+}
+
+/* Sliding active pill indicator */
+.wave-pattern-indicator {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  background: var(--wr-accent);
+  border-radius: 999px;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.wave-pattern-switcher.is-dots .wave-pattern-indicator {
+  transform: translateX(0);
+}
+
+.wave-pattern-switcher.is-grid .wave-pattern-indicator {
+  transform: translateX(100%);
+}
+
+.wave-pattern-btn {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Fixed equal width — slider indicator 50% bergantung pada tombol simetris.
+     Cukup lebar untuk "Grid" / "Dot" + ikon; translate="no" mencegah browser
+     menerjemahkan label jadi teks lebih panjang (mis. "Jaringan"). */
+  width: 68px;
+  padding: 6px 0;
+  border: none;
+  background: transparent;
+  color: var(--wr-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  user-select: none;
+  gap: 7px;
+}
+
+.wave-pattern-btn:hover {
+  color: var(--wr-text-primary);
+}
+
+.wave-pattern-btn.active {
+  color: #ffffff;
+}
+
+.wave-pattern-dot-icon {
+  width: 5.5px;
+  height: 5.5px;
+  border-radius: 50%;
+  background: currentColor;
 }
 
 .wave-badge-pill {

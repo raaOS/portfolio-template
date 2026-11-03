@@ -42,6 +42,12 @@ Hero `MagazineShowcase` (koridor lembaran WebGL) memakai lembaran 720×450 desig
 - **Tidak bisa diverifikasi dari sini:** rasa akhir di produksi (kecepatan drift, ketajaman tekstur pada layar owner) — butuh mata owner setelah deploy.
 
 
+## Deploy
+
+- **2026-10-30 (WIB):** `npm run deploy` sukses. Pre-deploy lolos (compat audit 0 blocker, tsc 0 error, eslint bersih, **150 file / 1.266 test PASS**), build OpenNext + upload Worker selesai, **Version ID `ad5b6e92-0a30-4632-a173-68d0385af8d4`**.
+- **Verifikasi produksi:** `https://makeitbetter.my.id/api/health` → `version 1.3.76`, `database connected` (105 ms), worker-health probe `32/32`. Bundle hero produksi (`/_next/static/chunks/1_yn6bcb-tiul.js`) memuat `pages:20, spacing:2, pageWidth:960, pageHeight:600`, `drift:.62`, dan `Math.min(1536, …)` — nilai lama `1024` sudah tidak ada.
+- **Catatan operasional:** dev server lokal (port 3000) dihentikan sebelum deploy karena `ensure-next-dev-not-running` menolak build saat port masih aktif.
+
 ## Catatan lanjutan
 
 - `public/landing/spatial-gallery.webp` hanya 3,5 KB (1440×900, sangat flat) — kalau ingin terlihat setajam dua template lain setelah diperbesar, tangkapan layarnya perlu direkam ulang. `os-desktop.webp` 1524×720 (rasio 2,12) sehingga di-letterbox pada lembaran 16:10.

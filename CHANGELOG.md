@@ -3,6 +3,26 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.77] - 2026-11-01
+
+### Tombol "Tab Baru" Demo Live Berfungsi + Emulator Siku & Switcher Dot/Grid
+
+Rilis ini menggabungkan perbaikan bug klik pada bilah "Live Web" dengan pekerjaan pemilik repo yang sebelumnya belum tercatat (sudut siku emulator, switcher pola latar). Nol perubahan pada data/D1.
+
+**1. Tombol Tab Baru / ✕ di demo live tidak pernah terpicu (bug laporan owner).**
+
+- **Akar masalah:** `MagazineScene.onPointerDown` memanggil `container.setPointerCapture()` untuk **setiap** pointerdown di koridor, termasuk tombol overlay. Pointer capture me-retarget event `click` ke container, sehingga `onClick` tombol Tab Baru / ✕ tidak pernah jalan (terbukti empiris di Chromium: pointerdown sampai ke tombol, `click` berakhir di container). Jalur Esc tetap hidup — itu sebabnya bug ini tidak terlihat saat menutup demo.
+- **Perbaikan:** handler hanya bertindak bila `event.target` adalah kanvas WebGL (satu-satunya permukaan drag). Kini **Tab Baru** membuka `previewUrl` template yang sedang ditayangkan iframe demo di tab baru, **✕** menutup, dan klik backdrop menutup lagi sesuai desain awal.
+
+**2. Emulator siku + switcher pola latar (pekerjaan 2026-10-30, ikut dirilis di sini).**
+
+- Sudut emulator live `borderRadius` 14/10 px → **0**, `boxShadow` → **none**, blur ungu di backdrop dihapus, navbar atas disembunyikan (`body.mag-live-active .wave-nav-floating`).
+- Cover 3D tidak lagi bocor di pinggir emulator: uniform `uLiveActive` di `PAGE_VERTEX` menyembunyikan lembaran fokus selama demo live.
+- Badge "Interactive 3D Portfolio OS" diganti **switcher Dot/Grid** (`.wave-pattern-switcher`, indikator pill meluncur, `translate="no"` anti-terjemahan).
+- Rincian lengkap: `docs/tracker/logs/fix_hero_cover_bocor_grid_dot_switcher_2026_10_30.md`.
+
+**Verifikasi:** `npx vitest run src/components/landing/__tests__/magazine-showcase.test.tsx` **13 test PASS**; `constants.test.ts` (APP_VERSION = entri teratas CHANGELOG) PASS; `eslint` file tersentuh bersih; uji browser Chromium: switcher Dot/Grid mengganti kelas `.pattern-dots`/`.pattern-grid`, emulator `border-radius: 0px`, klik **Tab Baru** membuka tab baru berisi URL demo yang sama dengan iframe, drag koridor tetap bekerja.
+
 ## [1.3.76] - 2026-10-30
 
 ### Lembaran Hero Diperbesar & Koridor Dirapatkan (Tanpa Mengubah Hit-Test)

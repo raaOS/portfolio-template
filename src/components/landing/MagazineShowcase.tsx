@@ -314,6 +314,7 @@ const PAGE_VERTEX = `
  uniform float uFocusProgress;
  uniform float uFocusScale;
  uniform float uFocusZ;
+ uniform float uLiveActive;
 
  varying vec2 vUv;
  varying vec4 vRect;
@@ -358,6 +359,10 @@ const PAGE_VERTEX = `
 
      float focused = step(abs(aIndex - uFocusIndex), 0.5);
      float e = focused * uFocusProgress;
+     if (uLiveActive > 0.5 && focused > 0.5) {
+         gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+         return;
+     }
 
      float k = mix(1.0, uFocusScale, e);
      vec3 pivot = rotationCenter * (1.0 - e);
@@ -715,6 +720,7 @@ class MagazineScene {
     this.focus.target = 0;
     if (this.liveActive) {
       this.liveActive = false;
+      this.material.uniforms.uLiveActive.value = 0;
       this.onLiveEnd?.();
     }
   }
@@ -766,6 +772,7 @@ class MagazineScene {
         uFocusProgress: { value: 0 },
         uFocusScale: { value: 1 },
         uFocusZ: { value: 0 },
+        uLiveActive: { value: 0 },
         uPageAspect: { value: 2 / 3 },
         uAtlas: { value: this.blank as THREE.Texture },
       },
@@ -841,6 +848,7 @@ class MagazineScene {
     this.material.uniforms.uFocusProgress.value = 0;
     if (this.liveActive) {
       this.liveActive = false;
+      this.material.uniforms.uLiveActive.value = 0;
       this.onLiveEnd?.();
     }
   }
@@ -1195,6 +1203,12 @@ class MagazineScene {
 
   private onPointerDown = (event: PointerEvent) => {
     if (this.disposed || event.button !== 0) return;
+    /* Hanya kanvas 3D (satu-satunya permukaan drag) yang boleh menangkap
+       pointer. Overlay UI di atasnya — backdrop dan bilah "Live Web" dengan
+       tombol Tab Baru / ✕ — harus menerima click biasa: `setPointerCapture`
+       di container me-retarget click ke container, sehingga tombol overlay
+       tak pernah terpicu (bug: Tab Baru tidak membuka tab apa pun). */
+    if (event.target !== this.renderer.domElement) return;
     this.tap = {
       x: event.clientX,
       y: event.clientY,
@@ -1382,6 +1396,8 @@ class MagazineScene {
             : undefined;
           if (img && previewUrlOf(img)) {
             this.liveActive = true;
+            this.material.uniforms.uLiveActive.value = 1;
+            this.renderer.render(this.scene, this.camera);
             this.onLive?.(this.focus.index, this.computeFocusRect());
           }
         }
@@ -1716,7 +1732,7 @@ export default function MagazineShowcase({
                   inset: 0,
                   zIndex: 2,
                   background: 'rgba(0,0,0,0.4)',
-                  backdropFilter: 'blur(3px)',
+
                   cursor: 'zoom-out',
                 }}
               />
@@ -1730,10 +1746,10 @@ export default function MagazineShowcase({
                   width: live.rect.width,
                   height: live.rect.height,
                   zIndex: 3,
-                  borderRadius: 14,
+                  borderRadius: 0,
                   background: '#0d0d12',
-                  boxShadow:
-                    '0 25px 60px -15px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.18)',
+                  boxShadow: 'none',
+
                 }}
               >
                 {/* Top Header Bar di atas frame agar tidak memotong isi viewport */}
@@ -1750,7 +1766,7 @@ export default function MagazineShowcase({
                     background: 'rgba(15, 15, 22, 0.95)',
                     backdropFilter: 'blur(12px)',
                     border: '1px solid rgba(255,255,255,0.15)',
-                    borderRadius: 10,
+                    borderRadius: 0,
                     zIndex: 10,
                   }}
                 >
@@ -1762,7 +1778,7 @@ export default function MagazineShowcase({
                           height: 8,
                           borderRadius: '50%',
                           backgroundColor: '#10B981',
-                          boxShadow: '0 0 8px #10B981',
+                          boxShadow: 'none',
                         }}
                       />
                       <span
@@ -1841,7 +1857,7 @@ export default function MagazineShowcase({
                     position: 'absolute',
                     inset: 0,
                     overflow: 'hidden',
-                    borderRadius: 14,
+                    borderRadius: 0,
                     background: '#000',
                   }}
                 >

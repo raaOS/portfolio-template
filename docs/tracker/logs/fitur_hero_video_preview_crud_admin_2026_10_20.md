@@ -96,6 +96,27 @@ Setelah v1.3.48 (koridor majalah → snap → demo live on-tap) live, owner ingi
 
 > **Jika tampilan demo template berubah** (wallpaper/layout/fitur baru di halaman utama demo), **rekam ulang video hero & upload lewat admin → zone Tampilan → Video Hero** (ganti per slot). Tanpa ini, preview video hero jadi tidak akurat terhadap demo terbaru. Slot yang dikosongkan otomatis jatuh ke video default/gambar — aman kapan saja.
 
+## v1.3.77 — Tombol "Tab Baru" / "✕" Demo Live Tidak Berfungsi (2026-11-01)
+
+**Laporan owner (screenshot bilah "OS Desktop · LIVE WEB"):** menekan **Tab Baru** tidak membuka tab apa pun. Yang diinginkan: demo yang sedang ditayangkan di iframe terbuka di tab baru browser.
+
+**Akar masalah (terbukti empiris).** `MagazineScene.onPointerDown` (`MagazineShowcase.tsx`) memanggil `this.container.setPointerCapture(event.pointerId)` untuk **setiap** pointerdown di koridor — termasuk pointerdown yang jatuh di tombol overlay. Pointer capture me-retarget event lanjutan (termasuk `click` kompatibilitas) ke elemen pemegang capture. Dibuktikan di Chromium dengan markup minimal: pointerdown tercatat di `<button>`, wrapper memanggil `setPointerCapture`, lalu `click` diterima **wrapper** — handler React tombol tidak pernah jalan. Jalur tutup **Esc** tetap hidup (listener `keydown` di `window`), karena itu bug tidak terlihat saat menutup demo.
+
+**Perbaikan (1 guard).** `onPointerDown` langsung `return` bila `event.target !== this.renderer.domElement` — hanya kanvas WebGL (satu-satunya permukaan drag) yang menangkap pointer. Konsekuensi yang diinginkan: klik pada backdrop dan bilah "Live Web" kembali normal (Tab Baru → `window.open(previewUrlOf(liveImage))`, ✕ → `closeLive`, backdrop → `closeLive`).
+
+**Verifikasi (dev server 3101 di folder utama, Chromium 1000×700).**
+
+- Live demo dibuka pada lembaran `infinite-canvas`; iframe demo `src="/preview/infinite-canvas"`.
+- Tombol **Tab Baru** diklik dengan klik *trusted* → tab baru: `http://localhost:3101/preview/infinite-canvas`, judul *"3D Infinite Canvas Template Demo"* = **URL yang sama dengan iframe**.
+- Emulator siku terkonfirmasi dari `getComputedStyle` pada rantai induk tombol: kontainer frame `border-radius: 0px`, `box-shadow: none` (pekerjaan 2026-10-30 ikut tervalidasi).
+- Switcher pola: klik tombol **Grid** → `.wave-pattern-switcher` jadi `is-grid` dan `.wave-landing-viewport` jadi `pattern-grid` (sebelumnya `is-dots` / `pattern-dots`).
+- `npx eslint` 3 file tersentuh: bersih. `npx vitest run magazine-showcase + constants`: **2 file / 19 test PASS** (termasuk guard `APP_VERSION` = entri teratas CHANGELOG).
+- Instrumentasi sementara `window.__mag` untuk mengukur **sudah dihapus** (diverifikasi ulang lewat `git diff`: tidak ada sisa `__mag`).
+
+**File diubah:** `src/components/landing/MagazineShowcase.tsx` (guard 6 baris), `src/lib/constants.ts` (APP_VERSION 1.3.77), `CHANGELOG.md`.
+
+**Catatan untuk AI berikutnya:** jangan menambahkan listener pointer pada container koridor tanpa memeriksa `event.target`. Setiap `setPointerCapture` di ancestor mematikan SEMUA tombol overlay di dalamnya (Tab Baru, ✕, dan kontrol baru yang mungkin ditambahkan nanti). Pola aman yang dipakai sekarang: capture hanya dari kanvas.
+
 ## Aturan yang TIDAK Boleh Dilanggar AI Berikutnya
 
 - Jangan tampilkan aplikasi "Video Hero" / route API-nya di site klien (ownerOnly + requireOwnerMode; jangan dilepas tanpa keputusan owner).

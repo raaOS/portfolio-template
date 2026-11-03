@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, Sparkles } from 'lucide-react';
+import { ArrowUpRight, Grid } from 'lucide-react';
 import { archivoBlack } from '@/app/fonts';
 import { TEMPLATES_DATA } from './templates';
 import MagazineShowcase from './MagazineShowcase';
@@ -33,8 +33,12 @@ export default function LandingPage({
   heroVideos?: Record<string, string>;
   heroPosters?: Record<string, string>;
 }) {
+  const [bgPattern, setBgPattern] = useState<'grid' | 'dots'>('dots');
+
   return (
-    <main className={`wave-landing-viewport ${archivoBlack.variable}`}>
+    <main
+      className={`wave-landing-viewport ${archivoBlack.variable} pattern-${bgPattern}`}
+    >
       {/* Satu h1 tetap ada untuk SEO/a11y, disembunyikan secara visual —
           hero besar & hub bawah sudah dihapus atas permintaan owner. */}
       <h1 className="sr-only">PORTFOLIO OS</h1>
@@ -60,9 +64,33 @@ export default function LandingPage({
         </Link>
 
         <div className="wave-nav-center">
-          <div className="wave-badge-pill">
-            <Sparkles size={13} className="text-[#0008FF]" />
-            <span>Interactive 3D Portfolio OS</span>
+          <div
+            className={`wave-pattern-switcher is-${bgPattern}`}
+            role="group"
+            aria-label="Pilih background pattern"
+            translate="no"
+          >
+            {/* Sliding Pill Indicator */}
+            <span className="wave-pattern-indicator" aria-hidden="true" />
+
+            <button
+              type="button"
+              onClick={() => setBgPattern('dots')}
+              className={`wave-pattern-btn ${bgPattern === 'dots' ? 'active' : ''}`}
+              title="Dot Pattern"
+            >
+              <span className="wave-pattern-dot-icon" />
+              <span>Dot</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setBgPattern('grid')}
+              className={`wave-pattern-btn ${bgPattern === 'grid' ? 'active' : ''}`}
+              title="Grid Pattern"
+            >
+              <Grid size={11} />
+              <span>Grid</span>
+            </button>
           </div>
         </div>
 
