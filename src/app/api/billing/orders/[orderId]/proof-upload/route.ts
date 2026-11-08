@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyOrderAccessToken, uploadPaymentProof } from '@/lib/services/orderService';
 import { checkAdminAuth } from '@/lib/auth';
 import { enforceRequestRateLimit } from '@/lib/security/request';
-import { uploadToR2 } from '@/lib/r2Storage';
+import { uploadToR2, isR2StorageConfigured } from '@/lib/r2Storage';
+import { mediaDisabled } from '@/lib/api-response';
 import crypto from 'crypto';
 
 /**
@@ -73,6 +74,12 @@ export async function POST(
     const buffer = new Uint8Array(await file.arrayBuffer());
     const randomSuffix = crypto.randomBytes(4).toString('hex');
     const key = `orders/${orderId}/proof-${Date.now()}-${randomSuffix}.${extension}`;
+
+    // Deferred R2 (v1.3.78): cek sebelum upload supaya pesan 503 konsisten
+    // (dulu jatuh ke 500 generik lewat catch karena uploadToR2 melempar).
+    if (!isR2StorageConfigured()) {
+      return mediaDisabled();
+    }
 
     let uploaded: { key: string; url: string } | null = null;
     try {

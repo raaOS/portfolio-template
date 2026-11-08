@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { validateAdminRequest } from '@/lib/auth';
 import { SITE_ID } from '@/crud/shared/config';
-import { getR2Object } from '@/lib/r2Storage';
+import { getR2Object, isR2StorageConfigured } from '@/lib/r2Storage';
+import { mediaDisabled } from '@/lib/api-response';
 
 const BACKUP_PREFIX = `sites/${SITE_ID}/backups/d1/`;
 
@@ -38,6 +39,11 @@ export async function GET(req: NextRequest) {
     const key = req.nextUrl.searchParams.get('key') || '';
     if (!isValidBackupKey(key)) {
       return NextResponse.json({ error: 'Invalid backup key' }, { status: 400 });
+    }
+
+    // Deferred R2 (v1.3.78): tanpa R2 tidak ada backup yang tersimpan.
+    if (!isR2StorageConfigured()) {
+      return mediaDisabled();
     }
 
     const object = await getR2Object(key);

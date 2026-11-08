@@ -528,6 +528,43 @@ Konten legacy disimpan sebagai JSON string di tabel `app_kv`:
    scripts/cloudflare/reset-customer-password.ts
 ```
 
+### Deferred R2 Mode (v1.3.78) — deploy tanpa media, aktivasi oleh klien
+
+> Keputusan owner (2026-11-08): R2 menuntut verifikasi kartu/PayPal per akun
+> Cloudflare (CF error **10042**), dan owner melarang 1 kartu dipakai di
+> puluhan akun klien (risiko suspend anti-abuse). Arsitektur "1 klien = 1 R2"
+> **tetap** — yang berubah hanya timing. Detail penuh:
+> `docs/tracker/logs/fitur_deferred_r2_onboarding_2026_11_09.md`;
+> SOP: `docs/operations/GLADI_RESIK_KLIEN_PERDANA.md` §10.
+
+- **Alur:** deploy hari-1 TANPA R2 (situs online, 0 request media) → klien
+  aktivasi R2 sendiri via **wizard handover** `?onboard=<token>` → owner klik
+  "Selesaikan Setup" (= deploy ulang `/api/deploy-client`) → media ON.
+- **Kata kunci (jangan dihapus AI berikutnya):** `R2_PENDING` + `WIZARD_TOKEN`
+  di `arsip-klien/<slug>/config.env` (owner-side); `media_pending`,
+  `wizard_token_hash`, `wizard_token_created_at`, `wizard_completed` di D1
+  klien `site_settings` (nilai **wajib JSON.stringify**); `owner_whatsapp` di
+  `platform_settings` (JSON `{number}` — sumber `getOwnerWhatsapp`).
+- **Posture pending:** `buildClientEnvPlan` memaksa `CLOUDFLARE_R2_BUCKET` +
+  `CLOUDFLARE_R2_PUBLIC_BASE_URL` kosong → `isR2StorageConfigured()` false →
+  semua gate media balas **503 `mediaDisabled()`** (jangan kembalikan ke 500
+  env-key-leak), backup harian D1 klien skip, binding `MEDIA_BUCKET` di-skip
+  (`skipR2`) di wrangler config.
+- **Finalisasi:** probe R2 di-hoist DI ATAS `buildClientEnvPlan` di
+  `deployClient` (`create:true` saat flag aktif — PUT idempoten). Tulis D1
+  (`media_pending=false`, `wizard_completed=true`) **dulu**, baru hapus flag
+  config.env (self-healing: gagal → klik Selesaikan Setup lagi).
+- **Fail-closed tetap:** 10042 **tanpa** flag (klien lama) tetap menggagalkan
+  deploy; CLI `cloud-manager.ts` tidak mendukung pending (portal-only); 403
+  izin token tetap gagal keras di semua jalur.
+- **Wizard:** `R2ActivationWizard` (root layout) hanya tampil via
+  `?onboard=<token>` dari `window.location.search` (BUKAN server-read — home
+  ISR; token bisa ter-bake ke cache HTML). Endpoint publik read-only
+  `GET /api/onboarding/r2-status` (rate limit 30/menit; `wizard_completed`
+  dicek sebelum validasi token; umur token 30 hari).
+- **Dilarang:** mengaktifkan R2 pakai kartu owner di akun klien. Klien tanpa
+  kartu → 1 kartu virtual khusus klien itu, catat kadaluarsa di arsip.
+
 ### Deploy Pipeline
 
 Deploy per klien ditangani `deployClient()` di `scripts/onboarding/client-deploy.ts` (dipanggil portal `server.ts` STEP 5 dan CLI `cloud-manager.ts`), **bukan** `wrangler pages deploy` lagi:

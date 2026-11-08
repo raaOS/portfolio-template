@@ -15,11 +15,11 @@ import {
 import {
   buildR2PublicUrl,
   deleteFromR2,
-  getMissingR2EnvKeys,
   headR2Object,
   isR2StorageConfigured,
   uploadToR2,
 } from '@/lib/r2Storage';
+import { mediaDisabled } from '@/lib/api-response';
 import {
   assertWallpaperImageDimensions,
   extractPngFromIcns,
@@ -243,12 +243,8 @@ export async function POST(req: NextRequest) {
     }
 
     if (!isR2StorageConfigured()) {
-      return NextResponse.json(
-        {
-          error: `Cloudflare R2 env is incomplete. Missing: ${getMissingR2EnvKeys().join(', ')}`,
-        },
-        { status: 500 }
-      );
+      // Deferred R2 (v1.3.78): 503 ramah tanpa membocorkan nama kunci env.
+      return mediaDisabled();
     }
 
     const { searchParams } = new URL(req.url);
@@ -678,12 +674,8 @@ export async function DELETE(req: NextRequest) {
     }
 
     if (!isR2StorageConfigured()) {
-      return NextResponse.json(
-        {
-          error: `Cloudflare R2 env is incomplete. Missing: ${getMissingR2EnvKeys().join(', ')}`,
-        },
-        { status: 500 }
-      );
+      // Deferred R2 (v1.3.78): 503 ramah tanpa membocorkan nama kunci env.
+      return mediaDisabled();
     }
 
     await deleteFromR2(storagePath);

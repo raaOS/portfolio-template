@@ -12,8 +12,8 @@ import {
   buildR2PublicUrl,
   headR2Object,
   isR2StorageConfigured,
-  getMissingR2EnvKeys,
 } from '@/lib/r2Storage';
+import { mediaDisabled } from '@/lib/api-response';
 import type { Wallpaper } from '@/types/about';
 
 /**
@@ -175,12 +175,8 @@ export async function POST(req: NextRequest) {
     await assertKnownSite(siteId);
 
     if (!isR2StorageConfigured()) {
-      return NextResponse.json(
-        {
-          error: `Cloudflare R2 env tidak lengkap. Missing: ${getMissingR2EnvKeys().join(', ')}`,
-        },
-        { status: 500 }
-      );
+      // Deferred R2 (v1.3.78): 503 ramah tanpa membocorkan nama kunci env.
+      return mediaDisabled();
     }
 
     const about = await aboutService.getAboutData(true, false, siteId);

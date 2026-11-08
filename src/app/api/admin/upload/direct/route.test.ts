@@ -4,12 +4,14 @@ import { NextRequest } from 'next/server';
 const {
   uploadToR2Mock,
   verifyR2UploadTokenMock,
+  isConfiguredMock,
   getAdminSiteContextMock,
   enforceSiteStorageQuotaUnlockedMock,
   checkDataRateLimitMock,
 } = vi.hoisted(() => ({
   uploadToR2Mock: vi.fn(),
   verifyR2UploadTokenMock: vi.fn(),
+  isConfiguredMock: vi.fn(),
   getAdminSiteContextMock: vi.fn(),
   enforceSiteStorageQuotaUnlockedMock: vi.fn(),
   checkDataRateLimitMock: vi.fn(),
@@ -18,6 +20,7 @@ const {
 vi.mock('@/lib/r2Storage', () => ({
   uploadToR2: uploadToR2Mock,
   verifyR2UploadToken: verifyR2UploadTokenMock,
+  isR2StorageConfigured: isConfiguredMock,
 }));
 
 vi.mock('@/lib/dataRateLimit', () => ({
@@ -65,6 +68,9 @@ describe('PUT /api/admin/upload/direct', () => {
       maxSize: 1024,
       siteId: 'site-1',
     });
+    // Deferred R2 (v1.3.78): default media aktif; test terpisah menegaskan
+    // perilaku 503 saat tidak aktif.
+    isConfiguredMock.mockReturnValue(true);
     checkDataRateLimitMock.mockResolvedValue({ allowed: true });
     uploadToR2Mock.mockResolvedValue({
       key: 'sites/site-1/projects/videos/demo.mp4',
@@ -76,6 +82,15 @@ describe('PUT /api/admin/upload/direct', () => {
       quota: { storageMb: 100 },
     });
     enforceSiteStorageQuotaUnlockedMock.mockResolvedValue({});
+  });
+
+  it('returns 503 media-disabled when R2 is not configured (deferred R2)', async () => {
+    isConfiguredMock.mockReturnValue(false);
+    const response = await PUT(buildRequest({ contentLength: '11' }) as never);
+    expect(response.status).toBe(503);
+    const body = await response.json();
+    expect(body.error).toContain('Media belum diaktifkan');
+    expect(uploadToR2Mock).not.toHaveBeenCalled();
   });
 
   it('uses FixedLengthStream for known-length request bodies', async () => {

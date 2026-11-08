@@ -14,11 +14,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const r2Configured = isR2StorageConfigured();
+
     return NextResponse.json({
-      backups: await listD1Backups(),
+      // Deferred R2 (v1.3.78): tanpa R2, `listD1Backups` akan melempar error
+      // S3 fallback — jawab daftar kosong, bukan 500 mentah.
+      backups: r2Configured ? await listD1Backups() : [],
       keepCount: BACKUP_KEEP_COUNT,
       d1Configured: isD1Configured(),
-      r2Configured: isR2StorageConfigured(),
+      r2Configured,
     });
   } catch (error) {
     console.error('[API/Admin/Backup] GET error:', error);

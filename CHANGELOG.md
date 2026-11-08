@@ -3,6 +3,40 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.78] - 2026-11-09
+
+### Deferred R2: Onboarding Tanpa Media + Wizard Aktivasi Klien (Hapus Blocker Kartu)
+
+Keputusan owner: R2 menuntut verifikasi kartu/PayPal di akun Cloudflare klien (CF error 10042) dan owner menolak 1 kartu untuk puluhan akun (risiko suspend massal). Sekarang **deploy hari-1 tetap jalan tanpa R2**, klien mengaktifkan sendiri lewat wizard handover, owner menekan "Selesaikan Setup". Arsitektur "1 klien = 1 R2" tidak berubah; situs klien tanpa token wizard tidak berubah sama sekali.
+
+**1. Mode deferred di onboarding & deploy.**
+
+- STEP 3 portal: CF error **10042** tidak lagi menggagalkan onboarding — flag `R2_PENDING="true"` + token wizard ditulis ke `arsip-klien/<slug>/config.env`, flag media + hash token ditulis ke D1 klien (`site_settings`), nomor WA owner di-seed ke `platform_settings` (format `getOwnerWhatsapp`). Error lain (403 izin, dll.) tetap fail-closed; **CLI `cloud-manager.ts` tetap fail-closed** di 10042 (pending flow portal-only).
+- `buildClientEnvPlan`: `R2_PENDING=true` **memaksa kosong** `CLOUDFLARE_R2_BUCKET` + `CLOUDFLARE_R2_PUBLIC_BASE_URL` (mengalahkan fallback `||`) → `isR2StorageConfigured()` false → semua gate media membalas 503 ramah, backup harian skip. Probe R2 di `deployClient` **di-hoist di atas perhitungan env** dengan `create:true` saat flag aktif: sukses = bucket dibuat + flag dihapus in-memory → build yang sama langsung media-ON ("Selesaikan Setup" = deploy ulang via `/api/deploy-client`, idempoten, self-healing: tulis D1 gagal → klik lagi).
+- Finalisasi menulis D1 **dulu** (`media_pending=false`, `wizard_completed=true`), baru menghapus flag config.env — tulis D1 gagal tidak pernah meninggalkan situs "selesai tapi mati".
+- Wrangler config klien: binding `MEDIA_BUCKET` dilewati (`skipR2`) saat pending.
+- `/api/provision` ikut kunci deploy proses-tunggal (cek sebelum header SSE).
+
+**2. Wizard handover ber-token di situs klien.**
+
+- Komponen `R2ActivationWizard` (root layout): hanya tampil via `?onboard=<token>` yang dibaca dari `window.location.search` (aman dari bake cache ISR home) — situs publik tak berubah.
+- Endpoint publik read-only `GET /api/onboarding/r2-status?token=`: `selesai` dicek pertama; token di-hash sha256 + timing-safe (pola order), umur 30 hari, rate limit 30/menit; deep-link dashboard & link WA hanya dikirim ke pemegang token valid. Kredensial tidak pernah dirender di situs.
+
+**3. Runtime media saat pending: 503 ramah, bukan 500 bocor env.**
+
+- Helper `mediaDisabled()` (503 `Media belum diaktifkan`) dipasang di 8 endpoint media (upload FormData/DELETE, presign, direct — gate setelah token & sebelum body —, project cover/media/video-presign, wallpaper-poster-backfill, backup GET/GET-download, proof-upload) + normalisasi kegagalan import S3-fallback di Worker.
+- 503 proxy `/r2/[...key]` ikut pesan baru.
+
+**4. Portal.**
+
+- Kartu sukses provisioning: pesan WA siap-copy lengkap (link wizard + langkah + ekspektasi "maks 1×24 jam").
+- Daftar klien: `r2Pending` + `wizardUrl` (salin ulang link kapan pun).
+- Endpoint `POST /api/r2-pending/check`: cek read-only semua klien pending (terdeteksi sendiri yang sudah aktivasi — tidak menunggu WA).
+
+**5. SOP & docs.** `GLADI_RESIK_KLIEN_PERDANA.md` §10 (alur baru + kewajiban owner: cek pending harian, larangan kartu owner, kartu virtual per klien sebagai fallback, backup skip saat pending); AGENTS.md §12; tracker log `docs/tracker/logs/fitur_deferred_r2_onboarding_2026_11_09.md`.
+
+**Verifikasi:** `npx tsc --noEmit` bersih; `npm run lint` bersih; `npm test` **1277 test PASS** (termasuk test baru: posture pending `buildClientEnvPlan`, `skipR2` wrangler, `ensureR2Bucket` penanda `pending`, 6 skenario `r2-status`, 503 di 7 endpoint); desain melalui **3 ronde red-team** (ronde 1 runtime, ronde 2 provisioning, ronde 3 delta) — 20+ temuan file:line semuanya ditutup (detail di tracker log).
+
 ## [1.3.77] - 2026-11-01
 
 ### Tombol "Tab Baru" Demo Live Berfungsi + Emulator Siku & Switcher Dot/Grid

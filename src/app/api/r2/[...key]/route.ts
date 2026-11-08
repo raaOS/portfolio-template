@@ -21,7 +21,9 @@ export async function OPTIONS() {
 
 async function serveR2Object(request: NextRequest, context: RouteContext, headOnly: boolean) {
   if (!isR2StorageConfigured()) {
-    return NextResponse.json({ error: 'Cloudflare R2 is not configured' }, { status: 503 });
+    // Deferred R2 (v1.3.78): situs klien onboarding tanpa R2 — pengunjung
+    // tidak akan pernah meminta `/r2/...` sampai media diaktifkan.
+    return NextResponse.json({ error: 'Media belum diaktifkan' }, { status: 503 });
   }
 
   const { key: keyParts } = await context.params;

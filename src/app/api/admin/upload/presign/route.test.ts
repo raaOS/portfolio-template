@@ -57,16 +57,15 @@ describe('POST /api/upload/presign', () => {
     expect(body.error).toBe('Unauthorized');
   });
 
-  it('returns 500 when R2 is not configured', async () => {
+  it('returns 503 when R2 is not configured (deferred R2)', async () => {
     validateAdminRequestMock.mockResolvedValue(true);
     isConfiguredMock.mockReturnValue(false);
-    missingKeysMock.mockReturnValue(['R2_BUCKET']);
 
     const response = await POST(buildRequest({ folder: 'wallpapers' }) as never);
     const body = await response.json();
 
-    expect(response.status).toBe(500);
-    expect(body.error).toContain('R2_BUCKET');
+    expect(response.status).toBe(503);
+    expect(body.error).toContain('Media belum diaktifkan');
   });
 
   it('rejects when folder is not allowed', async () => {

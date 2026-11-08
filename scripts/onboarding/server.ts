@@ -6,7 +6,7 @@ import { spawn } from 'child_process';
 import { SHARED_SCHEMA_QUERIES } from '../../src/crud/shared/db/schema';
 import { D1_SCHEMA_QUERIES } from '../../src/lib/d1-schema';
 import { hashPasswordScrypt } from '../../src/crud/shared/auth/password';
-import { clientUrls, deployClient, ensureR2Bucket, resolveWorkersSubdomain, workersDevUrl } from './client-deploy';
+import { clientUrls, deployClient, ensureR2Bucket, resolveWorkersSubdomain, upsertConfigEnv, workersDevUrl } from './client-deploy';
 import { probeClientHealth } from './portal-status';
 import { sendWebsiteOnlineEmail, listOrderSlugs } from './notify-online';
 import { attachWorkerDomain, findWorkerDomain, buildDomainHandoverMessage, guardWorkerDomainAttach } from './custom-domain';
@@ -36,6 +36,7 @@ import {
   readClientDetail,
   readClientSecrets,
   readProjectVersions,
+  resolveArchiveConfigPath,
 } from './portal-clients';
 
 const PORT = Number(process.env.PORT) || 4567;
@@ -168,6 +169,48 @@ async function d1Query(
   return Array.isArray(first?.results) ? first.results : [];
 }
 
+/**
+ * Deferred R2 (v1.3.78): tandai media selesai di D1 klien setelah deploy
+ * finalisasi sukses. Nilai ditulis JSON.stringify (kanonis setSiteSetting —
+ * ronde-2 temuan F4); dipanggil dari /api/deploy-client hanya untuk klien
+ * yang sebelum deploy masih `R2_PENDING=true`.
+ *
+ * Pemanggil yang menghapus baris `R2_PENDING` dari config.env SETELAH fungsi
+ * ini sukses (ronde-3 temuan #2/A): kalau tulis D1 gagal, flag tetap true →
+ * klik "Selesaikan Setup" berikutnya menulis ulang (self-healing).
+ */
+async function finalizeDeferredMediaInD1(env: Record<string, string>): Promise<string> {
+  const accountId = env.CLOUDFLARE_ACCOUNT_ID || '';
+  const apiToken = env.CLOUDFLARE_API_TOKEN || '';
+  const databaseId = env.CLOUDFLARE_D1_DATABASE_ID || '';
+  const siteId = env.CUSTOMER_SITE_ID || env.CUSTOMER_SLUG || '';
+  if (!accountId || !apiToken || !databaseId || !siteId) {
+    throw new Error('config.env klien tidak lengkap (account/token/database/site).');
+  }
+
+  const now = new Date().toISOString();
+  const upsertSettingSql = `
+    INSERT INTO site_settings (id, site_id, setting_key, setting_value, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(site_id, setting_key)
+    DO UPDATE SET setting_value = excluded.setting_value, updated_at = excluded.updated_at;
+  `;
+  const settings: Array<[string, string]> = [
+    ['media_pending', 'false'],
+    ['wizard_completed', 'true'],
+  ];
+  for (const [key, value] of settings) {
+    await d1Query(accountId, apiToken, databaseId, upsertSettingSql, [
+      `setting_${siteId}_${key}`,
+      siteId,
+      key,
+      value,
+      now,
+    ]);
+  }
+  return 'media_pending=false + wizard_completed=true ditulis ke D1 klien';
+}
+
 // Generate folder arsip bernomor (01_slug, 02_slug, ...) — kini ada di
 // ./onboard-reuse (createArchiveDir) supaya portal & CLI memakai kebijakan yang sama.
 
@@ -231,13 +274,24 @@ async function provisionClient(
 
   // STEP 3: Storage Media R2
   onProgress(3, 'Menyiapkan Storage Media R2...', `Membuat bucket R2: ${r2BucketName}`);
-  // FAIL-CLOSED (audit 2026-10-24, temuan K8): dulu kegagalan di sini hanya
-  // `console.warn`, lalu portal tetap mengklaim "Infrastruktur Siap" dan build
-  // 5–10 menit berujung gagal saat wrangler deploy (bucket tidak ada).
-  // Sekarang provisioning berhenti dengan pesan yang bisa ditindaklanjuti.
+  // FAIL-CLOSED (audit 2026-10-24, temuan K8) + DEFERRED R2 (v1.3.78):
+  // dulu kegagalan di sini hanya `console.warn` (provisioning klaim siap tapi
+  // build gagal). Sekarang: kegagalan umum tetap menghentikan provisioning,
+  // TAPI 10042 (R2 belum diaktifkan di akun — butuh kartu/PayPal klien)
+  // TIDAK menghentikan: onboarding lanjut TANPA media. deployClient membaca
+  // flag R2_PENDING dari config.env dan membangun Worker tanpa binding R2;
+  // media menyala setelah klien aktivasi + owner klik "Selesaikan Setup".
   const r2 = await ensureR2Bucket(accountId, apiToken, r2BucketName, { create: true });
-  if (!r2.ok) {
+  const r2Pending = !r2.ok && r2.pending === true;
+  if (!r2.ok && !r2Pending) {
     throw new Error(`STEP 3 gagal menyiapkan bucket R2: ${r2.detail}`);
+  }
+  if (r2Pending) {
+    onProgress(
+      3,
+      'R2 belum diaktifkan — onboarding lanjut TANPA media (deferred).',
+      r2.detail
+    );
   }
 
   // STEP 4: Migrasi Skema Tabel & Data Awal
@@ -392,6 +446,78 @@ async function provisionClient(
     }
   }
 
+  // STEP 4d: Seed flag media deferred + token wizard (v1.3.78).
+  // Hanya untuk klien pending (R2 belum bisa dibuat). Nilai DITULIS sebagai
+  // JSON.stringify supaya `getSiteSetting` (JSON.parse) bisa membacanya —
+  // tulis raw hash tanpa JSON = dibaca null diam-diam (ronde-2 temuan F4).
+  // site_settings punya FK ke sites(id) — seed di sini berarti baris sites
+  // sudah ada (seed site SQL di atas). Bentuk INSERT mirror persis
+  // setSiteSetting (src/crud/shared/settings/site.ts:49-59) termasuk kolom
+  // `id` NOT NULL PK (schema STRICT).
+  let wizardToken = '';
+  let wizardUrl = '';
+  if (r2Pending) {
+    wizardToken = crypto.randomBytes(32).toString('hex');
+    const wizardHash = crypto.createHash('sha256').update(wizardToken).digest('hex');
+    const seededAt = new Date().toISOString();
+    const upsertSettingSql = `
+      INSERT INTO site_settings (id, site_id, setting_key, setting_value, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(site_id, setting_key)
+      DO UPDATE SET setting_value = excluded.setting_value, updated_at = excluded.updated_at;
+    `;
+    const wizardSettings: Array<[string, string]> = [
+      ['media_pending', 'true'],
+      ['wizard_token_hash', wizardHash],
+      ['wizard_token_created_at', seededAt],
+    ];
+    for (const [key, value] of wizardSettings) {
+      await d1Query(accountId, apiToken, databaseId, upsertSettingSql, [
+        `setting_${siteId}_${key}`,
+        siteId,
+        key,
+        value,
+        seededAt,
+      ]);
+    }
+    // Verifikasi tulis (audit 2026-10-08 temuan #2: tulis D1 tidak boleh
+    // dianggap sukses tanpa dibaca balik).
+    const pendingRows = await d1Query(
+      accountId,
+      apiToken,
+      databaseId,
+      `SELECT setting_value FROM site_settings WHERE site_id = ? AND setting_key = 'media_pending' LIMIT 1`,
+      [siteId]
+    );
+    if (pendingRows.length === 0) {
+      throw new Error('Verifikasi STEP 4d gagal — flag media_pending tidak tersimpan.');
+    }
+
+    // Nomor WA owner untuk tombol "Kabari Owner via WA" di wizard. Ditulis ke
+    // platform_settings (bukan site_settings) dengan format persis yang dibaca
+    // getOwnerWhatsapp: JSON { number } (pricingConfigService.ts:115-140) —
+    // ronde-3 temuan #12: bentuk salah = link WA kosong diam-diam.
+    const ownerWa = String(
+      process.env.ADMIN_WHATSAPP || process.env.NEXT_PUBLIC_ADMIN_WA || ''
+    ).replace(/\D/g, '');
+    if (ownerWa) {
+      const seedWaSql = `
+        INSERT INTO platform_settings (key, value, updated_at)
+        VALUES ('owner_whatsapp', ?, ?)
+        ON CONFLICT(key)
+        DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at;
+      `;
+      await d1Query(accountId, apiToken, databaseId, seedWaSql, [
+        JSON.stringify({ number: ownerWa, updatedAt: seededAt }),
+        seededAt,
+      ]);
+    } else {
+      console.warn(
+        '⚠️ ADMIN_WHATSAPP/NEXT_PUBLIC_ADMIN_WA kosong di .env.local — tombol WA wizard klien ini tidak akan berisi nomor.'
+      );
+    }
+  }
+
   // STEP 5: Pengarsipan Folder Klien (Isolasi Total)
   onProgress(5, 'Mengarsipkan Kunci & Dokumen Klien...', 'Menyimpan ke folder arsip-klien di laptop');
   // Re-provision: tulis ulang ke folder arsip YANG SAMA (arsip lama dipakai ulang,
@@ -437,8 +563,19 @@ async function provisionClient(
     ADMIN_URL: adminUrl,
   };
   if (subdomain) controlledEnv.WORKERS_SUBDOMAIN = subdomain;
+  // Deferred R2 (v1.3.78): flag pending + token wizard (mentah, owner-side
+  // only — tidak pernah masuk build/Worker klien) agar portal bisa membangun
+  // ulang link wizard kapan pun ("salin ulang link" tanpa baca D1).
+  if (r2Pending) {
+    controlledEnv.R2_PENDING = 'true';
+    controlledEnv.WIZARD_TOKEN = wizardToken;
+  }
   const hasWorkersSubdomain = Boolean(subdomain || prevEnv.WORKERS_SUBDOMAIN);
-  const leftoverKeys = Object.keys(prevEnv).filter((k) => !(k in controlledEnv)).sort();
+  // R2_PENDING difilter dari sisa kunci lama (ronde-2 temuan F8): klien yang
+  // sudah difinalisasi lalu di-re-provision tidak boleh "hidup lagi" pending.
+  const leftoverKeys = Object.keys(prevEnv)
+    .filter((k) => !(k in controlledEnv) && k !== 'R2_PENDING')
+    .sort();
 
   const envContent = [
     `# ========================================================`,
@@ -489,6 +626,20 @@ async function provisionClient(
     `Email    : ${adminEmail}`,
     `Password : ${adminPassword}`,
     ``,
+    ...(r2Pending
+      ? [
+          `ACTIVASI MEDIA (5 MENIT — GRATIS, WAJIB SEBELUM UPLOAD FOTO/VIDEO):`,
+          `------------------------------------------------------------------`,
+          `• Buka link wizard : ${websiteUrl}/?onboard=${wizardToken}`,
+          `• Login dash.cloudflare.com pakai akun Cloudflare yang dibuatkan`,
+          `  untuk klien ini (bukan akun pribadi).`,
+          `• Klik R2 → Enable → verifikasi pembayaran (PayPal / kartu debit).`,
+          `  GRATIS — kuota portfolio jauh di bawah batas free tier ($0).`,
+          `• Kabari owner via WhatsApp setelah selesai; media aktif maks`,
+          `  1×24 jam (owner menyelesaikan dari sisi admin).`,
+          ``,
+        ]
+      : []),
     `Semua foto, video karya, dan kontak bisa kamu tambahkan sendiri dengan sangat mudah di ruang admin. Selamat berkarya dan sukses selalu! 🎉✨`,
     `==================================================================`,
   ].join('\n');
@@ -510,6 +661,10 @@ async function provisionClient(
     archiveFolder: `arsip-klien/${folderName}`,
     databaseId,
     r2BucketName,
+    // Deferred R2 (v1.3.78): portal menampilkan pesan WA + link wizard
+    // langsung di kartu sukses kalau klien pending.
+    r2Pending,
+    wizardUrl: r2Pending ? `${websiteUrl.replace(/\/+$/, '')}/?onboard=${wizardToken}` : '',
   };
 }
 
@@ -704,6 +859,25 @@ const server = http.createServer(async (req, res) => {
 
   // API: Provision (Server-Sent Events for live progress)
   if (url === '/api/provision' && req.method === 'POST') {
+    // Deferred R2 (v1.3.78, ronde-3 temuan #5): provisioning berakhir di
+    // deployClient yang memakai `.open-next` bersama — harus ikut kunci
+    // deploy proses-tunggal. Cek di PALING ATAS (sebelum writeHead SSE):
+    // sendJson setelah header terkirim memicu ERR_HTTP_HEADERS_SENT.
+    if (deployInProgress) {
+      sendJson(res, 409, {
+        success: false,
+        message: 'Proses build/deploy lain sedang berjalan. Coba lagi setelah selesai.',
+      });
+      return;
+    }
+    deployInProgress = true;
+    let provisionLockReleased = false;
+    const releaseProvisionLock = () => {
+      if (provisionLockReleased) return;
+      provisionLockReleased = true;
+      deployInProgress = false;
+    };
+
     let body = '';
     req.on('data', (chunk) => (body += chunk));
     req.on('end', async () => {
@@ -795,6 +969,8 @@ const server = http.createServer(async (req, res) => {
       } catch (err) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: false, message: (err as Error).message }));
+      } finally {
+        releaseProvisionLock();
       }
     });
     return;
@@ -1361,6 +1537,83 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // API: Deferred R2 — cek status aktivasi media semua klien pending (v1.3.78).
+  // Read-only: GET bucket per klien pending (create:false). Tidak mengubah
+  // apa pun; owner memakai hasilnya untuk memutuskan klik "Selesaikan Setup".
+  //   activated=true            → R2 sudah aktif (bucket ada) → finalisasi.
+  //   pending=true (10042)      → klien belum aktivasi → follow-up WA.
+  //   404 (R2 aktif, bucket tak ada) → finalisasi akan membuat bucket otomatis.
+  if (url === '/api/r2-pending/check' && req.method === 'POST') {
+    try {
+      const pendingSummaries = listClientSummaries(ARCHIVE_DIR).filter((c) => c.r2Pending);
+      const results: Array<{
+        folder: string;
+        clientName: string;
+        slug: string;
+        activated: boolean;
+        stillPending: boolean;
+        detail: string;
+        wizardUrl: string;
+      }> = [];
+
+      for (const summary of pendingSummaries) {
+        const configPath = resolveArchiveConfigPath(ARCHIVE_DIR, summary.id);
+        if (!configPath) {
+          results.push({
+            folder: summary.id,
+            clientName: summary.clientName,
+            slug: summary.clientSlug,
+            activated: false,
+            stillPending: true,
+            detail: 'config.env tidak ditemukan.',
+            wizardUrl: summary.wizardUrl,
+          });
+          continue;
+        }
+        const env = parseEnv(fs.readFileSync(configPath, 'utf-8'));
+        const bucketName =
+          env.CLOUDFLARE_R2_BUCKET || env.CLOUDFLARE_R2_BUCKET_NAME || `media-${summary.clientSlug}`;
+        try {
+          const r2 = await ensureR2Bucket(
+            env.CLOUDFLARE_ACCOUNT_ID || '',
+            env.CLOUDFLARE_API_TOKEN || '',
+            bucketName,
+            { create: false }
+          );
+          results.push({
+            folder: summary.id,
+            clientName: summary.clientName,
+            slug: summary.clientSlug,
+            activated: r2.ok,
+            stillPending: r2.pending === true,
+            detail: r2.detail,
+            wizardUrl: summary.wizardUrl,
+          });
+        } catch (checkErr) {
+          results.push({
+            folder: summary.id,
+            clientName: summary.clientName,
+            slug: summary.clientSlug,
+            activated: false,
+            stillPending: true,
+            detail: `Gagal memeriksa: ${(checkErr as Error).message}`,
+            wizardUrl: summary.wizardUrl,
+          });
+        }
+      }
+
+      sendJson(res, 200, {
+        success: true,
+        checkedAt: new Date().toISOString(),
+        total: results.length,
+        results,
+      });
+    } catch (err) {
+      sendJson(res, 500, { success: false, message: (err as Error).message });
+    }
+    return;
+  }
+
   // API: Deploy / Update Client Template (Server-Sent Events for live streaming)
   if (url === '/api/deploy-client' && req.method === 'POST') {
     // KUNCI DEPLOY (audit 2026-10-26, temuan K2): build OpenNext menghapus dan
@@ -1500,6 +1753,9 @@ const server = http.createServer(async (req, res) => {
         const folder = targetFolders[i];
         const envPath = path.join(ARCHIVE_DIR, folder, 'config.env');
         const env = parseEnv(fs.readFileSync(envPath, 'utf-8'));
+        // Deferred R2 (v1.3.78): dibaca SEBELUM deployClient (yang menghapus
+        // flag in-memory saat finalisasi sukses).
+        const wasR2Pending = env.R2_PENDING === 'true';
 
         const clientName = env.CUSTOMER_NAME || folder;
         const clientSlug = env.CUSTOMER_SLUG || folder;
@@ -1529,6 +1785,21 @@ const server = http.createServer(async (req, res) => {
           sendEvent('log', {
             text: `✓ BERHASIL! Website ${clientName} telah diperbarui ke versi template terbaru: ${outcome.websiteUrl}`,
           });
+
+          // Deferred R2 (v1.3.78): finalisasi media — tulis flag D1 dulu,
+          // baru hapus flag config.env. Gagal tulis D1 = flag tetap true =
+          // klik "Selesaikan Setup" berikutnya menulis ulang (self-healing).
+          if (wasR2Pending) {
+            try {
+              const finalizeNote = await finalizeDeferredMediaInD1(env);
+              upsertConfigEnv(envPath, { R2_PENDING: '' });
+              sendEvent('log', { text: `📦 Deferred R2: ${finalizeNote}` });
+            } catch (finalizeErr) {
+              sendEvent('log', {
+                text: `⚠️ Deferred R2: finalisasi flag gagal — ${(finalizeErr as Error).message}. Klik "Selesaikan Setup" lagi untuk menulis ulang.`,
+              });
+            }
+          }
 
           // PK2 — retry deploy pertama dari kartu sukses onboarding:
           // kirim email "Website Sudah Online" (best-effort).

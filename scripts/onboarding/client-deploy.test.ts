@@ -123,6 +123,42 @@ describe('buildClientEnvPlan (Owner Mode fail-closed)', () => {
     expect(plan.buildOnly.CLOUDFLARE_D1_API_TOKEN).toBe('tok-d1');
     expect(plan.overrides.CLOUDFLARE_D1_API_TOKEN).toBeUndefined();
   });
+
+  it('deferred R2: R2_PENDING=true memaksa kedua kunci R2 kosong (tanpa fallback)', () => {
+    const plan = buildClientEnvPlan({
+      CUSTOMER_SLUG: 'klien-pending',
+      CLOUDFLARE_ACCOUNT_ID: 'acc',
+      CLOUDFLARE_API_TOKEN: 'acctok',
+      CLOUDFLARE_D1_DATABASE_ID: 'db',
+      CLOUDFLARE_D1_API_TOKEN: 'tok',
+      CLOUDFLARE_R2_BUCKET: 'media-klien-pending',
+      CLOUDFLARE_R2_PUBLIC_BASE_URL: '/r2',
+      JWT_SECRET: 'jwt',
+      PASSWORD_SALT: 'salt',
+      R2_PENDING: 'true',
+    });
+
+    // Ronde-2 temuan F1/F2: fallback `|| media-${slug}` / `|| '/r2'` TIDAK
+    // boleh menghidupkan ulang nilai — `isR2StorageConfigured()` harus false.
+    expect(plan.overrides.CLOUDFLARE_R2_BUCKET).toBe('');
+    expect(plan.overrides.CLOUDFLARE_R2_PUBLIC_BASE_URL).toBe('');
+    // Nama bucket tetap hidup di config.env → klien tetap deployable.
+    expect(plan.missing).toEqual([]);
+  });
+
+  it('deferred R2: tanpa flag, perilaku lama utuh (kunci R2 terisi)', () => {
+    const plan = buildClientEnvPlan({
+      CUSTOMER_SLUG: 'klien-normal',
+      CLOUDFLARE_ACCOUNT_ID: 'acc',
+      CLOUDFLARE_D1_DATABASE_ID: 'db',
+      CLOUDFLARE_R2_BUCKET: 'media-klien-normal',
+      JWT_SECRET: 'jwt',
+      PASSWORD_SALT: 'salt',
+    });
+
+    expect(plan.overrides.CLOUDFLARE_R2_BUCKET).toBe('media-klien-normal');
+    expect(plan.overrides.CLOUDFLARE_R2_PUBLIC_BASE_URL).toBe('/r2');
+  });
 });
 
 describe('readOwnerEnvKeys', () => {
@@ -223,6 +259,50 @@ describe('writeWranglerClientConfig (binding D1, tanpa token di vars)', () => {
         overrides: {},
       })
     ).toThrow(/CLOUDFLARE_D1_DATABASE_ID kosong/i);
+  });
+
+  it('deferred R2: skipR2=true menghilangkan binding MEDIA_BUCKET', () => {
+    const root = makeOwnerRoot('');
+
+    const configPath = writeWranglerClientConfig({
+      rootDir: root,
+      slug: 'klien-pending',
+      overrides: {
+        CLOUDFLARE_D1_DATABASE_ID: 'db-id-456',
+        JWT_SECRET: 'jwt-klien',
+      },
+      skipR2: true,
+    });
+
+    const config = JSON.parse(readFileSync(configPath, 'utf8')) as {
+      r2_buckets?: Array<Record<string, string>>;
+      d1_databases: Array<Record<string, string>>;
+    };
+
+    expect(config.r2_buckets).toBeUndefined();
+    expect(config.d1_databases).toHaveLength(1);
+  });
+
+  it('tanpa skipR2, binding MEDIA_BUCKET tetap ditulis (perilaku lama)', () => {
+    const root = makeOwnerRoot('');
+
+    const configPath = writeWranglerClientConfig({
+      rootDir: root,
+      slug: 'klien-normal',
+      overrides: {
+        CLOUDFLARE_D1_DATABASE_ID: 'db-id-789',
+        CLOUDFLARE_R2_BUCKET: 'media-klien-normal',
+        JWT_SECRET: 'jwt-klien',
+      },
+    });
+
+    const config = JSON.parse(readFileSync(configPath, 'utf8')) as {
+      r2_buckets?: Array<Record<string, string>>;
+    };
+
+    expect(config.r2_buckets).toEqual([
+      { binding: 'MEDIA_BUCKET', bucket_name: 'media-klien-normal' },
+    ]);
   });
 });
 
@@ -404,6 +484,9 @@ describe('ensureR2Bucket (fail-closed sebelum build)', () => {
 
     expect(result.ok).toBe(false);
     expect(result.detail).toContain('R2 belum diaktifkan');
+    // Deferred R2 (v1.3.78): 10042 membawa penanda pending — pemanggil
+    // memakainya untuk melanjutkan onboarding tanpa media.
+    expect(result.pending).toBe(true);
   });
 
   it('menolak bucket yang hilang, bukan lanjut build', async () => {

@@ -16,6 +16,17 @@ export interface ClientSummary {
   deployable: boolean;
   /** Kunci wajib yang masih kosong; dipakai UI untuk menjelaskan alasan. */
   missingKeys: string[];
+  /**
+   * Deferred R2 (v1.3.78): true saat media klien belum aktif (R2 belum
+   * diaktifkan di akun klien). Situs sudah online, media menyusul.
+   */
+  r2Pending: boolean;
+  /**
+   * Link wizard aktivasi media untuk klien pending (`/?onboard=<token>`).
+   * Token mentah hanya hidup di config.env milik owner — tidak pernah ke
+   * Worker klien. Kosong untuk klien non-pending.
+   */
+  wizardUrl: string;
 }
 
 /** Hasil penilaian satu konfigurasi arsip terhadap syarat deploy klien. */
@@ -173,6 +184,13 @@ export function maskIdentifier(value: string): string {
   return `${value.slice(0, 6)}…${value.slice(-4)}`;
 }
 
+/** Bangun link wizard aktivasi media dari token mentah di config.env (owner-side). */
+export function buildWizardUrl(env: Record<string, string>, websiteUrl: string): string {
+  const token = env.WIZARD_TOKEN || '';
+  if (!token || !websiteUrl) return '';
+  return `${websiteUrl.replace(/\/+$/, '')}/?onboard=${token}`;
+}
+
 export function listClientSummaries(archiveDir: string): ClientSummary[] {
   if (!fs.existsSync(archiveDir)) return [];
 
@@ -187,6 +205,7 @@ export function listClientSummaries(archiveDir: string): ClientSummary[] {
       const { env } = data;
       const urls = clientUrls(env, folderName);
       const deploy = assessDeployability(env);
+      const r2Pending = env.R2_PENDING === 'true';
       return [{
         id: folderName,
         clientName: env.CUSTOMER_NAME || folderName,
@@ -198,6 +217,8 @@ export function listClientSummaries(archiveDir: string): ClientSummary[] {
         templateKey: env.ACTIVE_TEMPLATE_KEY || 'os-desktop',
         deployable: deploy.deployable,
         missingKeys: deploy.missingKeys,
+        r2Pending,
+        wizardUrl: r2Pending ? buildWizardUrl(env, urls.websiteUrl) : '',
       }];
     });
 }
@@ -224,6 +245,8 @@ export function readClientDetail(
     templateKey: env.ACTIVE_TEMPLATE_KEY || 'os-desktop',
     deployable: deploy.deployable,
     missingKeys: deploy.missingKeys,
+    r2Pending: env.R2_PENDING === 'true',
+    wizardUrl: env.R2_PENDING === 'true' ? buildWizardUrl(env, urls.websiteUrl) : '',
     siteId: env.CUSTOMER_SITE_ID || clientSlug,
     archiveFolder: `arsip-klien/${folderName}`,
     workerName: clientSlug,

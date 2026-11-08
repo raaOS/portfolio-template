@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { uploadToR2, verifyR2UploadToken } from '@/lib/r2Storage';
+import { uploadToR2, verifyR2UploadToken, isR2StorageConfigured } from '@/lib/r2Storage';
+import { mediaDisabled } from '@/lib/api-response';
 import { checkDataRateLimit } from '@/lib/dataRateLimit';
 import { getClientIP } from '@/lib/security/request';
 
@@ -108,6 +109,13 @@ export async function PUT(req: NextRequest) {
     const contentType = req.headers.get('content-type') || '';
     if (contentType !== payload.contentType) {
       return NextResponse.json({ error: 'Content-Type does not match upload token' }, { status: 400 });
+    }
+
+    // Deferred R2 (v1.3.78): gate SETELAH token & target tervalidasi (PUT
+    // tanpa token tidak boleh membedakan "media off" dari "target salah")
+    // dan SEBELUM body dibaca, mencakup kedua call uploadToR2 di bawah.
+    if (!isR2StorageConfigured()) {
+      return mediaDisabled();
     }
 
     const contentLengthHeader = req.headers.get('content-length');

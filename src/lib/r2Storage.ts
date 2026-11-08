@@ -208,7 +208,20 @@ async function getR2BucketOrFallback() {
   const bucket = await getRuntimeR2Bucket();
   if (bucket) return { bucket, fallback: null };
 
-  return { bucket: null, fallback: await getS3Fallback() };
+  try {
+    return { bucket: null, fallback: await getS3Fallback() };
+  } catch (err) {
+    // Deferred R2 (v1.3.78): di Worker klien tanpa binding `MEDIA_BUCKET`,
+    // import modul S3 gagal karena modul itu sengaja tidak di-bundle ke
+    // Worker. Normalisasi jadi pesan yang sama dengan gate konfigurasi
+    // (bukan "Cannot find module" yang tidak bisa ditindaklanjuti).
+    if (err instanceof Error && err.message.includes('Cannot find module')) {
+      throw new Error(
+        'Media belum diaktifkan. Selesaikan aktivasi media (R2) terlebih dahulu.'
+      );
+    }
+    throw err;
+  }
 }
 
 function createNotFoundError(key: string) {

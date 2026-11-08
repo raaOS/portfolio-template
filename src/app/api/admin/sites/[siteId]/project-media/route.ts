@@ -6,10 +6,10 @@ import {
 import { validateSiteMutationRequest } from '@/lib/admin/siteMutationAuth';
 import {
   deleteFromR2,
-  getMissingR2EnvKeys,
   isR2StorageConfigured,
   uploadToR2,
 } from '@/lib/r2Storage';
+import { mediaDisabled } from '@/lib/api-response';
 import {
   withSiteQuotaLock,
   enforceSiteStorageQuotaUnlocked,
@@ -63,12 +63,8 @@ export async function POST(
     }
 
     if (!isR2StorageConfigured()) {
-      return NextResponse.json(
-        {
-          error: `Cloudflare R2 env is incomplete. Missing: ${getMissingR2EnvKeys().join(', ')}`,
-        },
-        { status: 500 }
-      );
+      // Deferred R2 (v1.3.78): 503 ramah tanpa membocorkan nama kunci env.
+      return mediaDisabled();
     }
 
     const site = await getAdminSiteContext(siteId);

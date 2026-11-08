@@ -149,11 +149,10 @@ describe('POST /api/admin/wallpaper-poster-backfill', () => {
     expect(updateAboutData).not.toHaveBeenCalled();
   });
 
-  it('returns 500 when R2 env is missing', async () => {
+  it('returns 503 when R2 env is missing (deferred R2)', async () => {
     isR2StorageConfigured.mockReturnValue(false);
-    getMissingR2EnvKeys.mockReturnValueOnce(['CLOUDFLARE_R2_BUCKET']);
     const res = await POST(buildPostRequest());
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(503);
   });
 
   it('returns success no-op when collection is empty', async () => {

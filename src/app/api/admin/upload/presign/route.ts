@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  createR2PresignedPutUrl,
-  getMissingR2EnvKeys,
-  isR2StorageConfigured,
-} from '@/lib/r2Storage';
+import { createR2PresignedPutUrl, isR2StorageConfigured } from '@/lib/r2Storage';
+import { mediaDisabled } from '@/lib/api-response';
 import { validateSiteMutationRequest } from '@/lib/admin/siteMutationAuth';
 import {
   assertKnownSite,
@@ -72,12 +69,8 @@ function sanitizeBaseName(input: string): string {
 export async function POST(req: NextRequest) {
   try {
     if (!isR2StorageConfigured()) {
-      return NextResponse.json(
-        {
-          error: `Cloudflare R2 env is incomplete. Missing: ${getMissingR2EnvKeys().join(', ')}`,
-        },
-        { status: 500 }
-      );
+      // Deferred R2 (v1.3.78): 503 ramah tanpa membocorkan nama kunci env.
+      return mediaDisabled();
     }
 
     const body = (await req.json().catch(() => null)) as PresignRequestBody | null;

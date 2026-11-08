@@ -39,7 +39,7 @@ describe('/api/r2/[...key]', () => {
       const body = await response.json();
 
       expect(response.status).toBe(503);
-      expect(body.error).toContain('R2');
+      expect(body.error).toContain('Media belum diaktifkan');
     });
 
     it('returns 404 for keys outside allowed prefixes', async () => {

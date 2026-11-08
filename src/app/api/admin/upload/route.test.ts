@@ -172,10 +172,9 @@ describe('/api/upload', () => {
       expect(body.error).toContain('Invalid filename');
     });
 
-    it('returns 500 when R2 is not configured', async () => {
+    it('returns 503 when R2 is not configured (deferred R2)', async () => {
       validateAdminMock.mockResolvedValue(true);
       isConfiguredMock.mockReturnValue(false);
-      missingKeysMock.mockReturnValue(['R2_ACCOUNT_ID']);
 
       const req = buildRequestWithFormData({
         name: 'test.png',
@@ -185,8 +184,8 @@ describe('/api/upload', () => {
       const response = await POST(req as never);
       const body = await response.json();
 
-      expect(response.status).toBe(500);
-      expect(body.error).toContain('R2_ACCOUNT_ID');
+      expect(response.status).toBe(503);
+      expect(body.error).toContain('Media belum diaktifkan');
     });
 
     it('rejects oversized images', async () => {

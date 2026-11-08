@@ -193,6 +193,26 @@ export function rateLimit(
 }
 
 /**
+ * Create a 503 response for media operations while the client's R2 storage is
+ * not active yet (deferred R2 mode, v1.3.78: onboarding deploys without R2 and
+ * the client activates it later via the handover wizard). Gates that guard
+ * media endpoints use this instead of leaking env-key names in a 500.
+ */
+export function mediaDisabled(): NextResponse<ApiErrorResponse> {
+  return NextResponse.json(
+    {
+      success: false,
+      error: 'Media belum diaktifkan. Selesaikan aktivasi media (R2) terlebih dahulu.',
+      errorCode: 'MEDIA_DISABLED',
+      meta: {
+        timestamp: new Date().toISOString(),
+      },
+    },
+    { status: 503 }
+  );
+}
+
+/**
  * Create an internal server error response
  */
 export function serverError(

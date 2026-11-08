@@ -203,6 +203,17 @@ export interface ClientEnvPlan {
 export function buildClientEnvPlan(config: EnvMap): ClientEnvPlan {
   const slug = config.CUSTOMER_SLUG || '';
 
+  /**
+   * Deferred R2 (v1.3.78): `R2_PENDING="true"` di config.env berarti bucket R2
+   * klien belum bisa dibuat (R2 belum diaktifkan di akun Cloudflare-nya).
+   * Deploy TETAP jalan tanpa media: kedua kunci R2 runtime DIPAKSA kosong —
+   * mengalahkan fallback `||` di bawah — supaya `isR2StorageConfigured()`
+   * (src/lib/r2Storage.ts) false dan semua gate media membalas 503 ramah,
+   * backup harian skip. Nama bucket tetap hidup di config.env (dipakai
+   * "Selesaikan Setup"); kosong di sini hanya untuk build/runtime klien.
+   */
+  const r2Pending = config.R2_PENDING === 'true';
+
   const overrides: EnvMap = {
     CUSTOMER_SITE_ID: config.CUSTOMER_SITE_ID || slug,
     CLOUDFLARE_ACCOUNT_ID: config.CLOUDFLARE_ACCOUNT_ID || '',
@@ -211,11 +222,12 @@ export function buildClientEnvPlan(config: EnvMap): ClientEnvPlan {
     // `env.DB` (lihat writeWranglerClientConfig). Token tetap hidup di
     // config.env untuk pemeliharaan owner, bukan di runtime klien.
     CLOUDFLARE_R2_ACCOUNT_ID: config.CLOUDFLARE_R2_ACCOUNT_ID || config.CLOUDFLARE_ACCOUNT_ID || '',
-    CLOUDFLARE_R2_BUCKET:
-      config.CLOUDFLARE_R2_BUCKET || config.CLOUDFLARE_R2_BUCKET_NAME || `media-${slug}`,
+    CLOUDFLARE_R2_BUCKET: r2Pending
+      ? ''
+      : config.CLOUDFLARE_R2_BUCKET || config.CLOUDFLARE_R2_BUCKET_NAME || `media-${slug}`,
     // Proxy publik `/r2/[...key]` di aplikasi sendiri (allowlist key `sites/`,
     // `assets/`, `platform/`, dst) — bucket klien tidak perlu domain publik.
-    CLOUDFLARE_R2_PUBLIC_BASE_URL: config.CLOUDFLARE_R2_PUBLIC_BASE_URL || '/r2',
+    CLOUDFLARE_R2_PUBLIC_BASE_URL: r2Pending ? '' : config.CLOUDFLARE_R2_PUBLIC_BASE_URL || '/r2',
     JWT_SECRET: config.JWT_SECRET || '',
     PASSWORD_SALT: config.PASSWORD_SALT || '',
     // Audit 2026-10-06 (MEDIUM): cron harian klien (backup D1 → R2 klien, 01:00 WIB).
@@ -357,6 +369,12 @@ export interface WranglerClientInput {
   kvTagId?: string;
   /** Nama database D1 klien (informasional di wrangler; `database_id` yang mengikat). */
   d1DatabaseName?: string;
+  /**
+   * Deferred R2 (v1.3.78): true saat klien pending — binding `MEDIA_BUCKET`
+   * TIDAK ditulis karena bucket-nya belum ada dan `wrangler deploy` menolak
+   * binding ke bucket yang tidak ada.
+   */
+  skipR2?: boolean;
 }
 
 function readRootCompatFlags(rootDir: string): { date: string; flags: string[] } {
@@ -379,7 +397,7 @@ function readRootCompatFlags(rootDir: string): { date: string; flags: string[] }
  * `assets.directory` menunjuk ke `worker.js` + `assets` hasil build.
  */
 export function writeWranglerClientConfig(input: WranglerClientInput): string {
-  const { rootDir, slug, overrides, kvIncId, kvTagId, d1DatabaseName } = input;
+  const { rootDir, slug, overrides, kvIncId, kvTagId, d1DatabaseName, skipR2 = false } = input;
   const compat = readRootCompatFlags(rootDir);
 
   const databaseId = overrides.CLOUDFLARE_D1_DATABASE_ID || '';
@@ -407,12 +425,6 @@ export function writeWranglerClientConfig(input: WranglerClientInput): string {
       directory: 'assets',
       binding: 'ASSETS',
     },
-    r2_buckets: [
-      {
-        binding: 'MEDIA_BUCKET',
-        bucket_name: overrides.CLOUDFLARE_R2_BUCKET || `media-${slug}`,
-      },
-    ],
     // Binding D1 = jalur utama runtime klien. Token REST sengaja TIDAK lagi
     // ditanam di `vars` (audit 2026-10-24); `queryD1` memakai `env.DB` dan hanya
     // jatuh ke REST dengan kredensial eksplisit bila binding tidak ada.
@@ -447,6 +459,17 @@ export function writeWranglerClientConfig(input: WranglerClientInput): string {
     clientConfig.kv_namespaces = [
       { binding: 'NEXT_INC_CACHE_KV', id: kvIncId },
       { binding: 'NEXT_TAG_CACHE_KV', id: kvTagId },
+    ];
+  }
+  // Deferred R2 (v1.3.78): binding MEDIA_BUCKET hanya ditulis kalau bucket
+  // klien benar-benar ada. Diletakkan setelah blok opsional KV supaya urutan
+  // properti mendekati config lama (r2 sebelum d1 tidak wajib, tapi rapi).
+  if (!skipR2) {
+    clientConfig.r2_buckets = [
+      {
+        binding: 'MEDIA_BUCKET',
+        bucket_name: overrides.CLOUDFLARE_R2_BUCKET || `media-${slug}`,
+      },
     ];
   }
 
@@ -551,6 +574,13 @@ export async function ensureClientKvNamespaces(
 export interface R2BucketCheck {
   ok: boolean;
   detail: string;
+  /**
+   * True HANYA saat Cloudflare membalas 10042 (R2 belum diaktifkan di akun —
+   * NotEntitled, level akun, bukan bucket hilang). Dipakai mode deferred R2
+   * (v1.3.78) untuk membedakan "belum aktivasi" (bisa lanjut tanpa media)
+   * dari masalah lain (403 izin token, 404 bucket) yang tetap fail-loud.
+   */
+  pending?: boolean;
 }
 
 /**
@@ -595,6 +625,7 @@ export async function ensureR2Bucket(
   if (firstError?.code === 10042) {
     return {
       ok: false,
+      pending: true,
       detail:
         `R2 belum diaktifkan di akun Cloudflare ini. Buka dashboard Cloudflare → R2 → ` +
         `Enable R2 (butuh kartu/PayPal; kuota gratis tetap $0), lalu ulangi. ` +
@@ -896,6 +927,59 @@ export async function deployClient(options: DeployClientOptions): Promise<Deploy
     notes.push(`Secret klien dibuat & disimpan: ${generated.join(', ')}`);
   }
 
+  // 1b. Probe R2 SEBELUM plan env — mode deferred R2 (v1.3.78).
+  //     Posisi ini SENGAJA di atas buildClientEnvPlan: plan membaca flag
+  //     in-memory `config.R2_PENDING`, jadi keputusan media-on/off harus
+  //     selesai sebelum plan dihitung (ronde-3 temuan #2).
+  //
+  //     - Config `R2_PENDING="true"` (klien baru yang R2-nya belum aktif,
+  //       atau finalisasi "Selesaikan Setup"): probe dengan `create:true` —
+  //       PUT bucket idempoten (PUT→GET di ensureR2Bucket). Sukses → hapus
+  //       flag (in-memory + config.env) → plan normal (media ON). Masih
+  //       10042 → biarkan flag → plan pending (media OFF, tanpa binding).
+  //     - Tanpa flag (klien lama): verify-only seperti semula; 10042 tetap
+  //       GAGAL KERAS — kontrak fail-closed K8 untuk klien lama terjaga
+  //       (ronde-3 temuan #3).
+  //     - dryRun: tidak ada probe & tidak ada mutasi config (kontrak dryRun).
+  let r2WasPending = false;
+  if (!dryRun) {
+    r2WasPending = config.R2_PENDING === 'true';
+    const bucketName =
+      config.CLOUDFLARE_R2_BUCKET || config.CLOUDFLARE_R2_BUCKET_NAME || `media-${slug}`;
+    const r2 = await ensureR2Bucket(
+      config.CLOUDFLARE_ACCOUNT_ID,
+      config.CLOUDFLARE_API_TOKEN,
+      bucketName,
+      { create: r2WasPending }
+    );
+    if (r2.ok) {
+      if (r2WasPending) {
+        // Finalisasi sukses: flag dihapus dari IN-MEMORY (dibaca plan di
+        // bawah) agar build ini media-ON. Penghapusan baris di config.env
+        // dilakukan PEMANGGIL (portal /api/deploy-client) SETELAH tulis D1
+        // `media_pending=false` + `wizard_completed` sukses — jadi kalau
+        // tulis D1 gagal, klik "Selesaikan Setup" berikutnya otomatis
+        // menulis ulang D1 (self-healing; ronde-3 temuan #2/A).
+        delete config.R2_PENDING;
+        notes.push('R2 sudah diaktifkan — media menyala pada deploy ini (finalisasi deferred).');
+      }
+      notes.push(r2.detail);
+    } else if (r2WasPending && r2.pending === true) {
+      notes.push(`R2 belum diaktifkan — deploy lanjut TANPA media (deferred). ${r2.detail}`);
+    } else {
+      return {
+        ok: false,
+        slug,
+        clientName,
+        websiteUrl,
+        buildCode: -1,
+        deployCode: -1,
+        notes,
+        error: r2.detail,
+      };
+    }
+  }
+
   const plan = buildClientEnvPlan(config);
   if (plan.missing.length > 0) {
     return {
@@ -964,33 +1048,9 @@ export async function deployClient(options: DeployClientOptions): Promise<Deploy
     buildEnv.NEXT_PUBLIC_SITE_URL = plan.overrides.NEXT_PUBLIC_SITE_URL;
   }
 
-  // 2b. Verifikasi bucket R2 SEBELUM build (audit 2026-10-24, temuan K8).
-  //     Dulu bucket yang gagal dibuat baru ketahuan setelah build 5–10 menit,
-  //     saat wrangler deploy menolak binding R2. Gagal cepat + pesan jelas.
-  if (!dryRun) {
-    const bucketName =
-      config.CLOUDFLARE_R2_BUCKET || config.CLOUDFLARE_R2_BUCKET_NAME || `media-${slug}`;
-    const r2 = await ensureR2Bucket(
-      config.CLOUDFLARE_ACCOUNT_ID,
-      config.CLOUDFLARE_API_TOKEN,
-      bucketName
-    );
-    if (!r2.ok) {
-      return {
-        ok: false,
-        slug,
-        clientName,
-        websiteUrl,
-        buildCode: -1,
-        deployCode: -1,
-        notes,
-        error: r2.detail,
-      };
-    }
-    notes.push(r2.detail);
-  }
-
   // 3. Bersihkan cache build lama (nilai env klien sebelumnya tidak boleh tersisa).
+  //    (Probe R2 kini di 1b — sebelum plan — supaya keputusan media-on/off
+  //    sudah final sebelum env build disusun. Mode deferred v1.3.78.)
   cleanNextBuildCache(rootDir);
 
   // 4. Build dengan env klien. (`{...process.env, ...}` = perilaku run impl;
@@ -1065,6 +1125,9 @@ export async function deployClient(options: DeployClientOptions): Promise<Deploy
   }
 
   // 7. Tulis wrangler config klien (setelah build: `.open-next` dibuat ulang).
+  //    Deferred R2 (v1.3.78): binding MEDIA_BUCKET dilewati saat klien pending
+  //    (overrides.CLOUDFLARE_R2_BUCKET kosong = posture pending).
+  const skipR2Binding = !plan.overrides.CLOUDFLARE_R2_BUCKET;
   const wranglerConfig = writeWranglerClientConfig({
     rootDir,
     slug,
@@ -1072,7 +1135,11 @@ export async function deployClient(options: DeployClientOptions): Promise<Deploy
     kvIncId,
     kvTagId,
     d1DatabaseName: config.CLOUDFLARE_D1_DATABASE_NAME,
+    skipR2: skipR2Binding,
   });
+  if (skipR2Binding) {
+    onLog('>>> [CONFIG] binding MEDIA_BUCKET dilewati (mode deferred R2 — tanpa media)');
+  }
   onLog(`>>> [CONFIG] wrangler config klien: ${path.relative(rootDir, wranglerConfig)}`);
 
   // 8. Deploy. `OPEN_NEXT_DEPLOY=true` mencegah wrangler memanggil balik

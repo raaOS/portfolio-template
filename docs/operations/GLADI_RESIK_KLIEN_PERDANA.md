@@ -187,6 +187,55 @@ sumber kebenaran.** Sebelum menekan "Verifikasi & Aktifkan":
 - [ ] Nominal tidak ada di mutasi / meleset → **jangan aktifkan**; minta bukti ulang
       atau biarkan order kedaluwarsa otomatis.
 
+## 10. SOP Deferred R2 (v1.3.78): deploy dulu tanpa media, klien aktivasi belakangan
+
+> Keputusan owner (2026-11-08): R2 menuntut verifikasi kartu/PayPal di akun Cloudflare
+> klien (CF error 10042), dan owner **menolak** memakai 1 kartu untuk puluhan akun.
+> Solusi: **deploy hari-1 tanpa R2** — situs tetap online — klien mengaktifkan R2
+> sendiri lewat **wizard handover**, lalu owner klik **"Selesaikan Setup"** di portal.
+> Arsitektur "1 klien = 1 R2" TIDAK berubah. Detail teknis:
+> `docs/tracker/logs/fitur_deferred_r2_onboarding_2026_11_09.md`.
+
+### 10a. Alur baru
+
+1. Portal STEP 3: kalau R2 belum diaktifkan di akun klien → onboarding **lanjut**
+   (pesan "onboarding lanjut TANPA media"). Kartu sukses + surat serah terima +
+   pesan WA otomatis sudah menyertakan **link wizard** + langkah aktivasi.
+2. Kirim WA ke klien (pesan siap-copy di kartu sukses portal): link wizard
+   `https://<slug>.workers.dev/?onboard=<token>` + kredensial Cloudflare.
+3. Klien buka link → wizard 3 langkah (login dashboard Cloudflare → R2 → Enable →
+   verifikasi PayPal/debit **GRATIS**) → tombol **"Kabari via WhatsApp"**.
+4. Owner klik **Selesaikan Setup** = tombol deploy/update klien di portal
+   (deployClient re-run): bucket dibuat otomatis, binding ditulis, build ulang,
+   deploy. Flag `media_pending=false` + `wizard_completed=true` ditulis ke D1 klien.
+5. Klien upload media normal. Wizard lama menampilkan "✅ Media aktif".
+
+### 10b. Kewajiban owner (SOP harian)
+
+- [ ] Klien pending didata; jalankan tombol **"Cek Pending R2"** portal (cek
+      read-only) — jangan hanya menunggu WA klien.
+- [ ] Klien yang sudah bayar tapi belum final → **Selesaikan Setup** hari itu
+      juga (janji ke klien: maks 1×24 jam).
+- [ ] Selama pending: **backup harian D1 klien otomatis skip** (butuh R2) —
+      normal, menyala otomatis setelah finalisasi.
+- [ ] **DILARANG** mengaktifkan R2 pakai kartu pribadi owner. Klien tanpa
+      kartu sama sekali → buat **1 kartu virtual khusus klien itu** (bank
+      digital), catat tanggal kadaluarsa di `arsip-klien/<slug>/`, ganti dengan
+      kartu milik klien saat serah terima.
+- [ ] Klien lapor gambar hilang belakangan → cek akun Cloudflare klien (kartu
+      kadaluarsa/diblokir) — bukan masalah template.
+- [ ] Klien lapor media hilang + bucket terhapus di dashboard-nya sendiri →
+      buat ulang via "Selesaikan Setup", klien upload ulang (konsekuensi
+      inheren "akun milik klien").
+
+### 10c. Yang TIDAK berubah
+
+- Klien tanpa token wizard TIDAK melihat apa pun baru di situsnya (overlay hanya
+  muncul via `?onboard=<token>`).
+- Kredensial Cloudflare & kartu klien hanya disentuh di halaman resmi
+  dash.cloudflare.com — tidak pernah lewat situs klien atau portal.
+- Error `10042` **tanpa** flag `R2_PENDING` (klien lama) tetap fail-closed.
+
 ---
 
 **Selesai gladi = semua centang di atas terpenuhi dua kali berturut-turut (sekali dengan

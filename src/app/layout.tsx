@@ -8,6 +8,7 @@ import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import UnregisterSW from '@/components/shared/UnregisterSW';
 import DevWebVitalsGate from '@/components/shared/DevWebVitalsGate';
 import PageViewTracker from '@/components/layout/PageViewTracker';
+import R2ActivationWizard from '@/components/onboarding/R2ActivationWizard';
 import { ViewTransitions } from 'next-view-transitions';
 import { APP_VERSION } from '@/lib/constants';
 
@@ -127,6 +128,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <UnregisterSW />
                 <DevWebVitalsGate />
                 <PageViewTracker />
+                {/* Deferred R2 (v1.3.78): overlay wizard handover — tampil hanya
+                    dengan ?onboard=<token> valid; situs publik tak berubah. */}
+                <R2ActivationWizard />
               </ErrorBoundary>
             </ToastProvider>
           </Providers>

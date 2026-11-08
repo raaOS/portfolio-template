@@ -131,9 +131,8 @@ describe('POST /api/admin/sites/[siteId]/project-cover', () => {
     expect(uploadToR2Mock).not.toHaveBeenCalled();
   });
 
-  it('returns 500 when R2 is not configured', async () => {
+  it('returns 503 when R2 is not configured (deferred R2)', async () => {
     isConfiguredMock.mockReturnValue(false);
-    missingKeysMock.mockReturnValue(['CLOUDFLARE_R2_BUCKET']);
 
     const response = await POST(
       buildRequest({ name: 'cover.png', type: 'image/png', data: new Uint8Array(10) }) as never,
@@ -141,8 +140,8 @@ describe('POST /api/admin/sites/[siteId]/project-cover', () => {
     );
     const body = await response.json();
 
-    expect(response.status).toBe(500);
-    expect(body.error).toContain('CLOUDFLARE_R2_BUCKET');
+    expect(response.status).toBe(503);
+    expect(body.error).toContain('Media belum diaktifkan');
     expect(uploadToR2Mock).not.toHaveBeenCalled();
   });
 
