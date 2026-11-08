@@ -171,6 +171,7 @@ if "%PILIHAN%"=="" (
   goto :mulai
 )
 set "DRIVE=%PILIHAN::=%"
+set "DRIVE=%DRIVE:\=%"
 if not exist "%DRIVE%:\" goto :drive_salah
 set "DEST=%DRIVE%:\cadangan-portfolio\%TANGGAL%"
 goto :mulai
@@ -184,7 +185,11 @@ if not exist "%DEST%" mkdir "%DEST%"
 
 rem --- 1. backups\ : database + media hasil backup harian/manual ---
 robocopy "%~dp0backups" "%DEST%" /E /NFL /NDL /NP /R:2 /W:2
-set "RC=%ERRORLEVEL%"
+rem Kode asli robocopy disimpan terpisah supaya :gagal menampilkan kode
+rem yang sebenarnya (16 = error serius, 32 = masalah memori, dst) — bukan
+rem 8 hasil penyeragaman.
+set "RC_ASAL=%ERRORLEVEL%"
+set "RC=%RC_ASAL%"
 set "RCX=0"
 if %RC% GEQ 8 set "RCX=8"
 
@@ -193,7 +198,10 @@ if not exist "%~dp0arsip-klien" goto :tanpa_arsip
 robocopy "%~dp0arsip-klien" "%DEST%\arsip-klien" /E /NFL /NDL /NP /R:2 /W:2
 set "RC2=%ERRORLEVEL%"
 if %RC2% GEQ 8 (echo [X] arsip-klien GAGAL tersalin.) else (echo [OK] arsip-klien ikut tersalin.)
-if %RC2% GEQ 8 set "RCX=8"
+if %RC2% GEQ 8 (
+    set "RCX=8"
+    set "RC_ASAL=%RC2%"
+)
 goto :arsip_selesai
 :tanpa_arsip
 echo [i] arsip-klien tidak ditemukan - dilewati (wajar bila belum ada klien).
@@ -204,7 +212,10 @@ if not exist "%~dp0.env.local" goto :tanpa_env
 robocopy "%~dp0." "%DEST%" .env.local /NFL /NDL /NP /R:2 /W:2
 set "RC2=%ERRORLEVEL%"
 if %RC2% GEQ 8 (echo [X] .env.local GAGAL tersalin.) else (echo [OK] .env.local ikut tersalin.)
-if %RC2% GEQ 8 set "RCX=8"
+if %RC2% GEQ 8 (
+    set "RCX=8"
+    set "RC_ASAL=%RC2%"
+)
 goto :env_selesai
 :tanpa_env
 echo [i] .env.local tidak ditemukan - dilewati.
@@ -226,7 +237,7 @@ pause >nul
 exit /b 0
 
 :gagal
-echo [X] Gagal menyalin. Kode masalah: %RC%
+echo [X] Gagal menyalin. Kode masalah: %RC_ASAL%
 echo     Cek tiga hal: flashdisk masih terpasang, huruf drive benar,
 echo     dan kapasitas flashdisk cukup.
 echo.

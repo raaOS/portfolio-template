@@ -378,3 +378,28 @@ Berkas: `scripts/onboarding/public/index.html` saja.
 **Catatan:** deploy ini juga mengaktifkan perubahan skema yang sudah ada di working tree: `CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_site_slug ON projects(site_id, slug)` di `src/crud/shared/db/schema.ts`. Aman diulang; bootstrap membungkus tiap statement dengan `try/catch`, dan data lama yang duplikat hanya membuat statement itu dilewati (tidak mengubah data). Terbukti: health `ok`, beranda & API publik 200.
 
 Portal uji 4568 dimatikan setelah verifikasi; portal 4567 tidak pernah dijalankan/diganggu.
+
+---
+
+## Tindak lanjut 2026-11-09: 2 perbaikan kecil hasil audit ulang
+
+Audit ulang seluruh 260 baris `PENGELOLA_KLIEN.bat` (diminta owner) menemukan 2 cacat
+minor; keduanya diperbaiki. Tidak ada perubahan alur — launcher tetap berperilaku sama.
+
+1. **Input drive ditulis lengkap (`E:\`) salah deteksi.** `set "DRIVE=%PILIHAN::=%"`
+   hanya membuang titik dua, sehingga `E:\` menjadi `E\` → `if not exist "E\:"` selalu
+   salah → pesan "drive tidak ditemukan" padahal flashdisk terpasang. Fix: baris tambahan
+   `set "DRIVE=%DRIVE:\=%"` (input `E`, `E:`, dan `E:\` kini semua dikenali).
+2. **`:gagal` kehilangan kode robocopy asli** — `RC` ditimpa jadi `8` sebelum ditampilkan,
+   pesan selalu generik. Fix: `RC_ASAL` menyimpan kode pertama (backups) dan di-update dari
+   `RC2` saat arsip-klien/.env.local gagal; `:gagal` menampilkan `%RC_ASAL%` (mis. 16 =
+   error serius, bukan 8 hasil penyeragaman).
+
+**Verifikasi (simulasi cmd terpisah, tanpa menyentuh folder repo):** input `C:\` dan `C:`
+keduanya dikenali sebagai drive valid; robocopy yang gagal (source tak ada, kode 16)
+kini terlapor `kode asli=16` sementara keputusan gagal tetap pakai ambang `GEQ 8`.
+
+**Tidak diubah (diputuskan bukan bug):** tunggu tetap 4 detik sebelum buka browser
+(cold-start tsx selama ini cukup); Ctrl+C saat server jalan mematikan batch sebelum blok
+error tampil (keterbatasan bawaan cmd.exe). Tidak perlu bump versi/CHANGELOG/deploy —
+file ini tooling owner lokal, tidak ikut bundle Worker.
