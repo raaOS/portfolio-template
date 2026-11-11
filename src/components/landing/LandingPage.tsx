@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, Grid } from 'lucide-react';
+import { ArrowUpRight, Grid, Menu, X } from 'lucide-react';
 import { archivoBlack } from '@/app/fonts';
 import { TEMPLATES_DATA } from './templates';
 import MagazineShowcase from './MagazineShowcase';
@@ -26,6 +26,12 @@ import './landing.css';
  * frame videonya sendiri — bukan screenshot lama. `previewUrl` (tautan
  * demo live) TIDAK disentuh.
  */
+const PUBLIC_LINKS = [
+  { href: '/fitur', label: 'Fitur' },
+  { href: '/harga', label: 'Harga' },
+  { href: '/cara-pesan', label: 'Cara Pesan' },
+] as const;
+
 export default function LandingPage({
   heroVideos,
   heroPosters,
@@ -34,6 +40,7 @@ export default function LandingPage({
   heroPosters?: Record<string, string>;
 }) {
   const [bgPattern, setBgPattern] = useState<'grid' | 'dots'>('dots');
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <main
@@ -63,44 +70,90 @@ export default function LandingPage({
           <span className="wave-brand-title">Make it Better Studio</span>
         </Link>
 
-        <div className="wave-nav-center">
-          <div
-            className={`wave-pattern-switcher is-${bgPattern}`}
-            role="group"
-            aria-label="Pilih background pattern"
-            translate="no"
-          >
-            {/* Sliding Pill Indicator */}
-            <span className="wave-pattern-indicator" aria-hidden="true" />
+        {/* Menu jualan — hanya tampil di desktop; di HP pindah ke sheet burger. */}
+        <nav className="wave-nav-links" aria-label="Menu storefront">
+          {PUBLIC_LINKS.map((item) => (
+            <Link key={item.href} href={item.href} className="wave-nav-link">
+              {item.label}
+            </Link>
+          ))}
+        </nav>
 
-            <button
-              type="button"
-              onClick={() => setBgPattern('dots')}
-              className={`wave-pattern-btn ${bgPattern === 'dots' ? 'active' : ''}`}
-              title="Dot Pattern"
+        <div className="wave-nav-right">
+          <div className="wave-nav-center">
+            <div
+              className={`wave-pattern-switcher is-${bgPattern}`}
+              role="group"
+              aria-label="Pilih background pattern"
+              translate="no"
             >
-              <span className="wave-pattern-dot-icon" />
-              <span>Dot</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setBgPattern('grid')}
-              className={`wave-pattern-btn ${bgPattern === 'grid' ? 'active' : ''}`}
-              title="Grid Pattern"
-            >
-              <Grid size={11} />
-              <span>Grid</span>
-            </button>
+              {/* Sliding Pill Indicator */}
+              <span className="wave-pattern-indicator" aria-hidden="true" />
+
+              <button
+                type="button"
+                onClick={() => setBgPattern('dots')}
+                className={`wave-pattern-btn ${bgPattern === 'dots' ? 'active' : ''}`}
+                title="Dot Pattern"
+              >
+                <span className="wave-pattern-dot-icon" />
+                <span>Dot</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setBgPattern('grid')}
+                className={`wave-pattern-btn ${bgPattern === 'grid' ? 'active' : ''}`}
+                title="Grid Pattern"
+              >
+                <Grid size={11} />
+                <span>Grid</span>
+              </button>
+            </div>
           </div>
-        </div>
 
-        <div className="wave-nav-actions">
-          <Link href="/checkout" className="wave-nav-cta">
+          <div className="wave-nav-actions">
+            <Link href="/checkout" className="wave-nav-cta">
+              <span>Pesan Template</span>
+              <ArrowUpRight size={15} />
+            </Link>
+          </div>
+
+          <button
+            type="button"
+            className="wave-nav-burger"
+            onClick={() => setMenuOpen((open) => !open)}
+            aria-expanded={menuOpen}
+            aria-controls="wave-nav-sheet"
+            aria-label={menuOpen ? 'Tutup menu' : 'Buka menu'}
+          >
+            {menuOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
+        </div>
+      </header>
+
+      {/* Sheet menu HP — daftar tautan yang sama dengan nav desktop. */}
+      {menuOpen && (
+        <nav id="wave-nav-sheet" className="wave-nav-sheet" aria-label="Menu storefront">
+          {PUBLIC_LINKS.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="wave-nav-sheet-link"
+              onClick={() => setMenuOpen(false)}
+            >
+              {item.label}
+            </Link>
+          ))}
+          <Link
+            href="/checkout"
+            className="wave-nav-sheet-cta"
+            onClick={() => setMenuOpen(false)}
+          >
             <span>Pesan Template</span>
             <ArrowUpRight size={15} />
           </Link>
-        </div>
-      </header>
+        </nav>
+      )}
     </main>
   );
 }

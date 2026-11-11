@@ -40,7 +40,7 @@ Anda bisa menggunakan salah satu dari dua cara berikut di HP Anda:
 ### Langkah 3: Tunggu Beberapa Menit & Salin Pesan WhatsApp Klien
 1. Server cloud GitHub (dengan RAM 16GB dan internet gigabit) akan otomatis menyala di cloud untuk:
    - Membuat Database D1 (`db-budi-pratama`)
-   - Membuat Storage Media R2 (`media-budi-pratama`)
+   - Membuat Storage Media R2 (`media-budi-pratama`) — **penting (v1.3.78):** jalur GitHub Actions **tidak** mendukung mode deferred R2; kalau R2 belum diaktifkan di akun klien (butuh kartu/PayPal), proses ini berhenti dengan pesan jelas. Untuk klien tanpa R2 aktif, onboarding lewat portal di PC (mode deferred), bukan dari HP.
    - Memasang seluruh tabel database dan template
    - Build & mendeploy website ke Cloudflare Worker milik klien (proses build ini yang paling lama — total biasanya beberapa menit, sabar ya)
 2. Setelah status centang hijau **✓** selesai, ketuk hasil eksekusi tersebut.

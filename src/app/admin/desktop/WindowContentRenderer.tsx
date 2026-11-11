@@ -120,6 +120,11 @@ const HeroVideosPanel = dynamic(() => import('./panels/HeroVideosPanel'), {
   loading: () => <AdminLoading size="page" />,
 });
 
+const PetaBisnisPanel = dynamic(() => import('./panels/PetaBisnisPanel'), {
+  ssr: false,
+  loading: () => <AdminLoading size="page" />,
+});
+
 /**
  * Map dari appId ke panel yang dirender di dalam window desktop admin.
  * Di-export untuk guard test coverage (registry vs PANEL_MAP) — app yang
@@ -149,6 +154,7 @@ export const PANEL_MAP: Record<string, React.ComponentType> = {
   harga: HargaPanel,
   orders: OrdersPanel,
   heroVideos: HeroVideosPanel,
+  petaBisnis: PetaBisnisPanel,
 };
 
 interface WindowContentRendererProps {

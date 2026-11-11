@@ -3,6 +3,124 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.82] - 2026-11-11
+
+### `/checkout`: Gerbang di Server + `?template=<id>`
+
+Dua celah lama yang ditutup atas permintaan owner.
+
+- **Gerbang pindah ke server.** `/checkout` dulu komponen client murni (`'use client'` di `page.tsx`) tanpa penjaga sendiri — satu-satunya penjaga adalah middleware (`STOREFRONT_ONLY_PREFIXES`). Sekarang `page.tsx` adalah server component yang memanggil `isStorefrontDeployment()` lalu `notFound()`; form dipindah ke `CheckoutForm.tsx` (client). Efek samping penting: rute ini kini dirender saat request (karena membaca `searchParams`), jadi tidak bisa disajikan sebagai HTML statis dari asset binding tanpa melewati Worker.
+- **`?template=<id>` diterima.** Nilai divalidasi terhadap tiga template; yang tidak dikenal jatuh ke `os-desktop` (tidak ada error, tidak ada template karangan). `?template=infinite-canvas` → dropdown langsung menampilkan **Infinite Canvas**; `?template=ngawur` → **OS Desktop**.
+- **Pintu masuk nyata:** overlay demo live di hero kini punya tombol **Pesan** (biru `#0008FF`) di samping "Tab Baru", menuju `/checkout?template=<id lembaran yang sedang dibuka>` — tautan itu terbukti menghasilkan `/checkout?template=spatial-gallery` untuk lembaran Spatial Gallery.
+- **Test regresi** `src/app/checkout/__tests__/page.test.tsx` (4 kasus: STOREFRONT false, kosong, `?template=` valid, tanpa param) + `templateIdOf` di suite landing.
+
+**Gerbang:** `tsc` 0 error, `eslint` bersih, `vitest` **25/25 PASS** (checkout + landing + constants), `/checkout`, `/checkout?template=infinite-canvas`, `/checkout?template=ngawur`, `/harga`, `/fitur` semuanya **200** di dev server.
+
+## [1.3.81] - 2026-11-11
+
+### Hero: Demo Live Tak Lagi Menutup Sendiri Sebelum Tampil
+
+Laporan owner: *"ketika diklik, popup live emulator desktop template kadang belum muncul tapi sudah kembali ke tumpukan — sering banget."*
+
+**Akar masalah (direproduksi di Chromium, bukan dugaan):**
+
+1. Lembaran butuh **±0,6 detik** untuk naik (`viewDuration`); overlay live baru dipasang setelah animasi itu selesai. Selama jeda tersebut layar belum memberi umpan balik apa pun.
+2. Tap kedua — double-click bawaan pengguna desktop, atau ketukan iseng karena animasi terasa lambat — selalu dianggap perintah tutup oleh `onTap()`. Terukur: dua tap berjarak **120 ms → overlay tidak pernah muncul**; tap kedua pada ±650 ms → overlay sempat tampil lalu langsung dibuang.
+3. Begitu overlay tampil, seluruh area di luar frame adalah backdrop `onClick={closeLive}` tanpa jeda, jadi sisa gestur/klik berikutnya menutupnya seketika.
+
+**Perbaikan:**
+
+- `TAP_GUARD_MS = 700` — tap pembatal diabaikan 700 ms sejak fokus dimulai, jadi double-click tidak lagi membatalkan animasi angkat.
+- Guard tutup **300 ms** pada `closeLive` (backdrop + tombol ✕).
+- `liveReady` tidak lagi di-reset saat `onLive` terpanggil ulang hanya karena rect berubah (resize/jendela berubah). Bug laten: iframe kembali ke `opacity: 0` padahal `onLoad` sudah lewat → demo tampak hitam permanen. Sekarang reset hanya terjadi saat indeks lembaran benar-benar berganti.
+- Selama iframe dimuat, frame menampilkan tangkapan layar lembaran + label "Memuat demo live…" (bukan kotak hitam) supaya tidak terkesan rusak.
+
+**Verifikasi (Chromium, dev server):**
+
+| Skenario | Sebelum | Sesudah |
+|---|---|---|
+| Single tap | overlay muncul ±0,6 s | overlay muncul **0,71 s**, bertahan |
+| Double tap 120 ms | overlay **tidak muncul** | overlay **muncul** |
+| Klik backdrop < 300 ms setelah tampil | langsung tertutup | **diabaikan** |
+| Klik backdrop setelah guard | tertutup | tertutup |
+| Resize container saat live | iframe `opacity: 0` (hilang) | `opacity: 1` (tetap) |
+| Esc | menutup | menutup |
+
+`tsc` 0 error, `eslint` bersih, `vitest` PASS (landing + constants). Tidak ada perubahan route, API, atau database.
+
+## [1.3.80] - 2026-11-11
+
+### Storefront Punya Halaman Jualan Nyata (Fitur · Harga · Cara Pesan · Panduan Klien)
+
+Header beranda sebelumnya hanya berisi brand, toggle Dot/Grid, dan satu tombol — tidak ada yang bisa dibaca pembeli sebelum checkout. Beranda `/` sendiri terkunci satu layar (`height: 100svh; overflow: hidden`) sehingga tidak bisa menampung section scroll. Solusinya: rute jualan terpisah bergaya sama, bukan menumpuk section di hero.
+
+- **Halaman baru** (semua digerbangi `isStorefrontDeployment()` → 404 di situs klien):
+  - `/fitur` — apa yang bisa dikelola sendiri lewat admin: zona Konten & Berkas, Tampilan, Komunikasi, dan Sistem (nama app nyata, tanpa app `ownerOnly`) + media pipeline + batas jujur pekerjaan tambahan. **Katalog template terpisah dihapus** (permintaan owner): hero beranda sudah menjadi etalase demo, jadi `/template` kini 404 dan diganti `/fitur`.
+  - `/harga` — harga dibaca dari panel **Harga Jual** (`getBasePrice()`, fallback `BASE_PRICE`, ISR 300 s) + 4 isi paket + tabel biaya Cloudflare apa adanya (termasuk catatan verifikasi kartu R2) + 8 FAQ di `#faq`.
+  - `/cara-pesan` — 5 langkah bernomor (pilih template → checkout/QRIS → verifikasi ≤1×24 jam → onboarding Cloudflare → online + kredensial admin) + checklist yang perlu disiapkan pembeli.
+  - `/panduan` — panduan klien: login `/admin/login`, lupa password, daftar app admin yang benar-benar dilihat klien (Konten & Berkas, Tampilan, Komunikasi — tanpa app `ownerOnly`), unggah media, larangan menghapus Worker/D1/R2, dan kontak bantuan.
+- **Chrome bersama** `src/components/landing/PublicChrome.tsx` (`PublicShell`) + `public-pages.css` (`.lp-*`), palet "Sticker on Paper" yang sama dengan storefront (kertas `#f4f1ec`, kartu putih, hairline ink, biru `#0008FF`, Archivo Black). Nav desktop baru (v1.3.80) memakai pil geser; di HP nav turun ke baris sendiri dan lebarnya dibagi rata (tanpa hamburger).
+- **Header beranda** (`LandingPage.tsx` + `landing.css`): menu tengah `Fitur · Harga · Cara Pesan`, toggle Dot/Grid + CTA dikelompokkan di kanan, dan **burger + sheet** di ≤900 px (sheet disembunyikan saat demo live aktif). Tidak ada tombol WhatsApp (keputusan owner).
+- **Halaman legal diperbaiki**: `/syarat-ketentuan` dan `/kebijakan-privasi` memakai kelas `.landing*` dan variabel `--lp-accent`/`--lp-muted` yang **tidak pernah ada di CSS mana pun** — praktis tak bergaya. Sekarang memakai `PublicShell` + `.lp-doc`; isi tidak diubah.
+- **Sitemap**: `/fitur`, `/harga`, `/cara-pesan`, `/panduan` didaftarkan hanya saat `isStorefrontDeployment()`.
+- **Halaman pesanan**: banner status `activated` di `/orders/[orderId]` kini menautkan **Panduan Klien**.
+
+### Pil Nav: Lebar Sama + Indikator Geser Antartab
+
+Permintaan owner: ketiga tab harus berukuran pil yang sama, dan pilnya bergeser saat pindah tab.
+
+- **Lebar sama**: `.lp-nav-link` dipatok `width: 104px` di desktop (di ≤640 px `flex: 1 1 0` sehingga membagi rata lebar penuh). Terukur di Chromium: 104/104/104 px, sebelumnya 84/63/96 px.
+- **Indikator geser** `PublicNav.tsx` (client, `usePathname`): satu pil putih absolut berlebar `(100% - 6px) / 3`, digeser `translateX(calc(var(--lp-active) * 100%))` dengan transisi 280 ms — pola yang sama dengan toggle Dot/Grid di beranda.
+- **Supaya animasinya benar-benar terlihat**, nav harus tetap ter-mount saat pindah halaman. Karena itu empat rute jualan dipindah ke route group `src/app/(storefront)/` dengan `layout.tsx` yang merender `PublicShell` (URL tidak berubah). Diverifikasi di Chromium: node nav bertanda `data-probe` masih ada setelah `/template` → `/cara-pesan`, dan `transform` tertangkap di tengah animasi (`translateX(138px)` menuju 208 px).
+- Halaman legal tetap memakai `PublicShell` langsung (di luar route group) dan bisa dibuka di situs klien — karena itu nav+footer jualan sekarang **disembunyikan** saat `isStorefrontDeployment()` false, tidak lagi menautkan route yang 404.
+
+### Bug Visual: Teks di Dalam Pil Nav Tidak Simetris
+
+Laporan owner: teks di pil (link nav yang di-hover/aktif) terlihat bergeser, tidak center. Akar masalah bukan padding: `globals.css` memasang target sentuh WCAG `a { min-height: 44px; min-width: 44px }`, sehingga anchor yang blockified sebagai flex item tingginya dipaksa 44 px sementara baris teks menempel di atas → sisa ~9 px menumpuk di bawah. Diperbaiki dengan menjadikan `.wave-nav-link`, `.wave-nav-sheet-link`, `.lp-nav-link`, dan link footer `inline-flex` + `align-items: center` (+ `justify-content: center` pada pil). Terukur di Chromium: inset teks 13/13 px kiri-kanan dan 13,2/13,8 px atas-bawah.
+
+**Gerbang:** `tsc` 0 error, `eslint` bersih (route group + nav baru), `vitest` 60/60 PASS (landing + orderService + orders API), 7 halaman publik di dev server semuanya **200**.
+
+**Catatan terbuka:** `/checkout` masih **tidak** memakai gerbang `isStorefrontDeployment()` (celah lama, belum disentuh) dan belum menerima `?template=` untuk memilih template dari katalog.
+
+## [1.3.79] - 2026-11-10
+
+### Peta Bisnis di Desktop Admin + Alur Jualan Jadi Diagram Berwarna
+
+Peta Bisnis pindah dari portal `PENGELOLA_KLIEN` ke desktop admin sebagai app **Peta Bisnis** (zona **Sistem Owner**, `ownerOnly` — tidak tampil di site klien), dan bagian **Alur Jualan** sekarang digambar sebagai **diagram panah berwarna**, bukan daftar kartu.
+
+- **App baru `petaBisnis`** (`src/app/admin/desktop/registry.ts`, `ownerOnly: true`, 1180×780) + panel `PetaBisnisPanel` di `PANEL_MAP` + halaman `/admin/system/peta-bisnis`. Konten dipusatkan di `bizMapContent.ts` (sumber tunggal: `ALUR_FASE`, `PETA_ASET`, `CATATAN_SOP`).
+- **Diagram `AlurBisnisDiagram`**: 18 langkah dalam 6 fase kiri → kanan (pesanan & bayar → verifikasi & aktivasi → onboarding & deploy → serah terima → aktivasi media → operasional harian). Kotak berwarna per pelaku (biru pembeli, ungu sistem, hijau owner, amber untuk aturan "cek mutasi dulu", abu cron); **panah berwarna per fase** + legenda di bawah.
+- **SVG inline, bukan file `/public`**: isi diagram memuat proses internal owner (`R2_PENDING`, `media_pending`, aturan "cek mutasi dulu, bukan struk") sehingga tidak boleh bisa dibuka lewat URL di deployment klien.
+- Mermaid tidak dipakai: 18 langkah berurutan menghasilkan layout 1303×4532 px (kolom) atau 5592×268 px (baris), dan `direction` di dalam subgraph diabaikan bila ada edge lintas subgraph.
+- Tidak ada perubahan runtime, database, atau endpoint.
+
+**Penyusulan (2026-11-10, setelah owner cek tampilan):** isi window sebelumnya menempel ke tepi kiri. Root panel `PetaBisnisPanel` diberi jarak dalam seragam — `px-5 pb-6 pt-4` (kiri/kanan 20 px, atas 16 px, bawah 24 px).
+
+### Desktop Admin Responsif: Ubin Zone Tidak Lagi Menumpuk
+
+- **Jarak antar zone terlalu jauh di layar lebar** karena ukuran ubin dipatok `Math.min(560, …)` / `Math.min(400, …)` sehingga sisa ruang menganggur di tengah. Sekarang lebar/tinggi ubin dihitung dari ruang tersedia (`useAdminDesktop.ts` → `getZoneTile`), jadi 2×2 mengisi layar dengan celah 10 px.
+- **HP & tablet sebelumnya menumpuk**: `canTile` (butuh ≥1160 px) membuat 4 zone jatuh ke posisi stagger bertumpuk, dan `@media (max-width: 768px)` memaksa **semua** `.admin-window` fullscreen sehingga keempat zone menimpa satu sama lain. Sekarang:
+  - ubin 2 kolom bila lebar ≥720 px (tablet/desktop), **1 kolom × 4 baris** di HP;
+  - media query fullscreen dibatasi ke jendela CRUD saja (`.admin-window:not(.admin-window-zone)`), jendela zone memakai posisi ubin;
+  - `admin-folder-grid` di HP: padding 12 px, gap 6 px.
+- **Responsif saat resize/rotasi**: listener `resize` (rAF) menghitung ulang ubin — jendela zone yang sudah ada digeser/diukur ulang, tidak digandakan.
+- **Ikon zone menumpuk & label tidak terlihat di HP/iPad (susulan)** — dua bug terpisah:
+  1. `.admin-folder-grid` dibatasi `h-full` sementara isinya lebih tinggi dari wadah → `align-content: stretch` bawaan **menyusutkan baris grid** sampai `min-height` tombol (44 px), sehingga ikon baris berikutnya menimpa label baris sebelumnya. Diperbaiki: `grid-auto-rows: max-content` + `align-content: start`.
+  2. Di HP, kartu zone masih terpotong walau `height: auto` sudah dipasang, karena `.admin-window` punya `min-height: 0` dan `.admin-desktop` memakai flex column → keempat kartu **menyusut dipaksa muat satu layar** (204/141/196/141 px), grid terpotong, 12 label hilang. Diperbaiki: `.admin-window-zone { flex: 0 0 auto }` + `.admin-window-content { flex: 0 0 auto; min-height: auto }` + grid `height: auto`.
+  - Di HP (≤768 px) desktop admin kini **daftar kartu vertikal yang di-scroll** (`.admin-window-zone` → `position: static`, lebar penuh, tinggi mengikuti isi), padding atas 48 px (menubar) & bawah 84 px (taskbar). Di ≤480 px ikon 46 px, padding 10/4, gap 6, label 10,5 px.
+- Diuji: `useAdminDesktop.test.ts` + `registry.test.ts` = **12/12 PASS** (tambahan kasus HP 390×844, iPad 820×1180, layar 1000×760 — semuanya `overlap: false` dan di dalam viewport), `tsc` 0 error, `eslint` bersih. Ukur ulang dengan CSS asli: HP kartu 360/239/333/239 px, `scrollHeight` 1334 > `clientHeight` 844 (benar-benar scroll), **0 label tersembunyi**, **0 bentrok**; iPad baris grid 123/123/108 px, 0 label tersembunyi, 0 bentrok.
+
+### Widget "Cloudflare D1" Memerah Palsu ("Browser sedang offline")
+
+Laporan owner: popout **Cloudflare D1** menampilkan **Bermasalah** + "Browser sedang offline" padahal D1 sehat.
+
+- **D1 memang sehat**: `GET /api/health` dari dev server menjawab **200** `{"database":"connected","databaseBackend":"cloudflare-d1","databaseLatencyMs":207}`.
+- **Akar masalah**: `useDataStatus.ts` memakai `navigator.onLine` sebagai **penentu** dan **melewati request sama sekali** kalau nilainya `false`. Nilai itu hanya dugaan OS/browser — sering `false` saat Wi-Fi tanpa internet, hotspot HP, VPN, atau bangun dari sleep — padahal request ke origin yang sama tetap jalan (dev server di LAN `192.168.x.x`, kasus owner saat uji di HP/iPad). Jadi widget memerah tanpa pernah bertanya ke server.
+- **Perbaikan**: short-circuit `navigator.onLine` dihapus — probe `/api/health` **selalu** dijalankan dan menjadi satu-satunya bukti. Status offline browser hanya dipakai di cabang `catch` sebagai keterangan tambahan: `Browser melaporkan offline · <pesan asli>`.
+- **Regresi test baru** `src/app/admin/hooks/useDataStatus.test.ts` (4 kasus): `navigator.onLine=false` + health 200 → tetap **connected**; request gagal saat browser online → pesan asli (`Failed to fetch`); request gagal saat benar-benar offline → pesan menyebut offline + sebab asli; health 200 tapi D1 tak terbaca → **disconnected** (bukan error).
+- **Bug versi ikut diperbaiki**: `APP_VERSION` masih `1.3.78` padahal entri teratas CHANGELOG `[1.3.79]`, sehingga test penjaga `src/lib/constants.test.ts` **gagal** dan `/api/health` melaporkan versi lama. Sekarang `APP_VERSION = '1.3.79'` (diverifikasi: `/api/health` → `version: 1.3.79`).
+- **Tombol Refresh di header popout (susulan)**: probe otomatis hanya tiap 30 detik, jadi admin tidak punya cara memaksa periksa ulang. Ditambahkan tombol `Refresh` (ikon `RefreshCw`, berputar + label "Memeriksa…" selama probe, `disabled` saat berjalan) yang memanggil `checkStatus()` — sekaligus menyegarkan angka Storage breakdown lewat endpoint cache. Prop baru `onRefresh` di `DatabasePopout`, disambungkan dari `AdminMenuBar`. Catatan performa: `API latency` besar (1288 ms) di dev hanyalah kompilasi awal Turbopack; setelah warm 754–776 ms total dengan D1 ~165 ms (REST API D1 dari mesin lokal, bukan binding Worker).
+
 ## [1.3.78] - 2026-11-09
 
 ### Deferred R2: Onboarding Tanpa Media + Wizard Aktivasi Klien (Hapus Blocker Kartu)

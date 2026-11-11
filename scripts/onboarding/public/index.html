@@ -55,33 +55,7 @@
       max-width: 1400px;
     }
 
-    /* Diagram Mermaid (Peta Bisnis) */
-    .mermaid {
-      background: #ffffff;
-      text-align: center;
-      font-size: 0.8125rem;
-      color: var(--text);
-      margin: 0;
-      width: 100%;
-      overflow-x: auto;
-      padding: 0.75rem 0;
-      line-height: 1.4;
-    }
-
-    .mermaid svg {
-      /* Pas selebar kotak — semua bagian terlihat sekaligus tanpa geser */
-      max-width: 100% !important;
-      height: auto !important;
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-      display: block;
-      margin: 0 auto;
-    }
-
-    /* Ukuran teks isi tab Peta Bisnis diperbesar supaya jelas terbaca */
-    #view-map .title { font-size: 1.75rem; }
-    #view-map .subtitle { font-size: 1rem; line-height: 1.65; }
-    #view-map .section-title { font-size: 1.0625rem; margin-bottom: 0.5rem; }
-    #view-map .card { padding: 1.5rem; }
+    /* (CSS Peta Bisnis/mermaid dihapus v1.3.79 — pindah ke desktop admin) */
 
   /* Top Navigation Tabs */
     .tabs-nav {
@@ -1007,7 +981,6 @@
       <button type="button" class="tab-btn" id="tab-btn-status">Status Klien</button>
       <button type="button" class="tab-btn" id="tab-btn-domain">Kelola Custom Domain</button>
       <button type="button" class="tab-btn" id="tab-btn-update">Update Versi Template</button>
-      <button type="button" class="tab-btn" id="tab-btn-map">Peta Bisnis</button>
   </div>
 
   <!-- TAB 1: ONBOARDING VIEW -->
@@ -1423,26 +1396,9 @@
     </div>
   </div>
 
-  <!-- TAB 5: OWNER BUSINESS MAP VIEW (khusus owner — diagram Mermaid dari docs/diagrams/) -->
-  <div id="view-map" style="display: none;">
-    <div class="header">
-      <span class="badge-master">Peta Bisnis</span>
-      <h1 class="title">Alur Bisnis &amp; Peta Aset</h1>
-      <p class="subtitle">Gambar besar khusus owner: perjalanan pembeli dari pesan sampai serah terima, dan posisi aset (siapa punya apa di mana). Diagram disimpan sebagai teks di <code class="inline-code">docs/diagrams/</code> sehingga AI juga membaca sumber yang sama.</p>
-    </div>
-
-    <div class="card">
-      <div class="section-title">1 · Alur Bisnis: Pembeli → Sistem → Anda</div>
-      <div style="font-size: 0.9375rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.6;">Kotak belah ketupat = keputusan sistem · panah tebal = alur utama · garis putus-putus = notifikasi/otomatis. Gambar otomatis pas selebar kotak — semua bagian terlihat sekaligus tanpa digeser.</div>
-      <div style="overflow-x: auto; padding: 0.5rem 0;"><pre class="mermaid" id="diagram-alur">Memuat diagram...</pre></div>
-    </div>
-
-    <div class="card" style="margin-top: 1.25rem;">
-      <div class="section-title">2 · Peta Aset: Siapa Punya Apa di Mana</div>
-      <div style="font-size: 0.9375rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.6;">Inti model bisnisnya: data tiap klien ada di akun Cloudflare milik klien (terisolasi), rahasia di arsip di komputer Anda, uang masuk langsung ke Anda. Gambar otomatis pas selebar kotak — semua bagian terlihat sekaligus tanpa digeser.</div>
-      <div style="overflow-x: auto; padding: 0.5rem 0;"><pre class="mermaid" id="diagram-aset">Memuat diagram...</pre></div>
-    </div>
-  </div>
+  <!-- TAB 5 (Peta Bisnis) dihapus v1.3.79 — pindah penuh ke desktop admin
+       owner (app "Peta Bisnis", zona Sistem Owner; konten: bizMapContent.ts).
+       Diagram mermaid + tab + JS render dihapus dari portal. -->
 </div>
 
 <div class="toast" id="toast">Pesan berhasil disalin ke clipboard.</div>
@@ -1522,18 +1478,16 @@
   const tabBtnDomain = document.getElementById('tab-btn-domain');
   const tabBtnUpdate = document.getElementById('tab-btn-update');
   const tabBtnStatus = document.getElementById('tab-btn-status');
-  const tabBtnMap = document.getElementById('tab-btn-map');
   const viewOnboard = document.getElementById('view-onboard');
   const viewDomain = document.getElementById('view-domain');
   const viewUpdate = document.getElementById('view-update');
   const viewStatus = document.getElementById('view-status');
-  const viewMap = document.getElementById('view-map');
 
   function switchTab(activeBtn, targetView, onActivate) {
-    [tabBtnOnboard, tabBtnDomain, tabBtnUpdate, tabBtnStatus, tabBtnMap].forEach(b => b.classList.remove('active'));
+    [tabBtnOnboard, tabBtnDomain, tabBtnUpdate, tabBtnStatus].forEach(b => b.classList.remove('active'));
     activeBtn.classList.add('active');
 
-    [viewOnboard, viewDomain, viewUpdate, viewStatus, viewMap].forEach(v => {
+    [viewOnboard, viewDomain, viewUpdate, viewStatus].forEach(v => {
       v.style.display = 'none';
       v.classList.remove('view-pane');
     });
@@ -1543,7 +1497,7 @@
     targetView.classList.add('view-pane');
 
     if (appContainer) {
-      if (activeBtn === tabBtnMap || activeBtn === tabBtnStatus) {
+      if (activeBtn === tabBtnStatus) {
         appContainer.classList.add('is-wide');
       } else {
         appContainer.classList.remove('is-wide');
@@ -1567,215 +1521,6 @@
 
   tabBtnUpdate.addEventListener('click', () => {
     switchTab(tabBtnUpdate, viewUpdate, loadUpdateView);
-  });
-
-  // Peta Bisnis (owner-only): render diagram Mermaid dari docs/diagrams/*.mmd
-  // Selalu render ulang agar perubahan .mmd langsung terlihat tanpa restart portal.
-  // Rapikan garis hasil render (v1.3.25 putaran 4): buang titik kembar,
-  // luruskan garis rantai yang belok beberapa px karena pusat kotak selisih,
-  // dan paksa panah yang masuk ke tepi ATAS kotak selalu tegak lurus dari atas.
-  function straightenEdges(preEl) {
-    const svg = preEl ? preEl.querySelector('svg') : null;
-    if (!svg) return;
-    const boxes = [...svg.querySelectorAll('g.node')].map(g => {
-      const b = g.getBBox();
-      const t = g.transform.baseVal.consolidate();
-      const m = t ? t.matrix : { e: 0, f: 0 };
-      return { x: b.x + m.e, y: b.y + m.f, w: b.width, h: b.height };
-    });
-    // Toleransi 6px: mermaid sengaja memangkas ujung garis ~4px sebelum tepi
-    // kotak supaya segitiga panah tidak menabrak kotak.
-    const findBox = (x, y, top) =>
-      boxes.find(b => Math.abs(y - (top ? b.y : b.y + b.h)) <= 6 && x > b.x + 4 && x < b.x + b.w - 4) || null;
-    // Titik masuk/keluar di tepi KIRI/KANAN kotak (bukan atas/bawah).
-    // Toleransi 10px: garis tebal dipangkas mermaid ~8px dari tepi kotak
-    // (marker panah 8px) — toleransi 6px meleset (audit 2026-10-12).
-    const findSideBox = (x, y) =>
-      boxes.find(b => (Math.abs(x - b.x) <= 10 || Math.abs(x - (b.x + b.w)) <= 10) && y > b.y + 4 && y < b.y + b.h - 4) || null;
-    for (const p of svg.querySelectorAll('path.flowchart-link')) {
-      const d = p.getAttribute('d') || '';
-      if (/[^ML\s\d.,-]/.test(d)) continue; // jalur berkurva (bukan poligon siku) → lewati
-      const raw = [];
-      const re = /([ML])\s*(-?[\d.]+)[,\s]+(-?[\d.]+)/g;
-      let mm;
-      while ((mm = re.exec(d))) raw.push([+mm[2], +mm[3]]);
-      if (raw.length < 2) continue;
-      const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
-      const pts = raw.filter((q, i) => i === 0 || dist(q, raw[i - 1]) > 0.6);
-      if (pts.length < 2) continue;
-      const first = pts[0], last = pts[pts.length - 1];
-      // Garis TEBAL alur utama (==>, audit visual owner 2026-10-12): rangkum
-      // seluruh jalur jadi maksimal SATU belokan 90°, memakai jangkar keluar
-      // (tepi kotak sumber) dan masuk (tepi kotak tujuan) yang sudah dipilih
-      // mermaid — jalur baru tetap melewati ruang yang sama aman. Segmen
-      // terakhir selalu tegak lurus ke tepi kotak → segitiga panah (marker
-      // orient=auto) lurus dan simetris.
-      if ((p.getAttribute('class') || '').split(/\s+/).includes('edge-thickness-thick')) {
-        const srcB = findBox(first[0], first[1], false) || findSideBox(first[0], first[1]);
-        const dstTop = findBox(last[0], last[1], true);
-        const dstBox = dstTop || findSideBox(last[0], last[1]);
-        if (srcB && dstBox) {
-          const cx = dstBox.x + dstBox.w / 2;
-          const topY = dstTop ? last[1] : dstBox.y;
-          const cy = dstTop ? dstBox.y + dstBox.h / 2 : last[1];
-          const sideX = cx > first[0] ? dstBox.x : dstBox.x + dstBox.w;
-          // Dua kandidat rute satu-belokan; pilih yang TIDAK menabrak kotak
-          // mana pun (audit 2026-10-12: rute samping PB1→OW5 menembus kotak
-          // OW2 — kandidat masuk-atas di atasnya bebas tabrak).
-          const candA = Math.abs(first[0] - cx) < 4
-            ? [first, [cx, topY]]
-            : [first, [cx, first[1]], [cx, topY]];  // H lalu V, masuk tengah atas
-          const candB = Math.abs(first[1] - cy) < 4
-            ? [first, [sideX, cy]]
-            : [first, [first[0], cy], [sideX, cy]]; // V lalu H, masuk samping
-          // Kandidat cadangan (2 belokan): jalur padat lalu lintas — koridor
-          // bebas di tengah, tetap masuk tegak lurus ke tengah atas kotak.
-          const bandY = (srcB.y + srcB.h + dstBox.y) / 2;
-          const candC = [first, [first[0], bandY], [cx, bandY], [cx, topY]];
-          const hits = (pts2) => boxes.some(b => b !== srcB && b !== dstBox &&
-            pts2.some((q, i) => {
-              if (!i) return false;
-              const a = pts2[i - 1];
-              const bx = b.x + 3, by = b.y + 3, bw = b.x + b.w - 3, bh = b.y + b.h - 3;
-              if (Math.abs(a[0] - q[0]) < 0.6) { // segmen tegak
-                const x = a[0];
-                return x > bx && x < bw && Math.min(a[1], q[1]) < bh && Math.max(a[1], q[1]) > by;
-              }
-              if (Math.abs(a[1] - q[1]) < 0.6) { // segmen mendatar
-                const y = a[1];
-                return y > by && y < bh && Math.min(a[0], q[0]) < bw && Math.max(a[0], q[0]) > bx;
-              }
-              return false;
-            }));
-          const outT = !hits(candA) ? candA : !hits(candB) ? candB : !hits(candC) ? candC : null;
-          if (outT) {
-            p.setAttribute('d', outT.map((q, i) => (i ? 'L' : 'M') + q[0] + ',' + q[1]).join(' '));
-            continue;
-          }
-          // Dua-duanya menabrak → biarkan jalur mermaid (logika umum di bawah).
-        }
-      }
-      let maxH = 0;
-      for (let i = 1; i < pts.length; i++) {
-        const dx = Math.abs(pts[i][0] - pts[i - 1][0]);
-        const dy = Math.abs(pts[i][1] - pts[i - 1][1]);
-        if (dy < 0.6 && dx > 0.6) maxH = Math.max(maxH, dx);
-      }
-      let out;
-      const srcBox = findBox(first[0], first[1], false);
-      const dstBox = findBox(last[0], last[1], true);
-      if (maxH <= 8 && srcBox && dstBox && last[0] > srcBox.x + 4 && last[0] < srcBox.x + srcBox.w - 4) {
-        // Garis rantai: satu garis betul-betul lurus, tepat di atas tengah kotak tujuan
-        out = [[last[0], first[1]], last];
-      } else {
-        out = pts.slice();
-        const prev = out[out.length - 2];
-        const flatTail = Math.abs(prev[1] - last[1]) < 0.6 && Math.abs(prev[0] - last[0]) > 0.6;
-        if (flatTail && dstBox) {
-          // Berhenti mendatar di tepi atas kotak → naikkan belokannya supaya panah tegak
-          let j = out.length - 1;
-          while (j > 1 && Math.abs(out[j - 1][1] - out[j][1]) < 0.6 && Math.abs(out[j - 1][0] - out[j][0]) > 0.6) j--;
-          const room = last[1] - out[j - 1][1];
-          if (room > 3) {
-            const yMid = last[1] - Math.min(12, room * 0.5);
-            const head = out.slice(0, j);
-            head.push([out[j][0], yMid], [last[0], yMid], last);
-            out = head;
-          }
-        }
-      }
-      p.setAttribute('d', out.map((q, i) => (i ? 'L' : 'M') + q[0] + ',' + q[1]).join(' '));
-    }
-  }
-
-  let mermaidLib = null;
-  async function loadBizMap() {
-    const alurEl = document.getElementById('diagram-alur');
-    const asetEl = document.getElementById('diagram-aset');
-    // Reset elemen — hapus SVG lama agar mermaid.run bisa proses ulang
-    alurEl.removeAttribute('data-processed');
-    asetEl.removeAttribute('data-processed');
-    const prevSvgA = alurEl.querySelector('svg');
-    const prevSvgB = asetEl.querySelector('svg');
-    if (prevSvgA) prevSvgA.remove();
-    if (prevSvgB) prevSvgB.remove();
-    alurEl.textContent = 'Memuat...';
-    asetEl.textContent = 'Memuat...';
-    let stage = 'mengambil data diagram dari portal';
-    try {
-      const res = await fetch('/api/diagrams?t=' + Date.now());
-      const data = await res.json();
-      alurEl.textContent = (data.alurBisnis || '').trim();
-      asetEl.textContent = (data.petaAset || '').trim();
-      if (!alurEl.textContent || !asetEl.textContent) {
-        throw new Error('File diagram belum tersedia di docs/diagrams/.');
-      }
-      stage = 'memuat pustaka diagram (CDN)';
-      if (!mermaidLib) {
-        mermaidLib = (await import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs')).default;
-      }
-      mermaidLib.initialize({
-        startOnLoad: false,
-        theme: 'base',
-        themeVariables: {
-          fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-          fontSize: '16px',
-          darkMode: false,
-          primaryColor: '#ffffff',
-          primaryBorderColor: '#111827',
-          primaryTextColor: '#111827',
-          secondaryColor: '#f9fafb',
-          secondaryBorderColor: '#4b5563',
-          secondaryTextColor: '#111827',
-          tertiaryColor: '#ffffff',
-          tertiaryBorderColor: '#6b7280',
-          tertiaryTextColor: '#111827',
-          lineColor: '#1f2937',
-          textColor: '#111827',
-          mainBkg: '#ffffff',
-          nodeBorder: '#111827',
-          clusterBkg: '#f3f4f6',
-          clusterBorder: '#9ca3af',
-          titleColor: '#374151',
-          edgeLabelBackground: '#f9fafb',
-          nodeTextColor: '#111827',
-        },
-        flowchart: {
-          curve: 'stepBefore',
-          nodeSpacing: 55,
-          rankSpacing: 55,
-          htmlLabels: true,
-          padding: 20,
-          useMaxWidth: true,
-        },
-      });
-      // Render terpisah per diagram: satu file .mmd rusak tidak ikut
-      // mematikan diagram sebelahnya (audit 2026-10-11 — sebelumnya satu
-      // run() bersama bikin keduanya gagal sekaligus).
-      for (const el of [alurEl, asetEl]) {
-        try {
-          await mermaidLib.run({ nodes: [el] });
-          straightenEdges(el);
-        } catch (renderErr) {
-          const detail = (renderErr && (renderErr.str || renderErr.message)) || String(renderErr);
-          console.error('[PetaBisnis] Gagal merender ' + el.id + ':', detail);
-          el.textContent = 'Teks diagram tidak valid di docs/diagrams/*.mmd (' + String(detail).split('\n')[0] + ').';
-        }
-      }
-    } catch (err) {
-      const detail = (err && (err.str || err.message)) || String(err);
-      console.error('[PetaBisnis] Gagal memuat diagram:', detail, '(tahap: ' + stage + ')');
-      ['diagram-alur', 'diagram-aset'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el && !el.textContent.trim().startsWith('flowchart')) {
-          el.textContent = 'Gagal ' + stage + '. Pastikan portal berjalan dan internet aktif, lalu muat ulang halaman.';
-        }
-      });
-    }
-  }
-
-  tabBtnMap.addEventListener('click', () => {
-    switchTab(tabBtnMap, viewMap, loadBizMap);
   });
 
   // Template card click

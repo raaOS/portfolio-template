@@ -23,6 +23,7 @@ import {
   Receipt,
   MonitorPlay,
   Clapperboard,
+  Map as MapIcon,
 } from 'lucide-react';
 import type { AdminZone } from './types';
 
@@ -197,6 +198,19 @@ const ALL_ADMIN_ZONES: AdminZone[] = [
         defaultHeight: 620,
         ownerOnly: true,
       },
+      {
+        // Peta Bisnis — alur jualan & peta aset. Pindah penuh dari portal
+        // PENGELOLA_KLIEN di v1.3.79 (flow berubah di v1.3.78 deferred R2).
+        // Informasi internal bisnis owner → ownerOnly.
+        id: 'petaBisnis',
+        label: 'Peta Bisnis',
+        icon: MapIcon,
+        iconColor: 'text-sky-600',
+        iconBg: 'bg-sky-100',
+        defaultWidth: 1180,
+        defaultHeight: 780,
+        ownerOnly: true,
+      },
     ],
   },
   {
@@ -331,6 +345,7 @@ export const APP_ROUTE_MAP: Record<string, string> = {
   heroVideos: '/admin/hero-videos',
   harga: '/admin/harga',
   orders: '/admin/system/orders',
+  petaBisnis: '/admin/system/peta-bisnis',
   notifications: '/admin/communications/notifications',
   messages: '/admin/communications/messages',
   feedback: '/admin/communications/feedback',

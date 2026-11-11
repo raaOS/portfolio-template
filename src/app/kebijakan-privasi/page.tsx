@@ -1,9 +1,8 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
-import '@/components/landing/landing.css';
+import { PublicShell } from '@/components/landing/PublicChrome';
 
 export const metadata: Metadata = {
-  title: 'Kebijakan Privasi — Make it Better Studio',
+  title: 'Kebijakan Privasi',
   description:
     'Kebijakan privasi Make it Better Studio: data apa yang dikumpulkan saat membeli template dan memakai website, bagaimana dan untuk apa digunakan.',
 };
@@ -13,27 +12,20 @@ export const metadata: Metadata = {
  * dan footer email pesanan. Ditulis jujur mengikuti alur produk yang ada
  * (Cloudflare D1/R2, verifikasi manual, Resend untuk email, WhatsApp untuk
  * serah-terima akses) — jika alur berubah, perbarui juga halaman ini.
+ *
+ * v1.3.80: dipindahkan ke chrome publik bersama (`PublicShell` + `.lp-doc`).
+ * Kelas `.landing*` dan variabel `--lp-accent`/`--lp-muted` lama tidak pernah
+ * didefinisikan di CSS mana pun → halaman tidak bergaya.
  */
 export default function KebijakanPrivasiPage() {
-  const year = new Date().getFullYear();
-
   return (
-    <div className="landing">
-      <nav className="landing-nav">
-        <Link href="/" className="landing-logo">
-          Make it Better Studio
-        </Link>
-        <Link href="/syarat-ketentuan" className="landing-nav-link">
-          Syarat &amp; Ketentuan
-        </Link>
-      </nav>
-
-      <article className="landing-doc mx-auto max-w-3xl px-6 pb-24 pt-6">
-        <h1 className="mb-2 text-3xl font-bold tracking-tight" style={{ color: 'var(--lp-accent)' }}>
-          Kebijakan Privasi
-        </h1>
-        <p className="mb-10 text-sm" style={{ color: 'var(--lp-muted)' }}>
-          Berlaku sejak 8 Oktober 2026 — Make it Better Studio · m4keitbetter@gmail.com
+    <PublicShell>
+      <div className="lp-doc">
+        <p className="lp-eyebrow">Legal</p>
+        <h1 className="lp-title">Kebijakan Privasi</h1>
+        <p className="lp-lead">
+          Berlaku sejak 8 Oktober 2026 — Make it Better Studio ·{' '}
+          <a href="mailto:m4keitbetter@gmail.com">m4keitbetter@gmail.com</a>
         </p>
 
         <h2>1. Siapa yang memegang data Anda</h2>
@@ -125,16 +117,7 @@ export default function KebijakanPrivasiPage() {
           Kebijakan ini dapat diperbarui sewaktu-waktu; tanggal berlaku selalu dicantumkan di
           halaman ini.
         </p>
-
-        <footer
-          className="mt-12 border-t pt-6 text-sm"
-          style={{ borderColor: 'var(--lp-border)', color: 'var(--lp-muted)' }}
-        >
-          © {year} Make it Better Studio ·{' '}
-          <Link href="/syarat-ketentuan">Syarat &amp; Ketentuan</Link> ·{' '}
-          <Link href="/">Beranda</Link>
-        </footer>
-      </article>
-    </div>
+      </div>
+    </PublicShell>
   );
 }

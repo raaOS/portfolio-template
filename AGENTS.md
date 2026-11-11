@@ -498,6 +498,8 @@ Konten legacy disimpan sebagai JSON string di tabel `app_kv`:
 1. Owner daftarkan klien baru di portal: Gmail klien + Account ID & API Token
    dari akun Cloudflare MILIK KLIEN (disimpan di arsip-klien/<slug>/config.env)
 2. STEP 1-3: verifikasi kredensial → buat database D1 + bucket R2 di akun klien
+   (sejak v1.3.78 deferred R2: R2 belum aktif → onboarding LANJUT tanpa media —
+   lihat subseksi "Deferred R2 Mode" di bawah)
 3. STEP 4: pasang skema tabel (`SHARED_SCHEMA_QUERIES` **lalu**
    `D1_SCHEMA_QUERIES`) → seed row `site` (active_template_key sesuai pilihan
    template) dan admin user (scrypt), semua lewat binding parameter — lalu

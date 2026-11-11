@@ -94,19 +94,13 @@ async function checkStatusInternal() {
   inFlight = (async () => {
     const startedAt = performance.now();
     try {
-      if (!navigator.onLine) {
-        publish({
-          isLoading: false,
-          connectionStatus: 'error',
-          serverStatus: 'offline',
-          latencyMs: null,
-          lastCheckedAt: Date.now(),
-          errorMessage: 'Browser sedang offline',
-          health: null,
-        });
-        return;
-      }
-
+      // JANGAN pakai `navigator.onLine` sebagai penentu di sini. Nilai itu
+      // hanya dugaan OS/browser (sering `false` saat Wi-Fi tanpa internet,
+      // hotspot HP, VPN, atau bangun dari sleep) padahal request ke origin
+      // yang sama tetap jalan — mis. dev server di LAN `192.168.x.x`.
+      // Dulu short-circuit ini membuat widget "Cloudflare D1" memerah
+      // "Browser sedang offline" padahal `/api/health` menjawab 200 dan D1
+      // sehat. Satu-satunya bukti adalah request sungguhan di bawah.
       publish({ connectionStatus: 'checking', serverStatus: 'checking', errorMessage: null });
       const response = await fetch('/api/health', { cache: 'no-store' });
       const latencyMs = Math.round(performance.now() - startedAt);
@@ -134,13 +128,17 @@ async function checkStatusInternal() {
         });
       }
     } catch (error) {
+      // Request benar-benar gagal. Baru di sini status offline browser dipakai,
+      // dan hanya sebagai keterangan tambahan — bukan pengganti pesan asli.
+      const browserOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+      const realMessage = error instanceof Error ? error.message : 'API health tidak terjangkau';
       publish({
         isLoading: false,
         connectionStatus: 'error',
         serverStatus: 'offline',
         latencyMs: null,
         lastCheckedAt: Date.now(),
-        errorMessage: error instanceof Error ? error.message : 'API health tidak terjangkau',
+        errorMessage: browserOffline ? `Browser melaporkan offline · ${realMessage}` : realMessage,
         health: null,
       });
     } finally {

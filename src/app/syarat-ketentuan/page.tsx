@@ -1,9 +1,8 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
-import '@/components/landing/landing.css';
+import { PublicShell } from '@/components/landing/PublicChrome';
 
 export const metadata: Metadata = {
-  title: 'Syarat & Ketentuan — Make it Better Studio',
+  title: 'Syarat & Ketentuan',
   description:
     'Syarat & ketentuan pembelian template portfolio Make it Better Studio: harga, pembayaran, aktivasi, pembatalan, dan refund.',
 };
@@ -14,27 +13,21 @@ export const metadata: Metadata = {
  * email pesanan. Poin refund mengikuti kebijakan yang sudah disetujui owner
  * (docs/operations/support-playbook.md §8) — jangan menjanjikan apa pun di
  * luar poin ini tanpa persetujuan owner.
+ *
+ * v1.3.80: dipindahkan ke chrome publik bersama (`PublicShell` + `.lp-doc`).
+ * Sebelumnya memakai kelas `.landing` / `.landing-nav` / `.landing-doc` dan
+ * variabel `--lp-accent` yang TIDAK pernah didefinisikan di CSS mana pun →
+ * halaman tampil tanpa gaya dan tautannya nyasar.
  */
 export default function SyaratKetentuanPage() {
-  const year = new Date().getFullYear();
-
   return (
-    <div className="landing">
-      <nav className="landing-nav">
-        <Link href="/" className="landing-logo">
-          Make it Better Studio
-        </Link>
-        <Link href="/kebijakan-privasi" className="landing-nav-link">
-          Kebijakan Privasi
-        </Link>
-      </nav>
-
-      <article className="landing-doc mx-auto max-w-3xl px-6 pb-24 pt-6">
-        <h1 className="mb-2 text-3xl font-bold tracking-tight" style={{ color: 'var(--lp-accent)' }}>
-          Syarat &amp; Ketentuan
-        </h1>
-        <p className="mb-10 text-sm" style={{ color: 'var(--lp-muted)' }}>
-          Berlaku sejak 8 Oktober 2026 — Make it Better Studio · m4keitbetter@gmail.com
+    <PublicShell>
+      <div className="lp-doc">
+        <p className="lp-eyebrow">Legal</p>
+        <h1 className="lp-title">Syarat &amp; Ketentuan</h1>
+        <p className="lp-lead">
+          Berlaku sejak 8 Oktober 2026 — Make it Better Studio ·{' '}
+          <a href="mailto:m4keitbetter@gmail.com">m4keitbetter@gmail.com</a>
         </p>
 
         <h2>1. Tentang layanan</h2>
@@ -136,16 +129,7 @@ export default function SyaratKetentuanPage() {
 
         <h2>8. Kontak</h2>
         <p>Pertanyaan soal ketentuan ini: m4keitbetter@gmail.com.</p>
-
-        <footer
-          className="mt-12 border-t pt-6 text-sm"
-          style={{ borderColor: 'var(--lp-border)', color: 'var(--lp-muted)' }}
-        >
-          © {year} Make it Better Studio ·{' '}
-          <Link href="/kebijakan-privasi">Kebijakan Privasi</Link> ·{' '}
-          <Link href="/">Beranda</Link>
-        </footer>
-      </article>
-    </div>
+      </div>
+    </PublicShell>
   );
 }

@@ -209,8 +209,15 @@ export default function AdminMenuBar({ onLogout }: AdminMenuBarProps) {
     });
     return [header, '', ...rows].join('\n');
   }, [tasks, completedUploadCount, totalUploadCount, inFlightUploadProgress]);
-  const { connectionStatus, serverStatus, latencyMs, lastCheckedAt, errorMessage, health } =
-    useDataStatus();
+  const {
+    connectionStatus,
+    serverStatus,
+    latencyMs,
+    lastCheckedAt,
+    errorMessage,
+    health,
+    checkStatus,
+  } = useDataStatus();
 
   const updateCacheStep = React.useCallback(
     (id: string, patch: Partial<ClearCacheProgressStep>) => {
@@ -513,6 +520,7 @@ export default function AdminMenuBar({ onLogout }: AdminMenuBarProps) {
         backend={health?.databaseBackend ?? null}
         lastCheckedAt={lastCheckedAt}
         errorMessage={connectionStatus === 'connected' ? null : errorMessage}
+        onRefresh={() => void checkStatus()}
       />
       <NetworkPopout
         isOpen={openPopout === 'net'}

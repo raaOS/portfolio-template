@@ -34,6 +34,10 @@ Pesan itu pengingat, bukan sistem kerja — pekerjaan tetap dijalankan kamu.
 
 - Klien mendaftar Cloudflare, atau kamu daftarkan atas nama klien.
 - Ambil **Account ID** dan buat **API Token** dengan izin **D1, R2, dan Workers (Edit)**.
+  (Sejak v1.3.78 deferred R2: kalau R2 belum diaktifkan di akun klien — butuh
+  kartu/PayPal — onboarding **tetap jalan tanpa media**; R2 menyusul setelah klien
+  aktivasi via wizard dan kamu klik "Selesaikan Setup". Izin R2 di token tetap
+  dibutuhkan untuk finalisasi + "Cek Pending R2".)
 - (Izin **Pages** tidak lagi dipakai — deploy & custom domain klien sudah pindah ke Worker; izin Workers dibutuhkan untuk deploy dan penyambungan custom domain.)
 - Token inilah yang dipakai portal di langkah berikutnya; portal akan menolak token
   yang tidak valid atau tidak cocok dengan Account ID.
@@ -45,7 +49,7 @@ Dari folder repo, jalankan `PENGELOLA_KLIEN.bat` (portal terbuka di
 
 | Menu | Fungsi |
 |---|---|
-| `[1]` Pendaftaran Klien Baru | Verifikasi Account ID + API Token, lalu provisioning **D1**, **R2**, dan file konfigurasi klien |
+| `[1]` Pendaftaran Klien Baru | Verifikasi Account ID + API Token, lalu provisioning **D1** (+ **R2** kalau akun klien sudah aktifkan R2; kalau belum → mode deferred, media menyusul) dan file konfigurasi klien |
 | `[2]` Status Klien | Pantau online/offline, versi template, dan domain semua klien |
 | `[3]` Kelola Custom Domain Klien | Pasang domain sendiri untuk klien |
 | `[4]` Update Versi Template ke Klien | Terapkan bugfix/fitur baru ke klien yang sudah jalan |
@@ -61,6 +65,10 @@ Jangan tutup jendela terminal selama portal dipakai.
   ke akun klien. (Script lama `scripts/deploy/deploy-customer.sh` sudah dihapus
   pada audit 2026-10-08 — memang tidak pernah dipanggil portal.)
 - Hasil akhir: `https://<slug>.workers.dev` (atau custom domain klien).
+- **Deferred R2 (v1.3.78):** deploy tetap sukses walau R2 belum aktif — klien
+  aktivasi media sendiri via wizard `?onboard=<token>` (link ada di pesan WA
+  siap-copy), lalu klik **"Selesaikan Setup"** (= deploy ulang) dan pantau via
+  "Cek Pending R2". SOP lengkap: `GLADI_RESIK_KLIEN_PERDANA.md` §10.
 
 ### 6. Serah terima + tandai selesai
 

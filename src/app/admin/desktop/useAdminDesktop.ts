@@ -18,6 +18,29 @@ function getStaggerOffset(windowCount: number) {
 // kiri-bawah → kanan-bawah. Zone di luar daftar ini jatuh ke urutan registry.
 const QUADRANT_ORDER = ['system', 'communications', 'content', 'display'];
 
+/**
+ * Ubin zone responsif: 2 kolom (tablet/desktop) atau 1 kolom (HP). Ukuran
+ * dihitung dari ruang yang tersedia — bukan angka mati — supaya tidak ada celah
+ * besar di tengah layar lebar dan tidak saling tumpuk di layar sempit.
+ */
+const ZONE_TILE = { margin: 12, gap: 10, menubar: 36, taskbar: 60 };
+
+function getZoneTile(slot: number, vw: number, vh: number) {
+  const cols = vw >= 720 ? 2 : 1;
+  const rows = 4 / cols;
+  const width = Math.floor((vw - ZONE_TILE.margin * 2 - ZONE_TILE.gap * (cols - 1)) / cols);
+  const height = Math.floor(
+    (vh - ZONE_TILE.menubar - ZONE_TILE.taskbar - ZONE_TILE.margin * 2 - ZONE_TILE.gap * (rows - 1)) /
+      rows
+  );
+  return {
+    x: ZONE_TILE.margin + (slot % cols) * (width + ZONE_TILE.gap),
+    y: ZONE_TILE.menubar + ZONE_TILE.margin + Math.floor(slot / cols) * (height + ZONE_TILE.gap),
+    width,
+    height,
+  };
+}
+
 export function useAdminDesktop() {
   const [windows, setWindows] = useState<AdminWindowState[]>([]);
   const windowCountRef = useRef(0);
@@ -149,36 +172,28 @@ export function useAdminDesktop() {
   }, []);
 
   /**
-   * Auto-buka semua zone tersusun kuadran 2×2 (v1.3.65) — pengganti 4 kartu
-   * folder di desktop. Layar terlalu kecil untuk 2×2 rapi → jatuh ke stagger
-   * lama (tumpuk, masih bisa digeser manual oleh user).
+   * Susun 4 zone sebagai ubin responsif (v1.3.80): 2×2 di tablet/desktop,
+   * 1 kolom × 4 baris di HP. Dipanggil saat desktop dimuat dan setiap resize /
+   * rotasi layar — jendela zone yang sudah ada cukup digeser, bukan digandakan.
    */
-  const openAllZonesTiled = useCallback(() => {
+  const layoutZones = useCallback(() => {
     const vw = typeof window !== 'undefined' ? window.innerWidth : 1440;
     const vh = typeof window !== 'undefined' ? window.innerHeight : 900;
-    const MARGIN = 16;
-    const GAP = 12;
-    const MENUBAR = 36;
-    const TASKBAR = 60;
-    const canTile = vw >= 1160 && vh >= 700;
-
-    if (!canTile) {
-      for (const zone of ADMIN_ZONES) openFolder(zone.id);
-      return;
-    }
-
-    const w = Math.min(560, Math.floor((vw - MARGIN * 2 - GAP) / 2));
-    const h = Math.min(400, Math.floor((vh - MENUBAR - TASKBAR - MARGIN * 2 - GAP) / 2));
-    const cols = [MARGIN, vw - MARGIN - w];
-    const rows = [MENUBAR + MARGIN, vh - TASKBAR - MARGIN - h];
 
     setWindows((prev) => {
       const next = [...prev];
       ADMIN_ZONES.forEach((zone, index) => {
         const folderAppId = `folder-${zone.id}`;
-        if (next.some((win) => win.appId === folderAppId)) return;
         const quadrant = QUADRANT_ORDER.indexOf(zone.id);
         const slot = (quadrant === -1 ? index : quadrant) % 4;
+        const rect = getZoneTile(slot, vw, vh);
+        const existingIndex = next.findIndex((w) => w.appId === folderAppId);
+
+        if (existingIndex >= 0) {
+          next[existingIndex] = { ...next[existingIndex], ...rect };
+          return;
+        }
+
         windowCountRef.current++;
         nextZIndex++;
         next.push({
@@ -190,23 +205,34 @@ export function useAdminDesktop() {
           isMinimized: false,
           isMaximized: false,
           zIndex: nextZIndex,
-          x: cols[slot % 2],
-          y: rows[Math.floor(slot / 2)],
-          width: w,
-          height: h,
+          ...rect,
         });
       });
       return next;
     });
-  }, [openFolder]);
+  }, []);
 
   // Auto-open saat desktop dimuat. Timer (bukan setState sinkron di effect)
   // agar lolos lint react-hooks/set-state-in-effect; dedup `folder-<zoneId>`
   // bawaan membuat aman terhadap StrictMode double-invoke.
   useEffect(() => {
-    const timer = setTimeout(openAllZonesTiled, 0);
+    const timer = setTimeout(layoutZones, 0);
     return () => clearTimeout(timer);
-  }, [openAllZonesTiled]);
+  }, [layoutZones]);
+
+  // Resize / rotasi perangkat → hitung ulang ubin supaya tetap rapi.
+  useEffect(() => {
+    let raf = 0;
+    const onResize = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(layoutZones);
+    };
+    window.addEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      cancelAnimationFrame(raf);
+    };
+  }, [layoutZones]);
 
   const actions: AdminDesktopActions = {
     openApp,

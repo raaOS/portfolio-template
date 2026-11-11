@@ -15,6 +15,20 @@ function flushAutoOpen() {
   });
 }
 
+/** Apakah ada dua jendela yang saling menumpuk? */
+function hasOverlap(windows: { x: number; y: number; width: number; height: number }[]) {
+  return windows.some((a, i) =>
+    windows.some(
+      (b, j) =>
+        i < j &&
+        a.x < b.x + b.width &&
+        b.x < a.x + a.width &&
+        a.y < b.y + b.height &&
+        b.y < a.y + a.height
+    )
+  );
+}
+
 describe('useAdminDesktop — auto-open 4 zone tersusun 2×2 (v1.3.65)', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -77,7 +91,7 @@ describe('useAdminDesktop — auto-open 4 zone tersusun 2×2 (v1.3.65)', () => {
     expect(new Set(result.current.windows.map((w) => w.appId)).size).toBe(4);
   });
 
-  it('layar kecil (fallback stagger): semua zone tetap terbuka dan tidak ada yang keluar layar', () => {
+  it('layar sedang (1000×760): tetap 2×2 rapi tanpa tumpuk', () => {
     setViewport(1000, 760);
     const { result } = renderHook(() => useAdminDesktop());
     flushAutoOpen();
@@ -88,6 +102,40 @@ describe('useAdminDesktop — auto-open 4 zone tersusun 2×2 (v1.3.65)', () => {
       expect(w.y).toBeGreaterThanOrEqual(0);
       expect(w.x + w.width).toBeLessThanOrEqual(1000);
       expect(w.y + w.height).toBeLessThanOrEqual(760);
+    }
+    expect(hasOverlap(result.current.windows)).toBe(false);
+  });
+
+  it('tablet iPad (820×1180): 2×2, tidak menumpuk, semua di dalam layar', () => {
+    setViewport(820, 1180);
+    const { result } = renderHook(() => useAdminDesktop());
+    flushAutoOpen();
+
+    expect(result.current.windows).toHaveLength(4);
+    expect(hasOverlap(result.current.windows)).toBe(false);
+    for (const w of result.current.windows) {
+      expect(w.x).toBeGreaterThanOrEqual(0);
+      expect(w.y).toBeGreaterThanOrEqual(0);
+      expect(w.x + w.width).toBeLessThanOrEqual(820);
+      expect(w.y + w.height).toBeLessThanOrEqual(1180);
+    }
+  });
+
+  it('HP (390×844): satu kolom 4 baris, tidak menumpuk, semua di dalam layar', () => {
+    setViewport(390, 844);
+    const { result } = renderHook(() => useAdminDesktop());
+    flushAutoOpen();
+
+    expect(result.current.windows).toHaveLength(4);
+    expect(hasOverlap(result.current.windows)).toBe(false);
+    // satu kolom → semua jendela x sama, y naik berurutan
+    const xs = new Set(result.current.windows.map((w) => w.x));
+    expect(xs.size).toBe(1);
+    for (const w of result.current.windows) {
+      expect(w.x).toBeGreaterThanOrEqual(0);
+      expect(w.y).toBeGreaterThanOrEqual(0);
+      expect(w.x + w.width).toBeLessThanOrEqual(390);
+      expect(w.y + w.height).toBeLessThanOrEqual(844);
     }
   });
 });

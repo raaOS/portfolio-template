@@ -1,6 +1,7 @@
 import { MetadataRoute } from 'next';
 import { allProjectsAsync } from '@/lib/projects';
 import { DEFAULT_SITE_URL } from '@/lib/constants';
+import { isStorefrontDeployment } from '@/lib/storefront';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || DEFAULT_SITE_URL;
@@ -52,6 +53,37 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
+  // Halaman jualan hanya ada di build owner (`STOREFRONT=true`); build klien
+  // menghapus variabel itu sehingga route-nya 404 — jangan diindeks.
+  const storefrontUrls: MetadataRoute.Sitemap = isStorefrontDeployment()
+    ? [
+        {
+          url: `${baseUrl}/fitur`,
+          lastModified: new Date(),
+          changeFrequency: 'monthly',
+          priority: 0.9,
+        },
+        {
+          url: `${baseUrl}/harga`,
+          lastModified: new Date(),
+          changeFrequency: 'monthly',
+          priority: 0.9,
+        },
+        {
+          url: `${baseUrl}/cara-pesan`,
+          lastModified: new Date(),
+          changeFrequency: 'monthly',
+          priority: 0.8,
+        },
+        {
+          url: `${baseUrl}/panduan`,
+          lastModified: new Date(),
+          changeFrequency: 'monthly',
+          priority: 0.5,
+        },
+      ]
+    : [];
+
   // URL dinamis dari project
   const projectUrls: MetadataRoute.Sitemap = projects
     .filter((project) => project.status !== 'draft') // Hanya publish project
@@ -62,5 +94,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     }));
 
-  return [...staticUrls, ...projectUrls];
+  return [...staticUrls, ...storefrontUrls, ...projectUrls];
 }

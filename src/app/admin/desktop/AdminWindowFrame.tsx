@@ -315,7 +315,9 @@ export default function AdminWindowFrame({ state, actions, children }: AdminWind
   return (
     <div
       ref={windowRef}
-      className={`admin-window ${isMax ? 'admin-window-maximized' : ''}`}
+      className={`admin-window ${isZone ? 'admin-window-zone' : ''} ${
+        isMax ? 'admin-window-maximized' : ''
+      }`}
       style={style}
       onMouseDown={() => actions.bringToFront(state.id)}
     >

@@ -789,25 +789,8 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // API: Diagram peta bisnis owner (sumber kebenaran: docs/diagrams/*.mmd)
-  if (url === '/api/diagrams' && req.method === 'GET') {
-    const diagramsDir = path.join(ROOT_DIR, 'docs', 'diagrams');
-    const readDiagram = (name: string) => {
-      try {
-        return fs.readFileSync(path.join(diagramsDir, name), 'utf-8');
-      } catch {
-        return '';
-      }
-    };
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(
-      JSON.stringify({
-        alurBisnis: readDiagram('alur-bisnis.mmd'),
-        petaAset: readDiagram('peta-aset.mmd'),
-      })
-    );
-    return;
-  }
+  // (API /api/diagrams dihapus v1.3.79 — Peta Bisnis pindah penuh ke desktop
+  // admin owner: app "Peta Bisnis", konten di bizMapContent.ts.)
 
   // API: Verify Token
   if (url === '/api/verify' && req.method === 'POST') {

@@ -53,6 +53,7 @@
 
 import * as React from 'react';
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import * as THREE from 'three';
 import { ExternalLink } from 'lucide-react';
 import { extractStoragePath } from '@/lib/urlResolver';
@@ -91,6 +92,14 @@ const DEFAULTS = {
 const CORRIDOR_DIM = 0.22;
 const TAP_SLOP = 6;
 const TAP_MS = 600;
+/** v1.3.81 — jendela "jangan batalkan dulu" setelah lembaran mulai naik.
+    Bug yang dilaporkan owner: ketuk lembaran → popup live sempat terbuka
+    (atau belum sempat muncul) lalu langsung kembali ke tumpukan. Penyebabnya
+    tap kedua — entah double-click bawaan pengguna, entah ketukan iseng karena
+    animasi angkat terasa lama (≈0,6 detik). Sebelum v1.3.81 tap kedua saat
+    fokus aktif selalu memanggil `releaseFocus()`, membatalkan animasi tepat
+    sebelum iframe tampil. Sekarang tap pembatal diabaikan selama TAP_GUARD_MS. */
+const TAP_GUARD_MS = 700;
 /** v1.3.76: 1600 → 2048 — lembaran lebih besar & lebih rapat, jadi
     downscale pass pick dibuat lebih halus agar tepi tumpang-tindih tetap
     menunjuk lembaran yang benar-benar diketuk (1× render per klik). */
@@ -188,6 +197,13 @@ export function previewVideoOf(image: MagazineImage): string {
   } catch {
     return '';
   }
+}
+
+/** v1.3.82 — id template dari `previewUrl` (`/preview/os-desktop` →
+    `os-desktop`), dipakai tautan "Pesan" → `/checkout?template=<id>`. */
+export function templateIdOf(image: MagazineImage): string {
+  const url = previewUrlOf(image);
+  return url.split('?')[0].split('/').filter(Boolean).pop() ?? '';
 }
 
 /** Modulo gaya GLSL (hasil selalu non-negatif untuk y > 0). */
@@ -690,6 +706,8 @@ class MagazineScene {
   private drag = { active: false, lastX: 0, id: -1 };
 
   private focus = { index: -1, t: 0, target: 0, fired: false };
+  /** Kapan fokus terakhir dimulai (ms) — dipakai guard tap pembatal. */
+  private focusStamp = 0;
 
   private tap = { x: 0, y: 0, at: 0, id: -1, hit: -1 };
 
@@ -1139,6 +1157,9 @@ class MagazineScene {
   private onTap(hit: number) {
     if (!this.settings().tapToView) return;
     if (this.focus.index >= 0) {
+      // v1.3.81 — lihat TAP_GUARD_MS: tap kedua terlalu cepat diabaikan,
+      // bukan membatalkan animasi angkat sebelum demo live tampil.
+      if (performance.now() - this.focusStamp < TAP_GUARD_MS) return;
       this.releaseFocus();
       return;
     }
@@ -1146,6 +1167,7 @@ class MagazineScene {
       this.focus.index = hit;
       this.focus.target = 1;
       this.focus.fired = false;
+      this.focusStamp = performance.now();
       this.onFocusStart?.(hit);
     }
   }
@@ -1529,6 +1551,12 @@ export default function MagazineShowcase({
   const [liveReady, setLiveReady] = useState(false);
   const [preloadingIndex, setPreloadingIndex] = useState<number | null>(null);
 
+  /** Kapan overlay live terakhir kali dipasang (ms) — guard tutup tak sengaja. */
+  const liveOpenedAt = useRef(0);
+  /** Indeks yang sedang ditayangkan; dipakai agar `liveReady` tidak di-reset
+      saat `onLive` terpanggil ulang hanya karena rect berubah (resize). */
+  const liveIndexRef = useRef(-1);
+
   // Ref agar callback terbaru terpakai tanpa meresefkan scene (disinkronkan
   // di effect — pola wajib React Compiler; lihat Dock.tsx isClientHydrated).
   const imagesRef = useRef(images);
@@ -1571,10 +1599,19 @@ export default function MagazineShowcase({
       setPreloadingIndex(index);
     };
     scene.onLive = (index, rect) => {
-      setLiveReady(false);
+      // Hanya reset kesiapan jika lembaran memang berganti. `setSize` memanggil
+      // `onLive` lagi setiap container berubah ukuran; dulu itu mengembalikan
+      // iframe ke opacity 0 padahal `onLoad` sudah lewat → demo tampak hitam.
+      if (index !== liveIndexRef.current) {
+        liveIndexRef.current = index;
+        setLiveReady(false);
+      }
+      liveOpenedAt.current = performance.now();
       setLive({ index, rect });
     };
     scene.onLiveEnd = () => {
+      liveIndexRef.current = -1;
+      liveOpenedAt.current = 0;
       setLive(null);
       setPreloadingIndex(null);
       setLiveReady(false);
@@ -1615,7 +1652,11 @@ export default function MagazineShowcase({
   // Penyesuaian #6: jalur keyboard — tanpa mouse, template tetap terbuka.
   const firstAlt = images[0] ? altOf(images[0]) : '';
 
+  /** v1.3.81 — overlay live dipasang tepat di bawah jari/kursor yang baru
+      mengetuk, jadi sisa gestur yang sama bisa langsung menutupnya. Beri jeda
+      singkat sebelum klik-luar / tombol ✕ boleh menutup. */
   const closeLive = () => {
+    if (performance.now() - liveOpenedAt.current < 300) return;
     sceneRef.current?.releaseFocus();
     setLive(null);
     setPreloadingIndex(null);
@@ -1752,6 +1793,46 @@ export default function MagazineShowcase({
 
                 }}
               >
+                {/* v1.3.81 — selama iframe belum selesai dimuat, tampilkan
+                    tangkapan layar lembaran + label "memuat" agar pengguna
+                    tidak melihat kotak hitam lalu mengetuk lagi (yang dulu
+                    malah menutup overlay). */}
+                {!liveReady && (
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      zIndex: 1,
+                      backgroundImage: `url(${srcOf(liveImage)})`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                    }}
+                  />
+                )}
+                {!liveReady && (
+                  <div
+                    role="status"
+                    style={{
+                      position: 'absolute',
+                      left: '50%',
+                      bottom: 12,
+                      transform: 'translateX(-50%)',
+                      zIndex: 5,
+                      maxWidth: '90%',
+                      padding: '6px 12px',
+                      borderRadius: 999,
+                      background: 'rgba(15,15,22,0.86)',
+                      color: '#fff',
+                      fontSize: 12,
+                      lineHeight: 1.2,
+                      textAlign: 'center',
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    Memuat demo live…
+                  </div>
+                )}
                 {/* Top Header Bar di atas frame agar tidak memotong isi viewport */}
                 <div
                   style={{
@@ -1808,6 +1889,29 @@ export default function MagazineShowcase({
                   )}
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {/* v1.3.82 — pintu masuk jualan langsung dari demo yang
+                        sedang dilihat: /checkout?template=<id> memilih
+                        template itu di form checkout. */}
+                    <Link
+                      href={`/checkout?template=${templateIdOf(liveImage)}`}
+                      title={`Pesan template ${altOf(liveImage) || ''}`.trim()}
+                      aria-label={`Pesan template ${altOf(liveImage) || 'ini'}`}
+                      style={{
+                        color: '#fff',
+                        textDecoration: 'none',
+                        borderRadius: 6,
+                        padding: '4px 10px',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        background: '#0008FF',
+                      }}
+                    >
+                      Pesan
+                    </Link>
+
                     <button
                       type="button"
                       onClick={() => openDemo(liveImage)}

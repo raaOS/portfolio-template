@@ -259,6 +259,109 @@ body.mag-live-active .wave-nav-floating {
   background: var(--wr-text-primary);
 }
 
+/* ---------- Menu jualan (v1.3.80) ---------- */
+.wave-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  pointer-events: auto;
+}
+
+.wave-nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 13px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--wr-text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  text-decoration: none;
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.wave-nav-link:hover {
+  background: var(--wr-card-bg);
+  border-color: var(--wr-border);
+  color: var(--wr-text-primary);
+}
+
+/* Pembungkus kanan: toggle pattern + CTA + burger HP. */
+.wave-nav-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.wave-nav-burger {
+  display: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--wr-border);
+  border-radius: 50%;
+  background: var(--wr-card-bg);
+  color: var(--wr-text-primary);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+/* Sheet menu HP: daftar tautan yang sama dengan nav desktop. */
+.wave-nav-sheet {
+  position: fixed;
+  top: 70px;
+  right: 16px;
+  left: 16px;
+  z-index: 40;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  border: 1px solid var(--wr-border);
+  border-radius: 16px;
+  background: var(--wr-card-bg);
+  pointer-events: auto;
+}
+
+.wave-nav-sheet-link {
+  display: flex;
+  align-items: center;
+  padding: 11px 12px;
+  border-radius: 10px;
+  color: var(--wr-text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.wave-nav-sheet-link:hover {
+  background: rgba(11, 11, 15, 0.06);
+}
+
+.wave-nav-sheet-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 11px 12px;
+  border-radius: 999px;
+  background: var(--wr-accent);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+body.mag-live-active .wave-nav-sheet {
+  display: none !important;
+}
+
 /* ==========================================================================
    Modal Detail Template (Popup)
    ========================================================================== */
@@ -558,6 +661,22 @@ body.mag-live-active .wave-nav-floating {
 }
 
 /* ---------- Responsive Adjustments ---------- */
+/* ≤900px: nav tautan + toggle pattern disembunyikan, menu pindah ke sheet. */
+@media (max-width: 900px) {
+  .wave-nav-links,
+  .wave-nav-center {
+    display: none;
+  }
+
+  .wave-nav-burger {
+    display: grid;
+  }
+
+  .wave-nav-sheet {
+    display: flex;
+  }
+}
+
 @media (max-width: 768px) {
   .wave-nav-floating {
     padding: 16px 20px;

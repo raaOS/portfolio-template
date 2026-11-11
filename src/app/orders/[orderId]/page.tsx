@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, use, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { motion } from 'motion/react';
 import {
   Copy,
@@ -721,6 +722,14 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ orderId
               </p>
               <p className="text-[10px] text-slate-500">
                 Akses login diserahkan lewat WhatsApp; kabar &quot;sudah online&quot; menyusul lewat email.
+              </p>
+              <p className="text-[11px]">
+                <Link
+                  href="/panduan"
+                  className="font-bold text-emerald-800 underline underline-offset-2 hover:text-emerald-950"
+                >
+                  Baca Panduan Klien →
+                </Link>
               </p>
             </div>
           )}

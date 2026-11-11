@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Database, Cloud, Activity, Shield } from 'lucide-react';
+import { Database, Cloud, Activity, Shield, RefreshCw } from 'lucide-react';
 import { useStorageStats } from '../../hooks/useStorageStats';
 import PopoutShell from './PopoutShell';
 import { StorageBreakdownSection } from './StorageBreakdown';
@@ -16,6 +16,8 @@ interface DatabasePopoutProps {
   backend?: string | null;
   lastCheckedAt?: number | null;
   errorMessage?: string | null;
+  /** Probe `/api/health` sekarang, tanpa menunggu poll 30 detik. */
+  onRefresh?: () => void;
 }
 
 const STATUS_LABEL: Record<DatabasePopoutProps['status'], string> = {
@@ -80,10 +82,20 @@ export function DatabasePopout({
   backend,
   lastCheckedAt,
   errorMessage,
+  onRefresh,
 }: DatabasePopoutProps) {
   const { state: storageState, refresh: refreshStorage } = useStorageStats({
     enabled: isOpen,
   });
+
+  // Satu tombol untuk seluruh popout: probe kesehatan D1 + segarkan angka
+  // storage (endpoint storage-stats versi cache, bukan `fresh=true` — itu
+  // milik tombol Refresh di dalam bagian Storage breakdown).
+  const isChecking = status === 'checking';
+  const refreshAll = () => {
+    onRefresh?.();
+    void refreshStorage(false);
+  };
 
   return (
     <PopoutShell isOpen={isOpen} onClose={onClose} anchorRef={anchorRef} width={340}>
@@ -99,6 +111,17 @@ export function DatabasePopout({
               {STATUS_LABEL[status]}
             </div>
           </div>
+          <button
+            type="button"
+            onClick={refreshAll}
+            disabled={isChecking}
+            className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] text-zinc-500 transition-colors hover:text-blue-600 disabled:opacity-50 disabled:hover:text-zinc-500"
+            title="Periksa sekarang (tanpa menunggu 30 detik)"
+            aria-label="Periksa status D1 sekarang"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isChecking ? 'animate-spin' : ''}`} />
+            {isChecking ? 'Memeriksa…' : 'Refresh'}
+          </button>
         </div>
       </div>
 

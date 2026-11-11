@@ -23,6 +23,7 @@ import MagazineShowcase, {
   type MagazineImage,
   sameOriginMediaUrl,
   previewVideoOf,
+  templateIdOf,
 } from '@/components/landing/MagazineShowcase';
 
 const IMAGES: MagazineImage[] = [
@@ -181,6 +182,22 @@ describe('MagazineShowcase', () => {
 
     it('slot tanpa video tetap kosong', () => {
       expect(previewVideoOf({ src: '/x.webp' })).toBe('');
+    });
+  });
+
+  // v1.3.82 — tautan "Pesan" di overlay demo memakai id dari previewUrl.
+  describe('templateIdOf', () => {
+    it('mengambil segmen terakhir previewUrl', () => {
+      expect(templateIdOf({ src: '/x.webp', previewUrl: '/preview/os-desktop' })).toBe(
+        'os-desktop'
+      );
+      expect(
+        templateIdOf({ src: '/x.webp', previewUrl: '/preview/spatial-gallery?x=1' })
+      ).toBe('spatial-gallery');
+    });
+
+    it('kosong bila lembaran tidak punya previewUrl', () => {
+      expect(templateIdOf({ src: '/x.webp' })).toBe('');
     });
   });
 });

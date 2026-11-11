@@ -1,0 +1,499 @@
+/* ==========================================================================
+   Halaman publik storefront (Template, Harga, Cara Pesan, Panduan, legal).
+   Berdiri sendiri — TIDAK memakai `landing.css` (isinya gaya hero WebGL
+   satu-layar). Palet & arah visual disamakan dengan storefront:
+   "Sticker on Paper" — kertas off-white, kartu putih, hairline ink 1px,
+   biru electric #0008FF. Tanpa gradient / glow / box-shadow / backdrop-blur.
+   ========================================================================== */
+
+.lp-shell {
+  --lp-bg: #f4f1ec;
+  --lp-card: #ffffff;
+  --lp-ink: #0b0b0f;
+  --lp-body: #2a2a33;
+  --lp-muted: #5a5a66;
+  --lp-border: rgba(11, 11, 15, 0.16);
+  --lp-accent: #0008ff;
+
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  background: var(--lp-bg);
+  color: var(--lp-ink);
+  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- Nav ---------- */
+.lp-nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 14px 24px;
+  background: var(--lp-bg);
+  border-bottom: 1px solid var(--lp-border);
+}
+
+.lp-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: inherit;
+  font-family: var(--font-brand, inherit);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+}
+
+.lp-brand-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--lp-accent);
+}
+
+.lp-nav-links {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  padding: 3px;
+  border-radius: 999px;
+}
+
+/* Pil putih yang bergeser antartab. Lebar = 1/3 area dalam kontainer; posisi
+   digeser lewat `--lp-active` (0/1/2) dari `PublicNav`. */
+.lp-nav-indicator {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / 3);
+  border: 1px solid var(--lp-border);
+  border-radius: 999px;
+  background: var(--lp-card);
+  transform: translateX(calc(var(--lp-active, 0) * 100%));
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.lp-nav-indicator.is-hidden {
+  opacity: 0;
+}
+
+.lp-nav-link {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Lebar sama untuk ketiga tab: pil tidak berubah ukuran saat pindah. */
+  width: 104px;
+  padding: 7px 6px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lp-muted);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.lp-nav-link:hover,
+.lp-nav-link.is-active {
+  color: var(--lp-ink);
+}
+
+.lp-nav-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: var(--lp-accent);
+  color: #ffffff;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+
+.lp-nav-cta:hover {
+  filter: brightness(0.92);
+}
+
+/* ---------- Kerangka isi ---------- */
+.lp-main {
+  flex: 1;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 34px 24px 72px;
+}
+
+.lp-eyebrow {
+  color: var(--lp-accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.lp-title {
+  margin: 8px 0 10px;
+  font-family: var(--font-brand, inherit);
+  font-size: clamp(27px, 5vw, 38px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.lp-lead {
+  max-width: 64ch;
+  margin: 0;
+  color: var(--lp-muted);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.lp-section {
+  margin-top: 42px;
+}
+
+.lp-h2 {
+  margin: 0 0 10px;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.lp-h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.lp-p {
+  margin: 0 0 10px;
+  color: var(--lp-body);
+  font-size: 14.5px;
+  line-height: 1.7;
+}
+
+.lp-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.lp-list li {
+  margin-bottom: 6px;
+  color: var(--lp-body);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.lp-card {
+  padding: 20px;
+  border: 1px solid var(--lp-border);
+  border-radius: 14px;
+  background: var(--lp-card);
+}
+
+.lp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 14px;
+}
+
+.lp-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(0, 8, 255, 0.08);
+  color: var(--lp-accent);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.lp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border: 1px solid var(--lp-border);
+  border-radius: 999px;
+  background: var(--lp-card);
+  color: var(--lp-ink);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.lp-btn:hover {
+  border-color: var(--lp-ink);
+}
+
+.lp-btn-primary {
+  border-color: var(--lp-accent);
+  background: var(--lp-accent);
+  color: #ffffff;
+}
+
+.lp-btn-primary:hover {
+  border-color: var(--lp-accent);
+  filter: brightness(0.92);
+}
+
+/* Harga */
+.lp-price-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.lp-price {
+  font-family: var(--font-brand, inherit);
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.lp-price-note {
+  color: var(--lp-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Langkah bernomor */
+.lp-steps {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: lp-step;
+}
+
+.lp-step {
+  position: relative;
+  padding: 16px 18px 16px 56px;
+  border: 1px solid var(--lp-border);
+  border-radius: 14px;
+  background: var(--lp-card);
+  counter-increment: lp-step;
+}
+
+.lp-step::before {
+  position: absolute;
+  top: 15px;
+  left: 16px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--lp-accent);
+  color: #ffffff;
+  content: counter(lp-step);
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+/* Tabel */
+.lp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.lp-table th,
+.lp-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--lp-border);
+  color: var(--lp-body);
+  text-align: left;
+  vertical-align: top;
+}
+
+.lp-table th {
+  color: var(--lp-ink);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* FAQ */
+.lp-faq {
+  border-top: 1px solid var(--lp-border);
+}
+
+.lp-faq details {
+  border-bottom: 1px solid var(--lp-border);
+}
+
+.lp-faq summary {
+  padding: 14px 0;
+  color: var(--lp-ink);
+  cursor: pointer;
+  font-size: 14.5px;
+  font-weight: 700;
+  list-style: none;
+}
+
+.lp-faq summary::-webkit-details-marker {
+  display: none;
+}
+
+.lp-faq summary::after {
+  float: right;
+  color: var(--lp-muted);
+  content: '+';
+  font-weight: 700;
+}
+
+.lp-faq details[open] summary::after {
+  content: '\2212';
+}
+
+.lp-faq details p {
+  margin: 0 0 14px;
+  color: var(--lp-body);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+/* ---------- Footer ---------- */
+.lp-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  padding: 22px 24px;
+  border-top: 1px solid var(--lp-border);
+  color: var(--lp-muted);
+  font-size: 12.5px;
+}
+
+.lp-footer a {
+  display: inline-flex;
+  align-items: center;
+  color: inherit;
+  text-decoration: none;
+}
+
+.lp-footer a:hover {
+  color: var(--lp-accent);
+}
+
+/* ---------- Artikel dokumen (S&K, Privasi, Panduan) ---------- */
+.lp-doc {
+  max-width: 72ch;
+}
+
+.lp-doc h2 {
+  margin: 30px 0 8px;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.lp-doc h3 {
+  margin: 18px 0 6px;
+  font-size: 14.5px;
+  font-weight: 800;
+}
+
+.lp-doc p {
+  margin: 0 0 10px;
+  color: var(--lp-body);
+  font-size: 14.5px;
+  line-height: 1.7;
+}
+
+.lp-doc ul,
+.lp-doc ol {
+  margin: 0 0 12px;
+  padding-left: 18px;
+}
+
+.lp-doc li {
+  margin-bottom: 6px;
+  color: var(--lp-body);
+  font-size: 14.5px;
+  line-height: 1.7;
+}
+
+.lp-doc a {
+  color: var(--lp-accent);
+}
+
+.lp-doc code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(11, 11, 15, 0.06);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.92em;
+}
+
+.lp-note {
+  padding: 12px 14px;
+  border: 1px solid var(--lp-border);
+  border-left: 3px solid var(--lp-accent);
+  border-radius: 10px;
+  background: var(--lp-card);
+  color: var(--lp-body);
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+
+@media (max-width: 640px) {
+  .lp-nav {
+    padding: 12px 16px;
+  }
+
+  .lp-nav-links {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .lp-nav-link {
+    flex: 1 1 0;
+    width: auto;
+    padding-inline: 4px;
+  }
+
+  .lp-nav-cta {
+    margin-left: auto;
+  }
+
+  .lp-main {
+    padding: 24px 16px 56px;
+  }
+
+  .lp-step {
+    padding: 14px 14px 14px 50px;
+  }
+
+  .lp-footer {
+    padding: 18px 16px;
+  }
+}

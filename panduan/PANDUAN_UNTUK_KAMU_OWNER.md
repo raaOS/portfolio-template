@@ -67,7 +67,7 @@ Cukup tanyakan / sepakati 3 hal ini di WhatsApp:
    - Pilih gaya template: **macOS Desktop OS** atau **Infinite Canvas**.
    - Masukkan **Account ID** & **API Token** Cloudflare klien (ada panduan bergambarnya di layar).
 4. Klik tombol: **`🚀 PROSES OTOMATIS SEKARANG`**.
-5. Sistem otomatis membuat database D1, storage R2, migrasi tabel, dan mengarsipkan file ke folder `arsip-klien/` di laptop kamu (± 30 detik), **lalu otomatis build & deploy sampai website benar-benar online** (proses build ± beberapa menit — log tampil di layar, jangan tutup halamannya).
+5. Sistem otomatis membuat database D1, migrasi tabel, dan mengarsipkan file ke folder `arsip-klien/` di laptop kamu (± 30 detik), **lalu otomatis build & deploy sampai website benar-benar online** (proses build ± beberapa menit — log tampil di layar, jangan tutup halamannya). **Sejak v1.3.78:** kalau R2 belum diaktifkan di akun Cloudflare klien (butuh kartu/PayPal), deploy tetap sukses **tanpa media** — klien mengaktifkannya sendiri via link wizard di pesan WhatsApp, lalu kamu klik "Selesaikan Setup" di portal agar upload foto/video menyala.
 6. Kalau semua sukses, kartu sukses menampilkan alamat website asli dan tombol **"📋 Salin Pesan WhatsApp untuk Klien"** aktif. Kalau deploy gagal, muncul kotak peringatan **"Website BELUM online"** — tekan tombol **"Coba Deploy Ulang Sekarang"** dulu, jangan kirim pesan ke klien sebelum peringatan hilang.
 
 ---
