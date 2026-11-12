@@ -1,6 +1,6 @@
 # Fitur: Deferred R2 — Onboarding Tanpa Media + Wizard Aktivasi Klien (v1.3.78)
 
-**Tanggal:** 2026-11-09 · **Status:** 🟢 Selesai (belum gladi end-to-end di akun uji)
+**Tanggal:** 2026-11-09 · **Status:** 🟢 Selesai (gladi end-to-end DITUNDA owner 2026-11-12)
 **Pemicu:** Owner tidak bisa mengaktifkan R2 di akun Cloudflare klien tanpa kartu
 (CF error 10042), dan menolak memakai 1 kartu untuk puluhan akun (risiko suspend
 massal oleh sistem anti-abuse Cloudflare yang mengorelasikan metode pembayaran).
@@ -100,6 +100,25 @@ Detail lengkap 3 ronde: ronde 1 (runtime & graceful degradation), ronde 2
 - **Belum dilakukan (wajib sebelum dipakai klien nyata):** gladi end-to-end di akun uji
   (deploy pending → wizard tampil via link → aktivasi manual → Cek Pending → Selesaikan
   Setup → upload media → wizard "selesai"). Checklist: `GLADI_RESIK_KLIEN_PERDANA.md` §10.
+
+### 4a. Update 2026-11-12 — penundaan gladi (keputusan owner)
+
+- Deploy template **1.3.82 ke gladi TERVERIFIKASI selesai**: `deployClient()` menulis
+  `arsip-klien/01_gladi-2026-10-24/CATATAN_SERAH_TERIMA.md` pukul 15:40:05Z (22:40 WIB);
+  `https://makeitbatter.my.id/api/health` → `version: 1.3.82`, `database: connected`;
+  root `/admin/login` `/fitur` HTTP 200, `/admin` 307 (redirect login).
+- Portal onboarding lokal sudah tidak berjalan (port 4567 kosong) — tidak ada proses
+  latar yang perlu dimatikan.
+- **Blocker gladi deferred R2 tetap sama:** akun `gladi-2026-10-24` R2-nya **sudah aktif**
+  (`config.env` berisi `CLOUDFLARE_R2_BUCKET="media-gladi-2026-10-24"`, tanpa
+  `R2_PENDING`/`WIZARD_TOKEN`), jadi tidak bisa dipakai menguji postur "tanpa media".
+  Jalur ini butuh **akun Cloudflare uji baru yang R2-nya sengaja belum diaktifkan**.
+- **Keputusan owner 2026-11-12:** gladi deferred R2 **ditunda** ("tunda dulu"). Opsi yang
+  ditolak saat itu: (a) buat akun uji baru + API Token D1+R2+Workers, (b) simulasi
+  `R2_PENDING=true` + `WIZARD_TOKEN` di `config.env` gladi (gladi jadi tanpa media
+  sementara, dan tidak menguji error 10042 asli). **Jangan dijalankan tanpa izin owner.**
+  Kode v1.3.78 tetap seperti teruji unit (1277 test PASS); yang belum ada hanya bukti
+  end-to-end di akun Cloudflare nyata.
 
 ## 5. Sisa Risiko (diputuskan owner — SOP, bukan kode)
 
