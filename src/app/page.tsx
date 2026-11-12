@@ -37,12 +37,13 @@ interface SiteRow {
  */
 export default async function Home() {
   if (isStorefrontDeployment()) {
-    // Hero storefront = koridor majalah WebGL (MagazineShowcase). Harga &
-    // CTA "Pesan Template" mengarah ke /checkout (popup detail dihapus
-    // v1.3.48). Video preview lembaran hero (v1.3.49) + poster otomatis
-    // (v1.3.57) dibaca dari D1 (panel admin "Video Hero", owner-only);
-    // kegagalan apa pun jatuh ke `{}` di dalam service — hero tetap tampil
-    // dengan gambar screenshot statis.
+    // Hero storefront = koridor majalah WebGL (MagazineShowcase). Popup detail
+    // dihapus v1.3.48; tombol "Pesan Template" di navbar dihapus v1.3.83
+    // (pintu masuk checkout tinggal tombol "Pesan" di overlay demo + CTA di
+    // halaman Harga/Cara Pesan). Video preview lembaran hero (v1.3.49) +
+    // poster otomatis (v1.3.57) dibaca dari D1 (panel admin "Video Hero",
+    // owner-only); kegagalan apa pun jatuh ke `{}` di dalam service — hero
+    // tetap tampil dengan gambar screenshot statis.
     const [heroVideos, heroPosters] = await Promise.all([
       getHeroPreviewVideos(),
       getHeroPreviewPosters(),

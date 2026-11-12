@@ -236,43 +236,57 @@ body.mag-live-active .wave-nav-floating {
   color: var(--wr-text-secondary);
 }
 
-.wave-nav-actions {
-  pointer-events: auto;
-}
-
-.wave-nav-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 18px;
-  background: var(--wr-accent);
-  color: #ffffff;
-  font-size: 13px;
-  font-weight: 600;
-  border-radius: 999px;
-  text-decoration: none;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease;
-}
-
-.wave-nav-cta:hover {
-  transform: translateY(-2px);
-  background: var(--wr-text-primary);
-}
-
-/* ---------- Menu jualan (v1.3.80) ---------- */
-.wave-nav-links {
+.wave-nav-right {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 10px;
+  pointer-events: none;
+}
+
+/* ---------- Menu jualan (v1.3.83) ----------
+   Tiga tab selebar sama (104 px, sama dengan nav halaman dalam) di dalam
+   kontainer pil. Penanda putih bergeser lewat `--wave-active` (0/1/2) yang
+   di-set `LandingPage` saat tab diketuk — jadi terlihat meluncur sebelum
+   navigasi selesai. Di `/` tidak ada tab aktif, karena itu pilnya
+   disembunyikan (`is-idle`). */
+.wave-nav-links {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  border-radius: 999px;
   pointer-events: auto;
+}
+
+.wave-nav-indicator {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: 104px;
+  border: 1px solid var(--wr-border);
+  border-radius: 999px;
+  background: var(--wr-card-bg);
+  opacity: 1;
+  transform: translateX(calc(var(--wave-active, 0) * 104px));
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.wave-nav-links.is-idle .wave-nav-indicator {
+  opacity: 0;
 }
 
 .wave-nav-link {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 7px 13px;
-  border: 1px solid transparent;
+  /* Lebar sama untuk ketiga tab: pil tidak berubah ukuran saat pindah. */
+  width: 104px;
+  padding: 7px 6px;
+  border: 0;
   border-radius: 999px;
   color: var(--wr-text-secondary);
   font-size: 12.5px;
@@ -280,12 +294,11 @@ body.mag-live-active .wave-nav-floating {
   letter-spacing: -0.01em;
   line-height: 1.2;
   text-decoration: none;
-  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+  transition: color 0.2s ease;
 }
 
-.wave-nav-link:hover {
-  background: var(--wr-card-bg);
-  border-color: var(--wr-border);
+.wave-nav-link:hover,
+.wave-nav-link.is-active {
   color: var(--wr-text-primary);
 }
 
@@ -341,21 +354,6 @@ body.mag-live-active .wave-nav-floating {
 
 .wave-nav-sheet-link:hover {
   background: rgba(11, 11, 15, 0.06);
-}
-
-.wave-nav-sheet-cta {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin-top: 4px;
-  padding: 11px 12px;
-  border-radius: 999px;
-  background: var(--wr-accent);
-  color: #ffffff;
-  font-size: 13px;
-  font-weight: 700;
-  text-decoration: none;
 }
 
 body.mag-live-active .wave-nav-sheet {

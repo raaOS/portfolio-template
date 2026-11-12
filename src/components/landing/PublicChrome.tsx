@@ -39,12 +39,6 @@ export function PublicShell({ children }: PublicShellProps) {
         </Link>
 
         {storefront && <PublicNav />}
-
-        {storefront && (
-          <Link href="/checkout" className="lp-nav-cta">
-            Pesan Template <span aria-hidden="true">↗</span>
-          </Link>
-        )}
       </header>
 
       <main className="lp-main">{children}</main>

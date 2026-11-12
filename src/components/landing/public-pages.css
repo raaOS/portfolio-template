@@ -112,24 +112,6 @@
   color: var(--lp-ink);
 }
 
-.lp-nav-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 9px 16px;
-  border-radius: 999px;
-  background: var(--lp-accent);
-  color: #ffffff;
-  font-size: 12.5px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  text-decoration: none;
-}
-
-.lp-nav-cta:hover {
-  filter: brightness(0.92);
-}
-
 /* ---------- Kerangka isi ---------- */
 .lp-main {
   flex: 1;
@@ -479,10 +461,6 @@
     flex: 1 1 0;
     width: auto;
     padding-inline: 4px;
-  }
-
-  .lp-nav-cta {
-    margin-left: auto;
   }
 
   .lp-main {

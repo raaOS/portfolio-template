@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, Grid, Menu, X } from 'lucide-react';
+import { Grid, Menu, X } from 'lucide-react';
 import { archivoBlack } from '@/app/fonts';
 import { TEMPLATES_DATA } from './templates';
 import MagazineShowcase from './MagazineShowcase';
@@ -41,6 +41,10 @@ export default function LandingPage({
 }) {
   const [bgPattern, setBgPattern] = useState<'grid' | 'dots'>('dots');
   const [menuOpen, setMenuOpen] = useState(false);
+  /* v1.3.83 — tab yang barusan diklik. Di `/` tidak ada tab yang "aktif"
+     (hero bukan salah satu halaman jualan), jadi pil penanda baru muncul
+     setelah tab diketuk lalu meluncur ke tab itu sebelum navigasi selesai. */
+  const [tabIndex, setTabIndex] = useState<number | null>(null);
 
   return (
     <main
@@ -70,10 +74,22 @@ export default function LandingPage({
           <span className="wave-brand-title">Make it Better Studio</span>
         </Link>
 
-        {/* Menu jualan — hanya tampil di desktop; di HP pindah ke sheet burger. */}
-        <nav className="wave-nav-links" aria-label="Menu storefront">
-          {PUBLIC_LINKS.map((item) => (
-            <Link key={item.href} href={item.href} className="wave-nav-link">
+        {/* Menu jualan — hanya tampil di desktop; di HP pindah ke sheet burger.
+            Ketiga tab lebarnya sama (104 px) dan pil putih bergeser saat tab
+            diketuk — sama seperti nav halaman Fitur/Harga/Cara Pesan. */}
+        <nav
+          className={`wave-nav-links${tabIndex === null ? ' is-idle' : ''}`}
+          aria-label="Menu storefront"
+          style={{ '--wave-active': tabIndex ?? 0 } as React.CSSProperties}
+        >
+          <span className="wave-nav-indicator" aria-hidden="true" />
+          {PUBLIC_LINKS.map((item, index) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`wave-nav-link${tabIndex === index ? ' is-active' : ''}`}
+              onClick={() => setTabIndex(index)}
+            >
               {item.label}
             </Link>
           ))}
@@ -111,13 +127,6 @@ export default function LandingPage({
             </div>
           </div>
 
-          <div className="wave-nav-actions">
-            <Link href="/checkout" className="wave-nav-cta">
-              <span>Pesan Template</span>
-              <ArrowUpRight size={15} />
-            </Link>
-          </div>
-
           <button
             type="button"
             className="wave-nav-burger"
@@ -144,14 +153,6 @@ export default function LandingPage({
               {item.label}
             </Link>
           ))}
-          <Link
-            href="/checkout"
-            className="wave-nav-sheet-cta"
-            onClick={() => setMenuOpen(false)}
-          >
-            <span>Pesan Template</span>
-            <ArrowUpRight size={15} />
-          </Link>
         </nav>
       )}
     </main>

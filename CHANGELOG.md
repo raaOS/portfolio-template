@@ -3,6 +3,18 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.83] - 2026-11-12
+
+### Nav Storefront: CTA "Pesan Template" Dihapus + Tiga Tab Selebar Sama dengan Pil Geser
+
+Permintaan owner: "hapus button pesan template ini di semua halaman dan perbaiki 3 button menu (fitur, harga, cara pesan) — buttonnya tidak sama ukurannya di halaman utama, dan beri efek animasi slider saat pindah tab menu."
+
+- **CTA "Pesan Template" dihapus dari semua navbar.** Hilang dari hero (`LandingPage`: `.wave-nav-actions` + CTA di sheet HP) dan dari nav halaman dalam (`PublicChrome`: `.lp-nav-cta`). CSS matinya ikut dibuang (`.wave-nav-cta`, `.wave-nav-actions`, `.wave-nav-sheet-cta`, `.lp-nav-cta` + aturan `margin-left: auto` di media query). Pintu masuk checkout yang tersisa: tombol **Pesan** di overlay demo hero (`/checkout?template=<id>`) dan CTA di badan halaman Harga/Cara Pesan — tidak ada jalur jualan yang hilang.
+- **Tiga tab hero kini selebar sama (104 px)**, sama dengan nav halaman dalam. Sebelumnya tombol mengikuti panjang teks (`padding: 7px 13px`), jadi "Fitur", "Harga", "Cara Pesan" berukuran beda.
+- **Pil penanda meluncur** di hero: kontainer `.wave-nav-links` sekarang punya `span.wave-nav-indicator` + variabel `--wave-active`, transisi `transform 0.28s` (timing identik dengan pil di halaman dalam). Di `/` tidak ada tab yang aktif, jadi pil tersembunyi (`is-idle`); saat tab diketuk, `LandingPage` men-set indeks lebih dulu sehingga pil terlihat meluncur ke tab itu sebelum navigasi selesai.
+
+**Bukti (Chromium, viewport 1440x900):** lebar ketiga tab `[104, 104, 104]`; setelah klik "Cara Pesan" (navigasi dicegah) `--wave-active = 2`, `transform` bergerak `68.4px` pada 50 ms menuju `208px` — animasi benar-benar berjalan; klik nyata `/` → `/cara-pesan` mendarat dengan pil halaman dalam di indeks 2 (`transform: 207.969px`). Teks "Pesan Template" tidak ditemukan lagi di `/`, `/fitur`, `/harga`, `/cara-pesan`, `/panduan`, `/syarat-ketentuan`. Di 375 px, sheet burger berisi 3 tautan dan tanpa CTA. `tsc` 0 error, `eslint` bersih.
+
 ## [1.3.82] - 2026-11-11
 
 ### `/checkout`: Gerbang di Server + `?template=<id>`
