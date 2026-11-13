@@ -1,5 +1,7 @@
 # Alamat Situs Jujur: `activated` ≠ Online + Bukti Serah Terima Otomatis (v1.3.85, 2026-11-13)
 
+> **Deployed 2026-11-13** — commit `7b37a66` (push `origin/main`), `npm run deploy` exit 0, `/api/health` produksi `version: "1.3.85"`, D1 connected.
+
 ## Latar Belakang
 
 Lanjutan audit alur pembeli 2026-11-13 (`buyer-journey-audit-2026-11-13`): temuan terburuk adalah **janji alamat palsu** — semua titik jualan menulis `https://<slug>.workers.dev`, padahal alamat riil Cloudflare Workers selalu menyertakan subdomain akun klien (`https://<slug>.<subdomain-akun>.workers.dev`; gladi = `anaak-setaan`). Setiap link yang pernah dijanjikan salah. Tambahan temuan dari handoff sesi `sess_0691bb1d`: `notify-online.ts` mengklaim "pencatatan tetap dijalankan walau email tidak dikonfigurasi" tapi **tidak pernah menulis apa pun ke D1**, dan subject email masih memakai format alamat palsu.
