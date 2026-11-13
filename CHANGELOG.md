@@ -3,6 +3,22 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.84] - 2026-11-13
+
+### Checkout & Halaman Order: Klaim Menyesatkan + 4 Friction Pembeli Ditutup
+
+Hasil audit jujur atas jalur jualan (owner minta "apa ini sudah aman dan bisa dapat klien?"). Tidak ada fitur baru — semuanya menutup hal yang akan langsung dilihat calon pembeli.
+
+- **Klaim palsu di checkout dihapus.** `/checkout` dulu menulis "Alamat di atas **sudah aktif** dan gratis selamanya" padahal situs baru dibuat setelah owner menjalankan portal onboarding. Sekarang: "Alamat ini **akan dipakai** untuk situs Anda dan baru aktif setelah pembayaran diverifikasi serta setup selesai (maksimal 1×24 jam kerja)" (`src/app/checkout/CheckoutForm.tsx`), tanpa klaim reservasi — ketersediaan slug dibuktikan lewat cek real-time (lihat poin berikutnya).
+- **Cek ketersediaan slug real-time di form.** Endpoint `GET /api/billing/checkout?slug=` sudah ada (rate limit 30/menit) tetapi tidak pernah dipanggil form; pembeli baru tahu slug bentrok setelah submit. Sekarang form menampilkan status "✓ tersedia / ✕ alasan" dengan debounce 600 ms + `AbortController` (hasil lama tidak menimpa hasil baru), dan submit diblokir kalau status terakhir `unavailable`. Kegagalan jaringan tidak memblokir pembeli (server tetap memvalidasi saat submit).
+- **Blok "Transfer Bank" tidak lagi tampil kosong.** Selama `payment_config.bankName`/`bankAccountNumber` kosong, halaman order menampilkan "Bank / - / -" padahal iklan menyebut "QRIS atau Transfer Bank". Sekarang blok itu hanya dirender kalau rekening benar-benar diisi (`hasBankAccount`), dan grid QRIS otomatis satu kolom (`src/app/orders/[orderId]/page.tsx`).
+- **`templateId` divalidasi server.** `?template=` sebelumnya menerima ID arbitrer dan menyimpannya ke `orders.template_id` (dipakai saat provisioning). Validasi ditaruh di chokepoint `createOrder()` terhadap registry resmi (`getTemplate`), dibalas 400 "Template tidak dikenal" sebelum menyentuh D1 — test baru di `orderService.test.ts` memastikan `queryD1` tidak dipanggil untuk ID palsu.
+- **Katalog template disinkronkan.** Seed `portfolio_templates` dulu hardcode 2 template (tanpa `spatial-gallery`) padahal yang dijual 3. Sekarang seed membaca `TEMPLATES` dari `src/lib/templates/registry.ts` (sumber tunggal), dan baris `spatial-gallery` sudah ditambahkan ke D1 produksi via `INSERT OR IGNORE` (katalog terverifikasi 3 baris: `infinite-canvas`, `os-desktop`, `spatial-gallery`).
+
+**Bukti:** `npx tsc --noEmit` 0 error, `npm run lint` bersih, `orderService.test.ts` 38/38 PASS, suite penuh **153 file / 1290 test PASS**.
+
+**Belum ditutup (butuh data owner, bukan kode):** `adminWhatsapp` di `platform_settings` masih kosong sehingga tombol "Chat Admin"/"Bantuan WA (Terlanjur Bayar)" di halaman order memakai fallback `628123456789`. Isi dengan `platform_settings.owner_whatsapp = {"number":"62..."}` (sumber `getOwnerWhatsapp`) supaya sekaligus aktif di wizard R2.
+
 ## [1.3.83] - 2026-11-12
 
 ### Nav Storefront: CTA "Pesan Template" Dihapus + Tiga Tab Selebar Sama dengan Pil Geser

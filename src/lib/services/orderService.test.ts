@@ -48,6 +48,20 @@ describe('orderService', () => {
   });
 
   describe('createOrder', () => {
+    it('rejects unknown templateId before touching the database', async () => {
+      const res = await createOrder({
+        buyerName: 'Nanda',
+        buyerEmail: 'nanda@test.com',
+        buyerWhatsapp: '628123456789',
+        desiredSlug: 'nanda-design',
+        templateId: 'template-palsu',
+      });
+
+      expect(res.success).toBe(false);
+      expect(res.error).toContain('Template tidak dikenal');
+      expect(cloudflareD1.queryD1).not.toHaveBeenCalled();
+    });
+
     it('fails if slug is not available', async () => {
       vi.mocked(slugService.isSlugAvailable).mockResolvedValueOnce(false);
 

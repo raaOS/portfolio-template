@@ -11,6 +11,7 @@
 import { queryD1, bootstrapD1Schema, createSite } from './connection';
 import { SITE_ID } from '../config';
 import { createScryptPasswordRecord } from '../auth/password';
+import { TEMPLATES } from '@/lib/templates/registry';
 
 export interface SeedResult {
   siteCreated: boolean;
@@ -49,11 +50,15 @@ export async function seedDeployment(options: {
     siteCreated = true;
   }
 
-  // Seed default templates if not exists
-  const defaultTemplates = [
-    { id: 'os-desktop', name: 'OS Desktop', description: 'Portfolio interaktif bergaya desktop macOS dengan window system, dock, dan efek visual.', price: 0 },
-    { id: 'infinite-canvas', name: 'Infinite Canvas', description: 'Infinite canvas dengan drag-to-explore dan zoom untuk melihat project.', price: 0 },
-  ];
+  // Seed default templates if not exists.
+  // Sumber tunggal = registry template (bukan daftar manual) supaya katalog D1
+  // tidak pernah ketinggalan template yang dijual di checkout (audit 2026-11-12).
+  const defaultTemplates = TEMPLATES.map((tmpl) => ({
+    id: tmpl.id,
+    name: tmpl.name,
+    description: tmpl.description,
+    price: 0,
+  }));
 
   for (const tmpl of defaultTemplates) {
     const existing = await queryD1<{ id: string }>(

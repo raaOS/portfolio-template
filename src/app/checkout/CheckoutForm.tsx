@@ -27,6 +27,11 @@ export default function CheckoutForm({ initialTemplateId }: { initialTemplateId?
   const [desiredSlug, setDesiredSlug] = useState('');
   const [slugTouched, setSlugTouched] = useState(false);
   const [slugSuggestions, setSlugSuggestions] = useState<string[]>([]);
+  const [slugStatus, setSlugStatus] = useState<{
+    slug: string;
+    state: 'idle' | 'checking' | 'available' | 'unavailable';
+    message: string;
+  }>({ slug: '', state: 'idle', message: '' });
   const [templateId, setTemplateId] = useState(() =>
     TEMPLATES.some((t) => t.id === initialTemplateId)
       ? (initialTemplateId as string)
@@ -87,6 +92,50 @@ export default function CheckoutForm({ initialTemplateId }: { initialTemplateId?
     })();
   }, []);
 
+  // Cek ketersediaan slug real-time (endpoint GET yang sudah ada, rate limit
+  // 30/menit). Debounce 600 ms supaya mengetik tidak membanjiri D1; pembatalan
+  // via AbortController mencegah hasil lama menimpa hasil baru.
+  // Status disimpan bersama slug yang diperiksa, lalu diturunkan (`slugCheck`)
+  // saat render — tidak ada setState sinkron di body effect.
+  useEffect(() => {
+    const slug = desiredSlug.trim();
+    if (slug.length < 3) return;
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setSlugStatus({ slug, state: 'checking', message: 'Memeriksa ketersediaan alamat…' });
+      try {
+        const res = await fetch(`/api/billing/checkout?slug=${encodeURIComponent(slug)}`, {
+          signal: controller.signal,
+        });
+        const data = await res.json();
+        if (data.available) {
+          setSlugStatus({
+            slug,
+            state: 'available',
+            message: `Alamat ${data.slug ?? slug}.workers.dev tersedia.`,
+          });
+        } else {
+          setSlugStatus({
+            slug,
+            state: 'unavailable',
+            message: data.reason || 'Alamat ini tidak bisa dipakai.',
+          });
+        }
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name === 'AbortError') return;
+        // Kegagalan jaringan bukan alasan memblokir pembeli: server tetap
+        // memvalidasi slug saat submit.
+        setSlugStatus({ slug, state: 'idle', message: '' });
+      }
+    }, 600);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [desiredSlug]);
+
   // Close dropdown on click outside
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -100,12 +149,21 @@ export default function CheckoutForm({ initialTemplateId }: { initialTemplateId?
 
   const selectedTemplate = TEMPLATES.find((t) => t.id === templateId) || TEMPLATES[0];
 
+  // Turunan status slug: hanya ditampilkan kalau hasilnya milik slug yang sekarang.
+  const slugCheck =
+    slugStatus.slug === desiredSlug.trim() ? slugStatus : { state: 'idle' as const, message: '' };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
 
     if (!paymentActive) {
       setErrorMessage('Pembayaran sedang tidak aktif. Silakan coba lagi nanti.');
+      return;
+    }
+
+    if (slugCheck.state === 'unavailable') {
+      setErrorMessage(slugCheck.message || 'Alamat website tidak tersedia. Pilih alamat lain.');
       return;
     }
 
@@ -202,10 +260,31 @@ export default function CheckoutForm({ initialTemplateId }: { initialTemplateId?
                 https://{desiredSlug || 'nama-anda'}.workers.dev
               </code>
               <br />
-              Alamat di atas sudah aktif dan gratis selamanya. Nanti bisa
-              disambungkan ke domain pribadi (.com / .id) kapan saja bila
+              Alamat ini <strong>akan dipakai</strong> untuk situs Anda dan baru aktif setelah
+              pembayaran diverifikasi serta setup selesai (maksimal 1×24 jam kerja).
+              Nanti bisa disambungkan ke domain pribadi (.com / .id) kapan saja bila
               diperlukan.
             </div>
+
+            {slugCheck.state !== 'idle' && (
+              <div
+                role="status"
+                aria-live="polite"
+                style={{
+                  marginTop: '0.35rem',
+                  fontSize: '0.75rem',
+                  color:
+                    slugCheck.state === 'available'
+                      ? '#15803d'
+                      : slugCheck.state === 'unavailable'
+                        ? '#b91c1c'
+                        : '#666',
+                }}
+              >
+                {slugCheck.state === 'available' ? '✓ ' : slugCheck.state === 'unavailable' ? '✕ ' : ''}
+                {slugCheck.message}
+              </div>
+            )}
 
             {slugSuggestions.length > 0 && (
               <div style={{ marginTop: '0.5rem' }}>

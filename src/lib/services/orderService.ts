@@ -7,6 +7,7 @@ import { getPaymentConfig, type PaymentConfig } from './paymentConfigService';
 import { logActivity } from '@/lib/services/auditLogger';
 import { deleteFromR2, isR2StorageConfigured, listR2ObjectKeys } from '@/lib/r2Storage';
 import { getBasePrice } from '@/lib/services/pricingConfigService';
+import { getTemplate } from '@/lib/templates/registry';
 
 export interface OrderRecord {
   id: string;
@@ -801,6 +802,13 @@ export async function createOrder(
   const now = new Date();
   const createdAt = now.toISOString();
   const updatedAt = createdAt;
+
+  // Validasi template di chokepoint ini (satu-satunya penulis orders.template_id):
+  // `?template=` dari client mana pun tidak boleh menyimpan ID arbitrer yang nanti
+  // dipakai saat provisioning (audit 2026-11-12).
+  if (input.templateId && !getTemplate(input.templateId)) {
+    return { success: false, error: 'Template tidak dikenal. Silakan pilih salah satu template yang tersedia.' };
+  }
 
   await expireStalePendingOrders(createdAt);
 

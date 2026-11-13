@@ -337,6 +337,11 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ orderId
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num);
 
   const verificationHours = paymentInfo?.verificationHours || '08:00 – 22:00 WIB (maks. 1x24 jam)';
+  // Blok transfer bank hanya dirender kalau rekeningnya benar-benar diisi.
+  // Dulu selalu tampil "Bank / - / -" saat payment_config kosong (audit 2026-11-12).
+  const hasBankAccount = Boolean(
+    paymentInfo?.bankName?.trim() && paymentInfo?.bankAccountNumber?.trim(),
+  );
   const bankName = paymentInfo?.bankName || 'Bank';
   const bankAccountNumber = paymentInfo?.bankAccountNumber || '-';
   const bankAccountName = paymentInfo?.bankAccountName || '-';
@@ -621,8 +626,8 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ orderId
                 </div>
               )}
 
-              {/* QRIS & Bank Grid */}
-              <div className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2">
+              {/* QRIS & Bank Grid — kolom kedua hanya ada kalau rekening bank diisi */}
+              <div className={`grid grid-cols-1 items-stretch gap-3 ${hasBankAccount ? 'sm:grid-cols-2' : ''}`}>
                 
                 {/* QRIS Container */}
                 <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-slate-50 p-3 text-center">
@@ -652,7 +657,8 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ orderId
                   )}
                 </div>
 
-                {/* Bank Transfer Container */}
+                {/* Bank Transfer Container (hanya jika rekening bank diisi) */}
+                {hasBankAccount && (
                 <div className="flex flex-col justify-center space-y-2 rounded-xl bg-slate-900 p-3 font-mono text-xs text-white shadow-sm">
                   <div>
                     <div className="mb-2 flex items-center gap-2 border-b border-slate-800 pb-1.5">
@@ -693,6 +699,7 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ orderId
                     Nominal: <strong className="font-mono text-amber-300">{formatRupiah(order.amount)}</strong>
                   </div>
                 </div>
+                )}
 
               </div>
 
