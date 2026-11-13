@@ -53,7 +53,7 @@ const FAQ = [
   },
   {
     q: 'Berapa lama sampai website online?',
-    a: 'Setelah pembayaran terverifikasi, kami memproses paling lambat 1×24 jam pada hari kerja. Prosesnya mencakup pembuatan database, bucket, deploy, dan pengiriman kredensial login admin.',
+    a: 'Setelah pembayaran terverifikasi, kami memproses paling lambat 1×24 jam kerja. Prosesnya mencakup pembuatan database, bucket, deploy, dan pengiriman kredensial login admin.',
   },
   {
     q: 'Bisa revisi desain?',

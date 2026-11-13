@@ -3,6 +3,18 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.87] - 2026-11-14
+
+### Dua Cacat Audit Terakhir Ditutup: Refund Bocor Diam-Diam (#8) + Janji Waktu dan Jendela Refund (#9)
+
+Menutup sisa cacat audit alur pembeli 2026-11-13. Setelah versi ini, **seluruh 10 temuan audit sudah diproses**.
+
+- **#8 — Pembeli transfer untuk order kedaluwarsa yang tidak bisa diproses kini TIDAK lagi bocor diam-diam.** Pembeli order `expired` yang mengunggah bukti bayar memang sudah ditolak dini bila slug/nominalnya sudah dipakai order lain (proteksi lama), tapi owner tidak pernah diberi tahu — padahal pembeli yang punya bukti bayar kemungkinan besar **sudah transfer**, dan pengembalian dana hanya bergantung pada pembeli berinisiatif menghubungi. Kini setiap penolakan tersebut memicu **alert Telegram** berisi alasan, identitas order, link WA pembeli, dan perintah atur refund. Pesan ke pembeli juga lebih jelas: "hubungi admin lewat tombol Bantuan WhatsApp di halaman ini — dana Anda akan dikembalikan." Alert kena juga pada kasus balapan bentrok index saat update.
+- **#9a — Janji waktu kini SATU frasa di semua titik:** **"paling lambat 1×24 jam kerja"** — sebelumnya tersebar 4 varian ("1×24 jam kerja", "1×24 jam", "1×24 jam pada hari kerja") di T&C §3, FAQ harga, cara pesan, halaman order, dan email aktivasi. Frasa kini identik di 6 titik, jadi tidak ada lagi celah "T&C bilang X, halaman bilang Y".
+- **#9b — Jendela refund T&C digeser ke titik yang benar.** Dulu refund 7 hari dihitung "dari aktivasi" padahal aktivasi hanya berarti pembayaran terverifikasi — website bisa saja belum online sehingga jendela refund pembeli terbuang menunggu. Kini T&C §4 menulis "dalam/lewat **7 hari sejak website online**" (ditandai email "Website Anda Sudah Online", alamat resmi tercatat di halaman pesanan) dengan penegasan eksplisit: pembayaran terverifikasi tapi website belum online **tidak mengurangi** jendela refund. Selaras dengan prinsip `activated` ≠ online (v1.3.85).
+
+**Bukti:** `npx tsc --noEmit` 0 error, `npm run lint` bersih, suite penuh **153 file / 1294 test PASS** (test penolakan late-payment diperluas: memverifikasi alert Telegram "BUTUH REFUND MANUAL" + link wa.me terkirim ke owner).
+
 ## [1.3.86] - 2026-11-14
 
 ### Keputusan Owner: Akun Gmail & Cloudflare Dibuat Owner Sendiri — T&C dan Cara Pesan Diselaraskan

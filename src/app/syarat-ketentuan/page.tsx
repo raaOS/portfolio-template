@@ -59,7 +59,7 @@ export default function SyaratKetentuanPage() {
         <ul>
           <li>
             Bukti bayar diverifikasi manual. Setelah pembayaran diverifikasi, website
-            diupayakan online paling lambat 1×24 jam. Jika antrean sedang ramai, kami
+            diupayakan online paling lambat 1×24 jam kerja. Jika antrean sedang ramai, kami
             mengantrikan Anda dan mengabari lewat WhatsApp.
           </li>
           <li>Akses login admin panel diserahkan lewat WhatsApp setelah website online.</li>
@@ -78,12 +78,15 @@ export default function SyaratKetentuanPage() {
             benar-benar terpakai (jika ada), dengan bukti mutasi.
           </li>
           <li>
-            <strong>Dalam 7 hari setelah aktivasi:</strong> refund penuh bila website tidak
+            <strong>Dalam 7 hari sejak website online:</strong> refund penuh bila website tidak
             sesuai deskripsi pesanan, atau rusak secara teknis yang tidak berhasil
-            diperbaiki dalam 3×24 jam.
+            diperbaiki dalam 3×24 jam. Jendela 7 hari dihitung sejak email &ldquo;Website Anda
+            Sudah Online&rdquo; terkirim (alamat resmi website tercatat di halaman pesanan Anda)
+            — pembayaran yang sudah terverifikasi tetapi website belum online tidak
+            mengurangi jendela refund Anda.
           </li>
           <li>
-            <strong>Lewat 7 hari setelah aktivasi:</strong> tanpa refund uang. Kompensasi
+            <strong>Lewat 7 hari sejak website online:</strong> tanpa refund uang. Kompensasi
             berupa perbaikan, penyesuaian konten, atau kredit layanan sesuai kasus.
           </li>
           <li>

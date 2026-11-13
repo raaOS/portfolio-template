@@ -728,7 +728,7 @@ async function sendActivationEmail({
           amountText,
           '',
           'Langkah selanjutnya:',
-          '• Website Anda sedang disiapkan dan akan online paling lambat 1×24 jam setelah email ini.',
+          '• Website Anda sedang disiapkan dan akan online paling lambat 1×24 jam kerja setelah email ini.',
           '• Jika antrean order sedang ramai, kami mengantrikan Anda dan mengabari lewat WhatsApp.',
           '• Akses login ke pengaturan website akan kami serahkan lewat WhatsApp.',
           '',
@@ -750,7 +750,7 @@ async function sendActivationEmail({
           `<hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0">`,
           `<p style="font-size:13px;color:#334155;margin:16px 0 0"><strong>Langkah selanjutnya:</strong></p>`,
           `<ul style="font-size:13px;color:#334155;padding-left:18px;margin:8px 0 0">`,
-          `<li>Website Anda sedang disiapkan — online paling lambat <strong>1×24 jam</strong> setelah email ini.</li>`,
+          `<li>Website Anda sedang disiapkan — online paling lambat <strong>1×24 jam kerja</strong> setelah email ini.</li>`,
           `<li>Jika antrean order sedang ramai, kami mengantrikan Anda dan mengabari lewat WhatsApp.</li>`,
           `<li>Akses login ke pengaturan website akan kami serahkan lewat WhatsApp.</li>`,
           `</ul>`,
@@ -1003,6 +1003,33 @@ export async function createOrder(
 /** Statuses that are allowed to upload payment proof */
 const PROOF_ALLOWED_STATUSES = new Set(['pending_payment', 'waiting_verification', 'expired']);
 
+/**
+ * #8 audit alur pembeli 2026-11-13: pembeli order `expired` yang mengunggah
+ * bukti bayar kemungkinan besar SUDAH transfer. Penolakan dini (slug/nominal
+ * dipakai order lain) tanpa alert = owner tidak pernah tahu ada uang masuk
+ * yang harus di-refund manual — dulu baru ketahuan saat pembeli mengeluh.
+ * Best-effort: `sendTelegramMessage` tidak pernah melempar.
+ */
+async function alertLateProofConflict(
+  env: { TELEGRAM_BOT_TOKEN?: string; TELEGRAM_ADMIN_CHAT_ID?: string },
+  order: OrderRecord,
+  reason: string
+): Promise<void> {
+  const waDigits = (order.buyer_whatsapp || '').replace(/\D/g, '');
+  const waLink = waDigits ? `\nWA pembeli: https://wa.me/${waDigits}` : '';
+  await sendTelegramMessage(
+    env,
+    `🚨 <b>BUTUH REFUND MANUAL — BUKTI BAYAR ORDER EXPIRED DITOLAK</b>\n\n` +
+      `Alasan: ${escapeTelegramHtml(reason)}\n` +
+      `ID: <code>${escapeTelegramHtml(order.id)}</code>\n` +
+      `Slug: <code>${escapeTelegramHtml(order.desired_slug)}</code>\n` +
+      `Pembeli: ${escapeTelegramHtml(order.buyer_name)}\n` +
+      `Email: ${escapeTelegramHtml(order.buyer_email)}${waLink}\n\n` +
+      `Pembeli kemungkinan sudah transfer (punya bukti bayar) tapi order ini tidak bisa diproses — ` +
+      `hubungi pembeli dan atur pengembalian dana.`
+  );
+}
+
 export async function uploadPaymentProof(
   orderId: string,
   proofUrl: string,
@@ -1051,9 +1078,12 @@ export async function uploadPaymentProof(
     );
 
     if (amountConflicts.length > 0) {
+      // Pembeli dengan bukti bayar = kemungkinan besar sudah transfer —
+      // owner WAJIB diberi tahu agar refund tidak bergantung pada pembeli.
+      await alertLateProofConflict(env, order, 'Nominal sudah dipakai order aktif lain.');
       return {
         success: false,
-        error: 'Order sudah kedaluwarsa dan nominalnya sudah dipakai order lain. Hubungi admin untuk verifikasi manual.',
+        error: 'Order sudah kedaluwarsa dan nominalnya sudah dipakai order lain. Hubungi admin lewat tombol Bantuan WhatsApp di halaman ini — dana Anda akan dikembalikan.',
       };
     }
 
@@ -1061,9 +1091,10 @@ export async function uploadPaymentProof(
     // Reject early instead of letting activation fail after the buyer has paid.
     const slugAvailable = await isSlugAvailable(order.desired_slug);
     if (!slugAvailable) {
+      await alertLateProofConflict(env, order, 'Slug sudah dipakai order/site lain.');
       return {
         success: false,
-        error: 'Order sudah kedaluwarsa dan slug-nya sudah dipakai order/site lain. Hubungi admin untuk verifikasi manual.',
+        error: 'Order sudah kedaluwarsa dan slug-nya sudah dipakai order/site lain. Hubungi admin lewat tombol Bantuan WhatsApp di halaman ini — dana Anda akan dikembalikan.',
       };
     }
   }
@@ -1101,12 +1132,20 @@ export async function uploadPaymentProof(
     );
   } catch (err) {
     if (isUniqueConstraintError(err, 'amount')) {
+      // Bisa kena juga oleh late payment yang kalah balapan sejak cek awal —
+      // beri alert yang sama (best-effort) bila ini order expired.
+      if (isLatePayment) {
+        await alertLateProofConflict(env, order, 'Nominal bentrok order aktif lain (bentrok index saat update).');
+      }
       return {
         success: false,
         error: 'Nominal pembayaran bentrok dengan order aktif lain. Hubungi admin untuk verifikasi manual.',
       };
     }
     if (isUniqueConstraintError(err, 'desired_slug')) {
+      if (isLatePayment) {
+        await alertLateProofConflict(env, order, 'Slug dipakai order/site lain (bentrok index saat update).');
+      }
       return {
         success: false,
         error: 'Slug pesanan ini sudah dipakai order/site lain. Hubungi admin untuk verifikasi manual.',

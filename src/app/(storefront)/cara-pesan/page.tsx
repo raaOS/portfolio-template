@@ -34,8 +34,8 @@ const STEPS = [
     title: 'Tunggu verifikasi pembayaran',
     body: (
       <>
-        Pembayaran diperiksa manual, paling lambat <strong>1×24 jam</strong> pada hari
-        kerja. Status pesanan bisa kamu pantau di link pesanan yang muncul setelah
+        Pembayaran diperiksa manual, paling lambat <strong>1×24 jam kerja</strong>.
+        Status pesanan bisa kamu pantau di link pesanan yang muncul setelah
         checkout.
       </>
     ),

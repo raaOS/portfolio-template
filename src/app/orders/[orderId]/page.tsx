@@ -772,7 +772,7 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ orderId
                   ✅ Pembayaran Terverifikasi — Website Sedang Disiapkan
                 </h3>
                 <p className="text-[11px] text-slate-600">
-                  Website Anda diupayakan online paling lambat <strong>1×24 jam pada hari kerja</strong>.
+                  Website Anda diupayakan online paling lambat <strong>1×24 jam kerja</strong>.
                   Alamat lengkapnya kami kabarkan lewat email dan WhatsApp begitu situs benar-benar
                   bisa dibuka — kami tidak akan mengirim alamat yang belum aktif.
                 </p>

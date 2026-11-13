@@ -455,7 +455,7 @@ describe('orderService', () => {
       expect(res.success).toBe(true);
     });
 
-    it('rejects late proof when the expired order slug has been taken by another order/site', async () => {
+    it('rejects late proof when the expired order slug has been taken by another order/site AND alerts owner for manual refund', async () => {
       vi.mocked(slugService.isSlugAvailable).mockResolvedValueOnce(false);
       vi.mocked(cloudflareD1.queryD1)
         .mockResolvedValueOnce([
@@ -470,12 +470,30 @@ describe('orderService', () => {
         ]) // SELECT order
         .mockResolvedValueOnce([]); // no active amount conflict
 
+      // #8 audit 2026-11-13: penolakan wajib memicu alert Telegram ke owner
+      // (pembeli yang punya bukti bayar kemungkinan besar sudah transfer).
+      process.env.TELEGRAM_BOT_TOKEN = 'tg_test_token';
+      process.env.TELEGRAM_ADMIN_CHAT_ID = '12345';
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+      vi.stubGlobal('fetch', fetchMock);
+
       const res = await uploadPaymentProof('ORD-124', 'https://proof.png');
       expect(res.success).toBe(false);
       expect(res.error).toContain('slug-nya sudah dipakai');
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [alertUrl, alertInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(alertUrl).toBe('https://api.telegram.org/bottg_test_token/sendMessage');
+      const alertPayload = JSON.parse(String(alertInit.body));
+      expect(alertPayload.text).toContain('BUTUH REFUND MANUAL');
+      expect(alertPayload.text).toContain('ORD-124');
+      expect(alertPayload.text).toContain('wa.me/62812345');
+      vi.unstubAllGlobals();
+      unsetEnv('TELEGRAM_BOT_TOKEN');
+      unsetEnv('TELEGRAM_ADMIN_CHAT_ID');
     });
 
-    it('rejects late proof when its expired amount has been reused by another active order', async () => {
+    it('rejects late proof when its expired amount has been reused by another active order AND alerts owner for manual refund', async () => {
       vi.mocked(cloudflareD1.queryD1)
         .mockResolvedValueOnce([
           {
@@ -489,9 +507,21 @@ describe('orderService', () => {
         ]) // SELECT order
         .mockResolvedValueOnce([{ id: 'ORD-NEW' }]); // amount conflict
 
+      process.env.TELEGRAM_BOT_TOKEN = 'tg_test_token';
+      process.env.TELEGRAM_ADMIN_CHAT_ID = '12345';
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+      vi.stubGlobal('fetch', fetchMock);
+
       const res = await uploadPaymentProof('ORD-124', 'https://proof.png');
       expect(res.success).toBe(false);
       expect(res.error).toContain('nominalnya sudah dipakai');
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const alertPayload = JSON.parse(String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body));
+      expect(alertPayload.text).toContain('BUTUH REFUND MANUAL');
+      vi.unstubAllGlobals();
+      unsetEnv('TELEGRAM_BOT_TOKEN');
+      unsetEnv('TELEGRAM_ADMIN_CHAT_ID');
     });
 
     it('tidak menimpa status order yang berubah di tengah jalan (race guard audit #4)', async () => {
