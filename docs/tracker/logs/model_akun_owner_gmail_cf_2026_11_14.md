@@ -1,5 +1,7 @@
 # Model Akun Final: Gmail + Cloudflare Dibuat Owner, Klien Hanya Aktivasi R2 (v1.3.86, 2026-11-14)
 
+> **Deployed 2026-11-14** — commit `45f3312` (push `origin/main`), `npm run deploy` exit 0, `/api/health` produksi `version: "1.3.86"`. Nomor WA terverifikasi baca balik dari D1 produksi.
+
 ## Latar Belakang
 
 Cacat audit #5 (2026-11-13): tiga versi "siapa punya akun Cloudflare" — T&C §5 bilang pembeli menyerahkan Account ID + API Token sendiri, `/cara-pesan` bilang "kalau belum punya kami bantu buatkan", kenyataan bengkel membuat akun atas Gmail pembeli. Owner memutuskan FINAL 2026-11-14 (dicatat permanen supaya AI tidak bertanya ulang):
