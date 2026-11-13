@@ -69,8 +69,18 @@ Hasil audit kesiapan jualan 2026-11-12 (pertanyaan owner: "apa ini sudah aman da
 - `npx vitest run src/lib/services/orderService.test.ts` → **38/38 PASS**.
 - Suite penuh `npx vitest run` → **153 file / 1290 test PASS** (termasuk `src/lib/constants.test.ts` yang mengunci `APP_VERSION` = entri teratas CHANGELOG).
 
+## Rilis & Deploy (2026-11-13)
+
+- Commit `8cfd964` — "release 1.3.84: checkout jujur + 5 friction pembeli ditutup", sudah **push ke `origin/main`** (pre-commit lint + pre-push lint PASS).
+- `npm run deploy` (jalur site owner: pre-deploy-check → build → `cf:deploy`) **exit 0**. Pre-deploy: **153 file / 1290 test PASS**, "All Cloudflare pre-deploy checks passed".
+- Worker `portfolio-os-template` versi `f60be587-8c18-47f8-907d-7f9e4f28d984`, jadwal `0 18 * * *`.
+- Verifikasi produksi `https://makeitbetter.my.id`:
+  - `/api/health` → `version: "1.3.84"`, `database: "connected"` (`cloudflare-d1`, 92 ms).
+  - `/`, `/harga`, `/admin/login`, `/checkout` → **200**.
+  - `/checkout?template=spatial-gallery` → HTML memuat "akan dipakai", **tidak** memuat "dipesan"/"sudah aktif".
+  - `GET /api/billing/checkout?slug=uji-1384-probe` → `{"available":true,...,"reason":"Slug tersedia"}`.
+
 ## Belum Ditutup
 
 - `platform_settings.owner_whatsapp` di produksi (butuh nomor WA owner).
-- Belum di-commit / belum di-deploy saat log ini ditulis.
 - Item audit lain yang belum dikerjakan: backup harian untuk klien R2-pending, alerting, lockout login per-IP saja, tidak ada batas sesi absolut, dan gladi deferred-R2 e2e (ditunda owner 2026-11-12).
