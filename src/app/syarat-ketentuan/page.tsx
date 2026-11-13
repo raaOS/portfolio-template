@@ -33,8 +33,9 @@ export default function SyaratKetentuanPage() {
         <h2>1. Tentang layanan</h2>
         <p>
           Make it Better Studio (&ldquo;kami&rdquo;) menjual template website portfolio siap
-          pakai berupa source code, termasuk bantuan setup dan deployment ke Cloudflare di
-          atas akun Cloudflare milik Anda. Kontak resmi kami: m4keitbetter@gmail.com.
+          pakai berupa source code, termasuk setup dan deployment ke Cloudflare yang kami
+          kerjakan penuh: akun email dan akun Cloudflare untuk website Anda kami buatkan
+          sendiri dan kami rawat di sana. Kontak resmi kami: m4keitbetter@gmail.com.
         </p>
 
         <h2>2. Harga &amp; pemesanan</h2>
@@ -99,9 +100,17 @@ export default function SyaratKetentuanPage() {
         <h2>5. Akses &amp; tanggung jawab</h2>
         <ul>
           <li>
-            Untuk keperluan setup awal, kami membutuhkan akses akun Cloudflare Anda (Account
-            ID &amp; API token) yang Anda serahkan sendiri; akses tersebut dipakai semata-mata
-            untuk memasang dan merawat website Anda.
+            Setup awal kami urus sepenuhnya: akun email dan akun Cloudflare untuk website
+            Anda kami buatkan sendiri, dan pemasangan serta perawatan website kami jalankan
+            di akun tersebut — Anda tidak perlu membuat akun Cloudflare sendiri.
+          </li>
+          <li>
+            Untuk mengunggah foto/video, penyimpanan media (Cloudflare R2) di akun tersebut
+            perlu diaktifkan. Cloudflare mensyaratkan verifikasi kartu kredit/debit atau
+            PayPal atas nama Anda untuk aktivasi ini, dan kami tidak dapat menyediakan
+            metode pembayaran di akun Anda — langkahnya kami pandu lewat tautan khusus,
+            tetapi penyelesaian verifikasinya wajib Anda lakukan sendiri. Website tetap
+            online tanpa R2; hanya unggah media yang tertunda sampai aktivasi selesai.
           </li>
           <li>
             Anda bertanggung jawab atas seluruh konten (teks, gambar, video) yang Anda

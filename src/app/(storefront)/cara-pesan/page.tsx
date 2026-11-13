@@ -44,9 +44,11 @@ const STEPS = [
     title: 'Onboarding akun Cloudflare',
     body: (
       <>
-        Kami menghubungimu lewat email/WhatsApp untuk membuat database D1 dan bucket R2
-        di akun Cloudflare milikmu. Kamu cukup mengikuti langkah yang kami kirim — tidak
-        perlu paham istilah teknisnya.
+        Kami yang membuatkan email dan akun Cloudflare untuk website-mu, lalu memasang
+        semuanya di sana — kamu tidak perlu membuat akun sendiri. Satu-satunya langkah yang
+        wajib kamu kerjakan sendiri: mengaktifkan penyimpanan media (R2), karena Cloudflare
+        butuh kartu/PayPal milikmu untuk verifikasinya. Langkahnya kami pandu lewat tautan
+        khusus.
       </>
     ),
   },
@@ -65,8 +67,8 @@ const STEPS = [
 const PREPARE = [
   'Email aktif — dipakai untuk kredensial admin dan komunikasi pesanan.',
   'Nomor WhatsApp aktif — untuk koordinasi onboarding.',
-  'Akun Cloudflare (gratis). Kalau belum punya, kami bantu buatkan saat onboarding.',
-  'Kartu atau PayPal untuk verifikasi R2 — hanya jika ingin mengunggah foto/video.',
+  'Tidak perlu membuat akun Cloudflare sendiri — kami yang buatkan saat onboarding.',
+  'Kartu atau PayPal atas namamu — hanya untuk verifikasi R2 jika ingin mengunggah foto/video.',
   'Materi konten: teks profil, daftar proyek, foto/logo. Boleh menyusul setelah online.',
 ];
 

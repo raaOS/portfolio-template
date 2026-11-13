@@ -3,6 +3,19 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.86] - 2026-11-14
+
+### Keputusan Owner: Akun Gmail & Cloudflare Dibuat Owner Sendiri — T&C dan Cara Pesan Diselaraskan
+
+Cacat audit #5 (tiga versi "siapa punya akun Cloudflare") ditutup dengan keputusan owner final: **owner sendiri yang membuat akun Gmail + Cloudflare klien dan menjalankan deploy**. Klien tidak membuat akun apa pun; satu-satunya langkah wajib dari klien adalah **aktivasi R2 sendiri** (verifikasi R2 Cloudflare butuh kartu/PayPal atas nama klien) lewat wizard `?onboard=` — situs tetap online tanpa R2, hanya unggah media yang tertunda sampai aktivasi. Alur deploy "setengah jadi" ini adalah desain yang disengaja, bukan cacat.
+
+- **T&C §5 (Akses & tanggung jawab)** ditulis ulang: tidak lagi menuntut pembeli menyerahkan Account ID & API Token. Sekarang menjelaskan bahwa akun dibuat dan dirawat oleh studio, plus satu paragraf jujur soal syarat verifikasi kartu/PayPal untuk R2 dan bahwa verifikasinya wajib diselesaikan klien sendiri.
+- **`/cara-pesan`** selaras: langkah onboarding dan daftar persiapan tidak lagi mengatakan "kalau belum punya akun Cloudflare, kami bantu buatkan" → "kami yang buatkan; kamu tidak perlu membuat akun sendiri", dengan penekanan kartu/PayPal milik klien hanya untuk verifikasi R2.
+- **Nomor WhatsApp owner diisi** (`platform_settings.owner_whatsapp` = nomor terverifikasi baca balik) — tombol "Chat Admin", "Bantuan WA (Terlanjur Bayar)" di halaman order, dan wizard R2 tidak lagi jatuh ke nomor contoh `628123456789`. Ganti nomor kapan saja tanpa deploy: `npx tsx scripts/cloudflare/set-owner-whatsapp.ts <nomor>`.
+- Keputusan dicatat permanen di AGENTS.md (Keputusan Produk Terkunci) + `docs/agent-context/09_PRODUCT_BOUNDARY_CONTEXT.md` supaya tidak pernah dipertanyakan ulang oleh AI.
+
+**Bukti:** `npx tsc --noEmit` 0 error, `npm run lint` bersih, suite penuh PASS. Nomor WA diverifikasi langsung di D1 produksi (baca balik).
+
 ## [1.3.85] - 2026-11-13
 
 ### Alamat Situs Jujur: `activated` ≠ Online, Bukti Serah Terima Tercatat Otomatis, Slug Tak Bisa Dijual Dua Kali

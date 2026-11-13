@@ -43,3 +43,10 @@ Client/pembeli tidak membutuhkan endpoint platform/global secara langsung.
 2. Ganti contact menjadi `site_settings` / `sites.contact_*` scoped `site_id`.
 3. Ganti notification menjadi provider generic atau simpan leads ke D1 dulu.
 4. Ganti AI menjadi provider generic dengan feature flag dan quota per site.
+
+## Model Akun Cloudflare Klien (Keputusan Owner 2026-11-14 — FINAL, jangan tanyakan ulang)
+
+- **Owner sendiri** yang membuat akun Gmail dan akun Cloudflare klien, dan **owner sendiri** yang menjalankan build + deploy. Klien TIDAK membuat akun Cloudflare, TIDAK menyerahkan Account ID/API Token, dan tidak diminta berbuat apa-apa teknis.
+- Satu-satunya langkah wajib dari klien: **aktivasi R2 sendiri** lewat wizard `?onboard=<token>` — verifikasi R2 Cloudflare butuh kartu kredit/debit/PayPal atas nama klien, dan owner melarang kartu owner dipakai di akun klien. Karena itu deploy memang "setengah jadi" (site online tanpa media) sampai klien selesai aktivasi — ini **by design**, bukan cacat.
+- Teks T&C §5 (`src/app/syarat-ketentuan/page.tsx`) dan `/cara-pesan` sudah diselaraskan dengan kenyataan ini (v1.3.86). Jangan mengubahnya kembali ke versi "pembeli menyerahkan akun sendiri".
+- Nomor WhatsApp owner = `platform_settings.owner_whatsapp` di D1 owner (dibaca runtime `getOwnerWhatsapp`); ganti via `npx tsx scripts/cloudflare/set-owner-whatsapp.ts <nomor>` tanpa deploy. Nomor bisa berubah sewaktu-waktu — selalu baca dari D1, jangan hardcode.
