@@ -1,5 +1,7 @@
 # Dua Cacat Audit Terakhir: Refund Bocor Diam-Diam (#8) + Janji Waktu & Jendela Refund (#9) (v1.3.87, 2026-11-14)
 
+> **Deployed 2026-11-14** — commit `0049d0f` (push `origin/main`), `npm run deploy` exit 0, `/api/health` produksi `version: "1.3.87"`.
+
 ## Latar Belakang
 
 Sisa cacat audit alur pembeli 2026-11-13 (buyer-journey-audit). Setelah versi ini **seluruh 10 temuan audit sudah diproses** (#1–#7 di v1.3.84–1.3.86, #5 diselesaikan lewat keputusan model akun owner di v1.3.86).
