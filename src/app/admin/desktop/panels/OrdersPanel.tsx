@@ -41,6 +41,9 @@ interface OrderItem {
   template_id?: string | null;
   payment_proof_url?: string | null;
   cancel_reason?: string | null;
+  /** Diisi portal onboarding setelah deploy sukses; `activated` tanpa ini = belum online. */
+  site_url?: string | null;
+  provisioned_at?: string | null;
   expires_at: string;
   created_at: string;
   updated_at: string;
@@ -613,6 +616,32 @@ export default function OrdersPanel() {
                           Alasan batal: {order.cancel_reason}
                         </p>
                       )}
+
+                      {/* Bukti serah terima (v1.3.85): "Aktif" berarti pembayaran
+                          terverifikasi — status deploy dibaca dari site_url. */}
+                      {order.status === 'activated' &&
+                        (order.site_url ? (
+                          <p className="text-xs text-emerald-700">
+                            🌐 Website:{' '}
+                            <a
+                              href={order.site_url}
+                              target="_blank"
+                              rel="noreferrer noopener"
+                              className="font-mono underline-offset-2 hover:underline"
+                            >
+                              {order.site_url}
+                            </a>
+                            {order.provisioned_at && (
+                              <span className="ml-2 text-emerald-600">
+                                (online {formatDate(order.provisioned_at)})
+                              </span>
+                            )}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-amber-600">
+                            ⏳ Menunggu deploy lewat portal — website belum online.
+                          </p>
+                        ))}
                     </div>
 
                     <div className="flex flex-col items-start gap-2 lg:items-end">

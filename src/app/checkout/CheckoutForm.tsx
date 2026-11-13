@@ -113,7 +113,7 @@ export default function CheckoutForm({ initialTemplateId }: { initialTemplateId?
           setSlugStatus({
             slug,
             state: 'available',
-            message: `Alamat ${data.slug ?? slug}.workers.dev tersedia.`,
+            message: `Nama alamat "${data.slug ?? slug}" tersedia.`,
           });
         } else {
           setSlugStatus({
@@ -255,15 +255,16 @@ export default function CheckoutForm({ initialTemplateId }: { initialTemplateId?
               }}
             />
             <div style={{ marginTop: '0.35rem', fontSize: '0.75rem', color: '#666' }}>
-              Alamat website Anda nantinya:{' '}
+              Nama alamat website Anda:{' '}
               <code style={{ background: '#f1f5f9', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 600, color: '#0f172a' }}>
-                https://{desiredSlug || 'nama-anda'}.workers.dev
+                {desiredSlug || 'nama-anda'}
               </code>
               <br />
-              Alamat ini <strong>akan dipakai</strong> untuk situs Anda dan baru aktif setelah
-              pembayaran diverifikasi serta setup selesai (maksimal 1×24 jam kerja).
-              Nanti bisa disambungkan ke domain pribadi (.com / .id) kapan saja bila
-              diperlukan.
+              Nama ini <strong>akan dipakai</strong> untuk situs Anda. Alamat lengkapnya
+              kami kabarkan saat situs online (nama ini tidak bisa dipakai pembeli lain).
+              Situs baru aktif setelah pembayaran diverifikasi serta setup selesai
+              (maksimal 1×24 jam kerja), dan nanti bisa disambungkan ke domain pribadi
+              (.com / .id) kapan saja bila diperlukan.
             </div>
 
             {slugCheck.state !== 'idle' && (

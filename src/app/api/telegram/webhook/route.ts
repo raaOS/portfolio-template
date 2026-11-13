@@ -73,9 +73,71 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: true });
       }
 
-      // Handle Activate Order Button
-      if (callbackData.startsWith('activate_')) {
-        const orderId = callbackData.replace('activate_', '');
+      // Dua langkah (audit alur bisnis 2026-11-13): tap pertama pada
+      // activate_/cancel_ TIDAK langsung mengeksekusi — kirim pesan konfirmasi
+      // dengan tombol kedua (confirm_*). Salah tap di notifikasi Telegram tidak
+      // lagi langsung mengubah status order. reopen_ sengaja tetap satu tap
+      // (dampaknya rendah: kembali ke antrean verifikasi).
+      const isActivateTap =
+        !callbackData.startsWith('confirm_') && callbackData.startsWith('activate_');
+      const isCancelTap =
+        !callbackData.startsWith('confirm_') && callbackData.startsWith('cancel_');
+
+      if ((isActivateTap || isCancelTap) && botToken && chatId) {
+        const action = isActivateTap ? 'activate' : 'cancel';
+        const orderId = callbackData.slice(action.length + 1);
+
+        if (botToken && callbackQuery.id) {
+          await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              callback_query_id: callbackQuery.id,
+              text: 'Klik tombol konfirmasi di pesan baru untuk mengeksekusi.',
+              show_alert: true,
+            }),
+          });
+        }
+
+        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: `⚠️ <b>Konfirmasi ${isActivateTap ? 'AKTIVASI' : 'PEMBATALAN/REFUND'}</b> order <code>${orderId}</code>\n\nTindakan ini langsung mengubah status order. ${isActivateTap ? 'Pastikan bukti bayar sudah benar.' : 'Pastikan refund ke pembeli sudah diatur.'}`,
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  {
+                    text: isActivateTap ? '✅ Ya, Aktifkan' : '❌ Ya, Batalkan/Refund',
+                    callback_data: `confirm_${action}_${orderId}`,
+                  },
+                  { text: '↩️ Tidak jadi', callback_data: 'noop' },
+                ],
+              ],
+            },
+          }),
+        });
+
+        return NextResponse.json({ ok: true });
+      }
+
+      if (callbackData === 'noop' && botToken && callbackQuery.id) {
+        await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            callback_query_id: callbackQuery.id,
+            text: 'Tidak ada aksi.',
+          }),
+        });
+        return NextResponse.json({ ok: true });
+      }
+
+      // Handle Activate Order Button (setelah konfirmasi dua langkah)
+      if (callbackData.startsWith('confirm_activate_')) {
+        const orderId = callbackData.replace('confirm_activate_', '');
 
         const result = await activateOrder(orderId);
 
@@ -105,9 +167,9 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Handle Cancel / Refund Order Button
-      if (callbackData.startsWith('cancel_')) {
-        const orderId = callbackData.replace('cancel_', '');
+      // Handle Cancel / Refund Order Button (setelah konfirmasi dua langkah)
+      if (callbackData.startsWith('confirm_cancel_')) {
+        const orderId = callbackData.replace('confirm_cancel_', '');
         const result = await cancelOrder(orderId);
 
         if (botToken && callbackQuery.id) {

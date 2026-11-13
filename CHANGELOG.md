@@ -3,6 +3,21 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.85] - 2026-11-13
+
+### Alamat Situs Jujur: `activated` ≠ Online, Bukti Serah Terima Tercatat Otomatis, Slug Tak Bisa Dijual Dua Kali
+
+Lanjutan audit alur pembeli 2026-11-13 (v1.3.84). Temuan terburuk diperbaiki: selama ini semua janji alamat situs tertulis `https://<slug>.workers.dev`, padahal alamat riil Cloudflare selalu menyertakan subdomain akun klien (`https://<slug>.<subdomain-akun>.workers.dev`) — setiap link yang pernah dijanjikan/pembeli klik salah. Selain itu `status='activated'` selama ini dianggap "situs online", padahal baru berarti pembayaran terverifikasi.
+
+- **Janji alamat palsu diganti di semua titik jualan.** Tiket Telegram bengkel (`sendWorkshopTicket`) dan pesan sukses aktivasi tidak lagi mencetak alamat fiktif; halaman order sekarang membedakan dua keadaan secara jujur: tanpa `site_url` → "website disiapkan, alamat resmi diberikan setelah deploy", dengan `site_url` → online + link asli. FAQ di `/harga` ikut disesuaikan.
+- **Bukti serah terima otomatis.** Kolom baru `orders.site_url` + `orders.provisioned_at` (fresh install di DDL + self-heal `ALTER TABLE` untuk database lama). Setelah deploy portal sukses, email "Website Sudah Online" **mencatat alamat asli + waktunya** ke order `activated` di D1 owner — jalan walau email belum dikonfigurasi (dulu klaimnya ada tapi kodenya tidak pernah menulis apa pun). Panel **Pesanan** kini menampilkan status deploy per order: link hijau "online sejak …" atau peringatan kuning "menunggu deploy".
+- **Slug yang sudah dibayar tidak bisa dijual ulang.** Dulu slug order `activated` bebas dijual lagi ke orang lain selama situsnya belum di-deploy. Kini `isSlugAvailable` menolak slug milik order `activated`, dan `reopenOrder` menolak membuka order lama bila slug-nya kini dipakai order lain (guard UPDATE — partial index hanya menjaga INSERT). Partial unique index sengaja TIDAK mengikutkan `activated` agar self-heal CREATE tidak pernah gagal diam-diam di data lama.
+- **Tombol Telegram dua langkah.** `Aktifkan`/`Batalkan` di notifikasi tidak lagi dieksekusi sekali tap — tap pertama memunculkan pesan konfirmasi dengan tombol `confirm_*`; salah tap tidak lagi langsung mengubah status order.
+- **Email struk gagal tidak lagi hilang diam.** `sendOrderEmail` kini membedakan "provider belum dikonfigurasi" vs gagal kirim; saat gagal, owner dapat alert Telegram berisi alasan + link order untuk dikirim manual ke pembeli.
+- **Sumber alamat portal dibersihkan.** `deployClient` tidak lagi menebak `slug.workers.dev` polos (menghormati `WORKERS_SUBDOMAIN`), retry-deploy portal **tidak akan mencatat alamat kosong/palsu** ke bukti serah terima (skip dengan catatan jujur), dan surat serah terima custom domain tidak lagi mencetak "bawaan" palsu.
+
+**Bukti:** `npx tsc --noEmit` 0 error, `npm run lint` bersih, suite penuh **153 file / 1294 test PASS** (termasuk test baru: slug `activated` ditolak, `recordProvisionedSite` menulis kolom baru, tiket bengkel tanpa alamat fiktif).
+
 ## [1.3.84] - 2026-11-13
 
 ### Checkout & Halaman Order: Klaim Menyesatkan + 4 Friction Pembeli Ditutup

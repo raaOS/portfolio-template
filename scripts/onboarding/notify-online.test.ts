@@ -16,7 +16,7 @@ vi.mock('../cloudflare/backup-common', () => ({
 }));
 
 import { getCurrentD1DatabaseId, queryD1ForDatabase } from '../cloudflare/backup-common';
-import { listOrderSlugs, sendWebsiteOnlineEmail } from './notify-online';
+import { listOrderSlugs, recordProvisionedSite, sendWebsiteOnlineEmail } from './notify-online';
 
 const dbIdMock = vi.mocked(getCurrentD1DatabaseId);
 const queryMock = vi.mocked(queryD1ForDatabase);
@@ -51,31 +51,39 @@ afterEach(() => {
 });
 
 describe('sendWebsiteOnlineEmail', () => {
-  it('melewati email tanpa konfigurasi Resend (tanpa query D1, tanpa fetch)', async () => {
+  it('tetap mencatat site_url ke D1 walau email tidak dikonfigurasi (tanpa fetch)', async () => {
     setResendEnv({ NOTIFICATION_API_KEY: '' });
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
+    queryMock.mockResolvedValueOnce([]); // UPDATE pencatatan bukti serah terima
 
     const result = await sendWebsiteOnlineEmail({
       slug: 'budi-site',
-      websiteUrl: 'https://budi-site.workers.dev',
+      websiteUrl: 'https://budi-site.sub-akun.workers.dev',
     });
 
     expect(result.sent).toBe(false);
     expect(result.reason).toContain('belum dikonfigurasi');
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(queryMock).not.toHaveBeenCalled();
+    // Pencatatan tetap jalan — inilah bukti serah terima untuk OrdersPanel.
+    expect(queryMock).toHaveBeenCalledTimes(1);
+    const [, sql, params] = queryMock.mock.calls[0];
+    expect(sql).toContain('UPDATE orders');
+    expect(sql).toContain('site_url');
+    expect(sql).toContain('provisioned_at');
+    expect(params?.[0]).toBe('https://budi-site.sub-akun.workers.dev');
   });
 
   it('melewati email bila slug tidak punya order di D1 owner', async () => {
     setResendEnv();
-    queryMock.mockResolvedValueOnce([]);
+    queryMock.mockResolvedValueOnce([]); // UPDATE pencatatan
+    queryMock.mockResolvedValueOnce([]); // SELECT order
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
 
     const result = await sendWebsiteOnlineEmail({
       slug: 'tidak-ada-order',
-      websiteUrl: 'https://tidak-ada-order.workers.dev',
+      websiteUrl: 'https://tidak-ada-order.sub-akun.workers.dev',
     });
 
     expect(result.sent).toBe(false);
@@ -85,13 +93,14 @@ describe('sendWebsiteOnlineEmail', () => {
 
   it('mengirim email "Sudah Online" berisi URL live yang benar ke pembeli order', async () => {
     setResendEnv();
+    queryMock.mockResolvedValueOnce([]); // UPDATE pencatatan
     queryMock.mockResolvedValueOnce([
       { id: 'ORD-9', buyer_email: 'beli@test.com', buyer_name: 'Budi Santoso' },
     ]);
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal('fetch', fetchMock);
 
-    const url = 'https://budi-site.workers.dev';
+    const url = 'https://budi-site.sub-akun.workers.dev';
     const result = await sendWebsiteOnlineEmail({ slug: 'budi-site', websiteUrl: url });
 
     expect(result.sent).toBe(true);
@@ -103,6 +112,8 @@ describe('sendWebsiteOnlineEmail', () => {
     const payload = JSON.parse(String(init.body));
     expect(payload.to).toBe('beli@test.com');
     expect(payload.subject).toContain('Sudah Online');
+    // Subject TIDAK menebak alamat `<slug>.workers.dev` palsu.
+    expect(payload.subject).not.toContain('budi-site');
     // Isi jujur: hanya URL live yang diberikan portal, tanpa alamat lain.
     expect(payload.text).toContain(url);
     expect(payload.text).toContain('ORD-9');
@@ -113,6 +124,7 @@ describe('sendWebsiteOnlineEmail', () => {
 
   it('tidak melempar saat Resend menolak (HTTP 500)', async () => {
     setResendEnv();
+    queryMock.mockResolvedValueOnce([]); // UPDATE pencatatan
     queryMock.mockResolvedValueOnce([
       { id: 'ORD-9', buyer_email: 'beli@test.com', buyer_name: 'Budi' },
     ]);
@@ -121,7 +133,7 @@ describe('sendWebsiteOnlineEmail', () => {
 
     const result = await sendWebsiteOnlineEmail({
       slug: 'budi-site',
-      websiteUrl: 'https://budi-site.workers.dev',
+      websiteUrl: 'https://budi-site.sub-akun.workers.dev',
     });
 
     expect(result.sent).toBe(false);
@@ -130,18 +142,55 @@ describe('sendWebsiteOnlineEmail', () => {
 
   it('tidak melempar saat query D1 owner gagal', async () => {
     setResendEnv();
-    queryMock.mockRejectedValueOnce(new Error('D1 down'));
+    queryMock.mockRejectedValue(new Error('D1 down'));
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
 
     const result = await sendWebsiteOnlineEmail({
       slug: 'budi-site',
-      websiteUrl: 'https://budi-site.workers.dev',
+      websiteUrl: 'https://budi-site.sub-akun.workers.dev',
     });
 
     expect(result.sent).toBe(false);
     expect(result.reason).toContain('D1 down');
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('recordProvisionedSite', () => {
+  it('menulis site_url + provisioned_at ke order activated milik slug', async () => {
+    queryMock.mockResolvedValueOnce([]);
+
+    const result = await recordProvisionedSite(
+      'budi-site',
+      'https://budi-site.sub-akun.workers.dev'
+    );
+
+    expect(result.sent).toBe(true);
+    expect(queryMock).toHaveBeenCalledTimes(1);
+    const [, sql, params] = queryMock.mock.calls[0];
+    expect(sql).toContain("status = 'activated'");
+    expect(params?.[0]).toBe('https://budi-site.sub-akun.workers.dev');
+    expect(params?.[1]).toBeTruthy(); // provisioned_at ISO timestamp
+    expect(params?.[3]).toBe('budi-site');
+  });
+
+  it('melewati pencatatan bila D1 owner tidak dikonfigurasi', async () => {
+    dbIdMock.mockReturnValue('');
+
+    const result = await recordProvisionedSite('budi-site', 'https://b.workers.dev');
+
+    expect(result.sent).toBe(false);
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  it('tidak melempar saat UPDATE gagal', async () => {
+    queryMock.mockRejectedValueOnce(new Error('D1 down'));
+
+    const result = await recordProvisionedSite('budi-site', 'https://b.workers.dev');
+
+    expect(result.sent).toBe(false);
+    expect(result.reason).toContain('D1 down');
   });
 });
 

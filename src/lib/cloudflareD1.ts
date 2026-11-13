@@ -357,10 +357,21 @@ export async function bootstrapD1Schema() {
         if (!hasPaymentProofUrl) {
           await queryD1('ALTER TABLE orders ADD COLUMN payment_proof_url TEXT');
         }
+        // Bukti serah terima (v1.3.85): portal onboarding mengisi URL asli hasil
+        // deploy + waktunya. `activated` tanpa `provisioned_at` = belum di-deploy.
+        const hasSiteUrl = ordersInfo.some((col) => col.name === 'site_url');
+        if (!hasSiteUrl) {
+          await queryD1('ALTER TABLE orders ADD COLUMN site_url TEXT');
+        }
+        const hasProvisionedAt = ordersInfo.some((col) => col.name === 'provisioned_at');
+        if (!hasProvisionedAt) {
+          await queryD1('ALTER TABLE orders ADD COLUMN provisioned_at TEXT');
+        }
 
-        // Migrate: replace plain desired_slug index with partial unique index
-        // (without 'activated' — slug must be reusable after a site is created;
-        // situs nyata sudah dijaga oleh index slug di tabel sites)
+        // Migrate: replace plain desired_slug index with partial unique index.
+        // Status aktif saja — perlindungan slug yang sudah `activated` ada di
+        // lapisan aplikasi (slugService.isSlugAvailable), BUKAN di sini: lihat
+        // alasan lengkap di komentar index pada src/lib/d1-schema.ts.
         try {
           await queryD1('DROP INDEX IF EXISTS idx_orders_desired_slug');
           await queryD1('DROP INDEX IF EXISTS idx_orders_desired_slug_active');

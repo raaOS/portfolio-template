@@ -1281,7 +1281,7 @@ const server = http.createServer(async (req, res) => {
           if (!suratRaw.includes('Custom Domain')) {
             suratRaw = suratRaw.replace(
               /• Alamat Website\s*:.*/,
-              `• Alamat Website   : https://${domain} (bawaan: https://${clientSlug}.workers.dev)\n• Custom Domain    : ${domain}`
+              `• Alamat Website   : https://${domain} (custom domain)\n• Custom Domain    : ${domain}`
             );
             fs.writeFileSync(suratPath, suratRaw, 'utf-8');
           }
@@ -1785,21 +1785,29 @@ const server = http.createServer(async (req, res) => {
           }
 
           // PK2 — retry deploy pertama dari kartu sukses onboarding:
-          // kirim email "Website Sudah Online" (best-effort).
+          // kirim email "Website Sudah Online" (best-effort). JANGAN menebak
+          // alamat: sendWebsiteOnlineEmail ikut mencatat orders.site_url, jadi
+          // alamat palsu akan meracuki bukti serah terima di D1 owner.
           let emailNote = '';
           if (notifyOnline === true) {
-            try {
-              const emailResult = await sendWebsiteOnlineEmail({
-                slug: outcome.slug || clientSlug,
-                websiteUrl: outcome.websiteUrl || `https://${clientSlug}.workers.dev`,
-              });
-              emailNote = emailResult.reason;
-              sendEvent('log', {
-                text: emailResult.sent ? `📧 ${emailResult.reason}` : `ℹ️ ${emailResult.reason}`,
-              });
-            } catch (emailErr) {
-              emailNote = `Email "Sudah Online" gagal: ${(emailErr as Error).message}`;
-              sendEvent('log', { text: `⚠️ ${emailNote}` });
+            const onlineUrl = outcome.websiteUrl || env.WEBSITE_URL || '';
+            if (onlineUrl) {
+              try {
+                const emailResult = await sendWebsiteOnlineEmail({
+                  slug: outcome.slug || clientSlug,
+                  websiteUrl: onlineUrl,
+                });
+                emailNote = emailResult.reason;
+                sendEvent('log', {
+                  text: emailResult.sent ? `📧 ${emailResult.reason}` : `ℹ️ ${emailResult.reason}`,
+                });
+              } catch (emailErr) {
+                emailNote = `Email "Sudah Online" gagal: ${(emailErr as Error).message}`;
+                sendEvent('log', { text: `⚠️ ${emailNote}` });
+              }
+            } else {
+              emailNote = 'Email "Sudah Online" dilewati: alamat website hasil deploy tidak diketahui.';
+              sendEvent('log', { text: `ℹ️ ${emailNote}` });
             }
           }
 

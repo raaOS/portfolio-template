@@ -49,7 +49,7 @@ const FAQ = [
   },
   {
     q: 'Bisa pakai domain sendiri?',
-    a: 'Bisa. Awalnya website online di alamat <slug>.workers.dev. Domain pribadi bisa dipasang setelahnya di akun Cloudflare yang sama — kami beri panduan langkahnya.',
+    a: 'Bisa. Awalnya website online di alamat gratis dari akun Cloudflare-mu (subdomain workers.dev — alamat lengkapnya kami kabarkan saat situs online). Domain pribadi bisa dipasang setelahnya di akun Cloudflare yang sama — kami beri panduan langkahnya.',
   },
   {
     q: 'Berapa lama sampai website online?',

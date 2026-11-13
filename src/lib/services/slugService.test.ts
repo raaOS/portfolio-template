@@ -70,11 +70,23 @@ describe('slugService', () => {
     });
 
     it('returns true if slug is free in both sites and orders', async () => {
+      // 1st query (sites) empty, 2nd (orders aktif) empty, 3rd (activated) empty
+      vi.mocked(cloudflareD1.queryD1).mockResolvedValueOnce([]);
       vi.mocked(cloudflareD1.queryD1).mockResolvedValueOnce([]);
       vi.mocked(cloudflareD1.queryD1).mockResolvedValueOnce([]);
 
       const res = await isSlugAvailable('nanda-design');
       expect(res).toBe(true);
+    });
+
+    it('returns false if slug belongs to an activated order (no double-sell)', async () => {
+      // 1st query (sites) empty, 2nd (orders aktif) empty, 3rd (activated) match
+      vi.mocked(cloudflareD1.queryD1).mockResolvedValueOnce([]);
+      vi.mocked(cloudflareD1.queryD1).mockResolvedValueOnce([]);
+      vi.mocked(cloudflareD1.queryD1).mockResolvedValueOnce([{ id: 'ORD-LAMA' }]);
+
+      const res = await isSlugAvailable('nanda-design');
+      expect(res).toBe(false);
     });
   });
 });

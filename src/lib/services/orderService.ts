@@ -22,6 +22,10 @@ export interface OrderRecord {
   payment_proof_url?: string | null;
   cancel_reason?: string | null;
   status: 'pending_payment' | 'waiting_verification' | 'activating' | 'activated' | 'failed' | 'expired' | 'canceled';
+  /** URL asli hasil deploy (diisi portal; `activated` tanpa ini = belum online). */
+  site_url?: string | null;
+  /** Waktu deploy sukses pertama (diisi portal onboarding). */
+  provisioned_at?: string | null;
   expires_at: string;
   created_at: string;
   updated_at: string;
@@ -405,13 +409,17 @@ async function sendOrderEmail({
   buyerName: string;
   amount: number;
   orderUrl: string;
-}): Promise<boolean> {
+}): Promise<{ sent: boolean; reason: string }> {
   const provider = (cleanEnvVar('NOTIFICATION_PROVIDER') || '').toLowerCase();
-  if (provider !== 'resend') return false;
+  if (provider !== 'resend') {
+    return { sent: false, reason: 'NOTIFICATION_PROVIDER bukan resend' };
+  }
 
   const apiKey = cleanEnvVar('NOTIFICATION_API_KEY');
   const from = cleanEnvVar('NOTIFICATION_DEFAULT_FROM');
-  if (!apiKey || !from) return false;
+  if (!apiKey || !from) {
+    return { sent: false, reason: 'NOTIFICATION_API_KEY/DEFAULT_FROM kosong' };
+  }
 
   const formattedAmount = `Rp ${amount.toLocaleString('id-ID')}`;
 
@@ -463,10 +471,13 @@ async function sendOrderEmail({
         ].join(''),
       }),
     });
-    return res.ok;
+    if (!res.ok) {
+      return { sent: false, reason: `Resend menolak (HTTP ${res.status})` };
+    }
+    return { sent: true, reason: 'ok' };
   } catch (err) {
     console.error('[sendOrderEmail] Failed:', err);
-    return false;
+    return { sent: false, reason: (err as Error).message };
   }
 }
 
@@ -958,13 +969,26 @@ export async function createOrder(
   // Send order confirmation email to buyer with direct link to order page
   const baseUrl = env.APP_BASE_URL || getPublicBaseUrl();
   const orderUrl = `${baseUrl}/orders/${orderId}?token=${accessToken}`;
-  await sendOrderEmail({
+  const emailResult = await sendOrderEmail({
     to: input.buyerEmail.trim().toLowerCase(),
     orderId,
     buyerName: input.buyerName.trim(),
     amount,
     orderUrl,
   });
+
+  // Audit alur bisnis 2026-11-13: struk email yang gagal jangan hilang diam —
+  // owner butuh tahu + link order untuk mengirim manual ke pembeli.
+  if (!emailResult.sent) {
+    await sendTelegramMessage(
+      env,
+      `⚠️ <b>EMAIL STRUK GAGAL TERKIRIM</b>\n` +
+        `Alasan: ${escapeTelegramHtml(emailResult.reason)}\n` +
+        `Order: <code>${escapeTelegramHtml(orderId)}</code>\n` +
+        `Pembeli: ${escapeTelegramHtml(input.buyerEmail)}\n` +
+        `Kirim link manual: <a href="${escapeTelegramHtml(orderUrl)}">${escapeTelegramHtml(orderUrl)}</a>`
+    );
+  }
 
   return { success: true, order: newOrder, accessToken };
 }
@@ -1162,14 +1186,14 @@ export async function uploadPaymentProof(
  * langkah kerja. Best-effort: kegagalan kirim tidak boleh memengaruhi
  * hasil aktivasi.
  */
-async function sendWorkshopTicket(order: OrderRecord, siteUrl: string): Promise<void> {
+async function sendWorkshopTicket(order: OrderRecord): Promise<void> {
   const steps = [
     '1. Buat Gmail untuk klien.',
     '2. Buat akun Cloudflare klien (Account ID + API Token izin D1, R2, Workers (Edit)).',
     '3. Jalankan PENGELOLA_KLIEN.bat → menu [1] Pendaftaran Klien Baru.',
-    '4. Deploy lewat portal yang sama.',
+    '4. Deploy lewat portal yang sama → alamat asli (https://<slug>.<subdomain-akun>.workers.dev) tercatat otomatis ke order.',
     '5. Kirim akses ke klien (URL + login /admin).',
-    '6. Tandai order selesai dan simpan datanya di arsip-klien/.',
+    '6. Simpan datanya di arsip-klien/.',
   ];
 
   const text =
@@ -1179,7 +1203,7 @@ async function sendWorkshopTicket(order: OrderRecord, siteUrl: string): Promise<
     `Pembeli: ${escapeTelegramHtml(order.buyer_name)}\n` +
     `WA: ${escapeTelegramHtml(order.buyer_whatsapp)}\n` +
     `Email: ${escapeTelegramHtml(order.buyer_email)}\n` +
-    `URL: <a href="${escapeTelegramHtml(siteUrl)}">${escapeTelegramHtml(siteUrl)}</a>\n\n` +
+    `Alamat final: ditentukan subdomain akun Cloudflare klien — tercatat otomatis setelah deploy.\n\n` +
     `☑️ <b>Langkah bengkel:</b>\n` +
     steps.map((step) => `   ${escapeTelegramHtml(step)}`).join('\n') +
     `\n\n📖 Panduan lengkap: docs/operations/BENGKEL_HANDOFF.md`;
@@ -1306,11 +1330,11 @@ export async function activateOrder(
     };
   }
 
-  // Alamat masa depan klien: `<slug>.workers.dev` (di-deploy lewat portal
-  // onboarding, diumumkan lewat email "Website Sudah Online"). Rute `/{slug}`
-  // di domain toko sudah dihapus — jangan kirim URL domain toko sebagai
-  // "website klien".
-  const siteUrl = `https://${actualSlug}.workers.dev`;
+  // Alamat final TIDAK bisa ditentukan dari sini: portal memakai subdomain akun
+  // Cloudflare klien (`https://<slug>.<subdomain>.workers.dev`), bukan
+  // `<slug>.workers.dev` polos. Jangan pernah menebak alamat yang belum ada —
+  // alamat asli diisi portal ke `orders.site_url` setelah deploy sukses
+  // (`scripts/onboarding/notify-online.ts`).
 
   // Email "pembayaran terverifikasi, website sedang disiapkan" ke pembeli.
   // Dibungkus try/catch: aktivasi sudah ter-commit ke D1 di atas, kegagalan
@@ -1327,9 +1351,9 @@ export async function activateOrder(
   }
 
   // Tiket kerja kasir → bengkel (lihat sendWorkshopTicket).
-  await sendWorkshopTicket(order, siteUrl);
+  await sendWorkshopTicket(order);
 
-  const message = `Berhasil mengaktifkan pesanan ${order.id}. Menunggu deploy: ${siteUrl}`;
+  const message = `Berhasil mengaktifkan pesanan ${order.id}. Menunggu deploy lewat portal (slug: ${actualSlug}).`;
 
   return { success: true, message, siteId };
 }
@@ -1498,6 +1522,31 @@ export async function reopenOrder(
       success: false,
       message: `Hanya order berstatus canceled atau failed yang bisa dibuka kembali. Status saat ini: ${order.status}.`,
     };
+  }
+
+  // Guard slug (audit alur bisnis 2026-11-13): selama order batal/gagal,
+  // slug-nya bisa saja sudah dijual ke order lain (slug boleh dipakai ulang
+  // setelah cancel). Reopen tidak boleh membuat dua order aktif memegang slug
+  // yang sama — index partial idx_orders_desired_slug_active hanya menjaga
+  // INSERT baru, bukan UPDATE status ini.
+  const slugLower = order.desired_slug?.trim().toLowerCase();
+  if (slugLower) {
+    const conflict = await queryD1<{ id: string }>(
+      `SELECT id FROM orders
+        WHERE id != ? AND LOWER(desired_slug) = ?
+          AND (
+            status IN ('waiting_verification', 'activating', 'activated')
+            OR (status = 'pending_payment' AND datetime(expires_at) > datetime('now'))
+          )
+        LIMIT 1`,
+      [orderId, slugLower]
+    );
+    if (conflict.length > 0) {
+      return {
+        success: false,
+        message: `Slug "${order.desired_slug}" kini dipakai order lain (${conflict[0].id}). Slug tidak bisa dikunci ulang untuk order ini.`,
+      };
+    }
   }
 
   const updated = await queryD1<OrderRecord>(

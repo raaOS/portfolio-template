@@ -6,11 +6,15 @@
  *  - `orderService.sendActivationEmail` → "✅ Pembayaran Terverifikasi —
  *    Website Sedang Disiapkan" (janji 1×24 jam, TANPA link) saat pembayaran masuk.
  *  - Modul ini → "🎉 Website Anda Sudah Online: <url>" dengan URL benar
- *    (`https://<slug>.workers.dev`), hanya setelah deploy benar-benar sukses.
+ *    (`websiteUrl` dari deployClient; bentuknya
+ *    `https://<slug>.<subdomain-akun-klien>.workers.dev`), hanya setelah deploy
+ *    benar-benar sukses. URL yang sama dicatat ke `orders.site_url` +
+ *    `orders.provisioned_at` supaya admin punya bukti serah terima.
  *
  * Pencarian pembeli: order di D1 OWNER dengan `desired_slug = slug` (order
- * `activated` diprioritaskan). Tanpa order (deploy demo/manual) atau tanpa
- * konfigurasi Resend → email DILEWATI dengan alasan jelas, bukan error.
+ * `activated` diprioritaskan). Tanpa order (deploy demo/manual) → email
+ * DILEWATI dengan alasan jelas, bukan error. Pencatatan serah terima tetap
+ * dijalankan walau email tidak dikonfigurasi.
  *
  * Sengaja TIDAK dipanggil pada mode update batch `cloud-manager.ts`
  * (deploy ulang site yang sudah online = bukan momen "sudah online" pertama).
@@ -82,6 +86,36 @@ export async function listOrderSlugs(): Promise<string[]> {
 }
 
 /**
+ * Catat bukti serah terima ke D1 owner: `orders.site_url` + `orders.provisioned_at`
+ * pada order `activated` milik slug. WAJIB dijalankan sebelum gerbang email —
+ * pencatatan tetap jalan walau email tidak dikonfigurasi (sesuai janji di
+ * komentar header). Best-effort: kegagalan tidak boleh menggagalkan deploy.
+ */
+export async function recordProvisionedSite(
+  slug: string,
+  websiteUrl: string
+): Promise<OnlineEmailResult> {
+  loadProductEnv();
+  try {
+    const databaseId = getCurrentD1DatabaseId();
+    if (!databaseId) {
+      return { sent: false, reason: 'Pencatatan site_url dilewati: database D1 owner tidak ditemukan di env.' };
+    }
+    const now = new Date().toISOString();
+    await queryD1ForDatabase(
+      databaseId,
+      `UPDATE orders
+         SET site_url = ?, provisioned_at = ?, updated_at = ?
+       WHERE desired_slug = ? AND status = 'activated'`,
+      [websiteUrl, now, now, slug]
+    );
+    return { sent: true, reason: `Bukti serah terima tercatat: site_url=${websiteUrl} (slug ${slug}).` };
+  } catch (err) {
+    return { sent: false, reason: `Pencatatan site_url gagal (${(err as Error).message}).` };
+  }
+}
+
+/**
  * Kirim email "Website Sudah Online". Tidak pernah melempar — semua kegagalan
  * dikembalikan sebagai `{ sent: false, reason }` supaya deploy yang sudah sukses
  * tidak dianggap gagal oleh portal.
@@ -92,6 +126,11 @@ export async function sendWebsiteOnlineEmail(params: {
 }): Promise<OnlineEmailResult> {
   const { slug, websiteUrl } = params;
   loadProductEnv();
+
+  // Bukti serah terima dulu, SEBELUM gerbang email — deploy sukses wajib
+  // tercatat ke order walau provider email belum diisi.
+  const record = await recordProvisionedSite(slug, websiteUrl);
+  console.log(record.sent ? `📝 ${record.reason}` : `⚠️ ${record.reason}`);
 
   const provider = (process.env.NOTIFICATION_PROVIDER || '').trim().toLowerCase();
   const apiKey = (process.env.NOTIFICATION_API_KEY || '').trim();
@@ -136,7 +175,7 @@ export async function sendWebsiteOnlineEmail(params: {
       body: JSON.stringify({
         from,
         to: order.buyer_email,
-        subject: `🎉 Website Anda Sudah Online — ${slug}.workers.dev`,
+        subject: `🎉 Website Anda Sudah Online`,
         text: [
           `Halo ${nameText},`,
           '',

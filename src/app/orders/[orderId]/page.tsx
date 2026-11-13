@@ -34,6 +34,9 @@ interface OrderData {
   payment_method: string;
   payment_proof_url?: string | null;
   cancel_reason?: string | null;
+  /** Diisi portal onboarding setelah deploy sukses — `activated` saja belum berarti online. */
+  site_url?: string | null;
+  provisioned_at?: string | null;
   status: string;
   expires_at: string;
   /** Dibutuhkan untuk countdown auto-cancel order waiting_verification (updated_at + 7 hari). */
@@ -485,7 +488,20 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ orderId
             </div>
             <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-slate-500 font-medium">Alamat Website:</span>
-              <span className="font-mono font-bold text-blue-600">{order.desired_slug}.workers.dev</span>
+              {order.site_url ? (
+                <a
+                  href={order.site_url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="font-mono font-bold text-blue-600 underline underline-offset-2"
+                >
+                  {order.site_url.replace(/^https?:\/\//, '')}
+                </a>
+              ) : (
+                <span className="font-mono font-semibold text-slate-500">
+                  {order.desired_slug} · dikabarkan saat online
+                </span>
+              )}
             </div>
           </div>
 
@@ -713,32 +729,67 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ orderId
             </div>
           )}
 
-          {/* Payment Verified — Website Being Prepared Banner (jujur: belum online) */}
+          {/* Status setelah pembayaran terverifikasi. `activated` = uang masuk,
+              BELUM tentu situs online; `site_url` baru diisi portal setelah deploy
+              sukses (v1.3.85). Jangan pernah menampilkan alamat karangan. */}
           {order.status === 'activated' && (
-            <div className="space-y-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-center">
-              <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-600" />
-              <h3 className="text-sm font-extrabold text-emerald-900">
-                ✅ Pembayaran Terverifikasi — Website Sedang Disiapkan
-              </h3>
-              <p className="text-[11px] text-slate-600">
-                Website Anda online paling lambat <strong>1×24 jam</strong> setelah pembayaran ini.
-                Alamatnya:
-              </p>
-              <p className="text-[11px] text-slate-600">
-                <code className="font-mono font-bold text-slate-900">{order.desired_slug}.workers.dev</code>
-              </p>
-              <p className="text-[10px] text-slate-500">
-                Akses login diserahkan lewat WhatsApp; kabar &quot;sudah online&quot; menyusul lewat email.
-              </p>
-              <p className="text-[11px]">
-                <Link
-                  href="/panduan"
-                  className="font-bold text-emerald-800 underline underline-offset-2 hover:text-emerald-950"
-                >
-                  Baca Panduan Klien →
-                </Link>
-              </p>
-            </div>
+            order.site_url ? (
+              <div className="space-y-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-center">
+                <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-600" />
+                <h3 className="text-sm font-extrabold text-emerald-900">
+                  🎉 Website Anda Sudah Online
+                </h3>
+                <p className="text-[11px] text-slate-600">
+                  Buka alamat berikut dari perangkat mana pun:
+                </p>
+                <p className="text-[11px]">
+                  <a
+                    href={order.site_url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="font-mono font-bold text-emerald-800 underline underline-offset-2"
+                  >
+                    {order.site_url}
+                  </a>
+                </p>
+                <p className="text-[10px] text-slate-500">
+                  Akses login admin diserahkan lewat WhatsApp. Butuh penyesuaian? Balas email
+                  &quot;sudah online&quot; atau hubungi kami.
+                </p>
+                <p className="text-[11px]">
+                  <Link
+                    href="/panduan"
+                    className="font-bold text-emerald-800 underline underline-offset-2 hover:text-emerald-950"
+                  >
+                    Baca Panduan Klien →
+                  </Link>
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-center">
+                <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-600" />
+                <h3 className="text-sm font-extrabold text-emerald-900">
+                  ✅ Pembayaran Terverifikasi — Website Sedang Disiapkan
+                </h3>
+                <p className="text-[11px] text-slate-600">
+                  Website Anda diupayakan online paling lambat <strong>1×24 jam pada hari kerja</strong>.
+                  Alamat lengkapnya kami kabarkan lewat email dan WhatsApp begitu situs benar-benar
+                  bisa dibuka — kami tidak akan mengirim alamat yang belum aktif.
+                </p>
+                <p className="text-[10px] text-slate-500">
+                  Nama alamat Anda: <code className="font-mono font-bold text-slate-900">{order.desired_slug}</code>
+                  {' · '}Akses login diserahkan lewat WhatsApp.
+                </p>
+                <p className="text-[11px]">
+                  <Link
+                    href="/panduan"
+                    className="font-bold text-emerald-800 underline underline-offset-2 hover:text-emerald-950"
+                  >
+                    Baca Panduan Klien →
+                  </Link>
+                </p>
+              </div>
+            )
           )}
 
           {/* Form Upload Bukti Bayar — hidden when activated or canceled (H3: expired tetap bisa upload) */}

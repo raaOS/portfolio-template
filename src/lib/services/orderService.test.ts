@@ -737,9 +737,10 @@ describe('orderService', () => {
       expect(payload.parse_mode).toBe('HTML');
       expect(payload.text).toContain('TIKET KERJA');
       expect(payload.text).toContain('PENGELOLA_KLIEN.bat');
-      // URL tiket = alamat masa depan klien (workers.dev), bukan rute tenant
-      // di domain toko yang sudah dihapus.
-      expect(payload.text).toContain('tiket-site.workers.dev');
+      // Tiket TIDAK memuat alamat situs: alamat asli (slug.subdomain-akun
+      // .workers.dev) baru diketahui portal setelah deploy — jangan menebak.
+      expect(payload.text).toContain('tercatat otomatis setelah deploy');
+      expect(payload.text).not.toContain('tiket-site.workers.dev');
       expect(payload.text).toContain('nanda@test.com');
     });
 

@@ -29,7 +29,7 @@ interface SiteRow {
  * Halaman utama `/` punya dua wajah, dipilah saat build per deployment:
  *
  * - Storefront (makeitbetter.my.id): halaman penjualan template.
- * - Website klien (`<slug>.workers.dev` + custom domain): portofolio milik
+ * - Website klien (`<slug>.<subdomain>.workers.dev` + custom domain): portofolio milik
  *   klien, dirender dari data D1 deployment ini sendiri (SITE_ID).
  *
  * Konsep lama `/<slug>` di domain owner sudah dihapus — tidak ada lagi

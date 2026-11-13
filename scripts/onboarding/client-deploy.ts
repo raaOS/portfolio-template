@@ -897,7 +897,11 @@ export async function deployClient(options: DeployClientOptions): Promise<Deploy
   const clientName =
     config.CUSTOMER_NAME || config.CUSTOMER_SLUG || path.basename(path.dirname(configPath));
   const slug = config.CUSTOMER_SLUG || '';
-  const websiteUrl = config.WEBSITE_URL || (slug ? `https://${slug}.workers.dev` : '');
+  // URL provisional: hormati WORKERS_SUBDOMAIN bila sudah tercatat — jangan
+  // pernah menebak `slug.workers.dev` polos (alamat asli selalu menyertakan
+  // subdomain akun klien). Kosong = pemanggil yang menentukan (biar tidak
+  // mencatat alamat palsu ke mana pun).
+  const websiteUrl = config.WEBSITE_URL || (slug ? workersDevUrl(config) : '');
 
   // R4: slug dipakai sebagai nama Worker dan nama berkas wrangler — tolak
   // sebelum menyentuh filesystem daripada menulis ke path yang tak diharapkan.

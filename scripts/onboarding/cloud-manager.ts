@@ -758,7 +758,9 @@ async function handleUpdate() {
       onLog: (line) => console.log(`   [deploy] ${line}`),
     });
 
-    const url = outcome.websiteUrl || `https://${t.slug}.workers.dev`;
+    // Jangan menebak alamat (`slug.workers.dev` polos hampir pasti salah —
+    // alamat asli menyertakan subdomain akun klien). Tampilkan penanda jujur.
+    const url = outcome.websiteUrl || '(alamat belum terbaca — cek config.env klien)';
     if (outcome.ok) {
       console.log(`✓ BERHASIL: ${t.name} telah diupdate ke template terbaru (${url}).`);
       results.push({ name: t.name, slug: t.slug, success: true, url });

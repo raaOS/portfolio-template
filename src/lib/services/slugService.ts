@@ -99,14 +99,27 @@ export async function isSlugAvailable(
 
   // 2. Check active pending/reserved orders table
   const orderRows = await queryD1<{ id: string }>(
-    `SELECT id FROM orders 
-     WHERE LOWER(desired_slug) = ? 
-     AND status IN ('pending_payment', 'waiting_verification', 'activating') 
+    `SELECT id FROM orders
+     WHERE LOWER(desired_slug) = ?
+     AND status IN ('pending_payment', 'waiting_verification', 'activating')
      AND datetime(expires_at) > datetime('now')`,
     [normalized]
   );
 
   if (orderRows.length > 0) {
+    return false;
+  }
+
+  // 3. Slug milik order yang sudah dibayar (`activated`) tidak dijual ulang —
+  // bahkan saat situsnya belum di-deploy (`site_url` masih kosong). Situs
+  // nyata hidup di D1 KLIEN, bukan D1 owner, jadi cek #1 tidak menahannya
+  // (audit alur bisnis 2026-11-13).
+  const activatedRows = await queryD1<{ id: string }>(
+    `SELECT id FROM orders WHERE LOWER(desired_slug) = ? AND status = 'activated' LIMIT 1`,
+    [normalized]
+  );
+
+  if (activatedRows.length > 0) {
     return false;
   }
 

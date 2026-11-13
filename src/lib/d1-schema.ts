@@ -119,6 +119,10 @@ export const D1_SCHEMA_QUERIES = [
     cancel_reason TEXT,
     access_token_hash TEXT,
     status TEXT NOT NULL DEFAULT 'pending_payment',
+    -- Bukti serah terima: diisi portal onboarding SETELAH deploy sukses.
+    -- status 'activated' hanya berarti pembayaran terverifikasi, belum online.
+    site_url TEXT,
+    provisioned_at TEXT,
     expires_at TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
@@ -162,9 +166,15 @@ export const D1_SCHEMA_QUERIES = [
   `CREATE INDEX IF NOT EXISTS idx_projects_site_status_order ON projects(site_id, status, order_index);`,
   `CREATE INDEX IF NOT EXISTS idx_projects_site_slug ON projects(site_id, slug);`,
   `CREATE INDEX IF NOT EXISTS idx_media_site_project_order ON media_assets(site_id, project_id, sort_order);`,
-  // Slug bebas dipakai ulang setelah order diaktifkan (aktivasi membuat situs
-  // nyata di tabel `sites` yang punya index slug sendiri). Include 'activated'
-  // membuat slug terkunci selamanya — sumber temuan audit #5.
+  // Index ini hanya menjaga BALAPAN dua checkout bersamaan (INSERT race) pada
+  // status aktif. Slug yang sudah `activated` TIDAK ikut di index — D1 owner
+  // tidak pernah berisi baris `sites` milik klien (situs klien hidup di D1
+  // klien), jadi penjualan ganda slug yang sudah diserahkan dicegah di lapisan
+  // aplikasi (`slugService.isSlugAvailable` ikut memeriksa status `activated`;
+  // audit alur bisnis 2026-11-13). Sengaja tidak menambahkan 'activated' ke
+  // partial index: self-heal DROP lalu CREATE index tiap boot — kalau data lama
+  // punya slug activated ganda, CREATE gagal diam-diam dan justru meniadakan
+  // proteksi race-nya.
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_desired_slug_active ON orders(desired_slug) WHERE status IN ('pending_payment', 'waiting_verification', 'activating');`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_amount_active ON orders(amount) WHERE status IN ('pending_payment', 'waiting_verification', 'activating');`,
   `CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);`,
