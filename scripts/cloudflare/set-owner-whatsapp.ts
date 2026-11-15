@@ -1,19 +1,40 @@
 /**
- * Set / ganti nomor WhatsApp owner di D1 OWNER (key `owner_whatsapp` di
- * `platform_settings`). Dipakai tombol "Chat Admin", "Bantuan WA (Terlanjur
- * Bayar)" di halaman order, dan wizard aktivasi R2 (`getOwnerWhatsapp`).
+ * Set / ganti nomor WhatsApp owner (key `owner_whatsapp` di `platform_settings`).
+ * Dipakai tombol "Chat Admin", "Bantuan WA (Terlanjur Bayar)" di halaman order,
+ * dan wizard aktivasi R2 (`getOwnerWhatsapp`).
  *
  * Pemakaian:
- *   npx tsx scripts/cloudflare/set-owner-whatsapp.ts 08817472310
+ *   npx tsx scripts/cloudflare/set-owner-whatsapp.ts 08817472310          # D1 OWNER
+ *   npx tsx scripts/cloudflare/set-owner-whatsapp.ts 08817472310 --client <folder-arsip>
+ *                                                                         # D1 KLIEN (wizard R2)
+ *   Tanpa nomor = tampilkan nilai saat ini (read-only, D1 owner).
  *
  * Format diterima: 08xx / 628xx / +628xx — otomatis dinormalisasi ke 628xx.
- * TANPA flag apa pun script ini hanya menampilkan nilai saat ini (read-only).
+ *
+ * Kenapa perlu mode --client: wizard R2 klien membaca `platform_settings` milik
+ * D1 KLIEN (getOwnerWhatsapp dijalankan di deployment klien), yang hanya terisi
+ * saat onboarding bila ADMIN_WHATSAPP ada di .env.local. Klien yang di-onboard
+ * sebelum nomor tercatat (mis. gladi) perlu diisi manual lewat mode ini.
  *
  * Catatan owner 2026-11-14: nomor 628817472310 SEMENTARA — akan diganti suatu
- * saat. Jalankan ulang script ini dengan nomor baru (tidak perlu deploy).
+ * saat. Jalankan ulang script ini (D1 owner + semua arsip klien aktif).
  */
+import fs from 'node:fs';
+import path from 'node:path';
 import { loadProductEnv } from './product-env';
 import { getCurrentD1DatabaseId, queryD1ForDatabase } from './backup-common';
+
+const ROOT_DIR = path.resolve(__dirname, '..', '..');
+const ARCHIVE_DIR = path.join(ROOT_DIR, 'arsip-klien');
+
+function parseEnv(raw: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const line of raw.split(/\r?\n/)) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*"([^"]*)"\s*$/);
+    if (m) out[m[1]] = m[2];
+  }
+  return out;
+}
 
 function normalize(raw: string): { ok: true; value: string } | { ok: false; error: string } {
   let digits = raw.replace(/\D/g, '');
@@ -26,13 +47,44 @@ function normalize(raw: string): { ok: true; value: string } | { ok: false; erro
 
 async function main() {
   loadProductEnv();
+
+  const rawArgs = process.argv.slice(2);
+  const clientIdx = rawArgs.indexOf('--client');
+  const clientFolder = clientIdx >= 0 ? rawArgs[clientIdx + 1] : '';
+  const positional = rawArgs.filter((a, i) => a !== '--client' && i !== clientIdx + 1);
+  const raw = positional[0];
+
+  // Mode klien: override kredensial env ke akun Cloudflare klien dari arsip
+  // sebelum queryD1ForDatabase dipakai (helper membaca env di waktu panggilan).
+  let targetLabel = 'D1 owner';
+  if (clientFolder) {
+    const envPath = path.join(ARCHIVE_DIR, clientFolder, 'config.env');
+    if (!fs.existsSync(envPath)) {
+      console.error(`✗ config.env tidak ditemukan di arsip-klien/${clientFolder}.`);
+      process.exit(1);
+    }
+    const clientEnv = parseEnv(fs.readFileSync(envPath, 'utf-8'));
+    const accountId = clientEnv.CLOUDFLARE_ACCOUNT_ID;
+    const apiToken = clientEnv.CLOUDFLARE_API_TOKEN;
+    const databaseId = clientEnv.CLOUDFLARE_D1_DATABASE_ID;
+    if (!accountId || !apiToken || !databaseId) {
+      console.error(
+        `✗ config.env ${clientFolder} tidak lengkap (butuh CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN, CLOUDFLARE_D1_DATABASE_ID).`
+      );
+      process.exit(1);
+    }
+    process.env.CLOUDFLARE_ACCOUNT_ID = accountId;
+    process.env.CLOUDFLARE_D1_API_TOKEN = apiToken;
+    process.env.CLOUDFLARE_D1_DATABASE_ID = databaseId;
+    targetLabel = `D1 klien ${clientFolder}`;
+  }
+
   const databaseId = getCurrentD1DatabaseId();
   if (!databaseId) {
-    console.error('✗ Database D1 owner tidak ditemukan di env (CLOUDFLARE_D1_DATABASE_ID).');
+    console.error(`✗ Database ${targetLabel} tidak ditemukan (CLOUDFLARE_D1_DATABASE_ID).`);
     process.exit(1);
   }
 
-  const raw = process.argv[2];
   if (!raw) {
     // Read-only: tampilkan nilai saat ini.
     const rows = await queryD1ForDatabase<{ value: string }>(
@@ -40,9 +92,9 @@ async function main() {
       `SELECT value FROM platform_settings WHERE key = 'owner_whatsapp' LIMIT 1`
     );
     console.log(
-      rows.length > 0
-        ? `Nomor WA owner saat ini: ${rows[0].value}`
-        : 'owner_whatsapp belum diisi di platform_settings.'
+      `${targetLabel} — nomor WA owner saat ini: ${
+        rows.length > 0 ? rows[0].value : 'owner_whatsapp belum diisi.'
+      }`
     );
     return;
   }
@@ -70,7 +122,7 @@ async function main() {
   );
   const written = rows[0]?.value ? (JSON.parse(rows[0].value) as { number?: string }) : null;
   if (written?.number === check.value) {
-    console.log(`✓ owner_whatsapp terpasang: ${check.value} (terverifikasi baca balik).`);
+    console.log(`✓ owner_whatsapp terpasang di ${targetLabel}: ${check.value} (terverifikasi baca balik).`);
   } else {
     console.error(`✗ Verifikasi gagal — nilai di DB: ${rows[0]?.value}`);
     process.exit(1);
