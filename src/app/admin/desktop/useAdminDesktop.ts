@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import type { AdminWindowState, AdminDesktopActions } from './types';
 import { ADMIN_ZONES } from './registry';
+import { filterZonesByTemplate } from './templateScope';
+import { useActiveTemplate } from './useActiveTemplate';
 
 let nextZIndex = 100;
 
@@ -45,30 +47,39 @@ export function useAdminDesktop() {
   const [windows, setWindows] = useState<AdminWindowState[]>([]);
   const windowCountRef = useRef(0);
 
-  const openApp: AdminDesktopActions['openApp'] = useCallback((_zoneId: string, appId: string) => {
-    // Check if app is already open
-    setWindows((prev) => {
-      const existing = prev.find((w) => w.appId === appId);
-      if (existing) {
-        // Bring to front & unminimize
-        nextZIndex++;
-        return prev.map((w) =>
-          w.id === existing.id ? { ...w, zIndex: nextZIndex, isMinimized: false } : w
-        );
-      }
+  // Cakupan template deployment ini (runtime, fail-open). App yang kontennya
+  // tidak ditampilkan template aktif disaring keluar sebelum desktop dibentuk.
+  const { activeTemplate, isLoaded: isTemplateLoaded } = useActiveTemplate();
+  const zones = useMemo(
+    () => filterZonesByTemplate(ADMIN_ZONES, activeTemplate),
+    [activeTemplate]
+  );
 
-      // Find app definition from registry
-      let appDef = null;
-      let zone = null;
-      for (const z of ADMIN_ZONES) {
-        const found = z.apps.find((a) => a.id === appId);
-        if (found) {
-          appDef = found;
-          zone = z;
-          break;
+  const openApp: AdminDesktopActions['openApp'] = useCallback(
+    (_zoneId: string, appId: string) => {
+      // Check if app is already open
+      setWindows((prev) => {
+        const existing = prev.find((w) => w.appId === appId);
+        if (existing) {
+          // Bring to front & unminimize
+          nextZIndex++;
+          return prev.map((w) =>
+            w.id === existing.id ? { ...w, zIndex: nextZIndex, isMinimized: false } : w
+          );
         }
-      }
-      if (!appDef || !zone) return prev;
+
+        // Find app definition from registry (sudah tersaring per template aktif)
+        let appDef = null;
+        let zone = null;
+        for (const z of zones) {
+          const found = z.apps.find((a) => a.id === appId);
+          if (found) {
+            appDef = found;
+            zone = z;
+            break;
+          }
+        }
+        if (!appDef || !zone) return prev;
 
       windowCountRef.current++;
       nextZIndex++;
@@ -95,8 +106,10 @@ export function useAdminDesktop() {
       };
 
       return [...prev, newWindow];
-    });
-  }, []);
+      });
+    },
+    [zones]
+  );
 
   const closeWindow: AdminDesktopActions['closeWindow'] = useCallback((windowId) => {
     setWindows((prev) => prev.filter((w) => w.id !== windowId));
@@ -138,7 +151,7 @@ export function useAdminDesktop() {
         );
       }
 
-      const zone = ADMIN_ZONES.find((z) => z.id === zoneId);
+      const zone = zones.find((z) => z.id === zoneId);
       if (!zone) return prev;
 
       windowCountRef.current++;
@@ -169,7 +182,7 @@ export function useAdminDesktop() {
 
       return [...prev, newWindow];
     });
-  }, []);
+  }, [zones]);
 
   /**
    * Susun 4 zone sebagai ubin responsif (v1.3.80): 2×2 di tablet/desktop,
@@ -182,7 +195,7 @@ export function useAdminDesktop() {
 
     setWindows((prev) => {
       const next = [...prev];
-      ADMIN_ZONES.forEach((zone, index) => {
+      zones.forEach((zone, index) => {
         const folderAppId = `folder-${zone.id}`;
         const quadrant = QUADRANT_ORDER.indexOf(zone.id);
         const slot = (quadrant === -1 ? index : quadrant) % 4;
@@ -210,18 +223,23 @@ export function useAdminDesktop() {
       });
       return next;
     });
-  }, []);
+  }, [zones]);
 
   // Auto-open saat desktop dimuat. Timer (bukan setState sinkron di effect)
   // agar lolos lint react-hooks/set-state-in-effect; dedup `folder-<zoneId>`
   // bawaan membuat aman terhadap StrictMode double-invoke.
+  // Gate isTemplateLoaded: ubin zone baru dibentuk SETELAH template aktif
+  // diketahui, supaya app yang tersaring tidak pernah sempat muncul lalu
+  // hilang (flash) di layar admin.
   useEffect(() => {
+    if (!isTemplateLoaded) return;
     const timer = setTimeout(layoutZones, 0);
     return () => clearTimeout(timer);
-  }, [layoutZones]);
+  }, [layoutZones, isTemplateLoaded]);
 
   // Resize / rotasi perangkat → hitung ulang ubin supaya tetap rapi.
   useEffect(() => {
+    if (!isTemplateLoaded) return;
     let raf = 0;
     const onResize = () => {
       cancelAnimationFrame(raf);
@@ -232,7 +250,7 @@ export function useAdminDesktop() {
       window.removeEventListener('resize', onResize);
       cancelAnimationFrame(raf);
     };
-  }, [layoutZones]);
+  }, [layoutZones, isTemplateLoaded]);
 
   const actions: AdminDesktopActions = {
     openApp,

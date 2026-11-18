@@ -17,6 +17,20 @@ vi.mock('@/components/os/ui/ProjectDetailWrapper', () => ({
   ),
 }));
 
+// Mock chat macOS (FullPageChat) — cukup verifikasi disematkan + mapping email kontak
+vi.mock('@/components/chat/FullPageChat', () => ({
+  default: ({ contactInfo }: { contactInfo?: { email?: string } }) => (
+    <div data-testid="full-page-chat">Chat: {contactInfo?.email ?? ''}</div>
+  ),
+}));
+
+// Mock FlowchartProcess (komponen flowchart berat) — cukup verifikasi ter-render
+vi.mock('@/components/ui/FlowchartProcess', () => ({
+  FlowchartProcess: ({ workflowSteps }: { workflowSteps: unknown[] }) => (
+    <div data-testid="flowchart-process">{workflowSteps.length} langkah</div>
+  ),
+}));
+
 let mockIsAdmin = false;
 const mockCsrfToken = 'test-csrf-token';
 
@@ -77,7 +91,33 @@ function createMockData(projectCount: number = 21): PortfolioTemplateData {
           content: 'Desainer dan engineer yang berfokus pada web modern.',
         },
       },
-      softSkills: {},
+      softSkills: {
+        items: [
+          {
+            text: 'Komunikasi',
+            description: 'Menjelaskan ide dengan jelas.',
+          },
+        ],
+      },
+      designPhilosophy: {
+        heading: 'Design Philosophy',
+        subheading: 'Strategic Thinking Framework',
+        workflowSteps: [
+          {
+            id: 'step-1',
+            number: '01',
+            title: 'Riset',
+            subtitle: 'Pahami masalah',
+            description: 'Riset pengguna dan konteks.',
+            type: 'phase',
+            color: 'amber',
+            icon: 'search',
+            subSteps: [],
+            nextSteps: [],
+            loopTargets: [],
+          },
+        ],
+      },
       lastUpdated: '2026-01-01T00:00:00.000Z',
     },
     projects,
@@ -264,6 +304,12 @@ describe('InfiniteCanvasRenderer', () => {
     expect(screen.getByText('Tentang Saya')).toBeInTheDocument();
     expect(screen.getByText('TypeScript')).toBeInTheDocument();
     expect(screen.getByText('Lead Designer')).toBeInTheDocument();
+
+    // Parity macOS: soft skills + design philosophy ikut tampil di panel About
+    expect(screen.getByText('Komunikasi')).toBeInTheDocument();
+    expect(screen.getByText('Menjelaskan ide dengan jelas.')).toBeInTheDocument();
+    expect(screen.getByText('Design Philosophy')).toBeInTheDocument();
+    expect(screen.getByTestId('flowchart-process')).toHaveTextContent('1 langkah');
   });
 
   it('membuka slide drawer kiri ketika ikon Hubungi Saya di Dock diklik', () => {
@@ -274,8 +320,12 @@ describe('InfiniteCanvasRenderer', () => {
     const contactBtn = screen.getByRole('button', { name: /hubungi saya/i });
     fireEvent.click(contactBtn);
 
+    // Info kontak statis tetap tampil...
     expect(screen.getByText('halo@studiokreatif.com')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/tuliskan pesan atau ide kolaborasi/i)).toBeInTheDocument();
+
+    // ...dan form mailto telah diganti chat macOS (FullPageChat) dengan email kontak ter-mapping
+    expect(screen.getByTestId('full-page-chat')).toBeInTheDocument();
+    expect(screen.getByTestId('full-page-chat')).toHaveTextContent('Chat: halo@studiokreatif.com');
   });
 
   it('membuka slide drawer kiri ketika ikon WA di Dock diklik', () => {

@@ -2,6 +2,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { useAdminDesktop } from './useAdminDesktop';
 
+// Stub template aktif mode fail-open (semua app tampil) — fokus test ini
+// tata letak ubin 2×2, bukan penyaringan templateScope (test terpisah).
+vi.mock('./useActiveTemplate', () => ({
+  useActiveTemplate: () => ({ activeTemplate: null, isLoaded: true }),
+}));
+
 /** Stub window.innerWidth/innerHeight (pola positionSync.test.ts). */
 function setViewport(width: number, height: number) {
   Object.defineProperty(window, 'innerWidth', { value: width, configurable: true });

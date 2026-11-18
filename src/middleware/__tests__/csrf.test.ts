@@ -72,7 +72,6 @@ describe('checkCSRF middleware', () => {
       '/api/hard-skills',
       '/api/gallery/featured',
       '/api/settings',
-      '/api/leads',
     ])('rejects %s PUT without csrf_token cookie', (pathname) => {
       const result = checkCSRF(buildRequest(pathname, 'PUT'));
       expect(result.isValid).toBe(false);

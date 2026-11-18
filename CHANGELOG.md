@@ -3,6 +3,46 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.90] - 2026-11-15
+
+### Dashboard Admin Kini Menyesuaikan Template yang Ter-Deploy: Badge Cakupan + Filter Otomatis + Peta Fitur
+
+Menutup kegelisahan owner: "kalau buat fitur baru di template canvas, CRUD-nya muncul di mana / punya siapa?". Sebelumnya dashboard admin **buta template** — klien yang aktif templatenya infinite-canvas tetap melihat 20 app termasuk yang kontennya tak pernah tampil (Sistem Dock, File Explorer, dll.), dan tidak ada tanda mana punya. Kini setiap app punya **cakupan template** dan dashboard menyesuaikannya sendiri.
+
+- **Badge cakupan di setiap app** yang tidak lintas template — chip kecil "macOS saja" / "macOS + Spatial saja" di folder admin. App lintas template (Proyek Karya, Info Profil, dll.) tanpa chip = jelas "semua template". Sekali lirik, langsung tahu mana punya.
+- **Filter otomatis per deployment (runtime, bukan build):** desktop admin klien membaca `sites.active_template_key` dari D1 klien via endpoint baru `GET /api/admin/site-template`, lalu app yang scopenya tidak mencakup template aktif **tidak muncul sama sekali**. Klien canvas hanya melihat CRUD canvas — persis perilaku "deploy canvas, CRUD menyesuaikan" yang diinginkan owner, tanpa varian build per template.
+- **Fail-open yang disengaja:** bila D1 sesaat gagal, SEMUA app tetap tampil (`activeTemplateKey: null`) — error tidak pernah menyembunyikan CRUD dari admin. Ubin zona juga baru dibentuk setelah template diketahui, jadi tidak ada app yang sempat muncul lalu hilang.
+- **App baru "Peta Fitur & Template"** (zona Sistem, read-only): tabel lengkap 15 CRUD konten × 3 template dengan catatan split (wallpaper=macOS, objek 3D=spatial) — dokumentasi hidup untuk owner & klien.
+- **Pemetaan scope mengikuti audit konten CRUD 2026-11-15:** macOS-only = Arsip Galeri, Label & Tag, File Explorer, Event Pages, Sistem Dock, Widget & Catatan, Feedback; split = Tampilan; sisanya lintas template. Scope baru tinggal ditulis satu baris di registry saat membuat fitur.
+
+**Bukti:** `npx tsc --noEmit` 0 error, ESLint bersih, test 33/33 PASS (27 baru: filter fail-open/mutasi-aman/label + guard scope registry + endpoint 401/D1/nilai-asing/fail-open). Detail: `docs/tracker/logs/fitur_template_scope_admin_2026_11_15.md`.
+
+## [1.3.89] - 2026-11-15
+
+### Panel "Pesan Masuk" Dihapus — Panel yang Selalu Kosong Tidak Lagi Menyesatkan Klien
+
+Audit dashboard menemukan panel **Pesan Masuk** (zona Komunikasi) tidak pernah bisa terisi: endpoint bacanya (`GET /api/leads`) **tidak punya satu pun kode di seluruh repo yang menulis data** ke sana — pesan chat pengunjung asli masuk ke sistem chat (`/api/chat/send` → D1), bukan ke leads. Akibatnya klien melihat panel yang selamanya kosong seolah ada pesan hilang. Atas keputusan owner, panel dihapus total (route + panel + query), bukan ditambal.
+
+- **Yang dihapus:** app "Pesan Masuk" dari desktop admin (registry + renderer), halaman `/admin/communications/messages`, `AdminLeadsClient`, `GET /api/leads` + test-nya, kunci query `leads`/`fetchAdminLeads` di admin prefetch, dan kasus `/api/leads` dari test CSRF.
+- **Redirect `/admin/communications` kini menuju "WhatsApp & Notif".** Zona Komunikasi tersisa 3 app: WhatsApp & Notif, Feedback, Info Kontak.
+- **Tidak ada yang hilang dari alur hidup:** pesan pengunjung tetap masuk sistem chat (dan via jembatan WhatsApp ke WA klien — jalur utama penjualan chat-first v1.3.40). Fondasi inbox chat (`chatStore.addAdminReply`) tetap ada bila kelak dibangun panel baca-balas chat sungguhan.
+- Tabel zona admin di `AGENTS.md` diselaraskan (Komunikasi 3 app; Tampilan ditambah Loader yang sebelumnya tertinggal).
+
+**Bukti:** `npx tsc --noEmit` 0 error, ESLint bersih, test terdampak PASS (registry + CSRF = 31/31; nol referensi tersisa ke `leads`/`AdminLeadsClient` di seluruh `src`). Detail: `docs/tracker/logs/hapus_panel_pesan_masuk_2026_11_15.md`.
+
+## [1.3.88] - 2026-11-15
+
+### Template Infinite Canvas & Spatial Gallery Kini Menampilkan Konten CRUD Lengkap Setara Demo macOS
+
+Panel admin dibangun di atas demo template macOS, tapi 2 template lain hanya menampilkan sebagian konten — klien yang memilih template non-macOS tidak mendapat nilai penuh dari panel admin (profil, testimoni, keahlian, pengalaman). Kini **ketiga template merender konten inti CRUD yang sama**. Dock macOS tetap fitur eksklusif demo macOS (keputusan owner, tidak diporting).
+
+- **Infinite Canvas — kontak kini chat macOS asli, bukan mailto.** Panel "Hubungi Saya" menampilkan `FullPageChat` yang sama persis dengan jendela Contact demo macOS: pesan pengunjung masuk sistem chat admin dan bisa dibalas langsung (di situs klien; di situs demo owner tetap mode simulasi). Form mailto lama dihapus — pesan tidak lagi hilang ke klien email pengunjung. Info kontak (email, telepon, lokasi, media sosial) tetap tampil di atas chat.
+- **Infinite Canvas — panel About diperkaya 2 section baru:** **Keahlian Interpersonal** (soft skills) dan **Design Philosophy** (flowchart alur kerja) — keduanya sebelumnya hanya ada di demo macOS. Data sudah tersedia dari panel admin Info Profil tanpa perubahan skema.
+- **Spatial Gallery — overlay konten lengkap pertama kalinya.** Template 3D yang sebelumnya hanya menampilkan galeri kini punya **tab bar mini melayang (kanan-atas)** dengan 5 panel slide-over gelap bergaya jendela macOS: **Tentang Saya** (profil, availability, bio), **Hubungi Saya** (info kontak + chat macOS), **Testimoni**, **Keahlian** (teknis + interpersonal), dan **Riwayat Karir** (CV). Plus sakelar bahasa ID/EN dan label yang kini ikut locale (sebelumnya hardcode). Mesin 3D tidak disentuh sama sekali — scene tetap berputar di belakang panel.
+- **Detail project sudah lama identik di 3 template** (narasi, galeri, komentar, likes) — tidak diubah; penyamaan ini murni menambah konten yang belum tampil.
+
+**Bukti:** `npx tsc --noEmit` 0 error, `npm run lint` bersih, `npx vitest run src/components/templates` **21/21 PASS** (13 canvas + 8 spatial baru). Verifikasi browser di `/preview/spatial-gallery` & `/preview/infinite-canvas`: kelima panel tampil dengan data asli, pesan uji terkirim via chat, dan demo macOS (`/preview/os-desktop`) tidak berubah. Detail pekerjaan: `docs/tracker/logs/fitur_penyamaan_konten_template_2026_11_15.md`.
+
 ## [1.3.87] - 2026-11-14
 
 ### Dua Cacat Audit Terakhir Ditutup: Refund Bocor Diam-Diam (#8) + Janji Waktu dan Jendela Refund (#9)

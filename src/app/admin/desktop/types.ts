@@ -1,5 +1,11 @@
 import type { LucideIcon } from 'lucide-react';
 
+/**
+ * Template yang dikonsumsi sebuah app admin. Nilainya = key template di
+ * `sites.active_template_key` / `src/lib/templates/registry.ts`.
+ */
+export type TemplateScope = 'os-desktop' | 'infinite-canvas' | 'spatial-gallery';
+
 // ─── Window state for each open CRUD window ───
 export interface AdminWindowState {
   id: string;
@@ -32,6 +38,16 @@ export interface AdminApp {
    * dari `ADMIN_ZONES` (lihat `registry.ts` + `src/lib/ownerMode.ts`).
    */
   ownerOnly?: boolean;
+  /**
+   * Cakupan template: app hanya relevan untuk template yang terdaftar di sini.
+   * Tidak diset (undefined) = tampil di semua template.
+   *
+   * Disaring RUNTIME di desktop admin berdasarkan `sites.active_template_key`
+   * deployment ini (endpoint `/api/admin/site-template` + `templateScope.ts`)
+   * — bukan saat build — sehingga satu bundle tetap melayani semua template
+   * dan dashboard otomatis menyesuaikan template yang aktif.
+   */
+  templateScope?: TemplateScope[];
 }
 
 // ─── Zone (folder) definition ───

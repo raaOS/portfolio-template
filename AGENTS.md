@@ -597,8 +597,10 @@ npx wrangler deploy --config .open-next/wrangler.client.<slug>.jsonc
 |---|---|
 | **Konten & Berkas** | Projects, Profile, Experience, Skills, Archive, Labels, Explorer, Event Pages |
 | **Sistem** | AI, Analytics, Activity Log, Backup, Harga Jual, Orders |
-| **Tampilan** | Appearance, Dock, Widgets |
-| **Komunikasi** | Notifications, Messages, Feedback, Contacts |
+| **Tampilan** | Appearance, Dock, Widgets, Loader |
+| **Komunikasi** | Notifications, Feedback, Contacts |
+
+> App "Pesan Masuk" (panel leads) dihapus 2026-11-15 (v1.3.89): `GET /api/leads` tidak punya writer di repo sehingga panel selalu kosong — menyesatkan bagi klien. Data visitor chat tetap tersimpan (`chatStore`); balasan admin (`addAdminReply`) siap dipakai bila kelak dibangun inbox chat.
 
 > Zone "Sistem & Tampilan" lama (10 app) dipecah jadi **Sistem** + **Tampilan** pada 2026-10-09 atas keputusan owner (3 → 4 zone); definisi zona = data di `src/app/admin/desktop/registry.ts` (`ADMIN_ZONES`).
 

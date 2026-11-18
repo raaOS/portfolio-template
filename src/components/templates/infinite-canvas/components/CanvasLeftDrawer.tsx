@@ -9,7 +9,6 @@ import {
   StickyNote,
   Phone,
   MapPin,
-  Send,
   Star,
   Cpu,
   Briefcase,
@@ -18,10 +17,18 @@ import {
   Plus,
   Minus,
   Trash2,
+  Lightbulb,
+  Sparkles,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage } from '@/contexts/LanguageContext';
-import type { AboutData } from '@/types/about';
+import FullPageChat from '@/components/chat/FullPageChat';
+import { FlowchartProcess } from '@/components/ui/FlowchartProcess';
+import {
+  localizeText,
+  localizeWorkflowSteps,
+} from '@/lib/i18n/contentLocalization';
+import type { AboutData, SoftSkillItem } from '@/types/about';
 import type { HardSkill } from '@/types/hardSkill';
 import type { WorkExperience } from '@/types/experience';
 import type { ContactData } from '@/types/contact';
@@ -68,9 +75,6 @@ export function CanvasLeftDrawer({
 }: CanvasLeftDrawerProps) {
   const { locale } = useLanguage();
   const [copiedEmail, setCopiedEmail] = useState(false);
-  const [contactSubject, setContactSubject] = useState('');
-  const [contactMessage, setContactMessage] = useState('');
-  const [contactSent, setContactSent] = useState(false);
 
   // Local Sticky Notes state with localStorage persistence
   const [notes, setNotes] = useState<QuickNote[]>(() => {
@@ -173,16 +177,31 @@ export function CanvasLeftDrawer({
     }
   };
 
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!contactMessage.trim()) return;
-    const mailto = `mailto:${email}?subject=${encodeURIComponent(
-      contactSubject || 'Inquiry dari Portfolio'
-    )}&body=${encodeURIComponent(contactMessage)}`;
-    window.open(mailto, '_blank');
-    setContactSent(true);
-    setTimeout(() => setContactSent(false), 4000);
+  // Kontak untuk chat macOS (FullPageChat) — pola sama dengan ContactWindow OS:
+  // pesan visitor dikirim via /api/chat/send dan masuk sistem chat admin.
+  const chatContactInfo = {
+    email: contact?.info?.email,
+    socialMedia: contact?.info?.socialMedia,
+    headline: localizeText(contact?.content?.headline, locale),
+    subtext: localizeText(contact?.content?.subtext, locale),
   };
+
+  // Normalisasi soft skills (pola InterestsTab OS): items baru, fallback teks lama.
+  const softSkills: SoftSkillItem[] =
+    about?.softSkills?.items ||
+    about?.softSkills?.texts?.map((text, i) => ({
+      text,
+      description: about?.softSkills?.descriptions?.[i] || '',
+      isDraft: false,
+    })) ||
+    [];
+  const visibleSoftSkills = softSkills.filter((item) => !item.isDraft);
+
+  // Design philosophy workflow (pola PhilosophyTab OS) — flowchart reuse.
+  const philosophy = about?.designPhilosophy;
+  const philosophySteps = philosophy?.workflowSteps
+    ? localizeWorkflowSteps(philosophy.workflowSteps, locale)
+    : [];
 
   // Title per panel
   const panelTitles: Record<CanvasLeftPanelType, { title: string; subtitle: string; icon: React.ReactNode }> = {
@@ -373,6 +392,36 @@ export function CanvasLeftDrawer({
                     </div>
                   )}
 
+                  {/* Soft Skills (Interpersonal) — parity panel Skillset macOS */}
+                  {visibleSoftSkills.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-neutral-700 dark:text-neutral-300" />
+                        <h3 className="text-xs font-mono uppercase tracking-wider text-neutral-700 dark:text-neutral-300 font-bold">
+                          {locale === 'en' ? 'Interpersonal Skills' : 'Keahlian Interpersonal'} (
+                          {visibleSoftSkills.length})
+                        </h3>
+                      </div>
+                      <div className="space-y-2">
+                        {visibleSoftSkills.map((item, idx) => (
+                          <div
+                            key={idx}
+                            className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200/70 dark:border-neutral-700/60 space-y-1"
+                          >
+                            <span className="text-neutral-900 dark:text-white text-xs font-bold block">
+                              {localizeText(item.text, locale)}
+                            </span>
+                            {item.description && (
+                              <p className="text-neutral-600 dark:text-neutral-400 text-xs leading-relaxed whitespace-pre-line">
+                                {localizeText(item.description, locale)}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Career Experience */}
                   {experiences && experiences.length > 0 && (
                     <div className="space-y-3">
@@ -404,6 +453,24 @@ export function CanvasLeftDrawer({
                           </div>
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Design Philosophy (flowchart workflow) — parity tab Philosophy macOS */}
+                  {philosophySteps.length > 0 && (
+                    <div className="space-y-3 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+                      <div className="flex items-center gap-2">
+                        <Lightbulb className="w-4 h-4 text-neutral-700 dark:text-neutral-300" />
+                        <h3 className="text-xs font-mono uppercase tracking-wider text-neutral-700 dark:text-neutral-300 font-bold">
+                          {localizeText(philosophy?.heading || 'Design Philosophy', locale)}
+                        </h3>
+                      </div>
+                      {philosophy?.subheading && (
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                          {localizeText(philosophy.subheading, locale)}
+                        </p>
+                      )}
+                      <FlowchartProcess workflowSteps={philosophySteps} />
                     </div>
                   )}
                 </div>
@@ -557,39 +624,16 @@ export function CanvasLeftDrawer({
                     </div>
                   )}
 
-                  {/* Message Form */}
-                  <form onSubmit={handleSendMessage} className="space-y-3 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+                  {/* Chat macOS (FullPageChat) — pesan visitor masuk sistem chat admin,
+                      jalur yang sama dengan jendela Contact di demo macOS (parity). */}
+                  <div className="pt-2 border-t border-neutral-100 dark:border-neutral-800 space-y-3">
                     <h4 className="text-xs font-mono uppercase tracking-wider text-neutral-500 dark:text-neutral-400 font-semibold">
-                      Kirim Pesan Cepat
+                      {locale === 'en' ? 'Send a Message' : 'Kirim Pesan Langsung'}
                     </h4>
-                    <input
-                      type="text"
-                      placeholder="Subjek / Keperluan"
-                      value={contactSubject}
-                      onChange={(e) => setContactSubject(e.target.value)}
-                      className="w-full px-3 py-2 text-xs rounded-xl bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white"
-                    />
-                    <textarea
-                      placeholder="Tuliskan pesan atau ide kolaborasi Anda di sini..."
-                      rows={4}
-                      value={contactMessage}
-                      onChange={(e) => setContactMessage(e.target.value)}
-                      required
-                      className="w-full px-3 py-2 text-xs rounded-xl bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white resize-none"
-                    />
-                    <button
-                      type="submit"
-                      className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-semibold text-xs hover:bg-neutral-800 dark:hover:bg-neutral-100 transition-colors cursor-pointer"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>Kirim via Email</span>
-                    </button>
-                    {contactSent && (
-                      <p className="text-xs text-center text-emerald-600 dark:text-emerald-400 font-medium">
-                        Klien email Anda telah terbuka!
-                      </p>
-                    )}
-                  </form>
+                    <div className="h-[420px] rounded-xl overflow-hidden border border-neutral-200 dark:border-neutral-700">
+                      <FullPageChat embedded contactInfo={chatContactInfo} />
+                    </div>
+                  </div>
                 </div>
               )}
 

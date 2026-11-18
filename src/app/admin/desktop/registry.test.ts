@@ -98,3 +98,48 @@ describe('ADMIN_ZONES owner filter', () => {
     expect(system!.apps.some((a) => a.ownerOnly)).toBe(false);
   });
 });
+
+describe('templateScope registry (audit konten CRUD 2026-11-15)', () => {
+  it('app khas macOS ber-scope os-desktop', async () => {
+    vi.stubEnv('NEXT_PUBLIC_OWNER_MODE', 'true');
+    const zones = await loadZones();
+
+    const macOnly = ['archive', 'labels', 'explorer', 'eventPages', 'dock', 'widgets', 'feedback'];
+    for (const appId of macOnly) {
+      const app = findApp(zones, appId);
+      expect(app, appId).toBeDefined();
+      expect(app!.templateScope, appId).toEqual(['os-desktop']);
+    }
+  });
+
+  it('app split: appearance dipakai macOS + spatial', async () => {
+    vi.stubEnv('NEXT_PUBLIC_OWNER_MODE', 'true');
+    const zones = await loadZones();
+
+    expect(findApp(zones, 'appearance')!.templateScope).toEqual([
+      'os-desktop',
+      'spatial-gallery',
+    ]);
+  });
+
+  it('app lintas template (konten inti) tanpa scope = semua template', async () => {
+    vi.stubEnv('NEXT_PUBLIC_OWNER_MODE', 'true');
+    const zones = await loadZones();
+
+    const universal = [
+      'projects',
+      'profile',
+      'experience',
+      'skills',
+      'loader',
+      'notifications',
+      'contacts',
+      'petaFitur',
+    ];
+    for (const appId of universal) {
+      const app = findApp(zones, appId);
+      expect(app, appId).toBeDefined();
+      expect(app!.templateScope, appId).toBeUndefined();
+    }
+  });
+});

@@ -4,6 +4,8 @@ import React, { Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import AdminLoading from '@/components/admin/AdminLoading';
 import { ADMIN_ZONES } from './registry';
+import { filterZonesByTemplate, getTemplateScopeLabel } from './templateScope';
+import { useActiveTemplate } from './useActiveTemplate';
 import type { AdminDesktopActions } from './types';
 
 // ─── Lazy-loaded CRUD client components ───
@@ -80,11 +82,6 @@ const NotificationsPanel = dynamic(() => import('./panels/NotificationsPanel'), 
   loading: () => <AdminLoading size="page" />,
 });
 
-const MessagesPanel = dynamic(
-  () => import('@/app/admin/communications/messages/AdminLeadsClient'),
-  { ssr: false, loading: () => <AdminLoading size="page" /> }
-);
-
 const FeedbackPanel = dynamic(
   () => import('@/app/admin/communications/feedback/AdminFeedbackClient'),
   { ssr: false, loading: () => <AdminLoading size="page" /> }
@@ -125,6 +122,11 @@ const PetaBisnisPanel = dynamic(() => import('./panels/PetaBisnisPanel'), {
   loading: () => <AdminLoading size="page" />,
 });
 
+const PetaFiturPanel = dynamic(() => import('./panels/PetaFiturPanel'), {
+  ssr: false,
+  loading: () => <AdminLoading size="page" />,
+});
+
 /**
  * Map dari appId ke panel yang dirender di dalam window desktop admin.
  * Di-export untuk guard test coverage (registry vs PANEL_MAP) — app yang
@@ -146,7 +148,6 @@ export const PANEL_MAP: Record<string, React.ComponentType> = {
   loader: LoaderPanel,
   analytics: AnalyticsPanel,
   notifications: NotificationsPanel,
-  messages: MessagesPanel,
   feedback: FeedbackPanel,
   contacts: ContactsPanel,
   activityLog: ActivityLogPanel,
@@ -155,6 +156,7 @@ export const PANEL_MAP: Record<string, React.ComponentType> = {
   orders: OrdersPanel,
   heroVideos: HeroVideosPanel,
   petaBisnis: PetaBisnisPanel,
+  petaFitur: PetaFiturPanel,
 };
 
 interface WindowContentRendererProps {
@@ -166,9 +168,14 @@ export default function WindowContentRenderer({
   appId,
   actions,
 }: WindowContentRendererProps) {
+  const { activeTemplate } = useActiveTemplate();
+
   if (appId.startsWith('folder-')) {
     const zoneId = appId.replace('folder-', '');
-    const zone = ADMIN_ZONES.find((z) => z.id === zoneId);
+    // Zona disaring runtime per template aktif (sinkron dengan ubin desktop)
+    const zone = filterZonesByTemplate(ADMIN_ZONES, activeTemplate).find(
+      (z) => z.id === zoneId
+    );
     if (!zone) {
       return (
         <div className="flex h-full items-center justify-center text-gray-400">
@@ -191,6 +198,15 @@ export default function WindowContentRenderer({
               <app.icon className={`h-7 w-7 ${app.iconColor}`} />
             </div>
             <span className="admin-folder-app-label">{app.label}</span>
+            {/* Badge cakupan template: "mana punya" terlihat sekali lirik */}
+            {app.templateScope && (
+              <span
+                className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                title="Template yang menampilkan konten app ini"
+              >
+                {getTemplateScopeLabel(app.templateScope)}
+              </span>
+            )}
           </button>
         ))}
       </div>

@@ -12,7 +12,6 @@ import {
   Type,
   MessageSquare,
   PhoneCall,
-  Users,
   MessageSquareText,
   Image as ImageIcon,
   Sparkles,
@@ -88,6 +87,7 @@ const ALL_ADMIN_ZONES: AdminZone[] = [
         iconBg: 'bg-indigo-100',
         defaultWidth: 900,
         defaultHeight: 650,
+        templateScope: ['os-desktop'],
       },
       {
         id: 'labels',
@@ -97,6 +97,7 @@ const ALL_ADMIN_ZONES: AdminZone[] = [
         iconBg: 'bg-gray-100',
         defaultWidth: 800,
         defaultHeight: 600,
+        templateScope: ['os-desktop'],
       },
       {
         id: 'explorer',
@@ -106,6 +107,7 @@ const ALL_ADMIN_ZONES: AdminZone[] = [
         iconBg: 'bg-indigo-100',
         defaultWidth: 950,
         defaultHeight: 650,
+        templateScope: ['os-desktop'],
       },
       {
         id: 'eventPages',
@@ -115,6 +117,7 @@ const ALL_ADMIN_ZONES: AdminZone[] = [
         iconBg: 'bg-cyan-100',
         defaultWidth: 1100,
         defaultHeight: 720,
+        templateScope: ['os-desktop'],
       },
     ],
   },
@@ -162,6 +165,18 @@ const ALL_ADMIN_ZONES: AdminZone[] = [
         iconBg: 'bg-emerald-100',
         defaultWidth: 900,
         defaultHeight: 600,
+      },
+      {
+        // Peta referensi: app CRUD mana yang kontennya tampil di template mana.
+        // Informasional (read-only), jawaban atas kebingungan owner soal
+        // "CRUD ini punya template mana" — pasangan filter templateScope.
+        id: 'petaFitur',
+        label: 'Peta Fitur & Template',
+        icon: MapIcon,
+        iconColor: 'text-slate-600',
+        iconBg: 'bg-slate-100',
+        defaultWidth: 980,
+        defaultHeight: 720,
       },
       {
         id: 'harga',
@@ -230,6 +245,8 @@ const ALL_ADMIN_ZONES: AdminZone[] = [
         iconBg: 'bg-cyan-100',
         defaultWidth: 900,
         defaultHeight: 650,
+        // Split: wallpaper = macOS, objek 3D tengah (spatialGalleryConfig) = spatial
+        templateScope: ['os-desktop', 'spatial-gallery'],
       },
       {
         id: 'dock',
@@ -239,6 +256,7 @@ const ALL_ADMIN_ZONES: AdminZone[] = [
         iconBg: 'bg-indigo-100',
         defaultWidth: 850,
         defaultHeight: 600,
+        templateScope: ['os-desktop'],
       },
       {
         id: 'widgets',
@@ -248,6 +266,7 @@ const ALL_ADMIN_ZONES: AdminZone[] = [
         iconBg: 'bg-yellow-100',
         defaultWidth: 900,
         defaultHeight: 650,
+        templateScope: ['os-desktop'],
       },
       {
         id: 'loader',
@@ -279,15 +298,6 @@ const ALL_ADMIN_ZONES: AdminZone[] = [
         defaultHeight: 700,
       },
       {
-        id: 'messages',
-        label: 'Pesan Masuk',
-        icon: Users,
-        iconColor: 'text-indigo-600',
-        iconBg: 'bg-indigo-100',
-        defaultWidth: 850,
-        defaultHeight: 600,
-      },
-      {
         id: 'feedback',
         label: 'Feedback',
         icon: MessageSquareText,
@@ -295,6 +305,7 @@ const ALL_ADMIN_ZONES: AdminZone[] = [
         iconBg: 'bg-emerald-100',
         defaultWidth: 900,
         defaultHeight: 650,
+        templateScope: ['os-desktop'],
       },
       {
         id: 'contacts',
@@ -347,7 +358,7 @@ export const APP_ROUTE_MAP: Record<string, string> = {
   orders: '/admin/system/orders',
   petaBisnis: '/admin/system/peta-bisnis',
   notifications: '/admin/communications/notifications',
-  messages: '/admin/communications/messages',
   feedback: '/admin/communications/feedback',
   contacts: '/admin/communications/contacts',
+  petaFitur: '/admin/system/peta-fitur',
 };

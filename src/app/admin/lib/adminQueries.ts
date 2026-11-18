@@ -32,7 +32,6 @@ export const ADMIN_QUERY_KEYS = {
   galleryFeatured: ['admin', 'gallery', 'featured'] as const,
   hardSkills: ['admin', 'hard-skills'] as const,
   labels: ['admin', 'labels'] as const,
-  leads: ['admin', 'leads'] as const,
   projects: ['projects', 'admin'] as const,
   stickyNotes: ['admin', 'sticky-notes'] as const,
   testimonial: ['admin', 'testimonial'] as const,
@@ -43,15 +42,6 @@ export interface AdminProjectsResponse {
     projects?: Project[];
     lastUpdated?: string;
   };
-}
-
-export interface Lead extends Record<string, unknown> {
-  id: string;
-  createdAt: string;
-  name: string;
-  contact: string;
-  contactType: 'WhatsApp' | 'Email';
-  message: string;
 }
 
 const placeholderHardSkills = (
@@ -74,7 +64,6 @@ export const ADMIN_PLACEHOLDER_DATA = {
   galleryFeatured: galleryFeaturedFallback as GalleryFeaturedData,
   hardSkills: placeholderHardSkills,
   labels: labelsFallback as Label[],
-  leads: [] as Lead[],
   projects: {
     data: {
       projects: (projectsFallback as { projects?: Project[] }).projects || [],
@@ -160,10 +149,6 @@ export function fetchAdminLabels() {
   return fetchJson<Label[]>('/api/about/labels').then((data) => (Array.isArray(data) ? data : []));
 }
 
-export function fetchAdminLeads() {
-  return fetchJson<Lead[]>('/api/leads').then((data) => (Array.isArray(data) ? data : []));
-}
-
 export function fetchAdminProjects() {
   return fetchJson<AdminProjectsResponse>('/api/projects');
 }
@@ -198,7 +183,6 @@ export function warmAdminCrudQueries(queryClient: QueryClient) {
     prefetch(queryClient, ADMIN_QUERY_KEYS.experience, fetchAdminExperience),
     prefetch(queryClient, ADMIN_QUERY_KEYS.testimonial, fetchAdminTestimonials),
     prefetch(queryClient, ADMIN_QUERY_KEYS.contact, fetchAdminContact),
-    prefetch(queryClient, ADMIN_QUERY_KEYS.leads, fetchAdminLeads),
     prefetch(queryClient, ADMIN_QUERY_KEYS.labels, fetchAdminLabels),
     prefetch(queryClient, ADMIN_QUERY_KEYS.commentCounts, fetchAdminCommentCounts),
   ]);

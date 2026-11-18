@@ -38,6 +38,7 @@ test-results/
 
 # Local AI/tooling state
 .claude/settings.local.json
+.zcode/
 .playwright-cli/
 .tmp/playwright-npm-cache/
 

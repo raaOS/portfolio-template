@@ -4,9 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ThreeEvent } from '@react-three/fiber'
 import dynamic from 'next/dynamic'
 import type { Project } from '@/types/projects'
-import type { AboutData } from '@/types/about'
+import type { PortfolioTemplateData } from '@/types/template'
+import { useLanguage } from '@/contexts/LanguageContext'
 import { HelloIntro } from '@/components/shared/HelloIntro'
 import { SpatialProjectModal } from './SpatialProjectModal'
+import SpatialInfoOverlay from './SpatialInfoOverlay'
 
 // Tubuh 3D dimuat HANYA saat canvasReady (idle/interaksi) — chunk three.js
 // tidak menyentuh bundle hidrasi awal (P41->target, lihat SpatialScene.tsx).
@@ -16,9 +18,10 @@ export default function SpatialGalleryRenderer({
   data,
   suppressIntro = false,
 }: {
-  data?: { projects?: Project[]; about?: AboutData };
+  data?: PortfolioTemplateData;
   suppressIntro?: boolean;
 }) {
+  const { locale } = useLanguage()
   const containerRef = useRef<HTMLDivElement>(null)
   const targetCenterUv = useRef({ x: 0.5, y: 0.5 })
   const projectsRaw = data?.projects
@@ -229,12 +232,16 @@ export default function SpatialGalleryRenderer({
             supaya tidak dobel. */}
         {!suppressIntro && <HelloIntro ready={sceneReady} />}
 
+        {/* Overlay konten inti CRUD (About/Kontak/Testimoni/Skills/CV + bahasa) —
+            parity demo macOS 2026-11-15; DOM murni, tidak menyentuh scene 3D. */}
+        <SpatialInfoOverlay data={data} />
+
         {/* Brand overlay */}
         <div className="absolute bottom-6 left-6 z-10 text-white/80 text-sm font-semibold tracking-wide select-none pointer-events-none">
-          Portfolio
+          {locale === 'en' ? 'Portfolio' : 'Portofolio'}
         </div>
         <div className="absolute bottom-6 right-6 z-10 text-white/40 text-xs tracking-widest uppercase select-none pointer-events-none">
-          Scroll untuk memutar
+          {locale === 'en' ? 'Scroll to rotate' : 'Scroll untuk memutar'}
         </div>
 
         {/* Tooltip */}
