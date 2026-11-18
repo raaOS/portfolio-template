@@ -17,7 +17,24 @@ import {
   guardCrossClientSlug,
 } from './onboard-reuse';
 import { verifyAppKvWritable } from './app-kv-preflight';
-import { parseEnv } from './env-file';
+import { parseEnv, upsertEnvFile } from './env-file';
+import {
+  DEFAULT_TEMPLATE_PRICE,
+  TEMPLATE_ADMIN_FILTER_VERSION,
+  TEMPLATE_CONTENT_PARITY_VERSION,
+  TEMPLATE_PRICE_MAX,
+  TEMPLATE_PRICE_MIN,
+  TEMPLATES,
+  TemplateChangeError,
+  applyTemplateChange,
+  checkTemplateVersionGate,
+  decideTemplateAction,
+  ensureTemplateCatalog,
+  isKnownTemplateKey,
+  readTemplateState,
+  templateDisplayName,
+  validatePurchasePrice,
+} from './template-purchase';
 import {
   VAULT_COOKIE_NAME,
   VAULT_SESSION_TTL_MS,
@@ -167,6 +184,161 @@ async function d1Query(
   }
 
   return Array.isArray(first?.results) ? first.results : [];
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Pembelian / aktivasi template (portal owner)
+//
+// Kredensial D1 OWNER dibaca EKSPLISIT dari .env.local per request, tidak
+// pernah ditulis ke process.env: server yang sama juga memegang kredensial
+// Cloudflare MILIK KLIEN, jadi mencampur env global berisiko salah database.
+// ───────────────────────────────────────────────────────────────────────────
+
+/** Cegah dua klik/double request mengubah template klien yang sama bersamaan. */
+const templateChangeLocks = new Set<string>();
+
+interface OwnerBillingContext {
+  accountId: string;
+  apiToken: string;
+  databaseId: string;
+}
+
+function readOwnerBillingContext(): OwnerBillingContext | null {
+  let fileEnv: Record<string, string> = {};
+  try {
+    if (fs.existsSync(ENV_LOCAL_PATH)) {
+      fileEnv = parseEnv(fs.readFileSync(ENV_LOCAL_PATH, 'utf-8'));
+    }
+  } catch {
+    // Jatuh ke process.env; panel tetap bisa dipakai kalau env sudah di-export.
+  }
+
+  const pick = (...names: string[]) => {
+    for (const name of names) {
+      const fromFile = (fileEnv[name] || '').trim();
+      if (fromFile) return fromFile;
+      const fromProcess = (process.env[name] || '').trim();
+      if (fromProcess) return fromProcess;
+    }
+    return '';
+  };
+
+  const accountId = pick('CLOUDFLARE_ACCOUNT_ID');
+  const apiToken = pick('CLOUDFLARE_D1_API_TOKEN', 'CLOUDFLARE_API_TOKEN');
+  const databaseId = pick('CLOUDFLARE_D1_DATABASE_ID');
+  if (!accountId || !apiToken || !databaseId) return null;
+  return { accountId, apiToken, databaseId };
+}
+
+/** Harga default dialog = Harga Jual owner (`base_price_idr`, fallback legacy). */
+async function readOwnerBasePrice(ctx: OwnerBillingContext): Promise<number> {
+  const rows = await d1Query(
+    ctx.accountId,
+    ctx.apiToken,
+    ctx.databaseId,
+    `SELECT value FROM platform_settings
+      WHERE key IN (?, ?)
+      ORDER BY CASE WHEN key = ? THEN 0 ELSE 1 END
+      LIMIT 1`,
+    ['base_price_idr', 'pricing_config', 'base_price_idr']
+  );
+
+  const raw = rows[0]?.value;
+  if (typeof raw === 'string' && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw) as { basePrice?: unknown };
+      const check = validatePurchasePrice(parsed.basePrice);
+      if (check.valid && typeof check.value === 'number') return check.value;
+    } catch {
+      // JSON rusak / format lama → pakai fallback di bawah.
+    }
+  }
+  return DEFAULT_TEMPLATE_PRICE;
+}
+
+function generateTemplateOrderId(): string {
+  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  return `ORD-${dateStr}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+}
+
+interface TemplateOrderInput {
+  siteId: string;
+  templateKey: string;
+  slug: string;
+  buyerName: string;
+  buyerEmail: string;
+  buyerWhatsapp: string;
+  amount: number;
+  siteUrl: string;
+  note: string;
+}
+
+async function createOwnerTemplateOrder(
+  ctx: OwnerBillingContext,
+  input: TemplateOrderInput
+): Promise<string> {
+  const now = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const orderId = generateTemplateOrderId();
+    await d1Query(
+      ctx.accountId,
+      ctx.apiToken,
+      ctx.databaseId,
+      `INSERT INTO orders (
+         id, site_id, template_id, desired_slug, buyer_name, buyer_email,
+         buyer_whatsapp, amount, payment_method, status, site_url,
+         provisioned_at, expires_at, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'template_tambahan', 'activated', ?, ?, ?, ?, ?)`,
+      [
+        orderId,
+        input.siteId,
+        input.templateKey,
+        input.slug,
+        input.buyerName,
+        input.buyerEmail,
+        input.buyerWhatsapp,
+        input.amount,
+        input.siteUrl,
+        now,
+        expiresAt,
+        now,
+        now,
+      ]
+    );
+
+    const verify = await d1Query(
+      ctx.accountId,
+      ctx.apiToken,
+      ctx.databaseId,
+      'SELECT id FROM orders WHERE id = ? LIMIT 1',
+      [orderId]
+    );
+    if (verify.length > 0) return orderId;
+  }
+
+  throw new Error('Order pembelian template gagal tersimpan setelah 3 percobaan.');
+}
+
+async function deleteOwnerOrder(ctx: OwnerBillingContext, orderId: string): Promise<void> {
+  await d1Query(
+    ctx.accountId,
+    ctx.apiToken,
+    ctx.databaseId,
+    'DELETE FROM orders WHERE id = ?',
+    [orderId]
+  );
+}
+
+/** Baca config.env arsip klien (hanya folder yang lolos validasi). */
+function readClientEnvForFolder(folderName: string): {
+  envPath: string;
+  env: Record<string, string>;
+} | null {
+  const envPath = resolveArchiveConfigPath(ARCHIVE_DIR, folderName);
+  if (!envPath) return null;
+  return { envPath, env: parseEnv(fs.readFileSync(envPath, 'utf-8')) };
 }
 
 /**
@@ -332,12 +504,26 @@ async function provisionClient(
   );
 
   // Seed site row — binding parameter (audit temuan #5: tanpa interpolasi SQL).
+  //
+  // `active_template_key` TIDAK ditimpa saat baris sudah ada: template yang
+  // tampil hanya boleh berubah lewat portal owner / CLI (ada bukti pembelian).
+  // Re-provision dulu menimpa kolom ini dan bisa mengembalikan template lama
+  // tanpa disadari.
+  const siteBeforeRows = await d1Query(
+    accountId,
+    apiToken,
+    databaseId,
+    `SELECT id FROM sites WHERE id = ? LIMIT 1`,
+    [siteId]
+  );
+  const siteWasNew = siteBeforeRows.length === 0;
+
   const seedSiteSql = `
     INSERT INTO sites (id, slug, name, status, active_template_key, created_at, updated_at)
     VALUES (?, ?, ?, 'active', ?, datetime('now'), datetime('now'))
     ON CONFLICT(id) DO UPDATE SET
       name = excluded.name,
-      active_template_key = excluded.active_template_key,
+      active_template_key = COALESCE(active_template_key, excluded.active_template_key),
       updated_at = datetime('now');
   `;
   await d1Query(accountId, apiToken, databaseId, seedSiteSql, [
@@ -346,6 +532,27 @@ async function provisionClient(
     clientName,
     templateKey,
   ]);
+
+  // STEP 4a: katalog template + kepemilikan awal.
+  //
+  // Klien hanya memiliki template yang dibayarnya (satu baris entitlement).
+  // Katalog di-upsert dari registry setiap provisioning; entitlement hanya
+  // diberikan saat site BARU, supaya re-provision tidak pernah membagikan
+  // template yang belum dibeli secara gratis.
+  const seedQuery = (sql: string, params: Array<string | number | null> = []) =>
+    d1Query(accountId, apiToken, databaseId, sql, params);
+  await ensureTemplateCatalog(seedQuery, { price: DEFAULT_TEMPLATE_PRICE });
+  if (siteWasNew) {
+    await d1Query(
+      accountId,
+      apiToken,
+      databaseId,
+      `INSERT OR IGNORE INTO site_template_entitlements
+         (id, site_id, template_id, purchased_at, price, granted_by, created_at)
+       VALUES (?, ?, ?, datetime('now'), ?, 'onboarding', datetime('now'))`,
+      [`ent-${crypto.randomUUID()}`, siteId, templateKey, DEFAULT_TEMPLATE_PRICE]
+    );
+  }
 
   // --- Penjagaan re-provision (audit MEDIUM M4, 2026-10-06) -----------------
   // Kalau slug ini sudah pernah onboarding: pakai arsip lama + password lama,
@@ -407,6 +614,8 @@ async function provisionClient(
     'media_assets',
     'orders',
     'platform_settings',
+    'portfolio_templates',
+    'site_template_entitlements',
   ];
   const tableRows = await d1Query(
     accountId,
@@ -431,6 +640,22 @@ async function provisionClient(
   );
   if (seededSiteRows.length === 0) {
     throw new Error('Verifikasi STEP 4 gagal — baris site tidak tersimpan di database.');
+  }
+
+  if (siteWasNew) {
+    const seededEntitlementRows = await d1Query(
+      accountId,
+      apiToken,
+      databaseId,
+      `SELECT id FROM site_template_entitlements
+        WHERE site_id = ? AND template_id = ? LIMIT 1`,
+      [siteId, templateKey]
+    );
+    if (seededEntitlementRows.length === 0) {
+      throw new Error(
+        `Verifikasi STEP 4 gagal — kepemilikan template "${templateKey}" tidak tersimpan.`
+      );
+    }
   }
 
   if (adminDecision.seedUser) {
@@ -983,6 +1208,305 @@ const server = http.createServer(async (req, res) => {
       });
     } catch (err) {
       sendJson(res, 500, { success: false, message: (err as Error).message });
+    }
+    return;
+  }
+
+  // API: Keadaan template klien — aktif + daftar yang sudah dibeli (D1 klien).
+  if (url === '/api/client-template' && req.method === 'GET') {
+    try {
+      const folderName =
+        new URL(req.url || '/', 'http://localhost').searchParams.get('folder') || '';
+
+      if (!isSafeArchiveFolderName(folderName)) {
+        sendJson(res, 400, { success: false, message: 'Nama folder klien tidak valid.' });
+        return;
+      }
+
+      const config = readClientEnvForFolder(folderName);
+      if (!config) {
+        sendJson(res, 404, { success: false, message: 'Arsip klien tidak ditemukan.' });
+        return;
+      }
+
+      const { env } = config;
+      const accountId = env.CLOUDFLARE_ACCOUNT_ID || '';
+      const apiToken = env.CLOUDFLARE_API_TOKEN || '';
+      const databaseId = env.CLOUDFLARE_D1_DATABASE_ID || '';
+      if (!accountId || !apiToken || !databaseId) {
+        sendJson(res, 400, {
+          success: false,
+          message: 'Kredensial Cloudflare klien pada arsip tidak lengkap.',
+        });
+        return;
+      }
+
+      const query = (sql: string, params: Array<string | number | null> = []) =>
+        d1Query(accountId, apiToken, databaseId, sql, params);
+
+      const state = await readTemplateState(query, env.CUSTOMER_SITE_ID || '');
+
+      const ownerCtx = readOwnerBillingContext();
+      let suggestedPrice = DEFAULT_TEMPLATE_PRICE;
+      let billingReady = false;
+      if (ownerCtx) {
+        try {
+          suggestedPrice = await readOwnerBasePrice(ownerCtx);
+          billingReady = true;
+        } catch {
+          // D1 owner tidak terjangkau: dialog tetap tampil dengan harga fallback,
+          // tetapi pembelian ditolak sampai panel owner bisa mencatat order.
+          billingReady = false;
+        }
+      }
+
+      sendJson(res, 200, {
+        success: true,
+        folder: folderName,
+        site: {
+          id: state.siteId,
+          name: state.siteName,
+          activeTemplateKey: state.activeTemplateKey,
+          createdAt: state.siteCreatedAt,
+        },
+        owned: state.owned,
+        catalogReady: state.catalogReady,
+        templates: TEMPLATES,
+        suggestedPrice,
+        billingReady,
+        priceRange: { min: TEMPLATE_PRICE_MIN, max: TEMPLATE_PRICE_MAX },
+        versionGate: {
+          contentParity: TEMPLATE_CONTENT_PARITY_VERSION,
+          adminFilter: TEMPLATE_ADMIN_FILTER_VERSION,
+        },
+      });
+    } catch (err) {
+      sendJson(res, 500, { success: false, message: (err as Error).message });
+    }
+    return;
+  }
+
+  // API: Aktivasi / pembelian template — hanya portal lokal owner.
+  if (url === '/api/client-template' && req.method === 'POST') {
+    let payload: Record<string, unknown>;
+    try {
+      payload = await readJsonBody(req);
+    } catch (error) {
+      sendJson(res, 400, {
+        success: false,
+        message:
+          (error as Error).message === 'TOO_LARGE'
+            ? 'Permintaan terlalu besar.'
+            : 'Format permintaan tidak valid.',
+      });
+      return;
+    }
+
+    const folderName = typeof payload.folder === 'string' ? payload.folder.trim() : '';
+    const templateKey = typeof payload.templateKey === 'string' ? payload.templateKey.trim() : '';
+    const mode = payload.mode === 'purchase' ? 'purchase' : payload.mode === 'activate' ? 'activate' : null;
+    const note = typeof payload.note === 'string' ? payload.note.trim().slice(0, 200) : '';
+
+    if (!isSafeArchiveFolderName(folderName)) {
+      sendJson(res, 400, { success: false, message: 'Nama folder klien tidak valid.' });
+      return;
+    }
+    if (!mode) {
+      sendJson(res, 400, { success: false, message: 'Mode harus "activate" atau "purchase".' });
+      return;
+    }
+    if (!isKnownTemplateKey(templateKey)) {
+      sendJson(res, 400, {
+        success: false,
+        message: `Template tidak dikenal. Key valid: ${TEMPLATES.map((t) => t.id).join(', ')}.`,
+      });
+      return;
+    }
+    if (templateChangeLocks.has(folderName)) {
+      sendJson(res, 409, {
+        success: false,
+        message: 'Perubahan template klien ini sedang berjalan. Tunggu sebentar.',
+      });
+      return;
+    }
+
+    templateChangeLocks.add(folderName);
+    try {
+      const config = readClientEnvForFolder(folderName);
+      if (!config) {
+        sendJson(res, 404, { success: false, message: 'Arsip klien tidak ditemukan.' });
+        return;
+      }
+
+      const { env, envPath } = config;
+      const accountId = env.CLOUDFLARE_ACCOUNT_ID || '';
+      const apiToken = env.CLOUDFLARE_API_TOKEN || '';
+      const databaseId = env.CLOUDFLARE_D1_DATABASE_ID || '';
+      if (!accountId || !apiToken || !databaseId) {
+        sendJson(res, 400, {
+          success: false,
+          message: 'Kredensial Cloudflare klien pada arsip tidak lengkap.',
+        });
+        return;
+      }
+
+      const query = (sql: string, params: Array<string | number | null> = []) =>
+        d1Query(accountId, apiToken, databaseId, sql, params);
+
+      const state = await readTemplateState(query, env.CUSTOMER_SITE_ID || '');
+      const decision = decideTemplateAction(state, templateKey, mode);
+
+      if (decision.kind === 'error') {
+        sendJson(res, 409, { success: false, message: decision.message });
+        return;
+      }
+      if (decision.kind === 'noop') {
+        sendJson(res, 200, {
+          success: true,
+          changed: false,
+          orderId: null,
+          activeTemplateKey: state.activeTemplateKey,
+          message: decision.message,
+        });
+        return;
+      }
+
+      const urls = clientUrls(env, folderName);
+      const health = await probeClientHealth(
+        [urls.websiteUrl, workersDevUrl(env, folderName)].filter(Boolean),
+        { timeoutMs: 8_000 }
+      );
+      const versionGate = checkTemplateVersionGate(health.deployedVersion, templateKey);
+      if (versionGate.level === 'block') {
+        sendJson(res, 409, {
+          success: false,
+          code: 'VERSION_TOO_OLD',
+          deployedVersion: health.deployedVersion,
+          message: versionGate.message,
+        });
+        return;
+      }
+
+      let price = 0;
+      let orderId: string | null = null;
+
+      if (decision.kind === 'purchase') {
+        const priceCheck = validatePurchasePrice(payload.price);
+        if (!priceCheck.valid || typeof priceCheck.value !== 'number') {
+          sendJson(res, 400, { success: false, message: priceCheck.error || 'Harga tidak valid.' });
+          return;
+        }
+        price = priceCheck.value;
+
+        const rawWhatsapp = typeof payload.buyerWhatsapp === 'string' ? payload.buyerWhatsapp : '';
+        const whatsappDigits = rawWhatsapp.replace(/\D/g, '');
+        if (whatsappDigits && (whatsappDigits.length < 8 || whatsappDigits.length > 15)) {
+          sendJson(res, 400, {
+            success: false,
+            message: 'Nomor WhatsApp harus 8–15 digit (contoh: 6281234567890).',
+          });
+          return;
+        }
+
+        const ownerCtx = readOwnerBillingContext();
+        if (!ownerCtx) {
+          sendJson(res, 409, {
+            success: false,
+            code: 'OWNER_BILLING_UNAVAILABLE',
+            message:
+              'D1 owner tidak bisa diakses dari .env.local, jadi pembelian tidak bisa dicatat. ' +
+              'Lengkapi CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_D1_API_TOKEN, dan CLOUDFLARE_D1_DATABASE_ID.',
+          });
+          return;
+        }
+
+        orderId = await createOwnerTemplateOrder(ownerCtx, {
+          siteId: state.siteId,
+          templateKey,
+          slug: env.CUSTOMER_SLUG || folderName.replace(/^\d+_/, ''),
+          buyerName: env.CUSTOMER_NAME || env.CUSTOMER_SLUG || folderName,
+          buyerEmail: env.ADMIN_EMAIL || '',
+          buyerWhatsapp: whatsappDigits || '-',
+          amount: price,
+          siteUrl: urls.websiteUrl,
+          note,
+        });
+      }
+
+      let result;
+      try {
+        result = await applyTemplateChange(query, state, {
+          templateKey,
+          price: decision.kind === 'purchase' ? price : undefined,
+          orderId: orderId || undefined,
+          catalogPrice: price || undefined,
+          note,
+        });
+      } catch (error) {
+        const isPartial = error instanceof TemplateChangeError && error.partial.entitlementCreated;
+
+        // Order hanya dihapus kalau kepemilikan TIDAK tercatat. Kalau entitlement
+        // sudah masuk, klien memang membeli — jangan hapus bukti pendapatannya.
+        if (orderId && !isPartial) {
+          try {
+            const ownerCtx = readOwnerBillingContext();
+            if (ownerCtx) await deleteOwnerOrder(ownerCtx, orderId);
+          } catch {
+            // Laporkan order yang tertinggal apa adanya di pesan error.
+          }
+        }
+
+        const message = error instanceof Error ? error.message : String(error);
+        sendJson(res, 500, {
+          success: false,
+          code: isPartial ? 'PARTIAL_OWNERSHIP_WRITTEN' : 'TEMPLATE_CHANGE_FAILED',
+          orderId,
+          message: isPartial
+            ? `Kepemilikan template tercatat, tetapi template gagal diaktifkan: ${message}. ` +
+              `Order ${orderId} DIPERTAHANKAN. Ulangi aktivasi (gratis) setelah masalah D1 beres.`
+            : `Aktivasi gagal: ${message}`,
+        });
+        return;
+      }
+
+      // Arsip disinkronkan supaya re-provision tidak mengembalikan template lama.
+      let archiveSynced = false;
+      try {
+        upsertEnvFile(envPath, { ACTIVE_TEMPLATE_KEY: templateKey });
+        archiveSynced =
+          (parseEnv(fs.readFileSync(envPath, 'utf-8')).ACTIVE_TEMPLATE_KEY || '') === templateKey;
+      } catch {
+        archiveSynced = false;
+      }
+
+      const label = templateDisplayName(templateKey);
+      const message = result.changed
+        ? decision.kind === 'purchase'
+          ? `Template ${label} dibeli & diaktifkan. Order ${orderId} tercatat di panel owner.`
+          : `Template ${label} diaktifkan (sudah dibeli — tanpa biaya).`
+        : `Template ${label} sudah aktif.`;
+
+      sendJson(res, 200, {
+        success: true,
+        changed: result.changed,
+        entitlementCreated: result.entitlementCreated,
+        orderId,
+        previousKey: result.previousKey,
+        activeTemplateKey: result.activeTemplateKey,
+        archiveSynced,
+        auditWarning: result.auditWarning,
+        deployedVersion: health.deployedVersion,
+        versionWarning: versionGate.level === 'warn' ? versionGate.message : null,
+        message:
+          message +
+          (archiveSynced
+            ? ''
+            : ' PERINGATAN: gagal menyinkronkan ACTIVE_TEMPLATE_KEY di arsip — perbaiki manual.'),
+      });
+    } catch (err) {
+      sendJson(res, 500, { success: false, message: (err as Error).message });
+    } finally {
+      templateChangeLocks.delete(folderName);
     }
     return;
   }

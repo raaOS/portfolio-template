@@ -25,6 +25,7 @@
     "pre-deploy": "node scripts/deploy/pre-deploy-check.js",
     "deploy": "node scripts/utils/ensure-next-dev-not-running.js && npm run pre-deploy && npm run cf:deploy",
     "client:new": "npx tsx scripts/onboarding/server.ts",
+    "client:template": "npx tsx scripts/cloudflare/set-client-template.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

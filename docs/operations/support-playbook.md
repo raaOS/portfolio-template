@@ -399,3 +399,78 @@ dipertahankan (rekonsiliasi bayar telat + pembeli masih bisa membuka halaman ord
 - **JANGAN** hapus data R2 secara manual tanpa menjalankan audit terlebih dulu.
 - **JANGAN** ubah `ADMIN_PASSWORD_SCRYPT` atau `JWT_SECRET` tanpa koordinasi dengan developer — ini akan invalidate semua session aktif.
 - **JANGAN** share screenshot Cloudflare Dashboard yang menampilkan account ID, API token, atau billing info.
+
+## 11. Klien Minta Ganti / Beli Template (tanpa deploy ulang)
+
+Satu deployment klien sudah memuat ketiga template (`os-desktop`, `infinite-canvas`,
+`spatial-gallery`). Yang menentukan tampilan hanya kolom `sites.active_template_key`
+di D1 klien — jadi ganti template **tidak butuh build/deploy** dan **tidak menghapus konten**.
+
+Sejak v1.3.92 template adalah **barang terpisah**: klien hanya boleh memakai template yang
+sudah dibayarnya. Bukti kepemilikan = `site_template_entitlements` di D1 klien; bukti
+pendapatan = baris `orders` di D1 owner. Aturannya lengkap di
+`docs/operations/template-purchase-flow.md` — baca itu sebelum bertindak.
+
+### 11a. Klien membeli template baru (Rp199.000)
+
+1. Pastikan uang sudah diterima (transfer/WhatsApp).
+2. Buka `PENGELOLA_KLIEN.bat` → **Status Board** → **Detail Klien** → seksi
+   **Template & Pembelian**.
+3. Pilih template berbadge **BELUM DIBELI**, isi harga (default = Harga Jual; batas
+   Rp50.000–Rp50.000.000), WhatsApp pembeli bila ada, catatan → **Catat Pembelian + Aktifkan**.
+4. Portal menulis **order di D1 owner** + **entitlement di D1 klien** + `active_template_key`
+   + audit, lalu menyinkronkan arsip. Tidak ada provisioning/deploy.
+5. Kabari klien: situs berganti **≤60 detik** (ISR), dashboard admin menyesuaikan setelah
+   refresh, pengaturan tampilan khas template baru mulai dari default (klien merapikan sendiri).
+
+Kalau portal membalas `PARTIAL_OWNERSHIP_WRITTEN`: **jangan** hapus order dan jangan minta
+bayar lagi — kepemilikan sudah tercatat, cukup ulangi aktivasi (gratis) setelah masalah D1 beres.
+
+### 11b. Klien kembali ke template yang sudah dibeli (gratis)
+
+Detail Klien → tombol **Aktifkan (gratis)** pada template berbadge **DIMILIKI**.
+Tidak ada order baru. Kalau template itu sudah aktif, portal menjawab "sudah aktif".
+
+### 11c. Klien lama (onboard sebelum v1.3.92)
+
+Kepemilikan belum tercatat. Jalankan (dry-run dulu, lalu `--apply`):
+
+```bash
+npx tsx scripts/cloudflare/backfill-template-entitlements.ts
+npx tsx scripts/cloudflare/backfill-template-entitlements.ts --apply
+```
+
+Mengisi katalog + entitlement template yang **sedang aktif** + order historis `ORD-MIG-…`
+(`payment_method='migrasi_historis'`). Idempoten; tidak mengubah `active_template_key`, arsip,
+atau konten. Folder tanpa kredensial D1 klien (mis. `00_site-owner`) dilewati `[SKIP]`.
+
+### 11d. Jalur CLI owner (bukan jalur penjualan)
+
+```bash
+# mode baca: template aktif + yang dimiliki
+npm run client:template -- <folder-arsip-klien>
+
+# aktifkan template yang SUDAH dibeli (gratis)
+npm run client:template -- <folder-arsip-klien> spatial-gallery
+```
+
+- CLI **menolak** template yang tidak punya entitlement. Pembelian hanya lewat portal
+  supaya tercatat sebagai order.
+- `--force` = darurat saja: template tetap diaktifkan, **tetapi tidak membuat order**
+  (catat manual di luar sistem bila ini dipakai).
+- CLI juga memperbarui `ACTIVE_TEMPLATE_KEY` di `config.env` arsip dan wajib lolos
+  verifikasi baca balik.
+
+### 11e. Aturan & larangan
+
+- **Gate versi:** deployment klien < v1.3.88 **diblokir** untuk canvas/spatial (konten belum
+  lengkap); v1.3.88–v1.3.89 boleh dengan peringatan; ≥ v1.3.90 tanpa peringatan.
+  `os-desktop` tidak diblokir. Solusinya deploy update, bukan memaksa.
+- **JANGAN** memakai SQL manual untuk mengubah `active_template_key` — arsip & audit tidak
+  ikut sinkron.
+- **JANGAN** mengaktifkan template tanpa entitlement, kecuali `--force` darurat yang dicatat.
+- **JANGAN** menambahkan pemilih template di panel admin klien — klien bisa mengganti sendiri
+  = pendapatan hilang.
+- **JANGAN** menghapus baris `orders` hasil pembelian portal, dan jangan memberi entitlement
+  "semua template" saat onboarding/re-provision.
+- Template key yang sah hanya yang terdaftar di `src/lib/templates/registry.ts`.

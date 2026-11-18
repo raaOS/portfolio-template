@@ -3,6 +3,39 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.92] - 2026-11-18
+
+### Jual Template Satuan: Rp199.000 per Template, Tercatat di Panel Order, Aktivasi Gratis untuk yang Sudah Dibeli
+
+Sebelumnya "punya template" tidak punya bukti apa pun: klien bisa dipindah template tanpa jejak pendapatan, dan tidak ada cara membedakan template yang dibeli vs yang cuma diaktifkan. Sekarang setiap template adalah barang terpisah dengan bukti kepemilikan di D1 klien dan bukti pendapatan di D1 owner.
+
+- **Satu template = satu pembelian Rp199.000** (harga default dibaca dari panel **Harga Jual**, boleh diubah saat mencatat pembelian dalam batas Rp50.000–Rp50.000.000). Setiap pembelian menulis **satu baris `orders`** di D1 owner (`payment_method='template_tambahan'`, `status='activated'`) sehingga muncul di panel **Order & Pembayaran**.
+- **Sumber kebenaran kepemilikan = `site_template_entitlements` di D1 klien** (UNIQUE `site_id + template_id`), ditautkan ke order lewat `granted_by = "portal:<orderId>"`. Tidak ada kolom baru, tidak ada duplikasi data klien di D1 owner.
+- **Pindah ke template yang sudah dibeli = gratis.** Server hanya mengubah `sites.active_template_key`; tidak ada order baru. Kalau template itu sudah aktif → server menjawab "sudah aktif" tanpa menulis apa pun.
+- **Klien tidak bisa mengganti template sendiri.** Tidak ada tombol/endpoint di panel admin klien; aktivasi hanya dari **portal lokal `PENGELOLA_KLIEN.bat`** (satu-satunya proses yang memegang kredensial D1 klien *dan* akses D1 owner) → Detail Klien → seksi baru **Template & Pembelian** (badge Aktif/Dimiliki/Belum Dibeli, tombol "Aktifkan (gratis)", form "Catat Pembelian + Aktifkan"). Diverifikasi: tidak ada route `src/app/api/**` yang menulis `active_template_key`, dan penulis entitlement lama (`/api/admin/sites/[siteId]/entitlements`, `/api/admin/sites`) digerbangi `requireOwnerMode()` → **404** di deployment klien.
+- **Membeli template B tidak mengulang onboarding**: tanpa provisioning/deploy, tanpa hapus konten. Situs berganti ≤60 detik (ISR), dashboard admin menyesuaikan (sejak v1.3.90).
+- **Gate versi deployment** sebelum aktivasi: build < v1.3.88 diblokir untuk `infinite-canvas`/`spatial-gallery` (konten canvas/spatial belum lengkap), v1.3.88–v1.3.89 diberi peringatan (menu admin belum disaring). `os-desktop` tidak diblokir.
+- **Kegagalan tidak boleh memalsukan pendapatan:** kalau kepemilikan sudah tertulis lalu aktivasi gagal, order **dipertahankan** dan portal membalas `PARTIAL_OWNERSHIP_WRITTEN` (ulangi aktivasi gratis); kalau kepemilikan belum tertulis, order yang baru dibuat dihapus lagi.
+- **Onboarding diperbaiki:** template yang dipilih saat provisioning hanya diberikan ke situs **baru**, dan re-provision tidak lagi menimpa `active_template_key` (`COALESCE`) — dulu template bisa kembali ke nilai lama / template lain bisa diberi gratis.
+- **Klien lama:** `npx tsx scripts/cloudflare/backfill-template-entitlements.ts` (dry-run default, `--apply`, `--no-orders`, `--folder`) mengisi katalog + entitlement template yang sedang aktif + **order historis** (`ORD-MIG-…`, `payment_method='migrasi_historis'`). Idempoten; arsip tanpa kredensial D1 klien dilewati `[SKIP]`.
+- **CLI `client:template` sekarang dijaga kepemilikan:** menolak aktivasi template tanpa entitlement; `--force` hanya untuk darurat dan **tidak** membuat order. Pembelian template baru wajib lewat portal.
+
+**Bukti:** 41/41 test PASS (`template-purchase.test.ts` 22 + `portal-clients.test.ts` 19), `tsc` 0 error pada 4 skrip yang berubah. Diuji nyata pada D1 gladi: backfill `--apply` (entitlement `os-desktop` + order `ORD-MIG-20261024-52490A`, dry-run ulang = "sudah ada — dilewati"), portal GET state, penolakan aktivasi tanpa pembelian (409), pembelian penuh `infinite-canvas` (order `ORD-20261118-027F30` + entitlement + audit + arsip sinkron), aktivasi balik gratis tanpa order baru, lalu **rollback total** (order/entitlement/audit dihapus, `active_template_key` kembali `os-desktop`) — state akhir identik dengan sebelum uji. Alur bisnis lengkap: `docs/operations/template-purchase-flow.md`.
+
+## [1.3.91] - 2026-11-18
+
+### Alat Owner: Ganti Template Klien Sekali Perintah (Tanpa Deploy Ulang)
+
+Klien yang ingin pindah template (mis. macOS → Spatial Gallery) tadinya hanya bisa lewat UPDATE manual buta ke D1 klien. Kini ada satu perintah permanen yang memvalidasi nama template, menulis satu kolom, dan membuktikan hasilnya dengan baca balik.
+
+- **Perintah:** `npm run client:template -- <folder-klien> <template-key>` (atau `npx tsx scripts/cloudflare/set-client-template.ts <folder-klien> <template-key>`). Tanpa `template-key` = mode baca (menampilkan template aktif saja).
+- **Hanya menulis `sites.active_template_key`** di D1 klien — ketiga template sudah ikut ter-build di setiap deployment, jadi situs pengunjung berganti ≤60 detik (ISR di `src/app/page.tsx`) dan dashboard admin menyesuaikan sendiri (`GET /api/admin/site-template`). Tidak ada build/deploy, tidak ada konten yang dihapus.
+- **Fail-closed:** template key divalidasi ke `src/lib/templates/registry.ts` sebelum kredensial/network disentuh; kredensial dibaca dari `arsip-klien/<folder>/config.env` (bukan `.env.local` owner); D1 klien wajib berisi **tepat 1 baris `sites`** dan `CUSTOMER_SITE_ID` arsip wajib cocok dengan baris itu — kalau tidak, berhenti tanpa menulis apa pun; hasil UPDATE wajib lolos verifikasi baca balik.
+- **Arsip ikut disinkronkan:** `ACTIVE_TEMPLATE_KEY` di `config.env` klien diperbarui, karena server onboarding/portal membacanya saat re-provision/update template — tanpa ini template bisa kembali ke nilai lama tanpa disadari.
+- **Batasan yang jujur:** pengaturan tampilan khas template tidak ikut berpindah (wallpaper desktop macOS vs objek 3D spatial) — template baru mulai dari default dan klien merapikan tampilannya sendiri lewat panel admin.
+
+**Bukti:** dijalankan nyata lewat `tsx` memakai salinan arsip gladi: `--help`/usage, guard template asing (ditolak tanpa network), mode baca, lalu round-trip `os-desktop → infinite-canvas → os-desktop` dengan verifikasi baca balik di setiap langkah + `ACTIVE_TEMPLATE_KEY` arsip tersinkron; state akhir D1 gladi = `os-desktop`. Test versi (`src/lib/constants.test.ts`) PASS setelah `APP_VERSION` naik. Detail: `docs/tracker/logs/tool_ganti_template_klien_2026_11_18.md`.
+
 ## [1.3.90] - 2026-11-15
 
 ### Dashboard Admin Kini Menyesuaikan Template yang Ter-Deploy: Badge Cakupan + Filter Otomatis + Peta Fitur

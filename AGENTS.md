@@ -591,6 +591,23 @@ npx wrangler deploy --config .open-next/wrangler.client.<slug>.jsonc
 > Kenapa berubah (v1.3.20): `wrangler pages deploy` lama **tidak memasang env D1/R2 per klien** → semua deployment klien memakai database owner (celah audit 2026-10-04). Lihat `docs/tracker/logs/patch_celah_env_klien_2026_10_04.md`.
 > `scripts/deploy/build-customer.sh` dan `scripts/deploy/deploy-customer.sh` (sisa jalur lama, tidak dipanggil kode mana pun) **sudah dihapus** pada audit 2026-10-08.
 
+### Pembelian & Aktivasi Template (v1.3.92) — aturan bisnis terkunci
+
+> Detail lengkap: [`docs/operations/template-purchase-flow.md`](docs/operations/template-purchase-flow.md). Jangan mengubah aturan di bawah tanpa izin eksplisit owner.
+
+- **Setiap template dijual terpisah Rp199.000** (default dibaca dari panel **Harga Jual** `platform_settings.base_price_idr`, fallback legacy `pricing_config`, fallback `199000`; boleh diubah saat mencatat pembelian, batas Rp50.000–Rp50.000.000). Satu pembelian = **satu baris `orders`** di D1 owner (`payment_method='template_tambahan'`, `status='activated'`).
+- **Kepemilikan** = baris `site_template_entitlements` di D1 **klien** (UNIQUE `site_id + template_id`). **Yang tampil** = `sites.active_template_key`. Tautan ke order: `granted_by = "portal:<orderId>"`.
+- **Pindah ke template yang sudah dibeli = GRATIS** (tanpa order baru). Template yang sudah aktif → server menjawab "sudah aktif" tanpa menulis.
+- **Klien TIDAK punya tombol/API ganti template.** Aktivasi & pencatatan pembelian hanya lewat portal lokal `PENGELOLA_KLIEN.bat` → Status Board → Detail Klien → **Template & Pembelian** (`GET/POST /api/client-template` di `scripts/onboarding/server.ts`). Portal adalah satu-satunya proses yang memegang kredensial D1 klien *dan* D1 owner; panel admin web owner hanya punya D1 owner sehingga tidak bisa membaca kepemilikan klien.
+- **Membeli template lain bukan onboarding baru**: tanpa provisioning/deploy, tanpa hapus konten. Situs berganti ≤60 detik (ISR).
+- **Gate versi:** build klien < v1.3.88 **diblokir** untuk `infinite-canvas`/`spatial-gallery`; v1.3.88–v1.3.89 diberi peringatan; ≥ v1.3.90 tanpa peringatan. `os-desktop` tidak diblokir.
+- **Semantik gagal:** entitlement sudah tertulis → order **DIPERTAHANKAN**, balasan `PARTIAL_OWNERSHIP_WRITTEN` (ulangi aktivasi gratis). Entitlement belum tertulis → order yang baru dibuat dihapus.
+- **Onboarding:** entitlement hanya diberikan ke situs **baru** (`granted_by='onboarding'`); re-provision **tidak** menimpa `active_template_key` (`COALESCE`) dan tidak membagikan template lain.
+- **Klien lama:** `npx tsx scripts/cloudflare/backfill-template-entitlements.ts` (dry-run default; `--apply`, `--no-orders`, `--folder`). Mengisi katalog + entitlement template yang sedang aktif + order historis `ORD-MIG-…` (`payment_method='migrasi_historis'`). Idempoten.
+- **CLI owner** `npm run client:template -- <folder> [template-key]` **menolak** template tanpa entitlement; `--force` hanya darurat dan **tidak** membuat order. Pembelian wajib lewat portal.
+- **DILARANG:** pemilih template di panel admin klien, aktivasi tanpa entitlement (selain `--force` darurat), order pembelian ditulis dari Worker/D1 klien, menghapus order saat `PARTIAL_OWNERSHIP_WRITTEN`, memberi entitlement "semua template" saat onboarding, SQL manual untuk `active_template_key`, atau harga berbeda per template tanpa keputusan owner.
+- **Kode:** `scripts/onboarding/template-purchase.ts` (logika + 22 unit test), `scripts/onboarding/server.ts` (`/api/client-template`, penulis order owner, seed onboarding), `scripts/onboarding/public/index.html` (UI seksi Template & Pembelian), `scripts/cloudflare/backfill-template-entitlements.ts`, `scripts/cloudflare/set-client-template.ts`.
+
 ### Admin UI Zones (4 Zones)
 
 | Zone | Apps |

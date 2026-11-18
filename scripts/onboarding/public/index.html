@@ -654,6 +654,55 @@
       font-weight: 400;
     }
 
+    /* Template & Pembelian (portal owner) */
+    .template-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      padding: 0.5rem 0;
+      border-bottom: 1px dashed #eef0f3;
+      font-size: 0.8125rem;
+    }
+
+    .template-row:last-of-type { border-bottom: none; }
+
+    .template-badge {
+      display: inline-block;
+      margin-left: 0.35rem;
+      font-size: 0.625rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      padding: 0.05rem 0.4rem;
+      border-radius: 9999px;
+      border: 1px solid #e5e7eb;
+      color: var(--text-muted);
+      background: var(--surface-subtle);
+      vertical-align: middle;
+    }
+
+    .template-badge.is-active {
+      color: #065f46;
+      background: #d1fae5;
+      border-color: #a7f3d0;
+    }
+
+    .template-badge.is-owned {
+      color: #1d4ed8;
+      background: #dbeafe;
+      border-color: #bfdbfe;
+    }
+
+    .template-input {
+      padding: 0.45rem 0.55rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.8125rem;
+      background: #ffffff;
+      color: var(--text);
+      font-family: inherit;
+    }
+
     .detail-value a {
       color: var(--primary);
       text-decoration: none;
@@ -2365,15 +2414,267 @@ Website bisa dibuka di https://${data.domain} (aktif dalam 5-15 menit). 🚀`;
           ${detailRow('Cloudflare API token', apiTokenMask, { mono: true, secret: 'cloudflareApiToken', masked: apiTokenMask })}
           ${detailRow('D1 API token', d1TokenMask, { mono: true, secret: 'cloudflareD1ApiToken', masked: d1TokenMask })}
         </section>
+
+        <section class="detail-section" style="grid-column: 1 / -1;">
+          <div class="detail-section-title">Template &amp; Pembelian</div>
+          <div style="font-size: 0.6875rem; color: var(--text-muted); margin-bottom: 0.4rem;">
+            Klien tidak punya tombol ganti template di panel admin mereka — aktivasi hanya dari portal ini.
+          </div>
+          <div id="template-section-body" style="color: var(--text-muted); font-size: 0.8125rem;">Memuat data template...</div>
+        </section>
       </div>
     `;
+  }
+
+  // --- TEMPLATE & PEMBELIAN (portal owner) ---
+  //
+  // Sumber kebenaran kepemilikan = D1 klien (`site_template_entitlements`),
+  // sumber bukti pendapatan = order di D1 owner (dibuat server). UI ini tidak
+  // pernah menghitung ulang harga: nominal yang dikirim adalah nominal yang
+  // tampil di dialog (owner boleh memberi diskon sesuai Harga Jual).
+  let templateSectionFolder = null;
+
+  function formatRupiah(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return '-';
+    return 'Rp' + num.toLocaleString('id-ID');
+  }
+
+  function formatTemplateDate(value) {
+    const at = Date.parse(String(value || '').replace(' ', 'T'));
+    if (!Number.isFinite(at)) return '';
+    return new Date(at).toLocaleDateString('id-ID', {
+      day: '2-digit', month: 'short', year: 'numeric',
+    });
+  }
+
+  function deployedVersionForFolder(folderId) {
+    const status = statusClients.find((item) => item.id === folderId);
+    return status && status.deployedVersion ? status.deployedVersion : null;
+  }
+
+  function templateGateFor(folderId, targetKey, thresholds) {
+    const version = deployedVersionForFolder(folderId);
+    if (!version) {
+      return {
+        level: 'warn',
+        message: 'Versi deployment tidak terbaca — cek Status Board sebelum mengganti template.',
+      };
+    }
+    if (targetKey === 'os-desktop') return { level: 'ok', message: '' };
+
+    const parity = (thresholds && thresholds.contentParity) || '1.3.88';
+    const adminFilter = (thresholds && thresholds.adminFilter) || '1.3.90';
+    if (compareVersions(version, parity) < 0) {
+      return {
+        level: 'block',
+        message: 'Deployment v' + version + ' belum mendukung konten canvas/spatial (butuh ≥ v' + parity + '). Deploy update dulu.',
+      };
+    }
+    if (compareVersions(version, adminFilter) < 0) {
+      return {
+        level: 'warn',
+        message: 'Deployment v' + version + ' belum menyaring menu admin per template (baru sejak v' + adminFilter + ').',
+      };
+    }
+    return { level: 'ok', message: '' };
+  }
+
+  function renderTemplateSection(data) {
+    const box = document.getElementById('template-section-body');
+    if (!box) return;
+
+    const folderId = data.folder;
+    const activeKey = data.site.activeTemplateKey;
+    const templates = Array.isArray(data.templates) ? data.templates : [];
+    const owned = Array.isArray(data.owned) ? data.owned : [];
+    const thresholds = data.versionGate || {};
+    const version = deployedVersionForFolder(folderId);
+
+    const unowned = templates.filter(
+      (template) => !owned.some((item) => item.templateId === template.id)
+    );
+    const purchasable = unowned.filter(
+      (template) => templateGateFor(folderId, template.id, thresholds).level !== 'block'
+    );
+    const blocked = unowned.filter(
+      (template) => templateGateFor(folderId, template.id, thresholds).level === 'block'
+    );
+
+    const rows = templates.map((template) => {
+      const own = owned.find((item) => item.templateId === template.id);
+      const isActive = activeKey === template.id;
+      const gate = isActive
+        ? { level: 'ok', message: '' }
+        : templateGateFor(folderId, template.id, thresholds);
+
+      const badge = isActive
+        ? '<span class="template-badge is-active">AKTIF</span>'
+        : own
+          ? '<span class="template-badge is-owned">DIMILIKI</span>'
+          : '<span class="template-badge">BELUM DIBELI</span>';
+
+      const meta = own
+        ? 'Dibeli ' + (formatTemplateDate(own.purchasedAt) || '-') + ' · ' + formatRupiah(own.price)
+        : 'Harga ' + formatRupiah(data.suggestedPrice);
+
+      let action = '';
+      if (isActive) {
+        action = '<span style="color:#047857;font-weight:600;">Sedang tampil</span>';
+      } else if (own) {
+        action = gate.level === 'block'
+          ? '<span style="color:#b91c1c;">' + escapeHtml(gate.message) + '</span>'
+          : '<button type="button" class="btn-reset btn-interactive" data-template-activate="' +
+            escapeHtml(template.id) +
+            '" style="width:auto;padding:0.4rem 0.7rem;font-size:0.75rem;">Aktifkan (gratis)</button>';
+      } else {
+        action = gate.level === 'block'
+          ? '<span style="color:#b91c1c;">' + escapeHtml(gate.message) + '</span>'
+          : '<span style="color:var(--text-muted);">Catat pembelian di bawah</span>';
+      }
+
+      const warn = !isActive && gate.level === 'warn'
+        ? '<div style="margin-top:0.25rem;color:#92400e;font-size:0.6875rem;">' + escapeHtml(gate.message) + '</div>'
+        : '';
+
+      return '<div class="template-row">' +
+        '<div><strong>' + escapeHtml(template.name) + '</strong> ' + badge +
+        '<div style="color:var(--text-muted);font-size:0.75rem;">' + meta + '</div>' + warn + '</div>' +
+        '<div style="text-align:right;">' + action + '</div>' +
+        '</div>';
+    }).join('');
+
+    let purchaseForm = '';
+    if (unowned.length === 0) {
+      purchaseForm = '<div style="margin-top:0.6rem;color:#047857;">Semua template sudah dibeli — klien bisa berpindah kapan saja tanpa biaya.</div>';
+    } else if (purchasable.length === 0) {
+      purchaseForm = '<div style="margin-top:0.6rem;color:#b45309;">Template baru butuh deploy update dulu: ' +
+        escapeHtml(blocked.map((template) => template.name).join(', ')) + '.</div>';
+    } else {
+      const options = purchasable.map((template) =>
+        '<option value="' + escapeHtml(template.id) + '">' + escapeHtml(template.name) + '</option>'
+      ).join('');
+      const min = data.priceRange ? data.priceRange.min : 50000;
+      const max = data.priceRange ? data.priceRange.max : 50000000;
+
+      purchaseForm =
+        '<form id="template-purchase-form" style="margin-top:0.75rem;border-top:1px dashed #eef0f3;padding-top:0.75rem;">' +
+          '<div style="font-weight:600;margin-bottom:0.4rem;">Catat pembelian template baru</div>' +
+          '<div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">' +
+            '<select id="template-purchase-key" class="template-input" aria-label="Template yang dibeli">' + options + '</select>' +
+            '<input id="template-purchase-price" class="template-input" type="number" min="' + min + '" max="' + max +
+              '" step="1000" value="' + escapeHtml(String(data.suggestedPrice)) + '" style="max-width:140px;" aria-label="Harga pembelian" required>' +
+            '<input id="template-purchase-wa" class="template-input" type="tel" placeholder="WA pembeli (opsional)" aria-label="WhatsApp pembeli">' +
+            '<input id="template-purchase-note" class="template-input" type="text" maxlength="200" placeholder="Catatan (opsional)" aria-label="Catatan">' +
+            '<button type="submit" class="btn-submit" style="width:auto;padding:0.5rem 0.8rem;"' +
+              (data.billingReady ? '' : ' disabled') + '>Catat Pembelian + Aktifkan</button>' +
+          '</div>' +
+          '<div style="font-size:0.6875rem;color:var(--text-muted);margin-top:0.35rem;">' +
+            (data.billingReady
+              ? 'Pembelian tercatat sebagai order di panel owner. Pindah ke template yang sudah dibeli selalu gratis.'
+              : 'D1 owner tidak terbaca — pembelian tidak bisa dicatat sampai .env.local owner lengkap.') +
+          '</div>' +
+        '</form>';
+    }
+
+    box.innerHTML =
+      '<div style="color:var(--text-muted);margin-bottom:0.5rem;">Aktif: <strong style="color:var(--text);">' +
+        escapeHtml(templateLabel(activeKey)) + '</strong>' +
+        (version ? ' · deployment v' + escapeHtml(version) : '') + '</div>' +
+      rows +
+      purchaseForm;
+
+    box.querySelectorAll('[data-template-activate]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const key = button.getAttribute('data-template-activate');
+        if (!key) return;
+        if (!window.confirm('Aktifkan ' + templateLabel(key) + ' untuk klien ini?\n\nTemplate ini sudah dibeli — tanpa biaya.')) return;
+        submitTemplateChange(folderId, { mode: 'activate', templateKey: key }, button);
+      });
+    });
+
+    const form = document.getElementById('template-purchase-form');
+    if (form) {
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const key = document.getElementById('template-purchase-key').value;
+        const price = Number(document.getElementById('template-purchase-price').value);
+        const wa = document.getElementById('template-purchase-wa').value;
+        const note = document.getElementById('template-purchase-note').value;
+
+        const confirmation = 'Catat pembelian ' + templateLabel(key) + ' sebesar ' + formatRupiah(price) + '?\n\n' +
+          'Pastikan uang sudah diterima. Order akan tercatat di panel owner, lalu template langsung diaktifkan.';
+        if (!window.confirm(confirmation)) return;
+
+        submitTemplateChange(
+          folderId,
+          { mode: 'purchase', templateKey: key, price, buyerWhatsapp: wa, note },
+          form.querySelector('button[type="submit"]')
+        );
+      });
+    }
+  }
+
+  async function loadTemplateSection(folderId) {
+    const box = document.getElementById('template-section-body');
+    if (!box) return;
+    templateSectionFolder = folderId;
+    box.textContent = 'Memuat data template...';
+
+    try {
+      const res = await fetch('/api/client-template?folder=' + encodeURIComponent(folderId), { cache: 'no-store' });
+      const data = await res.json().catch(() => ({}));
+      if (templateSectionFolder !== folderId) return;
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Gagal memuat data template.');
+      }
+      renderTemplateSection(data);
+    } catch (err) {
+      if (templateSectionFolder !== folderId) return;
+      box.innerHTML = '<span style="color:#b91c1c;">' + escapeHtml(err.message) + '</span>';
+    }
+  }
+
+  async function submitTemplateChange(folderId, payload, button) {
+    const originalText = button ? button.textContent : '';
+    if (button) {
+      button.disabled = true;
+      button.textContent = 'Memproses...';
+    }
+
+    try {
+      const res = await fetch('/api/client-template', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folder: folderId, ...payload }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data.success) {
+        // Error penting (mis. order tetap dipertahankan setelah kepemilikan
+        // tercatat) harus terbaca utuh, bukan toast 3 detik.
+        window.alert(data.message || 'Perubahan template gagal.');
+        await loadTemplateSection(folderId);
+        return;
+      }
+
+      showToast(data.message || 'Template diperbarui.');
+      await loadTemplateSection(folderId);
+      if (typeof loadStatusBoard === 'function') loadStatusBoard().catch(() => {});
+    } catch (err) {
+      window.alert('Gagal menghubungi portal: ' + err.message);
+    } finally {
+      if (button && document.body.contains(button)) {
+        button.disabled = false;
+        button.textContent = originalText;
+      }
+    }
   }
 
   function hideVaultMessage() {
     vaultMessage.textContent = '';
     vaultMessage.className = 'vault-message';
   }
-
   function showVaultMessage(message, type = 'error') {
     vaultMessage.textContent = message;
     vaultMessage.className = `vault-message ${type === 'error' ? 'is-error' : 'is-info'}`;
@@ -2508,6 +2809,7 @@ Website bisa dibuka di https://${data.domain} (aktif dalam 5-15 menit). 🚀`;
       }
 
       renderClientDetail(data);
+      loadTemplateSection(folderId).catch(() => {});
       detailVaultConfigured = Boolean(data.vaultConfigured);
       if (detailVaultConfigured) showUnlockBox();
       else showSetupBox();
@@ -2523,6 +2825,7 @@ Website bisa dibuka di https://${data.domain} (aktif dalam 5-15 menit). 🚀`;
     maskSecretFields();
     lockVaultSession();
     activeDetailFolder = null;
+    templateSectionFolder = null;
     detailVaultConfigured = false;
     detailModal.classList.remove('is-open');
     detailModal.setAttribute('aria-hidden', 'true');
