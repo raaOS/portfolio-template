@@ -10,10 +10,13 @@
 - **Progress:** Selesai penuh. Badge cakupan + filter runtime + app Peta Fitur terpasang.
 - **Deploy:** ✅ sudah di-deploy ke site owner 2026-11-18; endpoint baru
   `GET /api/admin/site-template` di produksi membalas **401** (ada & auth-gated),
-  `/api/health` `1.3.90`. Verifikasi visual desktop admin (login) masih bisa dilakukan saat
-  gladi berikutnya — logika sudah tertutup test.
+  `/api/health` `1.3.90`. **Gladi (`gladi-2026-10-24`, template `os-desktop`) juga sudah
+  di-update 2026-11-18 ke `1.3.90`** via `cloud-manager --action update_template`
+  (backup D1 pre-update otomatis; terverifikasi `/api/health` di `makeitbatter.my.id` &
+  `gladi.makeitbatter.my.id` = 1.3.90) — verifikasi visual dashboard klien (badge cakupan +
+  app Peta Fitur) kini bisa langsung dilakukan saat login gladi.
 - **Langkah berikutnya:** tidak ada pekerjaan kode/deploy tersisa; opsional cek visual saat
-  login admin berikutnya (badge cakupan + app Peta Fitur).
+  login admin gladi berikutnya (badge cakupan + app Peta Fitur).
 - **Kaitan:** lahir dari diskusi owner (2026-11-15): "kalau buat fitur baru di canvas, CRUD-nya
   muncul di mana?" + pertanyaan "deploy 1 template, CRUD menyesuaikan?" (jawaban jujur saat
   itu: belum ada; kini ada).

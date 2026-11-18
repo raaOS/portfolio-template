@@ -14,8 +14,8 @@
 - **Fase terakhir dikerjakan:** Semua fase selesai (0–3). Rilis v1.3.88 tercatat di
   `CHANGELOG.md` + `APP_VERSION` (`src/lib/constants.ts`).
 - **Deploy:** ✅ sudah di-deploy ke site owner 2026-11-18 (`npm run deploy` exit 0, commit
-  `9ea331b`); `/api/health` produksi `version: 1.3.90`. Template klien mendapat fitur ini saat
-  deploy klien berikutnya (tanpa langkah tambahan).
+  `9ea331b`); `/api/health` produksi `version: 1.3.90`. **Gladi (`os-desktop`) juga sudah
+  di-update 2026-11-18 ke `1.3.90`** — klien pertama mendapat fitur ini saat onboarding.
 - **Langkah berikutnya:** tidak ada — pekerjaan kode & deploy fitur ini selesai.
 - **Progress keseluruhan:** 10/10 item selesai.
 
