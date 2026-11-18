@@ -60,14 +60,14 @@ Berikut adalah daftar aktivitas yang telah atau sedang dikerjakan. Pilih log yan
    - _Status:_ 🟢 Completed (2026-10-26)
    - _Isi:_ Menghapus ketergantungan `npx` (penyebab prompt `Ok to proceed? (y)`), memperbaiki dua `&` yang tidak di-escape (`'PORTAL' is not recognized`), menambah `cd /d "%~dp0"`, deteksi portal yang sudah berjalan, dan jendela tidak lagi menutup sendiri saat server gagal. Diuji 4 skenario (normal, cwd lain, port terpakai, `node_modules` hilang).
 8. **[Penyamaan Konten CRUD Template](file:///C:/Users/USER/Documents/tamplate-portofolio/docs/tracker/logs/fitur_penyamaan_konten_template_2026_11_15.md)**
-   - _Status:_ 🟢 Completed (2026-11-15, rilis v1.3.88 — belum deploy)
-   - _Isi:_ Menyamakan konten inti CRUD ke infinite-canvas & spatial-gallery setara demo macOS: kontak canvas diganti FullPageChat macOS (masuk chat admin), + soft skills & philosophy di canvas, + overlay 5 panel (About/Kontak/Testimoni/Skills/CV) + bahasa ID/EN di spatial. Dock macOS TIDAK disamakan (keputusan owner). 21/21 test template + lint + tsc bersih, verifikasi browser selesai. Sisa: deploy oleh owner.
+   - _Status:_ 🟢 Completed & **deployed** (2026-11-15, rilis v1.3.88; deploy produksi 2026-11-18, commit `9ea331b`, produksi `1.3.90`)
+   - _Isi:_ Menyamakan konten inti CRUD ke infinite-canvas & spatial-gallery setara demo macOS: kontak canvas diganti FullPageChat macOS (masuk chat admin), + soft skills & philosophy di canvas, + overlay 5 panel (About/Kontak/Testimoni/Skills/CV) + bahasa ID/EN di spatial. Dock macOS TIDAK disamakan (keputusan owner). 21/21 test template + lint + tsc bersih, verifikasi browser selesai.
 9. **[Hapus Panel Pesan Masuk](file:///C:/Users/USER/Documents/tamplate-portofolio/docs/tracker/logs/hapus_panel_pesan_masuk_2026_11_15.md)**
-   - _Status:_ 🟢 Completed (2026-11-15, rilis v1.3.89 — belum deploy)
-   - _Isi:_ Panel "Pesan Masuk" dihapus total (keputusan owner): `GET /api/leads` tidak punya writer di repo sehingga panel selamanya kosong/menyesatkan. Registry + panel + API + query dibersihkan, redirect komunikasi kini ke WhatsApp & Notif. Inbox chat visitor (memakai `chatStore.addAdminReply`) sengaja TIDAK dibuat — fitur baru bila diminta. Sisa: deploy oleh owner.
+   - _Status:_ 🟢 Completed & **deployed** (2026-11-15, rilis v1.3.89; deploy produksi 2026-11-18, commit `9ea331b`, produksi `1.3.90`)
+   - _Isi:_ Panel "Pesan Masuk" dihapus total (keputusan owner): `GET /api/leads` tidak punya writer di repo sehingga panel selamanya kosong/menyesatkan. Registry + panel + API + query dibersihkan, redirect komunikasi kini ke WhatsApp & Notif. Inbox chat visitor (memakai `chatStore.addAdminReply`) sengaja TIDAK dibuat — fitur baru bila diminta. Produksi: `/api/leads` = 404.
 10. **[templateScope — Dashboard Admin Menyesuaikan Template Ter-Deploy](file:///C:/Users/USER/Documents/tamplate-portofolio/docs/tracker/logs/fitur_template_scope_admin_2026_11_15.md)** ⬅️ **TERBARU**
-   - _Status:_ 🟢 Completed (2026-11-15, rilis v1.3.90 — belum deploy)
-   - _Isi:_ Setiap app admin punya `templateScope`; desktop admin menyaring app RUNTIME berdasarkan `sites.active_template_key` (endpoint fail-open `/api/admin/site-template`) + badge "macOS saja" dst. di folder + app referensi "Peta Fitur & Template". Klien canvas kini hanya melihat CRUD canvas. Buat app baru: tulis `templateScope` bila tidak lintas template. Sisa: deploy oleh owner.
+   - _Status:_ 🟢 Completed & **deployed** (2026-11-15, rilis v1.3.90; deploy produksi 2026-11-18, commit `9ea331b`, produksi `1.3.90`)
+   - _Isi:_ Setiap app admin punya `templateScope`; desktop admin menyaring app RUNTIME berdasarkan `sites.active_template_key` (endpoint fail-open `/api/admin/site-template`) + badge "macOS saja" dst. di folder + app referensi "Peta Fitur & Template". Klien canvas kini hanya melihat CRUD canvas. Buat app baru: tulis `templateScope` bila tidak lintas template. Produksi: endpoint = 401 (ada, auth-gated).
 
 ## 🛠️ Aturan Pengisian Log
 

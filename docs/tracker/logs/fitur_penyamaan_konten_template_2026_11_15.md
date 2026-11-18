@@ -2,7 +2,7 @@
 
 **Status:** 🟢 Completed
 **Mulai:** 2026-11-15
-**Selesai:** 2026-11-15 (rilis v1.3.88 — belum di-deploy ke produksi)
+**Selesai:** 2026-11-15 (rilis v1.3.88; **deploy produksi 2026-11-18** — commit `9ea331b`, produksi terverifikasi `1.3.90`)
 
 ## 📌 STATUS TERAKHIR — WAJIB DIBACA & DIUPDATE AI BERIKUTNYA
 
@@ -10,12 +10,13 @@
 > (2) lanjutkan item pertama yang masih `- [ ]`, (3) update section ini + checklist + daftar
 > file saat sesi selesai. Jangan bertanya ulang keputusan owner — sudah terkunci.
 
-- **Tanggal update:** 2026-11-15
+- **Tanggal update:** 2026-11-18
 - **Fase terakhir dikerjakan:** Semua fase selesai (0–3). Rilis v1.3.88 tercatat di
   `CHANGELOG.md` + `APP_VERSION` (`src/lib/constants.ts`).
-- **Langkah berikutnya:** **Deploy** ke produksi oleh owner (`npm run deploy` untuk site
-  owner; template klien mendapat fitur ini saat deploy berikutnya). Tidak ada pekerjaan kode
-  tersisa untuk fitur ini.
+- **Deploy:** ✅ sudah di-deploy ke site owner 2026-11-18 (`npm run deploy` exit 0, commit
+  `9ea331b`); `/api/health` produksi `version: 1.3.90`. Template klien mendapat fitur ini saat
+  deploy klien berikutnya (tanpa langkah tambahan).
+- **Langkah berikutnya:** tidak ada — pekerjaan kode & deploy fitur ini selesai.
 - **Progress keseluruhan:** 10/10 item selesai.
 
 ## 🎯 Tujuan (Objective)

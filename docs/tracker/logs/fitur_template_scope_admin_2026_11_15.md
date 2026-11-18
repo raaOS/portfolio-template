@@ -2,14 +2,18 @@
 
 **Status:** 🟢 Completed
 **Mulai:** 2026-11-15
-**Selesai:** 2026-11-15 (rilis v1.3.90 — belum deploy)
+**Selesai:** 2026-11-15 (rilis v1.3.90; **deploy produksi 2026-11-18** — commit `9ea331b`, produksi terverifikasi `1.3.90`)
 
 ## 📌 STATUS TERAKHIR — WAJIB DIBACA & DIUPDATE AI BERIKUTNYA
 
-- **Tanggal update:** 2026-11-15
+- **Tanggal update:** 2026-11-18
 - **Progress:** Selesai penuh. Badge cakupan + filter runtime + app Peta Fitur terpasang.
-- **Langkah berikutnya:** Deploy oleh owner. Verifikasi visual desktop admin (login) bisa
-  dilakukan saat gladi berikutnya — logika sudah tertutup test.
+- **Deploy:** ✅ sudah di-deploy ke site owner 2026-11-18; endpoint baru
+  `GET /api/admin/site-template` di produksi membalas **401** (ada & auth-gated),
+  `/api/health` `1.3.90`. Verifikasi visual desktop admin (login) masih bisa dilakukan saat
+  gladi berikutnya — logika sudah tertutup test.
+- **Langkah berikutnya:** tidak ada pekerjaan kode/deploy tersisa; opsional cek visual saat
+  login admin berikutnya (badge cakupan + app Peta Fitur).
 - **Kaitan:** lahir dari diskusi owner (2026-11-15): "kalau buat fitur baru di canvas, CRUD-nya
   muncul di mana?" + pertanyaan "deploy 1 template, CRUD menyesuaikan?" (jawaban jujur saat
   itu: belum ada; kini ada).

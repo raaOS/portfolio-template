@@ -2,14 +2,16 @@
 
 **Status:** 🟢 Completed
 **Mulai:** 2026-11-15
-**Selesai:** 2026-11-15 (rilis v1.3.89 — belum deploy)
+**Selesai:** 2026-11-15 (rilis v1.3.89; **deploy produksi 2026-11-18** — commit `9ea331b`, produksi terverifikasi `1.3.90`)
 
 ## 📌 STATUS TERAKHIR — WAJIB DIBACA & DIUPDATE AI BERIKUTNYA
 
-- **Tanggal update:** 2026-11-15
+- **Tanggal update:** 2026-11-18
 - **Progress:** Selesai penuh. Panel "Pesan Masuk" dihapus total atas keputusan owner
   (percakapan 2026-11-15, lanjutan audit CRUD dashboard).
-- **Langkah berikutnya:** Deploy oleh owner. Tidak ada kode tersisa.
+- **Deploy:** ✅ sudah di-deploy ke site owner 2026-11-18; `GET /api/leads` di produksi
+  membalas **404** (bukti route benar-benar hilang), `/api/health` `1.3.90`.
+- **Langkah berikutnya:** tidak ada — kode & deploy selesai.
 - **Kaitan:** lanjutan konteks dari `fitur_penyamaan_konten_template_2026_11_15.md`
   (audit 16 CRUD konten; "Pesan Masuk" = satu-satunya CRUD yang mati di SEMUA template).
 
