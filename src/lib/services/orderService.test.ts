@@ -11,7 +11,7 @@ import {
 } from './orderService';
 import * as cloudflareD1 from '@/lib/cloudflareD1';
 import * as slugService from './slugService';
-import { clearBasePriceCache, updateBasePrice } from './pricingConfigService';
+import { clearBasePriceCache, clearBundleTiersCache, updateBasePrice } from './pricingConfigService';
 
 /**
  * Set env jadi "tidak dikonfigurasi".
@@ -385,6 +385,7 @@ describe('orderService', () => {
           },
         ]) // sapuan darurat: pending tua terdeteksi (cutoff now+18h)
         .mockResolvedValueOnce([]) // sapuan darurat: UPDATE expired
+        .mockResolvedValueOnce([]) // release kupon untuk order pending tua (v1.3.93)
         .mockResolvedValueOnce([{ amount: 199001 }]) // alokasi ulang: hanya offset 1 terpakai
         .mockResolvedValueOnce([]); // INSERT order
 
@@ -868,6 +869,65 @@ describe('orderService', () => {
       expect(res.message).toContain('Status saat ini: activated');
       expect(vi.mocked(cloudflareD1.queryD1).mock.calls.length).toBe(1);
     });
+
+    it('re-reserves the released coupon quota when reopening a canceled order', async () => {
+      const couponRow = {
+        id: 'cpn-reopen',
+        code: 'HEMAT10',
+        kind: 'percent',
+        value: 10,
+        min_subtotal: 0,
+        max_discount: null,
+        applies_to: null,
+        starts_at: null,
+        ends_at: null,
+        max_redemptions: 1,
+        max_per_email: null,
+        is_active: 1,
+        note: null,
+        archived_at: null,
+        created_at: '2026-11-01T00:00:00.000Z',
+        updated_at: '2026-11-01T00:00:00.000Z',
+      };
+
+      const query = vi.mocked(cloudflareD1.queryD1);
+      query
+        .mockResolvedValueOnce([
+          {
+            id: 'ORD-CPN',
+            status: 'canceled',
+            payment_proof_url: 'https://proof.png',
+            desired_slug: '',
+            coupon_code: 'HEMAT10',
+            buyer_email: 'nanda@test.com',
+            discount_total: 10000,
+          },
+        ]) // SELECT sebelum reopen
+        .mockResolvedValueOnce([
+          {
+            id: 'ORD-CPN',
+            status: 'waiting_verification',
+            payment_proof_url: 'https://proof.png',
+            coupon_code: 'HEMAT10',
+            buyer_email: 'nanda@test.com',
+            discount_total: 10000,
+          },
+        ]) // UPDATE ... RETURNING *
+        .mockResolvedValueOnce([couponRow]) // getCouponByCode
+        .mockResolvedValueOnce([]) // INSERT OR IGNORE coupon_redemptions
+        .mockResolvedValueOnce([{ id: 'red-1' }]); // verifikasi baris reservasi
+
+      const res = await reopenOrder('ORD-CPN');
+
+      expect(res.success).toBe(true);
+      const reservation = query.mock.calls.find(([sql]) =>
+        String(sql).includes('INSERT OR IGNORE INTO coupon_redemptions')
+      );
+      expect(reservation).toBeDefined();
+      expect(reservation?.[1]).toEqual(
+        expect.arrayContaining(['cpn-reopen', 'ORD-CPN', 'nanda@test.com', 10000])
+      );
+    });
   });
 
   describe('expireOrderIfStale', () => {
@@ -1029,6 +1089,121 @@ describe('orderService', () => {
 
       expect(res.limit).toBe(100);
       expect(res.hasMore).toBe(false);
+    });
+  });
+
+  /**
+   * Jalur multi-template (v1.3.93) hanya ditulis oleh `createOrder`, jadi
+   * wiring-nya diuji di sini: rincian `order_items`, diskon bundel, dan
+   * reservasi kupon. Perhitungan angkanya sendiri diuji di
+   * `checkoutPricing.test.ts`.
+   */
+  describe('createOrder multi-template (v1.3.93)', () => {
+    const couponRow = {
+      id: 'cpn-1',
+      code: 'HEMAT10',
+      kind: 'percent',
+      value: 10,
+      min_subtotal: 0,
+      max_discount: null,
+      applies_to: null,
+      starts_at: null,
+      ends_at: null,
+      max_redemptions: 1,
+      max_per_email: null,
+      is_active: 1,
+      note: null,
+      archived_at: null,
+      created_at: '2026-11-01T00:00:00.000Z',
+      updated_at: '2026-11-01T00:00:00.000Z',
+    };
+
+    beforeEach(() => {
+      clearBundleTiersCache();
+    });
+
+    it('menulis satu order + order_items dengan diskon bundel 10% untuk 2 template', async () => {
+      vi.mocked(slugService.isSlugAvailable).mockResolvedValueOnce(true);
+      const query = vi.mocked(cloudflareD1.queryD1);
+      query
+        .mockResolvedValueOnce([]) // expire stale: activating-recovery sweep
+        .mockResolvedValueOnce([]) // expire stale: 7-day auto-cancel sweep
+        .mockResolvedValueOnce([]) // expire stale pending orders
+        .mockResolvedValueOnce(activePaymentConfigRows) // payment config
+        .mockResolvedValueOnce([]) // M5: duplicate order check
+        .mockResolvedValueOnce([]) // getBasePrice (platform_settings kosong → default)
+        .mockResolvedValueOnce([]) // getBundleTiers (belum disimpan → default 2→10%)
+        .mockResolvedValueOnce([]) // used unique offsets
+        .mockResolvedValueOnce([]) // INSERT orders
+        .mockResolvedValueOnce([]) // INSERT order_items #1
+        .mockResolvedValueOnce([]); // INSERT order_items #2
+
+      const res = await createOrder({
+        buyerName: 'Nanda',
+        buyerEmail: 'nanda@test.com',
+        buyerWhatsapp: '628123456789',
+        desiredSlug: 'nanda-design',
+        templateIds: ['os-desktop', 'infinite-canvas'],
+      });
+
+      expect(res.success).toBe(true);
+      // Subtotal 2 × Rp199.000, diskon bundel 10%, total + kode unik QRIS.
+      expect(res.order?.subtotal).toBe(398_000);
+      expect(res.order?.discount_total).toBe(39_800);
+      expect(res.order?.amount).toBeGreaterThanOrEqual(358_201);
+      expect(res.order?.amount).toBeLessThanOrEqual(359_199);
+      expect(res.order?.template_id).toBe('os-desktop');
+      expect(res.order?.coupon_code).toBeNull();
+
+      const itemInserts = query.mock.calls.filter((call) =>
+        String(call[0]).includes('INSERT OR IGNORE INTO order_items')
+      );
+      expect(itemInserts).toHaveLength(2);
+      expect(itemInserts[0][1]).toEqual(
+        expect.arrayContaining(['os-desktop', 199_000, 19_900, 179_100])
+      );
+      // Tanpa kupon: tidak boleh ada reservasi kuota.
+      expect(
+        query.mock.calls.some((call) => String(call[0]).includes('coupon_redemptions'))
+      ).toBe(false);
+    });
+
+    it('membatalkan order bila kuota kupon habis (COUPON_EXHAUSTED) dan tidak meninggalkan order setengah jadi', async () => {
+      vi.mocked(slugService.isSlugAvailable).mockResolvedValueOnce(true);
+      const query = vi.mocked(cloudflareD1.queryD1);
+      query
+        .mockResolvedValueOnce([]) // expire stale: activating-recovery sweep
+        .mockResolvedValueOnce([]) // expire stale: 7-day auto-cancel sweep
+        .mockResolvedValueOnce([]) // expire stale pending orders
+        .mockResolvedValueOnce(activePaymentConfigRows) // payment config
+        .mockResolvedValueOnce([]) // M5: duplicate order check
+        .mockResolvedValueOnce([]) // getBasePrice
+        // 1 template → getBundleTiers dilewati
+        .mockResolvedValueOnce([couponRow]) // evaluateCoupon: SELECT coupons
+        .mockResolvedValueOnce([]) // used unique offsets
+        .mockResolvedValueOnce([]) // INSERT orders
+        .mockResolvedValueOnce([]) // INSERT order_items
+        .mockResolvedValueOnce([]) // reserveCouponRedemption: INSERT ... SELECT (tidak menulis)
+        .mockResolvedValueOnce([]) // verifikasi baris reservasi → kosong
+        .mockResolvedValueOnce([]) // DELETE order_items
+        .mockResolvedValueOnce([]); // DELETE orders
+
+      const res = await createOrder({
+        buyerName: 'Nanda',
+        buyerEmail: 'nanda@test.com',
+        buyerWhatsapp: '628123456789',
+        desiredSlug: 'nanda-design',
+        templateIds: ['os-desktop'],
+        couponCode: 'hemat10',
+      });
+
+      expect(res.success).toBe(false);
+      expect(res.code).toBe('COUPON_EXHAUSTED');
+      expect(
+        query.mock.calls.some((call) =>
+          String(call[0]).includes('DELETE FROM orders WHERE id = ?')
+        )
+      ).toBe(true);
     });
   });
 });

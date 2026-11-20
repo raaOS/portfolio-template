@@ -114,6 +114,11 @@ export const D1_SCHEMA_QUERIES = [
     buyer_email TEXT NOT NULL,
     buyer_whatsapp TEXT NOT NULL,
     amount INTEGER NOT NULL DEFAULT 0,
+    -- Rincian multi-template (v1.3.93): subtotal sebelum diskon, total diskon
+    -- (bundel ATAU kupon — tidak ditumpuk), dan kode kupon yang dipakai.
+    subtotal INTEGER NOT NULL DEFAULT 0,
+    discount_total INTEGER NOT NULL DEFAULT 0,
+    coupon_code TEXT,
     payment_method TEXT DEFAULT 'manual_qris',
     payment_proof_url TEXT,
     cancel_reason TEXT,
@@ -126,6 +131,53 @@ export const D1_SCHEMA_QUERIES = [
     expires_at TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
+  ) STRICT;`,
+
+  // 8a. Order Items (satu order boleh berisi beberapa template)
+  `CREATE TABLE IF NOT EXISTS order_items (
+    id TEXT PRIMARY KEY,
+    order_id TEXT NOT NULL,
+    template_id TEXT NOT NULL,
+    template_name TEXT,
+    list_price INTEGER NOT NULL DEFAULT 0,
+    discount_amount INTEGER NOT NULL DEFAULT 0,
+    final_price INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    UNIQUE(order_id, template_id)
+  ) STRICT;`,
+
+  // 8b. Coupons (kupon diskon owner — D1 owner, bukan situs klien)
+  `CREATE TABLE IF NOT EXISTS coupons (
+    id TEXT PRIMARY KEY,
+    code TEXT NOT NULL UNIQUE,
+    kind TEXT NOT NULL DEFAULT 'percent',
+    value INTEGER NOT NULL,
+    min_subtotal INTEGER NOT NULL DEFAULT 0,
+    max_discount INTEGER,
+    -- JSON array template id; NULL = berlaku untuk semua template.
+    applies_to TEXT,
+    starts_at TEXT,
+    ends_at TEXT,
+    max_redemptions INTEGER,
+    max_per_email INTEGER,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    note TEXT,
+    archived_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    CHECK (kind IN ('percent', 'fixed'))
+  ) STRICT;`,
+
+  // 8c. Coupon Redemptions (reservasi kuota saat order dibuat)
+  `CREATE TABLE IF NOT EXISTS coupon_redemptions (
+    id TEXT PRIMARY KEY,
+    coupon_id TEXT NOT NULL,
+    order_id TEXT NOT NULL,
+    buyer_email TEXT NOT NULL,
+    discount_amount INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    UNIQUE(coupon_id, order_id),
+    UNIQUE(order_id)
   ) STRICT;`,
 
   // 10. Site Custom Domains
@@ -179,6 +231,9 @@ export const D1_SCHEMA_QUERIES = [
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_amount_active ON orders(amount) WHERE status IN ('pending_payment', 'waiting_verification', 'activating');`,
   `CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);`,
   `CREATE INDEX IF NOT EXISTS idx_orders_email ON orders(buyer_email);`,
+  `CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);`,
+  `CREATE INDEX IF NOT EXISTS idx_coupons_active ON coupons(is_active, code);`,
+  `CREATE INDEX IF NOT EXISTS idx_coupon_redemptions_coupon ON coupon_redemptions(coupon_id);`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_site_custom_domains_hostname ON site_custom_domains(hostname);`,
   `CREATE INDEX IF NOT EXISTS idx_site_analytics_site ON site_analytics(site_id);`,
 ];

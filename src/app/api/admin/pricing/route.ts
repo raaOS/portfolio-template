@@ -3,8 +3,10 @@ import { validateAdminRequest } from '@/lib/auth';
 import { requireOwnerMode } from '@/lib/ownerMode';
 import {
   getBasePrice,
+  getBundleTiers,
   getOwnerWhatsapp,
   updateBasePrice,
+  updateBundleTiers,
   updateOwnerWhatsapp,
 } from '@/lib/services/pricingConfigService';
 
@@ -32,11 +34,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const [basePrice, adminWhatsapp] = await Promise.all([
+    const [basePrice, adminWhatsapp, bundleTiers] = await Promise.all([
       getBasePrice(),
       getOwnerWhatsapp(),
+      getBundleTiers(),
     ]);
-    return NextResponse.json({ success: true, basePrice, adminWhatsapp });
+    return NextResponse.json({ success: true, basePrice, adminWhatsapp, bundleTiers });
   } catch (error: unknown) {
     console.error('GET /api/admin/pricing error:', error);
     return NextResponse.json({ error: 'Gagal memuat harga' }, { status: 500 });
@@ -63,17 +66,31 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const hasPrice = body?.basePrice !== undefined;
     const hasWhatsapp = body?.adminWhatsapp !== undefined;
+    const hasBundle = body?.bundleTiers !== undefined;
 
-    if (!hasPrice && !hasWhatsapp) {
+    if (!hasPrice && !hasWhatsapp && !hasBundle) {
       return NextResponse.json(
-        { error: 'Tidak ada data yang disimpan (basePrice / adminWhatsapp).' },
+        { error: 'Tidak ada data yang disimpan (basePrice / adminWhatsapp / bundleTiers).' },
         { status: 400 }
       );
     }
 
     let basePrice: number | undefined;
     let adminWhatsapp: string | undefined;
+    let bundleTiers;
     const saved: string[] = [];
+
+    if (hasBundle) {
+      const bundleResult = await updateBundleTiers(body?.bundleTiers);
+      if (!bundleResult.success) {
+        return NextResponse.json(
+          { error: bundleResult.error || 'Gagal menyimpan diskon bundel' },
+          { status: 400 }
+        );
+      }
+      bundleTiers = bundleResult.tiers;
+      saved.push('Diskon bundel');
+    }
 
     if (hasPrice) {
       const priceResult = await updateBasePrice(body?.basePrice);
@@ -103,6 +120,7 @@ export async function PUT(request: NextRequest) {
       success: true,
       ...(basePrice !== undefined ? { basePrice } : {}),
       ...(adminWhatsapp !== undefined ? { adminWhatsapp } : {}),
+      ...(bundleTiers !== undefined ? { bundleTiers } : {}),
       message: `${saved.join(' & ')} berhasil disimpan`,
     });
   } catch (error: unknown) {

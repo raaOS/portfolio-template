@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     // TIDAK lewat rate-limit publik `billing_checkout` (5/menit per IP) karena
     // pemanggilnya owner sendiri — anti-spam publik tidak relevan di sini.
     if (action === 'create') {
-      const { buyerName, buyerEmail, buyerWhatsapp, desiredSlug, templateId } = body;
+      const { buyerName, buyerEmail, buyerWhatsapp, desiredSlug, templateId, templateIds, couponCode } = body;
 
       if (!buyerName || !buyerEmail || !buyerWhatsapp) {
         return NextResponse.json(
@@ -94,6 +94,10 @@ export async function POST(request: NextRequest) {
           buyerWhatsapp,
           desiredSlug: slug,
           templateId: typeof templateId === 'string' && templateId.trim() ? templateId.trim() : undefined,
+          templateIds: Array.isArray(templateIds)
+            ? templateIds.filter((id: unknown): id is string => typeof id === 'string' && id.trim() !== '')
+            : undefined,
+          couponCode: typeof couponCode === 'string' && couponCode.trim() ? couponCode.trim() : undefined,
         },
         {
           TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,

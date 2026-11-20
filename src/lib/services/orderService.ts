@@ -6,8 +6,27 @@ import { isSlugAvailable } from './slugService';
 import { getPaymentConfig, type PaymentConfig } from './paymentConfigService';
 import { logActivity } from '@/lib/services/auditLogger';
 import { deleteFromR2, isR2StorageConfigured, listR2ObjectKeys } from '@/lib/r2Storage';
-import { getBasePrice } from '@/lib/services/pricingConfigService';
-import { getTemplate } from '@/lib/templates/registry';
+import { getBasePrice, getBundleTiers } from '@/lib/services/pricingConfigService';
+import { getTemplate, TEMPLATES } from '@/lib/templates/registry';
+import {
+  PUBLIC_COUPON_ERROR,
+  evaluateCoupon,
+  getCouponByCode,
+  releaseCouponRedemption,
+  reserveCouponRedemption,
+} from './couponService';
+import { computeQuote, type QuoteResult } from './checkoutPricing';
+
+export interface OrderItemRecord {
+  id: string;
+  order_id: string;
+  template_id: string;
+  template_name: string | null;
+  list_price: number;
+  discount_amount: number;
+  final_price: number;
+  created_at: string;
+}
 
 export interface OrderRecord {
   id: string;
@@ -18,6 +37,11 @@ export interface OrderRecord {
   buyer_email: string;
   buyer_whatsapp: string;
   amount: number;
+  /** Subtotal sebelum diskon (v1.3.93). */
+  subtotal?: number;
+  /** Diskon bundel ATAU kupon — tidak pernah ditumpuk. */
+  discount_total?: number;
+  coupon_code?: string | null;
   payment_method: string;
   payment_proof_url?: string | null;
   cancel_reason?: string | null;
@@ -36,7 +60,11 @@ export interface CreateOrderInput {
   buyerEmail: string;
   buyerWhatsapp: string;
   desiredSlug: string;
+  /** Jalur lama: satu template. */
   templateId?: string;
+  /** Jalur baru (v1.3.93): satu atau lebih template dalam satu order. */
+  templateIds?: string[];
+  couponCode?: string;
   amount?: number;
 }
 
@@ -126,6 +154,7 @@ async function expireStalePendingOrders(nowIso: string, pendingCutoffIso?: strin
   // Bersihkan juga file bukti bayarnya di R2 (DB sudah tidak merujuknya).
   for (const row of staleCanceled || []) {
     if (!row?.id) continue;
+    await releaseCouponRedemption(row.id);
     await cleanupOrderProofObjects(row.id);
     sendOrderCanceledEmail({
       to: row.buyer_email,
@@ -167,6 +196,9 @@ async function expireStalePendingOrders(nowIso: string, pendingCutoffIso?: strin
   // spam jika buyer memiliki banyak order pending yang expired bersamaan.
   const notifiedEmails = new Set<string>();
   for (const order of pendingStale) {
+    // Reservasi kupon order yang kedaluwarsa dilepas agar kuota tidak habis
+    // karena checkout yang tidak pernah dibayar (v1.3.93).
+    await releaseCouponRedemption(order.id);
     const email = order.buyer_email.toLowerCase();
     if (notifiedEmails.has(email)) continue;
     notifiedEmails.add(email);
@@ -205,6 +237,7 @@ export async function expireOrderIfStale(orderId: string): Promise<void> {
 
   if (expiredRows.length > 0) {
     const order = expiredRows[0];
+    await releaseCouponRedemption(order.id);
     const baseUrl = getPublicBaseUrl();
     const checkoutUrl = `${baseUrl}/checkout`;
     sendOrderExpiredEmail({
@@ -278,9 +311,43 @@ function escapeTelegramHtml(value: string | number | null | undefined): string {
 }
 
 function formatTemplateName(templateId?: string | null): string {
-  if (templateId === 'spatial-gallery') return '3D Spatial Gallery';
-  if (templateId === 'infinite-canvas') return 'Infinite Canvas';
-  return 'macOS Desktop';
+  if (!templateId) return 'macOS Desktop';
+  return getTemplate(templateId)?.name || templateId;
+}
+
+function formatTemplateNames(templateIds: string[]): string {
+  return templateIds.map((id) => formatTemplateName(id)).join(' + ');
+}
+
+/** Buang duplikat & ID kosong, pertahankan urutan pilihan pembeli. */
+function normalizeTemplateIds(input: CreateOrderInput): string[] {
+  const raw = input.templateIds && input.templateIds.length > 0
+    ? input.templateIds
+    : input.templateId
+      ? [input.templateId]
+      : [];
+  return Array.from(
+    new Set(raw.map((id) => String(id || '').trim()).filter(Boolean))
+  );
+}
+
+/** Baris item order — dipakai endpoint pembeli & panel owner. */
+export async function getOrderItems(orderId: string): Promise<OrderItemRecord[]> {
+  if (!orderId) return [];
+  const rows = await queryD1<OrderItemRecord>(
+    `SELECT id, order_id, template_id, template_name, list_price,
+            discount_amount, final_price, created_at
+       FROM order_items
+      WHERE order_id = ?
+      ORDER BY created_at ASC`,
+    [orderId]
+  );
+  return (rows || []).map((row) => ({
+    ...row,
+    list_price: Number(row.list_price || 0),
+    discount_amount: Number(row.discount_amount || 0),
+    final_price: Number(row.final_price || 0),
+  }));
 }
 
 function normalizePaymentProofUrl(proofUrl: string): string | null {
@@ -808,7 +875,13 @@ export async function verifyOrderAccessToken(orderId: string, token: string): Pr
 export async function createOrder(
   input: CreateOrderInput,
   env: { TELEGRAM_BOT_TOKEN?: string; TELEGRAM_ADMIN_CHAT_ID?: string; APP_BASE_URL?: string } = {}
-): Promise<{ success: boolean; order?: OrderRecord; accessToken?: string; error?: string }> {
+): Promise<{
+  success: boolean;
+  order?: OrderRecord;
+  accessToken?: string;
+  error?: string;
+  code?: 'COUPON_INVALID' | 'COUPON_EXHAUSTED' | 'TEMPLATE_INVALID';
+}> {
   const slugLower = input.desiredSlug.trim().toLowerCase();
   const now = new Date();
   const createdAt = now.toISOString();
@@ -817,9 +890,35 @@ export async function createOrder(
   // Validasi template di chokepoint ini (satu-satunya penulis orders.template_id):
   // `?template=` dari client mana pun tidak boleh menyimpan ID arbitrer yang nanti
   // dipakai saat provisioning (audit 2026-11-12).
-  if (input.templateId && !getTemplate(input.templateId)) {
-    return { success: false, error: 'Template tidak dikenal. Silakan pilih salah satu template yang tersedia.' };
+  const templateIds = normalizeTemplateIds(input);
+  if (templateIds.length === 0 && Array.isArray(input.templateIds)) {
+    return {
+      success: false,
+      code: 'TEMPLATE_INVALID',
+      error: 'Pilih minimal satu template sebelum memesan.',
+    };
   }
+  if (templateIds.length > TEMPLATES.length) {
+    return {
+      success: false,
+      code: 'TEMPLATE_INVALID',
+      error: 'Jumlah template melebihi katalog yang tersedia.',
+    };
+  }
+  const unknownTemplate = templateIds.find((id) => !getTemplate(id));
+  if (unknownTemplate) {
+    return {
+      success: false,
+      code: 'TEMPLATE_INVALID',
+      error: 'Template tidak dikenal. Silakan pilih salah satu template yang tersedia.',
+    };
+  }
+
+  // Jalur lama (satu template, tanpa kupon) dipertahankan persis seperti
+  // sebelumnya supaya alur chat-first admin & klien lama tidak berubah.
+  // `templateIds` (array) menandai checkout baru yang boleh multi-template.
+  const legacySinglePath =
+    !Array.isArray(input.templateIds) && templateIds.length <= 1 && !input.couponCode;
 
   await expireStalePendingOrders(createdAt);
 
@@ -859,8 +958,34 @@ export async function createOrder(
 
   // Nominal dasar = harga dari D1 (panel admin "Harga Jual"); `input.amount`
   // hanya dipakai test/executor eksternal — route checkout tidak pernah
-  // meneruskan amount dari klien.
-  const baseAmount = input.amount ?? (await getBasePrice());
+  // meneruskan amount dari klien. Pada jalur multi-template `input.amount`
+  // berarti harga per template (bukan total).
+  const listPrice = Math.max(0, Math.floor(input.amount ?? (await getBasePrice())));
+  let quote: QuoteResult | null = null;
+  let couponRecord: Awaited<ReturnType<typeof getCouponByCode>> = null;
+
+  if (!legacySinglePath) {
+    const items = templateIds.map((templateId) => ({ templateId, listPrice }));
+    const bundleTiers = items.length > 1 ? await getBundleTiers() : [];
+    let couponRule = null;
+
+    if (input.couponCode) {
+      const evaluation = await evaluateCoupon(input.couponCode, items, now);
+      if (!evaluation.usable || !evaluation.rule) {
+        return {
+          success: false,
+          code: 'COUPON_INVALID',
+          error: evaluation.reason || PUBLIC_COUPON_ERROR,
+        };
+      }
+      couponRule = evaluation.rule;
+      couponRecord = evaluation.record ?? null;
+    }
+
+    quote = computeQuote({ items, bundleTiers, coupon: couponRule });
+  }
+
+  const baseAmount = legacySinglePath ? listPrice : (quote?.total ?? listPrice);
   let amount = baseAmount;
   let forceUniqueAmount = false;
   let releasedStaleUniqueSlots = false;
@@ -898,11 +1023,21 @@ export async function createOrder(
       // SECURITY FIX (audit 2026-09-29): templateId diterima route checkout
       // tapi sebelumnya tidak pernah ikut INSERT — pilihan template buyer
       // hilang diam-diam. Kolom `template_id` sudah ada di schema orders.
+      // v1.3.93: `template_id` = template utama (item pertama); seluruh
+      // pilihan disimpan di `order_items`.
+      const subtotalValue = legacySinglePath ? baseAmount : (quote?.subtotal ?? baseAmount);
+      const discountValue = legacySinglePath ? 0 : (quote?.appliedDiscount ?? 0);
+      const couponValue =
+        !legacySinglePath && quote?.appliedSource === 'coupon' && couponRecord
+          ? couponRecord.code
+          : null;
+
       await queryD1(
         `INSERT INTO orders (
           id, desired_slug, buyer_name, buyer_email, buyer_whatsapp,
-          amount, payment_method, access_token_hash, status, expires_at, created_at, updated_at, template_id
-        ) VALUES (?, ?, ?, ?, ?, ?, 'manual_qris', ?, 'pending_payment', ?, ?, ?, ?)`,
+          amount, subtotal, discount_total, coupon_code, payment_method,
+          access_token_hash, status, expires_at, created_at, updated_at, template_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual_qris', ?, 'pending_payment', ?, ?, ?, ?)`,
         [
           attemptOrderId,
           slugLower,
@@ -910,11 +1045,14 @@ export async function createOrder(
           input.buyerEmail.trim().toLowerCase(),
           input.buyerWhatsapp.trim(),
           amount,
+          subtotalValue,
+          discountValue,
+          couponValue,
           hashAccessToken(attemptAccessToken),
           expiresAt,
           createdAt,
           updatedAt,
-          input.templateId ?? null
+          templateIds[0] ?? null
         ]
       );
       orderId = attemptOrderId;
@@ -938,14 +1076,71 @@ export async function createOrder(
     }
   }
 
+  // Simpan rincian item + reservasi kuota kupon (jalur checkout baru).
+  // Order sudah memegang slug & nominal pada titik ini; kegagalan di sini
+  // menghapus order supaya pembeli tidak menerima tagihan yang salah.
+  if (!legacySinglePath && quote) {
+    try {
+      for (const item of quote.items) {
+        await queryD1(
+          `INSERT OR IGNORE INTO order_items
+             (id, order_id, template_id, template_name, list_price,
+              discount_amount, final_price, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            `itm-${orderId}-${item.templateId}`,
+            orderId,
+            item.templateId,
+            formatTemplateName(item.templateId),
+            item.listPrice,
+            item.discount,
+            item.finalPrice,
+            createdAt,
+          ]
+        );
+      }
+
+      if (quote.appliedSource === 'coupon' && couponRecord) {
+        const reserved = await reserveCouponRedemption(couponRecord, {
+          orderId,
+          buyerEmail: input.buyerEmail,
+          discount: quote.appliedDiscount,
+        });
+        if (!reserved) {
+          await queryD1('DELETE FROM order_items WHERE order_id = ?', [orderId]);
+          await queryD1('DELETE FROM orders WHERE id = ?', [orderId]);
+          return {
+            success: false,
+            code: 'COUPON_EXHAUSTED',
+            error: 'Kupon baru saja mencapai batas pemakaian. Silakan coba lagi tanpa kupon.',
+          };
+        }
+      }
+    } catch (err) {
+      console.error(`[createOrder] Gagal menyimpan rincian order ${orderId}:`, err);
+      await queryD1('DELETE FROM order_items WHERE order_id = ?', [orderId]).catch(() => {});
+      await queryD1('DELETE FROM orders WHERE id = ?', [orderId]).catch(() => {});
+      return {
+        success: false,
+        error: 'Gagal menyimpan rincian pesanan. Silakan coba lagi.',
+      };
+    }
+  }
+
   const newOrder: OrderRecord = {
     id: orderId,
-    template_id: input.templateId ?? null,
+    template_id: templateIds[0] ?? null,
     desired_slug: slugLower,
     buyer_name: input.buyerName.trim(),
     buyer_email: input.buyerEmail.trim().toLowerCase(),
     buyer_whatsapp: input.buyerWhatsapp.trim(),
     amount,
+    subtotal: legacySinglePath ? baseAmount : (quote?.subtotal ?? baseAmount),
+    discount_total: legacySinglePath ? 0 : (quote?.appliedDiscount ?? 0),
+    coupon_code:
+      !legacySinglePath && quote?.appliedSource === 'coupon' && couponRecord
+        ? couponRecord.code
+        : null,
     payment_method: 'manual_qris',
     status: 'pending_payment',
     expires_at: expiresAt,
@@ -954,13 +1149,23 @@ export async function createOrder(
   };
 
   // Notify Telegram Admin (Information only)
+  const discountNote =
+    !legacySinglePath && quote && quote.appliedDiscount > 0
+      ? `Subtotal: Rp ${quote.subtotal.toLocaleString('id-ID')}\n` +
+        `Diskon ${
+          quote.appliedSource === 'coupon'
+            ? `kupon ${couponRecord?.code ?? ''}`.trim()
+            : `bundel ${quote.bundlePercent}%`
+        }: -Rp ${quote.appliedDiscount.toLocaleString('id-ID')}\n`
+      : '';
   const tgMsg = `🛒 <b>ORDER BARU (BELUM DIBAYAR)</b>\n\n` +
     `ID: <code>${escapeTelegramHtml(orderId)}</code>\n` +
-    `Template: <b>${escapeTelegramHtml(formatTemplateName(input.templateId))}</b>\n` +
+    `Template: <b>${escapeTelegramHtml(formatTemplateNames(templateIds))}</b>\n` +
     `Slug: <code>${escapeTelegramHtml(slugLower)}</code>\n` +
     `Buyer: ${escapeTelegramHtml(input.buyerName)}\n` +
     `WA: ${escapeTelegramHtml(input.buyerWhatsapp)}\n` +
     `Email: ${escapeTelegramHtml(input.buyerEmail)}\n` +
+    discountNote +
     `Nominal: <b>Rp ${amount.toLocaleString('id-ID')}</b>\n` +
     `Status: <i>pending_payment</i> (Expired in 24h)`;
 
@@ -1515,6 +1720,9 @@ export async function cancelOrder(
   // via their secret token link.
   await cleanupOrderProofObjects(orderId);
 
+  // Lepas reservasi kupon agar kuota bisa dipakai pembeli lain (v1.3.93).
+  await releaseCouponRedemption(orderId);
+
   await logActivity('billing.order_cancel', {
     category: 'billing',
     orderId,
@@ -1601,6 +1809,25 @@ export async function reopenOrder(
   const reopened = updated[0];
   if (!reopened) {
     return { success: false, message: `Status order ${orderId} berubah saat diproses. Coba lagi.` };
+  }
+
+  // Kupon: cancel melepas reservasi kuota (DELETE), jadi order yang dibuka
+  // kembali harus me-reserve ulang. Bila kuota sudah penuh, order TETAP dibuka
+  // (uangnya sudah masuk) — cukup dicatat untuk audit, jangan gagalkan reopen.
+  if (reopened.coupon_code) {
+    const coupon = await getCouponByCode(reopened.coupon_code);
+    if (coupon) {
+      const reserved = await reserveCouponRedemption(coupon, {
+        orderId,
+        buyerEmail: reopened.buyer_email,
+        discount: Number(reopened.discount_total || 0),
+      }).catch(() => false);
+      if (!reserved) {
+        console.warn(
+          `[reopenOrder] Kupon ${reopened.coupon_code} order ${orderId} tidak bisa direservasi ulang (kuota sedang penuh).`
+        );
+      }
+    }
   }
 
   await logActivity('billing.order_reopen', {

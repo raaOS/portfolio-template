@@ -86,6 +86,76 @@ export async function listOrderSlugs(): Promise<string[]> {
 }
 
 /**
+ * Template yang dibeli untuk slug ini di D1 owner (v1.3.93).
+ *
+ * Satu checkout bisa berisi beberapa template (`order_items`). Portal
+ * onboarding hanya menanyakan SATU template untuk `active_template_key`,
+ * jadi kepemilikan template lain harus diambil dari order agar pembeli
+ * multi-template tidak kehilangan aksesnya.
+ *
+ * Semua order lunas untuk slug ini digabung (bukan hanya yang terakhir):
+ * slug bisa pernah order lalu batal, lalu membeli lagi — setiap pembelian
+ * menambah template yang berhak dipakai.
+ *
+ * `price` = harga efektif per template (`order_items.final_price`, sudah
+ * dipotong diskon). `null` = order lama tanpa rincian item → pemanggil
+ * memakai harga default. Best-effort: query gagal → [].
+ */
+export interface PurchasedTemplate {
+  templateId: string;
+  price: number | null;
+}
+
+export async function listPurchasedTemplates(slug: string): Promise<PurchasedTemplate[]> {
+  loadProductEnv();
+  try {
+    const databaseId = getCurrentD1DatabaseId();
+    if (!databaseId) return [];
+
+    let items: Array<{ template_id: string; final_price: number }> = [];
+    try {
+      items = await queryD1ForDatabase<{ template_id: string; final_price: number }>(
+        databaseId,
+        `SELECT i.template_id AS template_id, i.final_price AS final_price
+           FROM order_items i
+           JOIN orders o ON o.id = i.order_id
+          WHERE o.desired_slug = ?
+            AND o.status IN ('activated', 'waiting_verification')
+          ORDER BY o.created_at ASC`,
+        [slug]
+      );
+    } catch {
+      // Tabel `order_items` belum ada di database owner lama — pakai fallback.
+      items = [];
+    }
+
+    const byTemplate = new Map<string, number | null>();
+    for (const item of items) {
+      if (!item?.template_id) continue;
+      const price = Number(item.final_price);
+      byTemplate.set(item.template_id, Number.isFinite(price) ? price : null);
+    }
+    if (byTemplate.size > 0) {
+      return Array.from(byTemplate, ([templateId, price]) => ({ templateId, price }));
+    }
+
+    const legacy = await queryD1ForDatabase<{ template_id: string | null }>(
+      databaseId,
+      `SELECT template_id FROM orders
+        WHERE desired_slug = ?
+          AND status IN ('activated', 'waiting_verification')
+        ORDER BY created_at DESC
+        LIMIT 1`,
+      [slug]
+    );
+    const main = legacy[0]?.template_id;
+    return main ? [{ templateId: main, price: null }] : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Catat bukti serah terima ke D1 owner: `orders.site_url` + `orders.provisioned_at`
  * pada order `activated` milik slug. WAJIB dijalankan sebelum gerbang email —
  * pencatatan tetap jalan walau email tidak dikonfigurasi (sesuai janji di

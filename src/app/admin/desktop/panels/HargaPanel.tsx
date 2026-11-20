@@ -30,6 +30,14 @@ export default function HargaPanel() {
   const [waError, setWaError] = useState('');
   const [waStatus, setWaStatus] = useState('');
 
+  // Diskon bundel otomatis (v1.3.93): { minItems, percent } per tier.
+  // Kupon & bundel tidak ditumpuk — checkout memakai yang lebih besar.
+  const [bundleTiers, setBundleTiers] = useState<Array<{ minItems: string; percent: string }>>([]);
+  const [savedBundleTiers, setSavedBundleTiers] = useState<Array<{ minItems: number; percent: number }>>([]);
+  const [isSavingBundle, setIsSavingBundle] = useState(false);
+  const [bundleError, setBundleError] = useState('');
+  const [bundleStatus, setBundleStatus] = useState('');
+
   const fetchPrice = useCallback(async () => {
     setIsLoading(true);
     setError('');
@@ -44,6 +52,22 @@ export default function HargaPanel() {
       const wa = typeof data.adminWhatsapp === 'string' ? data.adminWhatsapp : '';
       setAdminWhatsapp(wa);
       setWaInput(wa);
+
+      if (Array.isArray(data.bundleTiers)) {
+        const tiers = data.bundleTiers
+          .map((tier: { minItems?: unknown; percent?: unknown }) => ({
+            minItems: Number(tier?.minItems),
+            percent: Number(tier?.percent),
+          }))
+          .filter((tier: { minItems: number; percent: number }) => Number.isFinite(tier.minItems));
+        setSavedBundleTiers(tiers);
+        setBundleTiers(
+          tiers.map((tier: { minItems: number; percent: number }) => ({
+            minItems: String(tier.minItems),
+            percent: String(tier.percent),
+          }))
+        );
+      }
     } catch (err) {
       console.error('[HargaPanel] Gagal memuat harga:', err);
       setError('Gagal memuat harga. Coba segarkan.');
@@ -142,6 +166,65 @@ export default function HargaPanel() {
     }
   };
 
+  const bundlePreview = bundleTiers
+    .map((tier) => ({ minItems: Number(tier.minItems), percent: Number(tier.percent) }))
+    .filter((tier) => Number.isFinite(tier.minItems) && Number.isFinite(tier.percent))
+    .sort((a, b) => a.minItems - b.minItems);
+  const bundleDirty =
+    JSON.stringify(bundlePreview) !==
+    JSON.stringify([...savedBundleTiers].sort((a, b) => a.minItems - b.minItems));
+
+  const handleSaveBundle = async () => {
+    setBundleError('');
+    setBundleStatus('');
+
+    if (bundlePreview.length > 5) {
+      setBundleError('Maksimal 5 tier diskon bundel.');
+      return;
+    }
+    for (const tier of bundlePreview) {
+      if (!Number.isInteger(tier.minItems) || tier.minItems < 2 || tier.minItems > 10) {
+        setBundleError('Jumlah template per tier harus bilangan bulat 2–10.');
+        return;
+      }
+      if (!Number.isInteger(tier.percent) || tier.percent < 1 || tier.percent > 50) {
+        setBundleError('Persentase diskon harus bilangan bulat 1–50.');
+        return;
+      }
+    }
+
+    setIsSavingBundle(true);
+    try {
+      const token = getWritableCsrfToken();
+      const res = await fetch('/api/admin/pricing', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-csrf-token': token,
+        },
+        credentials: 'include',
+        body: JSON.stringify({ bundleTiers: bundlePreview }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+      const tiers = Array.isArray(data.bundleTiers) ? data.bundleTiers : bundlePreview;
+      setSavedBundleTiers(tiers);
+      setBundleTiers(
+        tiers.map((tier: { minItems: number; percent: number }) => ({
+          minItems: String(tier.minItems),
+          percent: String(tier.percent),
+        }))
+      );
+      setBundleStatus('Diskon bundel disimpan. Checkout memakai aturan baru dalam ≤60 detik.');
+    } catch (err) {
+      console.error('[HargaPanel] Gagal simpan diskon bundel:', err);
+      setBundleError(err instanceof Error ? err.message : 'Gagal menyimpan diskon bundel.');
+    } finally {
+      setIsSavingBundle(false);
+    }
+  };
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex shrink-0 items-center justify-between border-b border-gray-100 bg-gray-50/50 px-6 py-3">
@@ -194,6 +277,85 @@ export default function HargaPanel() {
             <Save size={15} />
             {isSaving ? 'Menyimpan…' : 'Simpan Harga'}
           </button>
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-white p-5">
+          <h3 className="mb-1 text-sm font-semibold text-gray-800">Diskon bundel otomatis</h3>
+          <p className="mb-3 text-xs text-gray-500">
+            Pembeli yang memilih beberapa template sekaligus mendapat potongan otomatis.
+            Kupon dan bundel <strong>tidak ditumpuk</strong> — checkout memakai yang lebih besar.
+          </p>
+
+          <div className="space-y-2">
+            {bundleTiers.length === 0 && (
+              <p className="text-xs text-gray-500">Belum ada tier — pembelian multi-template tanpa diskon.</p>
+            )}
+            {bundleTiers.map((tier, index) => (
+              <div key={index} className="flex flex-wrap items-center gap-2 text-sm text-gray-700">
+                <span>Mulai</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  aria-label="Jumlah template minimal pada tier"
+                  value={tier.minItems}
+                  onChange={(e) =>
+                    setBundleTiers((prev) =>
+                      prev.map((item, i) =>
+                        i === index ? { ...item, minItems: e.target.value.replace(/[^0-9]/g, '') } : item
+                      )
+                    )
+                  }
+                  className="w-16 rounded-lg border border-gray-300 px-2 py-1.5 text-center font-mono text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+                />
+                <span>template → diskon</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  aria-label="Persentase diskon tier"
+                  value={tier.percent}
+                  onChange={(e) =>
+                    setBundleTiers((prev) =>
+                      prev.map((item, i) =>
+                        i === index ? { ...item, percent: e.target.value.replace(/[^0-9]/g, '') } : item
+                      )
+                    )
+                  }
+                  className="w-16 rounded-lg border border-gray-300 px-2 py-1.5 text-center font-mono text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+                />
+                <span>%</span>
+                <button
+                  type="button"
+                  onClick={() => setBundleTiers((prev) => prev.filter((_, i) => i !== index))}
+                  className="ml-auto rounded border border-gray-200 px-2 py-1 text-xs text-rose-600 hover:bg-rose-50"
+                >
+                  Hapus
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                setBundleTiers((prev) => [...prev, { minItems: '2', percent: '10' }])
+              }
+              disabled={bundleTiers.length >= 5}
+              className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              + Tambah tier
+            </button>
+            <button
+              onClick={() => void handleSaveBundle()}
+              disabled={isLoading || isSavingBundle || !bundleDirty}
+              className="flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-amber-700 disabled:opacity-50"
+            >
+              <Save size={15} />
+              {isSavingBundle ? 'Menyimpan…' : 'Simpan Diskon Bundel'}
+            </button>
+          </div>
+          {bundleError && <p className="mt-2 text-sm text-red-600">{bundleError}</p>}
+          {bundleStatus && <p className="mt-2 text-sm text-emerald-600">{bundleStatus}</p>}
         </div>
 
         <div className="rounded-xl border border-gray-200 bg-white p-5">

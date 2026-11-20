@@ -1,24 +1,49 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { BASE_PRICE, formatIdr } from '@/constants/pricing';
-
-/** Katalog template yang bisa dipilih saat checkout. */
-const TEMPLATES = [
-  { id: 'os-desktop', label: 'OS Desktop', desc: 'Desktop simulator bergaya macOS' },
-  { id: 'infinite-canvas', label: 'Infinite Canvas', desc: 'Drag dan zoom project cards' },
-  { id: 'spatial-gallery', label: 'Spatial Gallery', desc: '3D spatial gallery dengan curved grid dan orbital artwork' },
-];
+import { TEMPLATES } from '@/lib/templates/registry';
 
 /**
  * Form checkout (client). Gerbang `isStorefrontDeployment()` ada di
  * `page.tsx` (server) — komponen ini tidak boleh dipanggil di situs klien.
  *
+ * Sejak v1.3.93 pembeli boleh memilih SATU ATAU BEBERAPA template dalam satu
+ * checkout (satu order, satu pembayaran QRIS). Harga & diskon di layar adalah
+ * hasil `/api/billing/quote` (dihitung server dari D1 owner); nominal yang
+ * ditagih selalu dihitung ulang oleh `createOrder` dengan modul yang sama.
+ *
  * `initialTemplateId` datang dari `?template=<id>` (mis. tombol "Pesan" di
  * overlay demo hero). Nilai tak dikenal jatuh ke template pertama.
  */
+interface QuoteItem {
+  templateId: string;
+  name: string;
+  listPrice: number;
+  discount: number;
+  finalPrice: number;
+}
+
+interface QuoteData {
+  success: boolean;
+  items: QuoteItem[];
+  itemCount: number;
+  subtotal: number;
+  bundlePercent: number;
+  bundleDiscount: number;
+  couponCode: string | null;
+  couponDiscount: number;
+  appliedDiscount: number;
+  appliedSource: 'none' | 'bundle' | 'coupon';
+  total: number;
+  couponMessage: string | null;
+}
+
+const NORMALIZE_COUPON = (value: string) =>
+  value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+
 export default function CheckoutForm({ initialTemplateId }: { initialTemplateId?: string }) {
   const router = useRouter();
   const [buyerName, setBuyerName] = useState('');
@@ -32,16 +57,20 @@ export default function CheckoutForm({ initialTemplateId }: { initialTemplateId?
     state: 'idle' | 'checking' | 'available' | 'unavailable';
     message: string;
   }>({ slug: '', state: 'idle', message: '' });
-  const [templateId, setTemplateId] = useState(() =>
-    TEMPLATES.some((t) => t.id === initialTemplateId)
-      ? (initialTemplateId as string)
-      : TEMPLATES[0].id,
-  );
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>(() => {
+    const known = TEMPLATES.find((t) => t.id === initialTemplateId);
+    return [known ? known.id : TEMPLATES[0].id];
+  });
+  const [couponInput, setCouponInput] = useState('');
+  const [couponApplied, setCouponApplied] = useState<string | null>(null);
+  const [quote, setQuote] = useState<QuoteData | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [paymentActive, setPaymentActive] = useState(true);
+
+  // Harga tampil fallback; sumber sebenarnya adalah respons quote (D1 owner).
+  const [basePrice, setBasePrice] = useState(BASE_PRICE);
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const name = e.target.value;
@@ -55,11 +84,7 @@ export default function CheckoutForm({ initialTemplateId }: { initialTemplateId?
       .slice(0, 24);
 
     if (clean) {
-      const suggestions = [
-        clean,
-        `${clean}-portfolio`,
-        `karya-${clean}`,
-      ];
+      const suggestions = [clean, `${clean}-portfolio`, `karya-${clean}`];
       setSlugSuggestions(suggestions);
       if (!slugTouched) {
         setDesiredSlug(clean);
@@ -71,9 +96,6 @@ export default function CheckoutForm({ initialTemplateId }: { initialTemplateId?
       }
     }
   };
-  // Harga tampil dari payment-info (satu fetch untuk QRIS + harga);
-  // nominal diorders tetap dihitung server dari D1. Fallback: BASE_PRICE.
-  const [basePrice, setBasePrice] = useState(BASE_PRICE);
 
   useEffect(() => {
     (async () => {
@@ -95,8 +117,6 @@ export default function CheckoutForm({ initialTemplateId }: { initialTemplateId?
   // Cek ketersediaan slug real-time (endpoint GET yang sudah ada, rate limit
   // 30/menit). Debounce 600 ms supaya mengetik tidak membanjiri D1; pembatalan
   // via AbortController mencegah hasil lama menimpa hasil baru.
-  // Status disimpan bersama slug yang diperiksa, lalu diturunkan (`slugCheck`)
-  // saat render — tidak ada setState sinkron di body effect.
   useEffect(() => {
     const slug = desiredSlug.trim();
     if (slug.length < 3) return;
@@ -136,22 +156,95 @@ export default function CheckoutForm({ initialTemplateId }: { initialTemplateId?
     };
   }, [desiredSlug]);
 
-  // Close dropdown on click outside
+  // Hitung ulang rincian harga setiap pilihan template / kupon berubah.
+  // Debounce pendek agar klik cepat beberapa template hanya memicu satu request.
+  const selectedKey = selectedIds.join(',');
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setDropdownOpen(false);
+    const ids = selectedKey ? selectedKey.split(',') : [];
+    // Minimal satu template selalu terpilih (toggleTemplate menahannya), jadi
+    // cabang kosong hanya jaring pengaman — jangan setState di body effect.
+    if (ids.length === 0) return;
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setQuoteLoading(true);
+      try {
+        const res = await fetch('/api/billing/quote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ templateIds: ids, couponCode: couponApplied || undefined }),
+          signal: controller.signal,
+        });
+        const data = (await res.json()) as QuoteData;
+        if (res.ok && data.success) {
+          setQuote(data);
+          if (typeof data.items?.[0]?.listPrice === 'number' && data.items[0].listPrice > 0) {
+            setBasePrice(data.items[0].listPrice);
+          }
+        }
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name === 'AbortError') return;
+        // Biarkan nilai terakhir tampil; createOrder tetap menghitung ulang.
+      } finally {
+        setQuoteLoading(false);
       }
+    }, 250);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [selectedKey, couponApplied]);
+
+  const toggleTemplate = (id: string) => {
+    setErrorMessage('');
+    setSelectedIds((prev) => {
+      if (prev.includes(id)) {
+        // Minimal satu template harus tetap dipilih.
+        return prev.length === 1 ? prev : prev.filter((item) => item !== id);
+      }
+      return TEMPLATES.filter((t) => prev.includes(t.id) || t.id === id).map((t) => t.id);
+    });
+  };
+
+  const applyCoupon = useCallback(() => {
+    const code = NORMALIZE_COUPON(couponInput);
+    setErrorMessage('');
+    if (code.length < 3) {
+      setCouponApplied(null);
+      setErrorMessage('Kode kupon terlalu pendek.');
+      return;
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    setCouponInput(code);
+    setCouponApplied(code);
+  }, [couponInput]);
+
+  const clearCoupon = useCallback(() => {
+    setCouponApplied(null);
+    setCouponInput('');
   }, []);
 
-  const selectedTemplate = TEMPLATES.find((t) => t.id === templateId) || TEMPLATES[0];
-
-  // Turunan status slug: hanya ditampilkan kalau hasilnya milik slug yang sekarang.
   const slugCheck =
     slugStatus.slug === desiredSlug.trim() ? slugStatus : { state: 'idle' as const, message: '' };
+
+  const total = quote?.total ?? basePrice * selectedIds.length;
+  const itemCount = quote?.itemCount ?? selectedIds.length;
+  const subtotal = quote?.subtotal ?? basePrice * selectedIds.length;
+  const couponNotice = useMemo(() => {
+    if (!quote) return null;
+    if (quote.couponMessage) return quote.couponMessage;
+    if (quote.appliedSource === 'bundle' && couponApplied) {
+      return 'Kupon valid, tetapi diskon bundel otomatis lebih besar — diskon bundel yang dipakai (tidak ditumpuk).';
+    }
+    if (quote.couponCode && quote.appliedSource === 'coupon') {
+      // Pakai `appliedDiscount` (bukan `couponDiscount` mentah) supaya angka di
+      // sini selalu sama dengan baris diskon di ringkasan — kupon nominal besar
+      // dipangkas oleh batas bawah Rp1.000.
+      return `Kupon ${quote.couponCode} dipakai — potongan ${formatIdr(quote.appliedDiscount)}.`;
+    }
+    return null;
+  }, [quote, couponApplied]);
+  const couponError = Boolean(quote?.couponMessage);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -167,6 +260,16 @@ export default function CheckoutForm({ initialTemplateId }: { initialTemplateId?
       return;
     }
 
+    // Kode yang diketik tapi belum ditekan "Terapkan" dulu terbuang diam-diam →
+    // pembeli tertagih harga penuh. Blokir supaya selisih harga tidak mengejutkan.
+    const pendingCoupon = NORMALIZE_COUPON(couponInput);
+    if (pendingCoupon && pendingCoupon !== couponApplied) {
+      setErrorMessage(
+        'Kode kupon belum diterapkan. Klik "Terapkan" untuk memakainya, atau kosongkan kolom kupon.'
+      );
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -178,7 +281,8 @@ export default function CheckoutForm({ initialTemplateId }: { initialTemplateId?
           buyerEmail: buyerEmail.trim(),
           buyerWhatsapp: buyerWhatsapp.trim(),
           desiredSlug: desiredSlug.trim().toLowerCase(),
-          templateId,
+          templateIds: selectedIds,
+          couponCode: couponApplied || undefined,
         }),
       });
 
@@ -206,13 +310,17 @@ export default function CheckoutForm({ initialTemplateId }: { initialTemplateId?
         <div className="checkout-info">
           <h1>Checkout</h1>
           <p className="checkout-desc">
-            Lengkapi data berikut untuk membuat pesanan. Setelah submit, Anda akan
-            diarahkan ke halaman pembayaran QRIS.
+            Pilih satu atau beberapa template sekaligus. Semua template yang dipilih
+            dibayar dalam satu tagihan QRIS dan bisa diakses dari satu akun.
           </p>
 
           <div className="checkout-price-box">
-            <span className="checkout-price-label">Total pembayaran</span>
-            <span className="checkout-price-value">{formatIdr(basePrice)}</span>
+            <span className="checkout-price-label">
+              Total pembayaran · {itemCount} template
+            </span>
+            <span className="checkout-price-value">
+              {quoteLoading && !quote ? '…' : formatIdr(total)}
+            </span>
           </div>
 
           <ul className="checkout-includes">
@@ -256,7 +364,7 @@ export default function CheckoutForm({ initialTemplateId }: { initialTemplateId?
             />
             <div style={{ marginTop: '0.35rem', fontSize: '0.75rem', color: '#666' }}>
               Nama alamat website Anda:{' '}
-              <code style={{ background: '#f1f5f9', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 600, color: '#0f172a' }}>
+              <code style={{ background: '#1a1a1a', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 600, color: '#e5e5e5' }}>
                 {desiredSlug || 'nama-anda'}
               </code>
               <br />
@@ -276,10 +384,10 @@ export default function CheckoutForm({ initialTemplateId }: { initialTemplateId?
                   fontSize: '0.75rem',
                   color:
                     slugCheck.state === 'available'
-                      ? '#15803d'
+                      ? '#4ade80'
                       : slugCheck.state === 'unavailable'
-                        ? '#b91c1c'
-                        : '#666',
+                        ? '#f87171'
+                        : '#888',
                 }}
               >
                 {slugCheck.state === 'available' ? '✓ ' : slugCheck.state === 'unavailable' ? '✕ ' : ''}
@@ -303,9 +411,9 @@ export default function CheckoutForm({ initialTemplateId }: { initialTemplateId?
                         fontSize: '0.72rem',
                         padding: '0.2rem 0.55rem',
                         borderRadius: '9999px',
-                        border: desiredSlug === sug ? '1px solid #1e40af' : '1px solid #cbd5e1',
-                        background: desiredSlug === sug ? '#eff6ff' : '#ffffff',
-                        color: desiredSlug === sug ? '#1e40af' : '#475569',
+                        border: desiredSlug === sug ? '1px solid #60a5fa' : '1px solid #333',
+                        background: desiredSlug === sug ? '#172554' : '#111',
+                        color: desiredSlug === sug ? '#bfdbfe' : '#94a3b8',
                         fontWeight: desiredSlug === sug ? 600 : 500,
                         cursor: 'pointer',
                         transition: 'all 0.15s ease',
@@ -343,61 +451,112 @@ export default function CheckoutForm({ initialTemplateId }: { initialTemplateId?
             />
           </div>
 
-          <div className="checkout-field" ref={dropdownRef}>
-            <label>Pilih template</label>
-            <button
-              type="button"
-              className="checkout-dropdown-trigger"
-              onClick={() => setDropdownOpen((prev) => !prev)}
-              aria-expanded={dropdownOpen}
-            >
-              <span>{selectedTemplate.label}</span>
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#666"
-                strokeWidth="2"
-                className={`checkout-dropdown-chevron${dropdownOpen ? ' open' : ''}`}
-              >
-                <path d="M6 9l6 6 6-6" />
-              </svg>
-            </button>
-            <div className={`checkout-dropdown-menu${dropdownOpen ? ' open' : ''}`}>
-              {TEMPLATES.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  className={`checkout-dropdown-item${t.id === templateId ? ' active' : ''}`}
-                  onClick={() => {
-                    setTemplateId(t.id);
-                    setDropdownOpen(false);
-                  }}
-                >
-                  <span className="checkout-dropdown-item-label">{t.label}</span>
-                  <span className="checkout-dropdown-item-desc">{t.desc}</span>
-                </button>
-              ))}
+          <fieldset className="checkout-field checkout-templates">
+            <legend>Pilih template (boleh lebih dari satu)</legend>
+            <div className="checkout-template-grid">
+              {TEMPLATES.map((t) => {
+                const active = selectedIds.includes(t.id);
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => toggleTemplate(t.id)}
+                    className={`checkout-template-card${active ? ' active' : ''}`}
+                  >
+                    <span className="checkout-template-check" aria-hidden="true">
+                      {active ? '✓' : ''}
+                    </span>
+                    <span className="checkout-template-body">
+                      <span className="checkout-template-name">{t.name}</span>
+                      <span className="checkout-template-desc">{t.description}</span>
+                      <span className="checkout-template-price">{formatIdr(basePrice)}</span>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
+          </fieldset>
+
+          <div className="checkout-field">
+            <label htmlFor="checkout-coupon">Kode kupon (opsional)</label>
+            <div className="checkout-coupon-row">
+              <input
+                id="checkout-coupon"
+                type="text"
+                placeholder="HEMAT-XXXXX"
+                value={couponInput}
+                onChange={(e) => {
+                  const next = e.target.value.toUpperCase();
+                  setCouponInput(next);
+                  if (couponApplied && NORMALIZE_COUPON(next) !== couponApplied) {
+                    setCouponApplied(null);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    applyCoupon();
+                  }
+                }}
+                autoComplete="off"
+              />
+              {couponApplied ? (
+                <button type="button" className="checkout-coupon-btn" onClick={clearCoupon}>
+                  Hapus
+                </button>
+              ) : (
+                <button type="button" className="checkout-coupon-btn" onClick={applyCoupon}>
+                  Terapkan
+                </button>
+              )}
+            </div>
+            {couponNotice && (
+              <div
+                role="status"
+                aria-live="polite"
+                className={`checkout-coupon-note${couponError ? ' error' : ''}`}
+              >
+                {couponNotice}
+              </div>
+            )}
           </div>
 
-          {errorMessage && (
-            <div className="checkout-error">{errorMessage}</div>
-          )}
+          <div className="checkout-summary" aria-live="polite">
+            <div className="checkout-summary-row">
+              <span>Subtotal ({itemCount} template)</span>
+              <span>{formatIdr(subtotal)}</span>
+            </div>
+            {quote && quote.appliedSource === 'bundle' && quote.appliedDiscount > 0 && (
+              <div className="checkout-summary-row discount">
+                <span>Diskon bundel {quote.bundlePercent}%</span>
+                <span>−{formatIdr(quote.appliedDiscount)}</span>
+              </div>
+            )}
+            {quote && quote.appliedSource === 'coupon' && quote.appliedDiscount > 0 && (
+              <div className="checkout-summary-row discount">
+                <span>Kupon {quote.couponCode}</span>
+                <span>−{formatIdr(quote.appliedDiscount)}</span>
+              </div>
+            )}
+            <div className="checkout-summary-row total">
+              <span>Total</span>
+              <span>{formatIdr(total)}</span>
+            </div>
+            <p className="checkout-summary-hint">
+              Halaman berikutnya menampilkan kode unik QRIS (≤ Rp999) yang ditambahkan ke
+              nominal ini agar pembayaran Anda mudah dicocokkan.
+            </p>
+          </div>
+
+          {errorMessage && <div className="checkout-error">{errorMessage}</div>}
 
           {!paymentActive && !errorMessage && (
-            <div className="checkout-warning">
-              Pembayaran sedang tidak aktif.
-            </div>
+            <div className="checkout-warning">Pembayaran sedang tidak aktif.</div>
           )}
 
-          <button
-            type="submit"
-            disabled={loading || !paymentActive}
-            className="checkout-btn"
-          >
-            {loading ? 'Memproses...' : `Pesan — ${formatIdr(basePrice)}`}
+          <button type="submit" disabled={loading || !paymentActive} className="checkout-btn">
+            {loading ? 'Memproses...' : `Pesan — ${formatIdr(total)}`}
           </button>
 
           <p className="checkout-consent">
@@ -474,6 +633,7 @@ export default function CheckoutForm({ initialTemplateId }: { initialTemplateId?
           display: flex;
           align-items: baseline;
           justify-content: space-between;
+          gap: 12px;
           padding: 16px 0;
           border-top: 1px solid #222;
           border-bottom: 1px solid #222;
@@ -490,6 +650,7 @@ export default function CheckoutForm({ initialTemplateId }: { initialTemplateId?
           font-weight: 700;
           color: #fff;
           letter-spacing: -0.02em;
+          white-space: nowrap;
         }
 
         .checkout-includes {
@@ -522,10 +683,19 @@ export default function CheckoutForm({ initialTemplateId }: { initialTemplateId?
           gap: 6px;
         }
 
-        .checkout-field label {
+        fieldset.checkout-field {
+          border: none;
+          padding: 0;
+          margin: 0;
+          min-width: 0;
+        }
+
+        .checkout-field label,
+        .checkout-field legend {
           font-size: 13px;
           font-weight: 500;
           color: #888;
+          padding: 0;
         }
 
         .checkout-field input {
@@ -538,6 +708,7 @@ export default function CheckoutForm({ initialTemplateId }: { initialTemplateId?
           outline: none;
           transition: border-color 0.15s;
           font-family: inherit;
+          width: 100%;
         }
 
         .checkout-field input:focus {
@@ -548,94 +719,163 @@ export default function CheckoutForm({ initialTemplateId }: { initialTemplateId?
           color: #444;
         }
 
-        .checkout-dropdown-trigger {
-          width: 100%;
-          background: #111;
-          border: 1px solid #222;
-          border-radius: 8px;
-          padding: 12px 14px;
-          font-size: 14px;
-          color: #e5e5e5;
-          outline: none;
-          transition: border-color 0.15s;
-          font-family: inherit;
-          cursor: pointer;
+        .checkout-template-grid {
           display: flex;
-          align-items: center;
-          justify-content: space-between;
-          text-align: left;
+          flex-direction: column;
+          gap: 8px;
+          margin-top: 4px;
         }
 
-        .checkout-dropdown-trigger:hover {
+        .checkout-template-card {
+          display: flex;
+          gap: 10px;
+          align-items: flex-start;
+          width: 100%;
+          text-align: left;
+          background: #111;
+          border: 1px solid #222;
+          border-radius: 10px;
+          padding: 12px 14px;
+          cursor: pointer;
+          font-family: inherit;
+          transition: border-color 0.15s, background 0.15s;
+        }
+
+        .checkout-template-card:hover {
           border-color: #333;
         }
 
-        .checkout-dropdown-chevron {
-          transition: transform 0.2s ease;
+        .checkout-template-card.active {
+          border-color: #60a5fa;
+          background: #101a2b;
         }
 
-        .checkout-dropdown-chevron.open {
-          transform: rotate(180deg);
+        .checkout-template-check {
+          flex: 0 0 auto;
+          width: 18px;
+          height: 18px;
+          margin-top: 2px;
+          border-radius: 5px;
+          border: 1px solid #444;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+          line-height: 1;
+          color: #0a0a0a;
+          background: transparent;
         }
 
-        .checkout-dropdown-menu {
-          overflow: hidden;
-          max-height: 0;
-          opacity: 0;
-          transition: max-height 0.25s ease, opacity 0.2s ease, margin 0.25s ease;
-          margin-top: 0;
-          border-radius: 8px;
-          border: 1px solid transparent;
-          background: #111;
+        .checkout-template-card.active .checkout-template-check {
+          background: #60a5fa;
+          border-color: #60a5fa;
         }
 
-        .checkout-dropdown-menu.open {
-          max-height: 200px;
-          opacity: 1;
-          margin-top: 6px;
-          border-color: #222;
-        }
-
-        .checkout-dropdown-item {
-          width: 100%;
-          background: none;
-          border: none;
-          padding: 12px 14px;
-          cursor: pointer;
-          text-align: left;
+        .checkout-template-body {
           display: flex;
           flex-direction: column;
           gap: 2px;
-          font-family: inherit;
-          transition: background 0.12s;
         }
 
-        .checkout-dropdown-item:hover {
-          background: #1a1a1a;
-        }
-
-        .checkout-dropdown-item.active {
-          background: #1a1a1a;
-        }
-
-        .checkout-dropdown-item + .checkout-dropdown-item {
-          border-top: 1px solid #1a1a1a;
-        }
-
-        .checkout-dropdown-item-label {
+        .checkout-template-name {
           font-size: 14px;
-          font-weight: 500;
+          font-weight: 600;
           color: #e5e5e5;
         }
 
-        .checkout-dropdown-item-desc {
+        .checkout-template-desc {
           font-size: 12px;
+          color: #777;
+          line-height: 1.45;
+        }
+
+        .checkout-template-price {
+          font-size: 12px;
+          color: #94a3b8;
+          margin-top: 2px;
+        }
+
+        .checkout-coupon-row {
+          display: flex;
+          gap: 8px;
+        }
+
+        .checkout-coupon-row input {
+          flex: 1;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+
+        .checkout-coupon-btn {
+          padding: 0 16px;
+          border-radius: 8px;
+          border: 1px solid #333;
+          background: #1a1a1a;
+          color: #e5e5e5;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          font-family: inherit;
+          white-space: nowrap;
+          transition: background 0.15s, border-color 0.15s;
+        }
+
+        .checkout-coupon-btn:hover {
+          background: #222;
+          border-color: #444;
+        }
+
+        .checkout-coupon-note {
+          font-size: 12px;
+          color: #4ade80;
+          line-height: 1.5;
+          margin-top: 2px;
+        }
+
+        .checkout-coupon-note.error {
+          color: #f87171;
+        }
+
+        .checkout-summary {
+          border-top: 1px solid #222;
+          border-bottom: 1px solid #222;
+          padding: 14px 0;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .checkout-summary-row {
+          display: flex;
+          align-items: baseline;
+          justify-content: space-between;
+          gap: 12px;
+          font-size: 13px;
+          color: #888;
+        }
+
+        .checkout-summary-row.discount {
+          color: #4ade80;
+        }
+
+        .checkout-summary-row.total {
+          font-size: 16px;
+          font-weight: 700;
+          color: #fff;
+          padding-top: 6px;
+          border-top: 1px dashed #262626;
+        }
+
+        .checkout-summary-hint {
+          margin: 0;
+          font-size: 11px;
+          line-height: 1.55;
           color: #666;
         }
 
         .checkout-error {
           font-size: 13px;
-          color: #e55;
+          color: #f87171;
           padding: 10px 14px;
           border: 1px solid #422;
           border-radius: 8px;

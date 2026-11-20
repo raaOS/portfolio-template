@@ -31,6 +31,10 @@ interface OrderData {
   buyer_email: string;
   buyer_whatsapp: string;
   amount: number;
+  /** Rincian multi-template (v1.3.93) — order lama bisa kosong. */
+  subtotal?: number | null;
+  discount_total?: number | null;
+  coupon_code?: string | null;
   payment_method: string;
   payment_proof_url?: string | null;
   cancel_reason?: string | null;
@@ -42,6 +46,14 @@ interface OrderData {
   /** Dibutuhkan untuk countdown auto-cancel order waiting_verification (updated_at + 7 hari). */
   updated_at?: string | null;
   created_at: string;
+}
+
+interface OrderItemData {
+  template_id: string;
+  template_name: string | null;
+  list_price: number;
+  discount_amount: number;
+  final_price: number;
 }
 
 interface PublicQRISAccount {
@@ -78,6 +90,7 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ orderId
   const accessToken = useMemo(() => searchParams.get('token') || '', [searchParams]);
 
   const [order, setOrder] = useState<OrderData | null>(null);
+  const [orderItems, setOrderItems] = useState<OrderItemData[]>([]);
   const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null);
   const [dynamicQrisAccounts, setDynamicQrisAccounts] = useState<DynamicQRISAccountItem[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
@@ -116,6 +129,7 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ orderId
         throw new Error(data.error || 'Pesanan tidak ditemukan');
       }
       setOrder(data.order);
+      setOrderItems(Array.isArray(data.items) ? data.items : []);
       if (data.order.payment_proof_url) {
         setProofUrl(data.order.payment_proof_url);
       }
@@ -507,10 +521,61 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ orderId
 
           {/* Compact bill summary */}
           <div className="border-y border-slate-800 py-3 text-xs">
-            <div className="flex items-center justify-between gap-3 text-slate-600">
-              <span>Portfolio OS</span>
-              <span className="font-mono">{formatRupiah(order.amount)}</span>
-            </div>
+            {orderItems.length > 0 ? (
+              <>
+                {orderItems.map((item) => (
+                  <div
+                    key={item.template_id}
+                    className="flex items-center justify-between gap-3 text-slate-700"
+                  >
+                    <span>
+                      {item.template_name || item.template_id}
+                      {item.discount_amount > 0 && (
+                        <span className="ml-1.5 text-[10px] font-semibold text-emerald-700">
+                          (hemat {formatRupiah(item.discount_amount)})
+                        </span>
+                      )}
+                    </span>
+                    <span className="font-mono">{formatRupiah(item.final_price)}</span>
+                  </div>
+                ))}
+
+                {Number(order.discount_total || 0) > 0 && (
+                  <>
+                    <div className="mt-2 flex items-center justify-between gap-3 border-t border-slate-200 pt-2 text-slate-500">
+                      <span className="font-medium">Subtotal</span>
+                      <span className="font-mono">
+                        {formatRupiah(Number(order.subtotal || 0))}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between gap-3 text-emerald-700 font-semibold">
+                      <span>
+                        {order.coupon_code ? `Kupon ${order.coupon_code}` : 'Diskon bundel'}
+                      </span>
+                      <span className="font-mono">
+                        −{formatRupiah(Number(order.discount_total || 0))}
+                      </span>
+                    </div>
+                  </>
+                )}
+
+                {order.amount > Number(order.subtotal || 0) - Number(order.discount_total || 0) && (
+                  <div className="mt-1 flex items-center justify-between gap-3 text-slate-500">
+                    <span className="font-medium">Kode unik QRIS</span>
+                    <span className="font-mono">
+                      +{formatRupiah(
+                        order.amount - (Number(order.subtotal || 0) - Number(order.discount_total || 0))
+                      )}
+                    </span>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="flex items-center justify-between gap-3 text-slate-600">
+                <span>Portfolio OS</span>
+                <span className="font-mono">{formatRupiah(order.amount)}</span>
+              </div>
+            )}
             <div className="mt-2 flex items-center justify-between gap-3">
               <div>
                 <span className="block font-black uppercase text-slate-950">Total Bayar</span>

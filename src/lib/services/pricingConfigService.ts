@@ -22,6 +22,11 @@
  */
 import { queryD1 } from '@/lib/cloudflareD1';
 import { BASE_PRICE } from '@/constants/pricing';
+import {
+  DEFAULT_BUNDLE_TIERS,
+  normalizeBundleTiers,
+  type BundleTier,
+} from './checkoutPricing';
 
 const SETTINGS_KEY = 'base_price_idr';
 /** Key lama (rilis 1.3.27) — dibaca hanya bila key baru belum pernah ditulis. */
@@ -230,6 +235,86 @@ export async function updateBasePrice(
     return {
       success: false,
       error: err instanceof Error ? err.message : 'Gagal menyimpan harga'
+    };
+  }
+}
+
+// ── Diskon bundel otomatis (v1.3.93) ──────────────────────────────────────
+//
+// Disimpan di `platform_settings` key `bundle_discount` sebagai
+// `{ tiers: [{ minItems, percent }] }`. Diedit owner dari panel Harga Jual.
+// Pembacaan TIDAK PERNAH melempar: data kosong/rusak/D1 mati → default owner
+// (2 template 10%, 3 template 15%). Diskon kupon & bundel tidak ditumpuk —
+// mesin harga memilih yang lebih besar (lihat checkoutPricing.computeQuote).
+const BUNDLE_SETTINGS_KEY = 'bundle_discount';
+const BUNDLE_CACHE_TTL_MS = 60_000;
+let bundleCache: { value: BundleTier[]; loadedAt: number } | null = null;
+
+/** Bersihkan cache bundel (dipakai unit test & setelah update). */
+export function clearBundleTiersCache(): void {
+  bundleCache = null;
+}
+
+function defaultTiers(): BundleTier[] {
+  return [...DEFAULT_BUNDLE_TIERS].sort((a, b) => a.minItems - b.minItems);
+}
+
+/**
+ * Baca tier bundel dari D1 (cache 60 detik). Fallback aman ke default owner
+ * bila belum pernah disimpan, JSON rusak, atau D1 tidak terjangkau.
+ */
+export async function getBundleTiers(): Promise<BundleTier[]> {
+  if (bundleCache && Date.now() - bundleCache.loadedAt < BUNDLE_CACHE_TTL_MS) {
+    return bundleCache.value;
+  }
+  try {
+    const rows = await queryD1<{ value: string }>(
+      'SELECT value FROM platform_settings WHERE key = ? LIMIT 1',
+      [BUNDLE_SETTINGS_KEY]
+    );
+    let tiers = defaultTiers();
+    if (rows.length > 0 && rows[0].value) {
+      const parsed = JSON.parse(rows[0].value) as { tiers?: unknown };
+      const check = normalizeBundleTiers(parsed.tiers);
+      if (check.valid && check.tiers) tiers = check.tiers;
+    }
+    bundleCache = { value: tiers, loadedAt: Date.now() };
+    return tiers;
+  } catch (err) {
+    console.warn('[pricingConfigService] Gagal baca diskon bundel, pakai default:', err);
+    return defaultTiers();
+  }
+}
+
+/**
+ * Simpan tier bundel (upsert). Validasi ketat — nilai ilegal tidak pernah
+ * menyentuh D1. Sukses membersihkan cache sehingga pembacaan berikutnya
+ * langsung memakai aturan baru.
+ */
+export async function updateBundleTiers(
+  raw: unknown
+): Promise<{ success: boolean; error?: string; tiers?: BundleTier[] }> {
+  const check = normalizeBundleTiers(raw);
+  if (!check.valid || !check.tiers) {
+    return { success: false, error: check.error || 'Diskon bundel tidak valid.' };
+  }
+
+  try {
+    const now = new Date().toISOString();
+    await queryD1(
+      `INSERT INTO platform_settings (key, value, updated_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(key)
+       DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+      [BUNDLE_SETTINGS_KEY, JSON.stringify({ tiers: check.tiers, updatedAt: now }), now]
+    );
+    bundleCache = { value: check.tiers, loadedAt: Date.now() };
+    return { success: true, tiers: check.tiers };
+  } catch (err) {
+    console.error('[pricingConfigService] Gagal simpan diskon bundel:', err);
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Gagal menyimpan diskon bundel',
     };
   }
 }

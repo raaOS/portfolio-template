@@ -367,6 +367,19 @@ export async function bootstrapD1Schema() {
         if (!hasProvisionedAt) {
           await queryD1('ALTER TABLE orders ADD COLUMN provisioned_at TEXT');
         }
+        // Rincian multi-template & kupon (v1.3.93) untuk database lama.
+        const hasSubtotal = ordersInfo.some((col) => col.name === 'subtotal');
+        if (!hasSubtotal) {
+          await queryD1('ALTER TABLE orders ADD COLUMN subtotal INTEGER NOT NULL DEFAULT 0');
+        }
+        const hasDiscountTotal = ordersInfo.some((col) => col.name === 'discount_total');
+        if (!hasDiscountTotal) {
+          await queryD1('ALTER TABLE orders ADD COLUMN discount_total INTEGER NOT NULL DEFAULT 0');
+        }
+        const hasCouponCode = ordersInfo.some((col) => col.name === 'coupon_code');
+        if (!hasCouponCode) {
+          await queryD1('ALTER TABLE orders ADD COLUMN coupon_code TEXT');
+        }
 
         // Migrate: replace plain desired_slug index with partial unique index.
         // Status aktif saja — perlindungan slug yang sudah `activated` ada di

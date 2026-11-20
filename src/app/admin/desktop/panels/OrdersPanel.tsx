@@ -19,6 +19,7 @@ import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { useToast } from '@/contexts/ToastContext';
 import { useConfirm } from '@/components/admin/ConfirmDialog';
 import { getWritableCsrfToken } from '@/lib/security/client-csrf';
+import { TEMPLATES } from '@/lib/templates/registry';
 
 type OrderStatus =
   | 'pending_payment'
@@ -37,6 +38,11 @@ interface OrderItem {
   buyer_email: string;
   buyer_whatsapp: string;
   amount: number;
+  /** Rincian harga (v1.3.93): subtotal sebelum diskon. */
+  subtotal?: number | null;
+  /** Diskon bundel ATAU kupon — tidak pernah ditumpuk. */
+  discount_total?: number | null;
+  coupon_code?: string | null;
   status: OrderStatus;
   template_id?: string | null;
   payment_proof_url?: string | null;
@@ -141,10 +147,16 @@ export default function OrdersPanel() {
     buyerEmail: '',
     buyerWhatsapp: '',
     desiredSlug: '',
-    templateId: '',
+    // v1.3.93: satu order boleh berisi beberapa template (satu tagihan QRIS).
+    templateIds: [TEMPLATES[0]?.id ?? 'os-desktop'] as string[],
+    couponCode: '',
   });
   const [isCreating, setIsCreating] = useState(false);
-  const [createdLink, setCreatedLink] = useState<{ orderId: string; url: string } | null>(null);
+  const [createdLink, setCreatedLink] = useState<{
+    orderId: string;
+    url: string;
+    amount: number;
+  } | null>(null);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_LIMIT));
 
@@ -256,6 +268,20 @@ export default function OrdersPanel() {
     }
   };
 
+  /**
+   * Pilih/buang template pada form "Buat Pesanan". Minimal satu harus tetap
+   * terpilih — order tanpa template tidak bisa di-provision.
+   */
+  const toggleCreateTemplate = (templateId: string) => {
+    setCreateForm((prev) => {
+      if (prev.templateIds.includes(templateId)) {
+        if (prev.templateIds.length === 1) return prev;
+        return { ...prev, templateIds: prev.templateIds.filter((id) => id !== templateId) };
+      }
+      return { ...prev, templateIds: [...prev.templateIds, templateId] };
+    });
+  };
+
   const submitCreateOrder = async (event: React.FormEvent): Promise<void> => {
     event.preventDefault();
     if (isCreating) return;
@@ -276,7 +302,8 @@ export default function OrdersPanel() {
           buyerEmail: createForm.buyerEmail.trim(),
           buyerWhatsapp: createForm.buyerWhatsapp.trim(),
           desiredSlug: createForm.desiredSlug.trim() || undefined,
-          templateId: createForm.templateId.trim() || undefined,
+          templateIds: createForm.templateIds,
+          couponCode: createForm.couponCode.trim() || undefined,
         }),
       });
       const payload = (await res.json()) as OrderActionPayload & {
@@ -288,10 +315,21 @@ export default function OrdersPanel() {
       }
 
       showSuccess(payload.message || `Order ${payload.order.id} dibuat`);
-      setCreateForm({ buyerName: '', buyerEmail: '', buyerWhatsapp: '', desiredSlug: '', templateId: '' });
+      setCreateForm({
+        buyerName: '',
+        buyerEmail: '',
+        buyerWhatsapp: '',
+        desiredSlug: '',
+        templateIds: [TEMPLATES[0]?.id ?? 'os-desktop'],
+        couponCode: '',
+      });
       // Link checkout hanya bisa ditampilkan sekali (token tidak disimpan mentah
       // di server) — tampilkan di kotak salin, jangan ditutup sembarangan.
-      setCreatedLink({ orderId: payload.order.id, url: payload.checkoutUrl || '' });
+      setCreatedLink({
+        orderId: payload.order.id,
+        url: payload.checkoutUrl || '',
+        amount: payload.order.amount,
+      });
       setShowCreateForm(false);
       setPage(1);
       await loadOrders();
@@ -476,17 +514,40 @@ export default function OrdersPanel() {
                 className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-800 outline-none transition-colors focus:border-blue-500"
               />
             </label>
+            <fieldset className="text-xs text-gray-600 sm:col-span-2">
+              <legend className="block text-xs text-gray-600">
+                Template (boleh lebih dari satu — satu tagihan)
+              </legend>
+              <div className="mt-1 flex flex-wrap gap-3">
+                {TEMPLATES.map((template) => (
+                  <label
+                    key={template.id}
+                    className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={createForm.templateIds.includes(template.id)}
+                      onChange={() => toggleCreateTemplate(template.id)}
+                      className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-gray-700">{template.name}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
             <label className="block text-xs text-gray-600">
-              Template
-              <select
-                value={createForm.templateId}
-                onChange={(event) => setCreateForm((prev) => ({ ...prev, templateId: event.target.value }))}
-                className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-800 outline-none transition-colors focus:border-blue-500"
-              >
-                <option value="">macOS Desktop</option>
-                <option value="infinite-canvas">Infinite Canvas</option>
-                <option value="spatial-gallery">3D Spatial Gallery</option>
-              </select>
+              Kode kupon (opsional)
+              <input
+                value={createForm.couponCode}
+                onChange={(event) =>
+                  setCreateForm((prev) => ({
+                    ...prev,
+                    couponCode: event.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ''),
+                  }))
+                }
+                placeholder="HEMAT-ABC23"
+                className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 font-mono text-sm uppercase text-gray-800 outline-none transition-colors focus:border-blue-500"
+              />
             </label>
             <div className="flex items-end">
               <button
@@ -512,6 +573,9 @@ export default function OrdersPanel() {
               </p>
               <p className="mt-0.5 truncate font-mono text-xs text-emerald-700" title={createdLink.url}>
                 {createdLink.url || 'Link tidak tersedia — buat ulang pesanan'}
+              </p>
+              <p className="mt-1 text-xs text-emerald-800">
+                Nominal yang harus masuk: <b>{formatRupiah(createdLink.amount)}</b>
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
@@ -647,6 +711,18 @@ export default function OrdersPanel() {
                     <div className="flex flex-col items-start gap-2 lg:items-end">
                       <p className="text-base font-semibold text-gray-900">
                         {formatRupiah(order.amount)}
+                      </p>
+                      {/* Nominal `amount` = total setelah diskon + kode unik QRIS.
+                          Rincian ini mencegah sengketa "kenapa beda dengan harga katalog". */}
+                      {(order.discount_total ?? 0) > 0 && (
+                        <p className="text-[11px] text-gray-500">
+                          Subtotal {formatRupiah(order.subtotal ?? order.amount)} · diskon{' '}
+                          {formatRupiah(order.discount_total ?? 0)}
+                          {order.coupon_code ? ` (${order.coupon_code})` : ' (bundel)'}
+                        </p>
+                      )}
+                      <p className="text-[11px] text-gray-400">
+                        Termasuk kode unik QRIS
                       </p>
                       {order.payment_proof_url ? (
                         <a

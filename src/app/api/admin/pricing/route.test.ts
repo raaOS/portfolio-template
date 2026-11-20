@@ -18,12 +18,16 @@ const getBasePrice = vi.fn();
 const updateBasePrice = vi.fn();
 const getOwnerWhatsapp = vi.fn();
 const updateOwnerWhatsapp = vi.fn();
+const getBundleTiers = vi.fn();
+const updateBundleTiers = vi.fn();
 
 vi.mock('@/lib/services/pricingConfigService', () => ({
   getBasePrice: (...args: unknown[]) => getBasePrice(...args),
   updateBasePrice: (...args: unknown[]) => updateBasePrice(...args),
   getOwnerWhatsapp: (...args: unknown[]) => getOwnerWhatsapp(...args),
   updateOwnerWhatsapp: (...args: unknown[]) => updateOwnerWhatsapp(...args),
+  getBundleTiers: (...args: unknown[]) => getBundleTiers(...args),
+  updateBundleTiers: (...args: unknown[]) => updateBundleTiers(...args),
 }));
 
 import { GET, PUT } from './route';
@@ -52,6 +56,10 @@ describe('GET /api/admin/pricing', () => {
     authMock().mockResolvedValue(true);
     getBasePrice.mockResolvedValue(199000);
     getOwnerWhatsapp.mockResolvedValue('628111222333');
+    getBundleTiers.mockResolvedValue([
+      { minItems: 2, percent: 10 },
+      { minItems: 3, percent: 15 },
+    ]);
   });
 
   afterEach(() => {
@@ -107,6 +115,10 @@ describe('PUT /api/admin/pricing', () => {
     updateOwnerWhatsapp.mockResolvedValue({ success: true, adminWhatsapp: '628999888777' });
     getBasePrice.mockResolvedValue(199000);
     getOwnerWhatsapp.mockResolvedValue('628111222333');
+    getBundleTiers.mockResolvedValue([
+      { minItems: 2, percent: 10 },
+      { minItems: 3, percent: 15 },
+    ]);
   });
 
   afterEach(() => {
@@ -210,6 +222,10 @@ describe('Owner Mode guard /api/admin/pricing', () => {
     authMock().mockResolvedValue(true);
     getBasePrice.mockResolvedValue(199000);
     getOwnerWhatsapp.mockResolvedValue('628111222333');
+    getBundleTiers.mockResolvedValue([
+      { minItems: 2, percent: 10 },
+      { minItems: 3, percent: 15 },
+    ]);
     updateBasePrice.mockResolvedValue({ success: true, basePrice: 250000 });
     updateOwnerWhatsapp.mockResolvedValue({ success: true, adminWhatsapp: '628999888777' });
   });

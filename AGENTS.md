@@ -301,8 +301,8 @@ Sakelar identitas deployment: **site milik owner** (produksi sendiri) vs **site 
 
 - **Aturan: kedua kunci SELALU di-set bersamaan** (lihat `.env.example`).
 - Pipeline `deployClient()` memaksa kedua kunci `'false'` di `overrides` (`scripts/onboarding/client-deploy.ts`) — fail-closed dua lapis: selain dipaksa false, kunci ini juga tidak ada di `INHERITED_OWNER_KEYS` sehingga nilai owner dibuang dari `next-env.mjs` build klien secara independen.
-- **App desktop admin `ownerOnly`** (flag di `src/app/admin/desktop/types.ts`, saat ini: **Harga Jual** & **Order & Pembayaran**) disaring keluar dari `ADMIN_ZONES` di `registry.ts` saat `NEXT_PUBLIC_OWNER_MODE` != true — app & zone-nya tidak tampil sama sekali di desktop admin klien.
-- **Route API owner-only** dijaga `requireOwnerMode()` (`src/lib/ownerMode.ts`) yang membalas **404** (bukan 403 — site klien tidak boleh tahu route ada) sebelum auth. Saat ini: `/api/admin/pricing` (GET/PUT) + `/api/admin/orders` (GET/POST).
+- **App desktop admin `ownerOnly`** (flag di `src/app/admin/desktop/types.ts`, saat ini: **Harga Jual**, **Order & Pembayaran**, **Kupon Diskon**, **Video Hero**, **Peta Bisnis**) disaring keluar dari `ADMIN_ZONES` di `registry.ts` saat `NEXT_PUBLIC_OWNER_MODE` != true — app & zone-nya tidak tampil sama sekali di desktop admin klien.
+- **Route API owner-only** dijaga `requireOwnerMode()` (`src/lib/ownerMode.ts`) yang membalas **404** (bukan 403 — site klien tidak boleh tahu route ada) sebelum auth. Saat ini: `/api/admin/pricing` (GET/PUT) + `/api/admin/orders` (GET/POST) + `/api/admin/coupons` (GET/POST).
 - **Menambah tool superadmin baru:** (1) beri `ownerOnly: true` pada app di `registry.ts`, (2) pasang `requireOwnerMode()` di route API-nya, (3) jangan lupa `vi.stubEnv('OWNER_MODE', 'true')` di test route tersebut. Fitur klien TIDAK perlu flag ini.
 - **Awas:** tanpa `OWNER_MODE=true` di `.env.local`, deploy site owner sendiri akan kehilangan panel Harga Jual & Order & Pembayaran (kembali normal dengan menambahkan kunci + deploy ulang).
 - **Guard anti-human-error:** `scripts/deploy/pre-deploy-check.js` (dijalankan `npm run deploy` — hanya jalur site owner, build klien tidak lewat sini) kini **menolak deploy** kalau `OWNER_MODE`/`NEXT_PUBLIC_OWNER_MODE` tidak bernilai `"true"` — kunci terhapus/salah tidak lagi menyembunyikan panel secara diam-diam.
@@ -483,8 +483,8 @@ Dipasang portal onboarding ke D1 milik klien (`scripts/onboarding/server.ts`, `s
 | 9 | `portfolio_templates` | Katalog template (diisi oleh `seedDeployment()`) |
 | 10 | `site_template_entitlements` | Hak pakai template per site (diisi oleh `seedDeployment()`) |
 
-**2. Skema bootstrap produk — `src/lib/d1-schema.ts` (`D1_SCHEMA_QUERIES`, 12 tabel).**
-Dipakai `npm run cf:bootstrap` (`scripts/cloudflare/product-bootstrap.ts`), backup/restore (`scripts/cloudflare/backup-d1.ts`, `restore-d1.ts`), readiness gate, **dan dipasang portal setelah skema #1** (lihat invarian di atas). Empat namanya sama dengan skema di atas (`sites`, `projects`, `media_assets`, `audit_logs`) tapi definisi kolomnya berbeda, plus 8 tabel lain: `site_quota_overrides`, `project_narratives`, `submissions`, `ai_generations`, `orders`, `site_custom_domains`, `site_analytics`, `platform_settings` (skema ini tidak punya `site_users`, `site_settings`, `rate_limits`, `app_kv`, `portfolio_templates`, `site_template_entitlements`).
+**2. Skema bootstrap produk — `src/lib/d1-schema.ts` (`D1_SCHEMA_QUERIES`, 15 tabel).**
+Dipakai `npm run cf:bootstrap` (`scripts/cloudflare/product-bootstrap.ts`), backup/restore (`scripts/cloudflare/backup-d1.ts`, `restore-d1.ts`), readiness gate, **dan dipasang portal setelah skema #1** (lihat invarian di atas). Empat namanya sama dengan skema di atas (`sites`, `projects`, `media_assets`, `audit_logs`) tapi definisi kolomnya berbeda, plus 11 tabel lain: `site_quota_overrides`, `project_narratives`, `submissions`, `ai_generations`, `orders`, `order_items`, `coupons`, `coupon_redemptions`, `site_custom_domains`, `site_analytics`, `platform_settings` (skema ini tidak punya `site_users`, `site_settings`, `rate_limits`, `app_kv`, `portfolio_templates`, `site_template_entitlements`).
 
 > Tidak ada kolom `plan`/tier di tabel `sites` — paket Lite/Pro sudah dihapus (v1.3.15); harga tunggal Rp199.000.
 
@@ -616,6 +616,24 @@ npx wrangler deploy --config .open-next/wrangler.client.<slug>.jsonc
 - **CLI owner** `npm run client:template -- <folder> [template-key]` **menolak** template tanpa entitlement; `--force` hanya darurat dan **tidak** membuat order. Pembelian wajib lewat portal.
 - **DILARANG:** pemilih template di panel admin klien, aktivasi tanpa entitlement (selain `--force` darurat), order pembelian ditulis dari Worker/D1 klien, menghapus order saat `PARTIAL_OWNERSHIP_WRITTEN`, memberi entitlement "semua template" saat onboarding, SQL manual untuk `active_template_key`, atau harga berbeda per template tanpa keputusan owner.
 - **Kode:** `scripts/onboarding/template-purchase.ts` (logika + 22 unit test), `scripts/onboarding/server.ts` (`/api/client-template`, penulis order owner, seed onboarding), `scripts/onboarding/public/index.html` (UI seksi Template & Pembelian), `scripts/cloudflare/backfill-template-entitlements.ts`, `scripts/cloudflare/set-client-template.ts`.
+
+### Checkout Multi-Template & Kupon (v1.3.93) — aturan bisnis terkunci
+
+> Detail alur: [`docs/operations/template-purchase-flow.md`](docs/operations/template-purchase-flow.md).
+
+- **Satu checkout = SATU order = SATU pembayaran QRIS**, boleh berisi 1..N template. Rincian per template disimpan di `order_items` (bukan satu order per template — `UNIQUE INDEX idx_orders_amount_active` + nominal QRIS unik membuat dua order senilai sama mustahil).
+- `orders.template_id` = template utama (item pertama, dipakai provisioning); `orders.subtotal` = harga sebelum diskon; `orders.discount_total` = diskon yang dipakai; `orders.amount` = total setelah diskon + kode unik QRIS; `orders.coupon_code` = kupon yang benar-benar dipakai (nullable).
+- **Harga per template sama** (dibaca dari panel Harga Jual). Tidak ada harga per template saat ini.
+- **Diskon bundel otomatis** disimpan di `platform_settings` key `bundle_discount` (`{ tiers: [{ minItems, percent }] }`), default 2 template → 10%, 3+ → 15%, maksimal 50% dan 5 tier. Diedit owner dari panel **Harga Jual**.
+- **Kupon dan bundel TIDAK ditumpuk**: mesin harga memilih yang lebih besar (seri → bundel, agar kuota kupon tidak terbakar sia-sia). Diskon dihitung 100% server (`src/lib/services/checkoutPricing.ts`) — klien hanya menampilkan.
+- **Total yang harus dibayar tidak pernah di bawah Rp1.000.** Gratis penuh tetap hanya lewat aktivasi gratis portal (entitlement), bukan kupon 100%.
+- **Kupon disimpan di D1 owner** (`coupons` + `coupon_redemptions`). Kuota direservasi atomik saat order dibuat (`INSERT ... SELECT ... WHERE COUNT < kuota`), dilepas saat order expired/canceled. `max_per_email` bersifat best-effort. Kupon tidak pernah dihapus permanen — hanya diarsipkan (`archived_at`) agar riwayat pendapatan utuh.
+- **CRUD kupon = owner-only**: app admin `coupons` (`ownerOnly: true`), route `/api/admin/coupons` dijaga `requireOwnerMode()` → **404** di situs klien, plus auth + CSRF + audit log. Klien tidak punya akses kupon.
+- **Checkout publik hanya untuk pembeli situs baru.** Klien lama yang menambah template tetap lewat portal lokal (`/api/client-template`) — slug yang sudah `activated` ditolak `isSlugAvailable`.
+- **Jalur chat-first owner** (`/admin/system/orders` → **Buat Pesanan**) memakai mesin yang sama: bisa memilih beberapa template + kode kupon. Nominal di kotak link checkout adalah yang harus masuk (termasuk kode unik QRIS).
+- **Entitlement tetap hanya ditulis portal onboarding.** Saat provisioning situs baru, portal memberi entitlement untuk template yang dipilih **plus semua template pada order slug itu** (`order_items`, fallback `orders.template_id`).
+- **Rincian harga wajib tampil** di checkout & halaman order: subtotal, diskon (bundel/kupon), kode unik QRIS (≤Rp999), total transfer — mencegah sengketa "kenapa nominalnya beda".
+- **Backfill order lama:** `npx tsx scripts/cloudflare/backfill-order-items.ts` (dry-run default, `--apply`, `--limit N`).
 
 ### Admin UI Zones (4 Zones)
 

@@ -54,7 +54,7 @@ export async function GET(
     await expireOrderIfStale(orderId);
 
     const rows = await queryD1(
-      'SELECT id, desired_slug, buyer_name, buyer_email, buyer_whatsapp, amount, payment_method, payment_proof_url, status, site_url, provisioned_at, expires_at, updated_at, created_at FROM orders WHERE id = ?',
+      'SELECT id, desired_slug, buyer_name, buyer_email, buyer_whatsapp, amount, subtotal, discount_total, coupon_code, payment_method, payment_proof_url, status, site_url, provisioned_at, expires_at, updated_at, created_at FROM orders WHERE id = ?',
       [orderId]
     );
 
@@ -65,7 +65,23 @@ export async function GET(
     // Admin gets full data; buyer gets masked PII
     const order = isAdmin ? rows[0] : maskPII(rows[0] as Record<string, unknown>);
 
-    return NextResponse.json({ success: true, order });
+    // Rincian multi-template (v1.3.93). Baris kosong untuk order lama yang
+    // dibuat sebelum fitur ini ada — UI memakai `amount` sebagai fallback.
+    let items: Array<Record<string, unknown>> = [];
+    try {
+      const itemRows = await queryD1<Record<string, unknown>>(
+        `SELECT template_id, template_name, list_price, discount_amount, final_price
+           FROM order_items
+          WHERE order_id = ?
+          ORDER BY created_at ASC`,
+        [orderId]
+      );
+      items = itemRows || [];
+    } catch (err) {
+      console.error('[billing/orders GET] Gagal membaca order_items:', err);
+    }
+
+    return NextResponse.json({ success: true, order, items });
   } catch (error: unknown) {
     console.error('Fetch order API error:', error);
     return NextResponse.json({ error: 'Gagal mengambil data order' }, { status: 500 });

@@ -48,9 +48,11 @@ sendiri — keduanya memakai mesin order yang sama.
 
 Alur owner (ringkas):
 
-1. Chat dengan pembeli → sepakati harga, template, dan slug.
-2. `/admin/system/orders` → **Buat Pesanan** → isi nama, email, WA, slug, template.
+1. Chat dengan pembeli → sepakati harga, template (boleh beberapa), dan slug.
+2. `/admin/system/orders` → **Buat Pesanan** → isi nama, email, WA, slug, centang template
+   yang dibeli, dan kode kupon bila ada.
 3. **Salin link checkout** dari kotak hijau yang muncul → kirim ke pembeli via WhatsApp.
+   Kotak itu juga menampilkan **nominal yang harus masuk** (sudah termasuk diskon + kode unik).
    ⚠️ Link hanya tampil **sekali** saat pembuatan (token tidak disimpan mentah di server).
    Pembeli yang kehilangan link bisa dibantu lewat email struk (ada tautan yang sama).
 4. Pembeli bayar + upload bukti → notifikasi Telegram masuk.
@@ -68,6 +70,22 @@ Tiga langkah ini **berurutan dan tidak boleh dilompati**:
 - Terlanjur ada yang minta "langsung saja"? Order tetap bisa diaktifkan telat
   (aksi Aktifkan pada order `expired`, otomatis pakai `allowExpired`) — jangan pernah
   deploy dari order yang belum `activated`.
+
+### Order multi-template & kupon (v1.3.93)
+
+- Satu order bisa berisi beberapa template (satu pembayaran QRIS). Panel Pesanan dan
+  halaman pembeli menampilkan rincian per template, subtotal, diskon, dan total.
+- **Nominal di kolom `amount` adalah yang harus masuk** — sudah termasuk diskon dan
+  kode unik QRIS. Jangan menghitung ulang manual dari harga katalog.
+- **Kupon dan diskon bundel tidak ditumpuk**; yang dipakai hanya yang lebih besar.
+  Kalau pembeli menyebut kode kupon tetapi nominalnya memakai diskon bundel, itu benar.
+- Saat deploy, portal otomatis memberi entitlement untuk **semua template** pada order
+  slug itu. Jangan menambah/menghapus entitlement manual.
+- Kupon dikelola owner di app **Kupon Diskon** (bukan panel klien). Arsipkan kupon yang
+  sudah tidak dipakai — jangan minta SQL hapus, karena menghapus bukti pemakaian.
+- **Setelah update template ke v1.3.93+, jalankan `npm run cf:bootstrap` sekali** (atau buka
+  app Kupon Diskon di panel owner — route-nya memasang skema otomatis). Tanpa skema baru,
+  checkout multi-template gagal karena kolom `orders.subtotal` belum ada.
 
 ### Pembeli bayar telat (order sudah kedaluwarsa)
 

@@ -91,6 +91,12 @@ Saat portal melakukan provisioning (`scripts/onboarding/server.ts`, STEP 4):
 - Katalog `portfolio_templates` di-upsert dari registry (idempoten).
 - Site **baru** mendapat entitlement untuk template yang dipilih, `granted_by='onboarding'`,
   harga acuan Rp199.000.
+- Sejak v1.3.93, jika slug itu punya order di D1 owner, entitlement juga diberikan untuk
+  **semua template pada `order_items`** dari **semua** order lunas slug tersebut (fallback
+  `orders.template_id`). Harga yang dicatat = `order_items.final_price` (harga efektif
+  setelah diskon); harga default hanya untuk order lama tanpa rincian item.
+  Pemilih template di form onboarding hanya menentukan `active_template_key`; template lain
+  yang dibeli tidak boleh hilang.
 - Re-provision **tidak** menimpa `active_template_key` (dulu ditimpa; sekarang
   `COALESCE(active_template_key, excluded.active_template_key)`) dan **tidak** memberi
   entitlement baru — supaya template lain tidak pernah diberikan gratis lewat form onboarding.
@@ -171,3 +177,72 @@ Versi dibaca dari `/api/health` klien. Template `os-desktop` tidak diblokir (def
 - Endpoint portal diuji langsung (GET state, tolak aktivasi tanpa pembelian, noop, dan pembelian
   penuh dengan rollback) — lihat `docs/tracker/logs/fitur_pembelian_template_portal_2026_11_18.md`.
 - Setelah perubahan: gladi kembali ke `os-desktop`, tanpa entitlement/order/audit sisa uji.
+
+---
+
+## 11. Checkout multi-template & kupon (v1.3.93)
+
+Berlaku **hanya untuk pembeli situs baru** lewat `/checkout`. Klien lama tetap lewat portal
+(Alur A) — slug yang sudah `activated` tidak bisa dipakai checkout publik.
+
+### 11.1 Satu order, banyak item
+
+- Pembeli memilih 1..N template. Semua dibayar dalam **satu tagihan QRIS**.
+- `orders` menyimpan total + rincian ringkas: `subtotal`, `discount_total`, `coupon_code`,
+  `amount` (total setelah diskon + kode unik QRIS).
+- `order_items` menyimpan satu baris per template: `list_price`, `discount_amount`, `final_price`.
+  Jumlah `final_price` selalu = `subtotal − discount_total`.
+- Alasan tidak membuat satu order per template: `UNIQUE INDEX idx_orders_amount_active` +
+  nominal QRIS unik (offset 1–999) membuat dua order senilai sama tidak mungkin aktif bersamaan.
+
+### 11.2 Diskon
+
+| Sumber | Aturan |
+|---|---|
+| Bundel otomatis | `platform_settings.bundle_discount` (`{ tiers: [{ minItems, percent }] }`). Default 2→10%, 3→15%. Maks 5 tier, maks 50%. |
+| Kupon | `coupons` di D1 owner. Persen (1–90, opsional maks rupiah) atau nominal (≥Rp1.000). Opsional minimal belanja, jadwal WIB, kuota total, batas per email. |
+| Penggabungan | **Best-of, bukan tumpuk.** Kupon hanya dipakai bila potongannya **lebih besar** dari bundel. Seri → bundel. |
+| Batas bawah | Total tidak pernah < **Rp1.000**. Gratis penuh hanya lewat aktivasi gratis portal. |
+
+### 11.3 Anti-fraud
+
+- Diskon & total dihitung ulang server saat order dibuat (`createOrder`), bukan dari body klien.
+- Kuota kupon direservasi atomik (`INSERT ... SELECT ... WHERE COUNT < kuota`) di transaksi tulis
+  SQLite; kegagalan reservasi menghapus order yang baru dibuat.
+- Reservasi dilepas saat order `expired`/`canceled`; kupon tidak hangus karena checkout tak dibayar.
+- Order yang dibuka kembali (`reopen`) dari `canceled` **me-reserve ulang** kuota kuponnya
+  (idempoten untuk order `failed` yang reservasinya belum dilepas). Bila kuota sudah penuh,
+  reopen tetap jalan — uang pembeli sudah masuk — dan hanya dicatat sebagai warning.
+- `max_per_email` best-effort (pembeli bisa ganti email) — kuota total & jadwal adalah pengaman utama.
+- Pesan error kupon selalu generik ("tidak valid atau sudah tidak berlaku") agar kode tidak bisa ditebak.
+- Kupon tidak dihapus permanen — hanya `archived_at`.
+- Kode yang diketik pembeli tetapi belum ditekan **Terapkan** memblokir submit checkout
+  (mencegah pembeli tertagih harga penuh tanpa sadar).
+
+### 11.4 Panel owner
+
+- **Harga Jual** → editor tier diskon bundel.
+- **Kupon Diskon** (`/admin/system/coupons`, `ownerOnly`) → buat/ubah/arsipkan kupon, lihat pemakaian
+  dan total potongan. API `/api/admin/coupons` = owner-mode + auth + CSRF + audit.
+- **Buat Pesanan** (panel owner) → pilih beberapa template + kupon opsional; kotak link checkout
+  menampilkan nominal yang harus masuk. Semua tetap dihitung server.
+
+### 11.5 Order lama
+
+`npx tsx scripts/cloudflare/backfill-order-items.ts` (dry-run default, `--apply`, `--limit N`)
+membuat satu `order_items` dari `orders.template_id` lama dan mengisi `subtotal`/`discount_total`
+bila masih kosong. Tidak mengubah `amount`.
+
+### 11.5b Deploy & skema D1
+
+`npm run deploy` **tidak** menjalankan bootstrap skema. Sejak v1.3.93, `POST /api/billing/checkout`
+dan `/api/admin/coupons` memanggil `bootstrapD1Schema()` (idempoten, sekali per isolate) supaya
+checkout/panel kupon tidak gagal pada deployment yang belum pernah menulis konten sejak upgrade.
+Tetap disarankan menjalankan `npm run cf:bootstrap` sekali setelah deploy (atau sebelum
+mengumumkan fitur) agar tabel/kolom baru pasti ada.
+
+### 11.6 Verifikasi
+
+- `src/lib/services/checkoutPricing.test.ts` — 26 test (bundel, best-of, batas bawah, alokasi item,
+  validasi kupon, generator kode).
+- `src/lib/services/couponService.test.ts` — 15 test (validasi, status, evaluasi, reservasi atomik).

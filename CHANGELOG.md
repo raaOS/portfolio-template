@@ -3,6 +3,27 @@
 Semua pembaruan fitur, optimasi, dan perbaikan bug template dicatat di file ini.
 Format catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di menu **Update Versi Template**.
 
+## [1.3.93] - 2026-11-19
+
+### Checkout Multi-Template + Kupon Diskon: Satu Tagihan QRIS, Diskon Dihitung Server
+
+Dulu checkout hanya bisa membeli satu template. Pembeli yang ingin dua atau tiga template harus membuat beberapa pesanan — dan itu mustahil karena nominal QRIS dibuat unik (dua order senilai sama tidak boleh aktif bersamaan). Sekarang satu checkout = satu order = satu pembayaran, boleh berisi beberapa template sekaligus, dengan kupon opsional dan diskon bundel otomatis.
+
+- **Checkout multi-pilih.** Form memakai katalog resmi `src/lib/templates/registry.ts` (bukan daftar hardcode), pembeli bisa memilih 1..N template. Ringkasan harga (subtotal, diskon, total) dihitung `/api/billing/quote` dan selalu dihitung ulang server saat order dibuat.
+- **Rincian per template di `order_items`** (baru): `list_price`, `discount_amount`, `final_price`. `orders` dapat kolom baru `subtotal`, `discount_total`, `coupon_code` (self-heal `ALTER` untuk database lama). `orders.template_id` tetap diisi item pertama untuk provisioning.
+- **Diskon bundel otomatis** disimpan di `platform_settings.bundle_discount`; default 2 template 10%, 3 template 15%. Owner mengedit tier langsung dari panel **Harga Jual** (maks 5 tier, maks 50%).
+- **Kupon diskon** di tabel owner `coupons` + `coupon_redemptions`: persen (1–90, opsional batas rupiah) atau nominal, minimal belanja, jadwal WIB, kuota total, batas per email. Kode boleh diketik atau diacak (tanpa 0/O/1/I).
+- **Kupon vs bundel = best-of, bukan tumpuk.** Kupon hanya dipakai bila potongannya lebih besar; seri → bundel (agar kuota kupon tidak terbakar tanpa manfaat tambahan). Total tidak pernah di bawah **Rp1.000** — gratis penuh tetap hanya lewat aktivasi gratis portal.
+- **Anti-fraud:** potongan dihitung 100% server; kuota direservasi **atomik** (`INSERT ... SELECT ... WHERE COUNT < kuota`) saat order dibuat dan dilepas saat order batal/kedaluwarsa; pesan error kupon generik; kupon tidak dihapus permanen (hanya arsip).
+- **Panel owner baru "Kupon Diskon"** (`ownerOnly`, `/admin/system/coupons`) + API `/api/admin/coupons` yang dijaga `requireOwnerMode()` (**404** di situs klien) + auth + CSRF + audit log. Klien tidak punya akses kupon.
+- **Panel owner "Buat Pesanan" (alur chat-first)** kini memilih beberapa template sekaligus + kode kupon opsional, dan kotak link checkout menampilkan nominal yang harus masuk.
+- **Halaman order pembeli** menampilkan rincian per template, subtotal, diskon, kode unik QRIS, dan total; **panel Pesanan** menampilkan subtotal, diskon (kupon/bundel), dan nominal tagihan — mengurangi sengketa "kenapa nominalnya beda".
+- **Onboarding:** portal memberi entitlement untuk **semua template** pada order slug tersebut (`order_items`, fallback `orders.template_id`), bukan hanya satu template yang dipilih di form. Harga yang dicatat di entitlement = harga efektif per item (setelah diskon).
+- **Order lama** bisa dirapikan dengan `npx tsx scripts/cloudflare/backfill-order-items.ts` (dry-run default; `--apply`, `--limit N`). Tidak mengubah `amount`.
+- **Perbaikan hasil audit (2026-11-20):** (1) skema baru dipasang otomatis di checkout & panel kupon — deploy tidak lagi bisa "lupa bootstrap"; (2) buka kembali order yang batal kini me-reserve ulang kuota kuponnya; (3) kode kupon yang diketik tapi belum ditekan "Terapkan" diblokir saat submit (dulu pembeli tertagih harga penuh); (4) angka potongan kupon di notifikasi konsisten dengan ringkasan.
+
+**Bukti:** `checkoutPricing.test.ts` 26/26 PASS, `couponService.test.ts` 15/15 PASS, `orderService.test.ts` 41/41 PASS (termasuk wiring multi-template, kupon habis, dan reserve ulang saat reopen), `pricingConfigService.test.ts` PASS; `tsc --noEmit` 0 error; `eslint` bersih pada file yang berubah. Alur bisnis: `docs/operations/template-purchase-flow.md` §11.
+
 ## [1.3.92] - 2026-11-18
 
 ### Jual Template Satuan: Rp199.000 per Template, Tercatat di Panel Order, Aktivasi Gratis untuk yang Sudah Dibeli

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createOrder } from '@/lib/services/orderService';
 import { isSlugAvailable, validateSlugFormat } from '@/lib/services/slugService';
+import { bootstrapD1Schema } from '@/lib/cloudflareD1';
 import { enforceRequestRateLimit } from '@/lib/security/request';
 import { checkDataRateLimit } from '@/lib/dataRateLimit';
 import { getPublicBaseUrl } from '@/lib/constants';
@@ -83,10 +84,23 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { buyerName, buyerEmail, buyerWhatsapp, desiredSlug, templateId } = body;
+    const { buyerName, buyerEmail, buyerWhatsapp, desiredSlug, templateId, templateIds, couponCode } = body;
 
     if (!buyerName || !buyerEmail || !buyerWhatsapp) {
       return NextResponse.json({ error: 'Data form checkout tidak lengkap' }, { status: 400 });
+    }
+
+    // v1.3.93: checkout boleh berisi beberapa template sekaligus. Saat
+    // `templateIds` ada (array), jalur multi-template dipakai; `templateId`
+    // tunggal tetap didukung untuk kompatibilitas tautan lama.
+    const selectedTemplateIds = Array.isArray(templateIds)
+      ? templateIds
+          .filter((id: unknown): id is string => typeof id === 'string' && id.trim() !== '')
+          .map((id: string) => id.trim())
+      : undefined;
+
+    if (selectedTemplateIds && selectedTemplateIds.length === 0) {
+      return NextResponse.json({ error: 'Pilih minimal satu template.' }, { status: 400 });
     }
 
     // Rate-limit per email — cegah spam order pakai identitas berbeda tapi inbox sama.
@@ -115,6 +129,13 @@ export async function POST(request: NextRequest) {
           .replace(/^-|-$/g, '')
           .slice(0, 30) || 'portfolio';
 
+    // Skema baru v1.3.93 (kolom rincian di `orders`, tabel `order_items`,
+    // `coupons`, `coupon_redemptions`) hanya dipasang oleh `cf:bootstrap` atau
+    // bootstrap admin, TIDAK oleh `npm run deploy`. Bootstrap idempoten ini
+    // (sekali per isolate) mencegah checkout pertama setelah upgrade gagal
+    // dengan "no such column/table".
+    await bootstrapD1Schema();
+
     const result = await createOrder(
       {
         buyerName,
@@ -122,6 +143,8 @@ export async function POST(request: NextRequest) {
         buyerWhatsapp,
         desiredSlug: slug,
         templateId: typeof templateId === 'string' && templateId.trim() ? templateId.trim() : undefined,
+        templateIds: selectedTemplateIds,
+        couponCode: typeof couponCode === 'string' && couponCode.trim() ? couponCode.trim() : undefined,
       },
       {
         TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,

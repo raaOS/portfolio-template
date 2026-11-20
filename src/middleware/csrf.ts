@@ -21,7 +21,7 @@ import { CSRF_TOKEN_COOKIE, CSRF_TOKEN_HEADER } from '@/lib/security/constants';
  * curl/no-JS client) supaya tidak break integrasi lama — proteksi utama
  * endpoint ini adalah rate-limit + token akses per-order.
  */
-const PUBLIC_SAME_ORIGIN_PATHS = ['/api/billing/checkout', '/api/billing/orders'];
+const PUBLIC_SAME_ORIGIN_PATHS = ['/api/billing/checkout', '/api/billing/orders', '/api/billing/quote'];
 
 function hasSameOriginHeader(request: NextRequest): boolean {
   const host = request.headers.get('host');

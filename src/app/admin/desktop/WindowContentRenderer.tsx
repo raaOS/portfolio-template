@@ -112,6 +112,11 @@ const OrdersPanel = dynamic(() => import('./panels/OrdersPanel'), {
   loading: () => <AdminLoading size="page" />,
 });
 
+const CouponsPanel = dynamic(() => import('./panels/CouponsPanel'), {
+  ssr: false,
+  loading: () => <AdminLoading size="page" />,
+});
+
 const HeroVideosPanel = dynamic(() => import('./panels/HeroVideosPanel'), {
   ssr: false,
   loading: () => <AdminLoading size="page" />,
@@ -154,6 +159,7 @@ export const PANEL_MAP: Record<string, React.ComponentType> = {
   backup: BackupPanel,
   harga: HargaPanel,
   orders: OrdersPanel,
+  coupons: CouponsPanel,
   heroVideos: HeroVideosPanel,
   petaBisnis: PetaBisnisPanel,
   petaFitur: PetaFiturPanel,

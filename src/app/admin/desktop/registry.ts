@@ -20,6 +20,7 @@ import {
   DatabaseBackup,
   Banknote,
   Receipt,
+  TicketPercent,
   MonitorPlay,
   Clapperboard,
   Map as MapIcon,
@@ -124,7 +125,7 @@ const ALL_ADMIN_ZONES: AdminZone[] = [
   {
     id: 'system',
     label: 'Sistem Owner',
-    description: 'Statistik pengunjung, log aktivitas, backup, harga jual, pesanan, dan video hero',
+    description: 'Statistik pengunjung, log aktivitas, backup, harga jual, pesanan, kupon diskon, dan video hero',
     icon: Monitor,
     iconColor: 'text-cyan-600',
     iconBg: 'bg-cyan-500',
@@ -195,6 +196,18 @@ const ALL_ADMIN_ZONES: AdminZone[] = [
         iconColor: 'text-emerald-600',
         iconBg: 'bg-emerald-100',
         defaultWidth: 1100,
+        defaultHeight: 720,
+        ownerOnly: true,
+      },
+      {
+        // Kupon diskon checkout — alat penjualan owner (bukan konten klien).
+        // API `/api/admin/coupons` dijaga requireOwnerMode() → 404 di situs klien.
+        id: 'coupons',
+        label: 'Kupon Diskon',
+        icon: TicketPercent,
+        iconColor: 'text-rose-600',
+        iconBg: 'bg-rose-100',
+        defaultWidth: 1000,
         defaultHeight: 720,
         ownerOnly: true,
       },
@@ -356,6 +369,7 @@ export const APP_ROUTE_MAP: Record<string, string> = {
   heroVideos: '/admin/hero-videos',
   harga: '/admin/harga',
   orders: '/admin/system/orders',
+  coupons: '/admin/system/coupons',
   petaBisnis: '/admin/system/peta-bisnis',
   notifications: '/admin/communications/notifications',
   feedback: '/admin/communications/feedback',

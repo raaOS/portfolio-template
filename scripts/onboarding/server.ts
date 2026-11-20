@@ -8,7 +8,7 @@ import { D1_SCHEMA_QUERIES } from '../../src/lib/d1-schema';
 import { hashPasswordScrypt } from '../../src/crud/shared/auth/password';
 import { clientUrls, deployClient, ensureR2Bucket, resolveWorkersSubdomain, upsertConfigEnv, workersDevUrl } from './client-deploy';
 import { probeClientHealth } from './portal-status';
-import { sendWebsiteOnlineEmail, listOrderSlugs } from './notify-online';
+import { sendWebsiteOnlineEmail, listOrderSlugs, listPurchasedTemplates } from './notify-online';
 import { attachWorkerDomain, findWorkerDomain, buildDomainHandoverMessage, guardWorkerDomainAttach } from './custom-domain';
 import {
   findArchiveForSlug,
@@ -543,15 +543,33 @@ async function provisionClient(
     d1Query(accountId, apiToken, databaseId, sql, params);
   await ensureTemplateCatalog(seedQuery, { price: DEFAULT_TEMPLATE_PRICE });
   if (siteWasNew) {
-    await d1Query(
-      accountId,
-      apiToken,
-      databaseId,
-      `INSERT OR IGNORE INTO site_template_entitlements
-         (id, site_id, template_id, purchased_at, price, granted_by, created_at)
-       VALUES (?, ?, ?, datetime('now'), ?, 'onboarding', datetime('now'))`,
-      [`ent-${crypto.randomUUID()}`, siteId, templateKey, DEFAULT_TEMPLATE_PRICE]
+    // v1.3.93: pembeli bisa membeli beberapa template dalam satu checkout.
+    // Beri entitlement untuk SEMUA template pada order slug ini (fallback:
+    // template yang dipilih di form). Harga yang dicatat = harga efektif per
+    // item (`order_items.final_price`, sudah dipotong kupon/bundel); order
+    // lama tanpa rincian item memakai harga default.
+    const purchasedTemplates = await listPurchasedTemplates(clientSlug);
+    const paidPriceByTemplate = new Map(
+      purchasedTemplates.map((purchase) => [purchase.templateId, purchase.price])
     );
+    const templateIdsToGrant = Array.from(
+      new Set([templateKey, ...purchasedTemplates.map((purchase) => purchase.templateId)])
+    );
+
+    for (const grantedTemplateId of templateIdsToGrant) {
+      const paidPrice = paidPriceByTemplate.get(grantedTemplateId);
+      const entitlementPrice =
+        typeof paidPrice === 'number' ? paidPrice : DEFAULT_TEMPLATE_PRICE;
+      await d1Query(
+        accountId,
+        apiToken,
+        databaseId,
+        `INSERT OR IGNORE INTO site_template_entitlements
+           (id, site_id, template_id, purchased_at, price, granted_by, created_at)
+         VALUES (?, ?, ?, datetime('now'), ?, 'onboarding', datetime('now'))`,
+        [`ent-${crypto.randomUUID()}`, siteId, grantedTemplateId, entitlementPrice]
+      );
+    }
   }
 
   // --- Penjagaan re-provision (audit MEDIUM M4, 2026-10-06) -----------------
