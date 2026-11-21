@@ -1107,6 +1107,7 @@ export async function createOrder(
           discount: quote.appliedDiscount,
         });
         if (!reserved) {
+          await releaseCouponRedemption(orderId).catch(() => {});
           await queryD1('DELETE FROM order_items WHERE order_id = ?', [orderId]);
           await queryD1('DELETE FROM orders WHERE id = ?', [orderId]);
           return {
@@ -1118,6 +1119,7 @@ export async function createOrder(
       }
     } catch (err) {
       console.error(`[createOrder] Gagal menyimpan rincian order ${orderId}:`, err);
+      await releaseCouponRedemption(orderId).catch(() => {});
       await queryD1('DELETE FROM order_items WHERE order_id = ?', [orderId]).catch(() => {});
       await queryD1('DELETE FROM orders WHERE id = ?', [orderId]).catch(() => {});
       return {
@@ -1796,15 +1798,49 @@ export async function reopenOrder(
     }
   }
 
-  const updated = await queryD1<OrderRecord>(
-    `UPDATE orders
-     SET status = 'waiting_verification',
-         cancel_reason = NULL,
-         updated_at = ?
-     WHERE id = ? AND status IN ('canceled', 'failed')
-     RETURNING *`,
-    [now, orderId]
-  );
+  // Guard amount (audit 2026-11-21 F3): selama order batal/gagal, nominal uniknya
+  // bisa saja sudah dipakai order aktif lain. Menghindari tabrakan index
+  // idx_orders_amount_active saat status diubah kembali menjadi waiting_verification.
+  if (order.amount) {
+    const amountConflict = await queryD1<{ id: string }>(
+      `SELECT id FROM orders
+        WHERE id != ? AND amount = ?
+          AND (
+            status IN ('waiting_verification', 'activating')
+            OR (status = 'pending_payment' AND datetime(expires_at) > datetime('now'))
+          )
+        LIMIT 1`,
+      [orderId, order.amount]
+    );
+    if (amountConflict.length > 0) {
+      return {
+        success: false,
+        message: `Nominal tagihan Rp${Number(order.amount).toLocaleString('id-ID')} sedang dipakai order aktif lain (${amountConflict[0].id}). Selesaikan atau batalkan order tersebut terlebih dahulu.`,
+      };
+    }
+  }
+
+  let updated: OrderRecord[] = [];
+  try {
+    updated = await queryD1<OrderRecord>(
+      `UPDATE orders
+       SET status = 'waiting_verification',
+           cancel_reason = NULL,
+           updated_at = ?
+       WHERE id = ? AND status IN ('canceled', 'failed')
+       RETURNING *`,
+      [now, orderId]
+    );
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('UNIQUE') && msg.includes('amount')) {
+      return {
+        success: false,
+        message: `Nominal tagihan order ini sedang dipakai order aktif lain. Hubungi admin untuk verifikasi manual.`,
+      };
+    }
+    throw err;
+  }
 
   const reopened = updated[0];
   if (!reopened) {

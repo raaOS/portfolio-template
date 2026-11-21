@@ -87,7 +87,10 @@ function wibInputValue(iso: string | null): string {
 
 function wibInputToIso(value: string): string | null {
   if (!value) return null;
-  const date = new Date(`${value}:00+07:00`);
+  const trimmed = value.trim();
+  const withSeconds = trimmed.length === 16 ? `${trimmed}:00` : trimmed;
+  const withTz = withSeconds.includes('+') || withSeconds.endsWith('Z') ? withSeconds : `${withSeconds}+07:00`;
+  const date = new Date(withTz);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 

@@ -400,7 +400,10 @@ export async function bootstrapD1Schema() {
       } catch (e) {
         console.warn('D1 schema self-healing migration skipped:', e);
       }
-    })();
+    })().catch((err) => {
+      schemaPromise = null;
+      throw err;
+    });
   }
   return schemaPromise;
 }

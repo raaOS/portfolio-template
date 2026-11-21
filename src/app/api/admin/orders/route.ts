@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { validateAdminRequest } from '@/lib/auth';
 import { requireOwnerMode } from '@/lib/ownerMode';
 import { getPublicBaseUrl } from '@/lib/constants';
+import { bootstrapD1Schema } from '@/lib/cloudflareD1';
 import {
   activateOrder,
   cancelOrder,
@@ -18,6 +19,8 @@ export async function GET(request: NextRequest) {
     // sana (lihat src/lib/ownerMode.ts).
     const ownerDenied = requireOwnerMode();
     if (ownerDenied) return ownerDenied;
+
+    await bootstrapD1Schema();
 
     // validateAdminRequest (bukan checkAdminAuth polos) — mengenali sesi
     // customer site_user_token; checkAdminAuth hanya tahu cookie legacy
@@ -53,6 +56,8 @@ export async function POST(request: NextRequest) {
     // bisnis owner atas pembelian site, bukan milik klien.
     const ownerDenied = requireOwnerMode();
     if (ownerDenied) return ownerDenied;
+
+    await bootstrapD1Schema();
 
     // Audit HIGH: auth + CSRF (double-submit) + jejak audit dalam satu helper —
     // sebelumnya hanya checkAdminAuth (tanpa lapisan CSRF di handler).

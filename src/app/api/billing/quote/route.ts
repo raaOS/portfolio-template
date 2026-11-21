@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { bootstrapD1Schema } from '@/lib/cloudflareD1';
 import { enforceRequestRateLimit } from '@/lib/security/request';
 import { getBasePrice, getBundleTiers } from '@/lib/services/pricingConfigService';
 import { evaluateCoupon } from '@/lib/services/couponService';
@@ -17,6 +18,8 @@ import { getTemplate, TEMPLATES } from '@/lib/templates/registry';
  */
 export async function POST(request: NextRequest) {
   try {
+    await bootstrapD1Schema();
+
     const rateLimit = await enforceRequestRateLimit(request, 'billing_quote', 30, 60_000, 300_000);
     if (!rateLimit.allowed) {
       return NextResponse.json(

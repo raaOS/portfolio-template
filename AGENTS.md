@@ -26,6 +26,31 @@ Sistem dokumentasi pelacakan pekerjaan (Tracker) telah diaktifkan untuk menghema
 3. **MANDATORY CHANGELOG (Saat Ada Fitur Baru / Bugfix Template):**
    Setiap AI yang menambah fitur baru, mengoptimasi performa, atau memperbaiki bug pada template **wajib** menambahkan catatan versi baru di baris paling atas [CHANGELOG.md](file:///c:/Users/USER/Documents/portfolio-template/CHANGELOG.md). Catatan ini otomatis dibaca oleh portal `PENGELOLA_KLIEN.bat` di browser untuk ditampilkan kepada owner dan dirangkum menjadi pesan WhatsApp serah terima update ke klien.
 
+4. **MANDATORY STANDAR MUTU ALIBABA OPENCODEREVIEW (Semua AI, Bugfix, & Fitur Baru):**
+   Setiap AI agent baru, sesi percakapan baru, saat memperbaiki bug (fix), maupun membuat fitur baru **wajib** membaca dan mematuhi standar pemeriksaan resmi bawaan Alibaba OpenCodeReview untuk stack TypeScript + React/Next.js:
+
+   * **🛡️ Keamanan & Anti-Tampering (Security Checks)**
+     * **Injeksi & XSS:** Penggunaan `innerHTML`, `dangerouslySetInnerHTML`, `eval()`, atau manipulasi DOM langsung tanpa sanitasi dilarang keras.
+     * **Kebocoran Kredensial:** Mendeteksi & mencegah hardcoded token, API key, atau secret env di kode client.
+     * **SQL Injection:** Memastikan seluruh query D1 memakai parameterized binding (`?`), bukan string concatenation.
+     * **Pemeriksaan Batasan Produk (Owner Mode):** Memastikan route owner-only dibentengi `requireOwnerMode()` (membalas 404) dan CSRF token.
+
+   * **⚡ Kualitas Kode & Praktik React / Next.js (React Best Practices)**
+     * **Aturan Hooks:** Mencegah pelanggaran aturan hook (pemanggilan kondisional, dependensi `useEffect` yang hilang atau menyebabkan loop render).
+     * **Render Side-Effects:** Mencegah mutasi state langsung atau pemanggilan API di dalam fungsi render komponen.
+     * **Komponen Bersarang (Inner Components):** Mendeteksi & melarang pembuatan komponen baru di dalam komponen lain yang menyebabkan remount berulang.
+     * **Manajemen State & Memory Leak:** Penggunaan `AbortController` pada fetch, pembersihan `clearTimeout` / `removeEventListener`.
+
+   * **🔄 Penanganan Async & Race Conditions**
+     * **Operasi Database Bersamaan:** Menangkap potensi race condition (misalnya kuota kupon atau nomor unik amount yang diperebutkan bersamaan).
+     * **Error Handling:** Memastikan async/await selalu dibungkus `try/catch` dengan pesan error yang aman dan ramah bagi pengguna.
+     * **Loop Paralel vs Sekuensial:** Mengidentifikasi async di dalam loop (apakah harus `Promise.all` untuk performa atau sekuensial untuk dependensi).
+
+   * **🧹 Kebersihan Kode & Dead Code (Code Health)**
+     * **Dead Code:** Menghapus variabel/fungsi tak terpakai, blok kode setelah return, atau baris komentar usang yang tertinggal.
+     * **Type Safety:** Menghindari penggunaan tipe `any` tanpa alasan jelas, memastikan null check / safe optional chaining (`?.`).
+     * **Strict Equality:** Menandai dan melarang penggunaan `==` / `!=`, wajib menggunakan `===` / `!==`.
+
 ---
 
 ## 1. Ringkasan Proyek & Arsitektur

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { queryD1 } from '@/lib/cloudflareD1';
+import { bootstrapD1Schema, queryD1 } from '@/lib/cloudflareD1';
 import { expireOrderIfStale, uploadPaymentProof, verifyOrderAccessToken } from '@/lib/services/orderService';
 import { checkAdminAuth } from '@/lib/auth';
 import { enforceRequestRateLimit } from '@/lib/security/request';
@@ -31,6 +31,7 @@ export async function GET(
   { params }: { params: Promise<{ orderId: string }> }
 ) {
   try {
+    await bootstrapD1Schema();
     const { orderId } = await params;
 
     // L3: batasi polling/screping kunci independen dari token (brute-force mitigasi).

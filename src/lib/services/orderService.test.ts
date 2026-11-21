@@ -24,7 +24,13 @@ function unsetEnv(name: string): void {
 }
 
 vi.mock('@/lib/cloudflareD1', () => ({
-  queryD1: vi.fn()
+  queryD1: vi.fn(),
+  getD1Value: vi.fn(),
+  setD1Value: vi.fn(),
+  deleteD1Value: vi.fn(),
+  getAllD1Values: vi.fn(),
+  compareAndSetD1Value: vi.fn(),
+  replaceAllD1Values: vi.fn(),
 }));
 
 vi.mock('./slugService', () => ({
@@ -927,6 +933,24 @@ describe('orderService', () => {
       expect(reservation?.[1]).toEqual(
         expect.arrayContaining(['cpn-reopen', 'ORD-CPN', 'nanda@test.com', 10000])
       );
+    });
+
+    it('refuses to reopen when the amount is held by another active order', async () => {
+      vi.mocked(cloudflareD1.queryD1)
+        .mockResolvedValueOnce([
+          {
+            id: 'ORD-AMT',
+            status: 'canceled',
+            amount: 199342,
+            desired_slug: '',
+          },
+        ]) // SELECT before reopen
+        .mockResolvedValueOnce([{ id: 'ORD-ACTIVE' }]); // SELECT amount conflict
+
+      const res = await reopenOrder('ORD-AMT');
+
+      expect(res.success).toBe(false);
+      expect(res.message).toContain('sedang dipakai order aktif lain');
     });
   });
 
